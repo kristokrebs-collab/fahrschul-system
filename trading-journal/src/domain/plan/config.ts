@@ -32,6 +32,8 @@ export type FlatByState = "pending" | "fired" | "missed";
 export interface PlanAlarms {
   stopId: string;
   targetId: string;
+  /** the key level of the management trigger (F65: the price at which the stop is to be moved); absent = none */
+  triggerId?: string;
   flatBy: { at: number; state: FlatByState; firedAt: number | null } | null;
   createdAt: number;
 }
@@ -66,6 +68,8 @@ export interface SavedPlan {
   stopLabel: string;
   targetLabel: string;
   form: PlanForm;
+  /** the price at which the planned management starts (F65: the first break-even / partial / trailing trigger), absent = none */
+  manageTrigger?: number;
   alarms: PlanAlarms | null;
   /** a journal draft was opened from this plan at that time */
   journalAt: number | null;
@@ -117,7 +121,8 @@ function alarmsOf(raw: unknown): PlanAlarms | null {
     const st = raw.flatBy.state;
     if (at != null && (st === "pending" || st === "fired" || st === "missed")) flatBy = { at, state: st, firedAt: num(raw.flatBy.firedAt) };
   }
-  return { stopId, targetId, flatBy, createdAt };
+  const triggerId = str(raw.triggerId, 60);
+  return { stopId, targetId, ...(triggerId ? { triggerId } : {}), flatBy, createdAt };
 }
 
 /** One stored plan → `SavedPlan`, or `null` when it cannot be read (kept aside by the caller). */
@@ -133,6 +138,7 @@ export function normalizePlan(raw: unknown): SavedPlan | null {
   const light = raw.light === "green" || raw.light === "amber" || raw.light === "red" ? raw.light : null;
   if (!light) return null;
   const target = num(raw.target);
+  const trigger = num(raw.manageTrigger);
   return {
     id,
     savedAt,
@@ -159,6 +165,7 @@ export function normalizePlan(raw: unknown): SavedPlan | null {
     stopLabel: str(raw.stopLabel) ?? "",
     targetLabel: str(raw.targetLabel) ?? "",
     form: formOf(raw.form),
+    ...(trigger != null && trigger > 0 ? { manageTrigger: trigger } : {}),
     alarms: alarmsOf(raw.alarms),
     journalAt: num(raw.journalAt),
   };

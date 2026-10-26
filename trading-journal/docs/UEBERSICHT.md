@@ -77,7 +77,7 @@ _Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 8 Funktionen
 
 ### Trade prüfen & Chart
 
-_Einstieg prüfen, Chancen finden, den Chart lesen._ · 24 Funktionen
+_Einstieg prüfen, Chancen finden, den Chart lesen._ · 25 Funktionen
 
 **Einstieg prüfen**
 
@@ -127,6 +127,7 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 24 Funktionen
 | Ganze Einheiten innerhalb deiner vier Grenzen wählen | Positionsgröße im Handelsplan | Handelsplan › Größe | teilweise |
 | Prüfen, ob der Plan deine Grenzen einhält | Risiko-Check des Handelsplans | Handelsplan › Risiko-Check | fertig |
 | Den fertigen Plan als Text oder CSV mitnehmen | Ticket zum Kopieren (Handelsplan) | Handelsplan › Ticket | fertig |
+| Vor dem Einstieg festlegen, wann der Stop nachgezogen wird | Verwaltung planen (Handelsplan & Positionsrechner) | Handelsplan › Ausstieg · Verwaltung nach dem Einstieg | fertig |
 
 ### Risiko & Disziplin
 
@@ -161,7 +162,7 @@ _Limits, Exposure und Regeln, bevor es teuer wird._ · 12 Funktionen
 
 ### Strategie entwickeln & testen
 
-_Eine Idee bauen und gegen echte Historie prüfen._ · 23 Funktionen
+_Eine Idee bauen und gegen echte Historie prüfen._ · 24 Funktionen
 
 **Idee bauen**
 
@@ -176,6 +177,19 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 23 Funktionen
 | Deine Setups durchsuchen und vergleichen | Setup-Bibliothek (Journal) | Entscheidungsgrundlagen › Entscheidungsgrundlagen | teilweise |
 | Frühere Fassungen deines Entwurfs ansehen | Versionen der Entwürfe | Labor › Versionen deiner Entwürfe | fertig |
 
+**Härtetest**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
+| Sehen, ob Break-even oder Trailing dem Ergebnis hilft oder schadet | Verwaltung vergleichen | Labor › Verwaltung vergleichen | fertig |
+| Prüfen, ob die Strategie höhere Kosten übersteht | Kosten- und Belastungstest | Labor › Kosten- und Belastungstest | fertig |
+| Den Test auf Ausreißer und Datenlücken prüfen | Strategie-Prüfbericht | Labor › Strategie-Prüfbericht | fertig |
+| Prüfen, ob das Ergebnis nur Overfitting ist | Robustheit: Overfitting, Walk-forward, Heatmap | Labor › Overfitting-Check | fertig |
+| Sehen, was jeder Filter wirklich bringt | Varianten- und Filtervergleich | Labor › Varianten- und Filtervergleich | teilweise |
+| Prüfen, wie empfindlich die Idee auf Zahlen reagiert | Parameter-Raster | Labor › Parameter-Raster | fertig |
+| Eine Strategie schrittweise verbessern lassen, ohne dich zu überanpassen | Hintergrund-Optimierer | Labor › Optimierer | teilweise |
+| Einen Handelsplan durchspielen, bevor Geld im Spiel ist | Zeitmaschine (Plan durchspielen) | Labor › Zeitmaschine | fertig |
+
 **Test & Ergebnis**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
@@ -184,18 +198,6 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 23 Funktionen
 | Verstehen, warum ein Test schwach ausfiel | Diagnose: Warum so schwach? | Labor › Diagnose | fertig |
 | Mehrere Testläufe nebeneinander vergleichen | Läufe vergleichen | Labor › Vergleich | fertig |
 | Prüfen, ob die Strategie zu deinem Handeln passt | Passt die Strategie zu dir? | Labor › Passt zu dir? | teilweise |
-
-**Härtetest**
-
-| Aufgabe | Funktion | Seite › Abschnitt | Stand |
-|---|---|---|---|
-| Prüfen, ob die Strategie höhere Kosten übersteht | Kosten- und Belastungstest | Labor › Kosten- und Belastungstest | fertig |
-| Den Test auf Ausreißer und Datenlücken prüfen | Strategie-Prüfbericht | Labor › Strategie-Prüfbericht | fertig |
-| Prüfen, ob das Ergebnis nur Overfitting ist | Robustheit: Overfitting, Walk-forward, Heatmap | Labor › Overfitting-Check | fertig |
-| Sehen, was jeder Filter wirklich bringt | Varianten- und Filtervergleich | Labor › Varianten- und Filtervergleich | teilweise |
-| Prüfen, wie empfindlich die Idee auf Zahlen reagiert | Parameter-Raster | Labor › Parameter-Raster | fertig |
-| Eine Strategie schrittweise verbessern lassen, ohne dich zu überanpassen | Hintergrund-Optimierer | Labor › Optimierer | teilweise |
-| Einen Handelsplan durchspielen, bevor Geld im Spiel ist | Zeitmaschine (Plan durchspielen) | Labor › Zeitmaschine | fertig |
 
 **Live prüfen & teilen**
 

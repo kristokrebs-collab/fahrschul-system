@@ -9,7 +9,7 @@
  * above the leverage rule or the capital shakes the result block (`useShake`) the moment it tips over.
  */
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { boxTargetsFor, liquidationPrice, positionSize, rrCalc, rTargets, stopCandidates, symbolOf, type RiskLimits, type SizingResult } from "@/domain/risk";
 import { LAGE_STRUCTURE } from "@/domain/lage/compute";
 import { marketStructure } from "@/domain/signals/structure";
@@ -35,6 +35,8 @@ import { RISIKO } from "./strings";
 import { Metric, RiskCard, SEG_TOUCH, money, pct, priceText, qtyText } from "./ui";
 
 const S = RISIKO.calc;
+/** F65: the management plan (break-even, partial target, trailing) under the result – its own chunk, loaded when the card shows a result */
+const CalcManage = lazy(() => import("./CalcManage"));
 const ACC_OPTS = [
   { v: "scalp" as const, label: "Scalp" },
   { v: "makro" as const, label: "Makro" },
@@ -341,6 +343,11 @@ export function CalculatorCard({ base }: { base: RiskBase }) {
             </motion.p>
           )}
         </div>
+        {s.ok && (
+          <Suspense fallback={null}>
+            <CalcManage m={m} limits={limits} cur={cur} atr={atrV} />
+          </Suspense>
+        )}
       </div>
     </RiskCard>
   );

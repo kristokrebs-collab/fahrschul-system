@@ -6,6 +6,7 @@
  *
  * Runs on the routed page `/#labor` of the production build (`PW_LABOR_URL` overrides it).
  */
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed, stored } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
@@ -80,10 +81,33 @@ test.describe("Labor · Belastung, Bericht, Filter", () => {
     expect(errors).toEqual([]);
   });
 
+  test("Verwaltung vergleichen (F65): erst auf Knopfdruck, acht Zeilen mit Ausstoppern, kein seitliches Scrollen, axe", async ({ page }, info) => {
+    const errors = await openAndRun(page, info);
+    await page.getByTestId("labor-extras").scrollIntoViewIfNeeded();
+    await expect(page.getByTestId("labor-extra-toggle-manage")).toHaveAttribute("aria-expanded", "false");
+    await page.getByTestId("labor-extra-toggle-manage").click();
+    await expect(page.getByTestId("labor-manage")).toBeVisible();
+    await expect(page.getByTestId("labor-manage-table")).toHaveCount(0);
+    await page.getByTestId("labor-manage-run").click();
+    await expect(page.getByTestId("labor-manage-runbar")).toHaveAttribute("data-status", "done", { timeout: 60_000 });
+    const rows = page.getByTestId("labor-manage-row");
+    await expect(rows).toHaveCount(8);
+    expect(await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-variant")))).toEqual(["none", "be05", "be1", "be15", "be1net", "trail2", "trail3", "partial"]);
+    await expect(rows.first().locator("td").first()).toHaveText(/^\d+$/);
+    await expect(page.getByTestId("labor-manage-table")).toContainText("Ausgestoppt vor dem Ziel");
+    await expect(page.getByTestId("labor-manage-more-row")).toHaveCount(8);
+    await expect(page.getByTestId("labor-manage-foot")).toContainText("Keine professionelle Finanzberatung.");
+    await expectNoHorizontalScroll(page);
+    const res = await new AxeBuilder({ page }).include('[data-testid="labor-extra-manage"]').withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+    expect(res.violations.map((v) => `${v.id}: ${v.nodes.slice(0, 2).map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);
+    await page.getByTestId("labor-extra-manage").screenshot({ path: `/tmp/shots/${info.project.name}-labor-manage.png`, animations: "disabled" });
+    expect(errors).toEqual([]);
+  });
+
   test("Touch-Ziele der Karten sind mindestens 44 px", async ({ page }, info) => {
     test.skip(!hasTouch(info), "touch project only");
     await openAndRun(page, info);
-    for (const id of ["stress", "report", "filters"]) await page.getByTestId(`labor-extra-toggle-${id}`).click();
+    for (const id of ["stress", "report", "filters", "manage"]) await page.getByTestId(`labor-extra-toggle-${id}`).click();
     await expect(page.getByTestId("labor-filters")).toBeVisible();
     await page.getByTestId("labor-filter-switch-trend").click();
     const misses = await page.evaluate(auditHitBoxes, { selector: HIT_SELECTOR, root: '[data-testid="labor-extras"]' });

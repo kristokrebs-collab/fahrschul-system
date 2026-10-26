@@ -53,7 +53,7 @@ export function SavedPlans({ className }: { className?: string }) {
                 </p>
                 <p className="num text-[11.5px] leading-snug text-mute">
                   Gespeichert {dateTimeIn(p.savedAt, p.tz)} Uhr · Quelle: {p.sourceLabel} · Kerzen bis {p.candlesUntil != null ? `${dateTimeIn(p.candlesUntil, p.tz)} Uhr` : "keine Daten"}
-                  {p.alarms ? ` · 3 Alarme${p.alarms.flatBy ? ` (flat by ${clockIn(p.alarms.flatBy.at, p.tz)} Uhr)` : ""}` : ""}
+                  {p.alarms ? ` · ${p.alarms.triggerId ? 4 : 3} Alarme${p.alarms.flatBy ? ` (flat by ${clockIn(p.alarms.flatBy.at, p.tz)} Uhr)` : ""}` : ""}
                   {p.journalAt ? " · Journal-Entwurf geöffnet" : ""}
                 </p>
                 <div className="flex flex-wrap gap-2">

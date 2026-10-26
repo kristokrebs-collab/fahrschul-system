@@ -7,6 +7,7 @@ export * from "./format";
 export * from "./sessions";
 export * from "./entry";
 export * from "./exit";
+export * from "./manage";
 export * from "./size";
 export * from "./risk";
 export * from "./ticket";

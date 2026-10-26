@@ -10,12 +10,13 @@ import type { LimitReport } from "../risk/limits";
 import { atrOf, closedUpTo, entryTimer, intervalText, type EntryResult } from "./entry";
 import { exitPlan, stopRuleText, targetRuleText, type ExitResult } from "./exit";
 import { DEFAULT_LOT, TF_MS, type PlanForm } from "./form";
+import { manageActive, managePlan, type ManageResult } from "./manage";
 import { inferStep, moneyText, num, pctText, priceText, qtyText } from "./format";
 import type { PlanPrefs } from "./config";
 import { riskCheck, type RiskVerdict } from "./risk";
 import { flatByMs, latestSession, sessionDay, sessionDef, type SessionDay } from "./sessions";
 import { positionSizing, type SizeResult } from "./size";
-import { buildTicket, type EntrySource, type Ticket, type TicketPlan } from "./ticket";
+import { baseOf, buildTicket, type EntrySource, type Ticket, type TicketPlan } from "./ticket";
 import { clockIn, dateTimeIn, zoneLabel } from "./time";
 
 export type StepId = "entry" | "exit" | "size" | "risk" | "ticket";
@@ -65,6 +66,8 @@ export interface PlanModel {
   riskPct: number;
   size: SizeResult | null;
   risk: RiskVerdict | null;
+  /** the management plan (break-even, partial target, trailing); `null` while nothing is planned or the plan lacks a size (F65) */
+  manage: ManageResult | null;
   ticketPlan: TicketPlan | null;
   ticket: Ticket | null;
   steps: StepState[];
@@ -210,6 +213,12 @@ export function buildPlanModel(i: ModelInput): PlanModel {
         })
       : null;
 
+  // 4b — management after the entry (only when the trader switched a rule on)
+  const manage: ManageResult | null =
+    exit?.ok && size?.ok && manageActive(form.manage)
+      ? managePlan({ side: exit.side, entry: exit.entry, stop: exit.stop, target: exit.target, qty: size.qty, lot, tick, feePct: i.limits.feePct, slippagePct: i.limits.slippagePct, atr: atr?.value ?? null, spec: form.manage, currency: i.currency, unit: baseOf(form.symbol) })
+      : null;
+
   // 5 — ticket
   let ticketPlan: TicketPlan | null = null;
   let ticket: Ticket | null = null;
@@ -241,6 +250,7 @@ export function buildPlanModel(i: ModelInput): PlanModel {
       intervalLabel: intervalText(intervalMs),
       candlesUntil,
       fetchedAt: i.fetchedAt,
+      manage: manage?.ok ? manage.lines : null,
     };
     ticket = buildTicket(ticketPlan);
   }
@@ -307,6 +317,7 @@ export function buildPlanModel(i: ModelInput): PlanModel {
     riskPct,
     size,
     risk,
+    manage,
     ticketPlan,
     ticket,
     steps,

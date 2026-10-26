@@ -79,3 +79,6 @@ trade editor, the trade detail, the guard host, toasts and confetti.
 ## Inhalt-Leiste (Auffindbarkeit)
 
 Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Fünf Chips für Jetzt, Vor dem Trade, Portfolio, Muster, Einstellungen (`Section section=…` → `data-section` am Abschnittstitel). Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.
+
+## Verwaltung im Positionsrechner (F65)
+Unter dem Ergebnis des Rechners (`risk-calc`) steht, sobald es ein gültiges Ergebnis gibt, die Karte „Verwaltung nach dem Einstieg“ (`risk-manage`, `CalcManage.tsx`, eigener lazy Chunk): dieselbe Karte und dieselbe Rechnung (`managePlan`) wie im Handelsplan, mit Richtung, Einstieg, Stop und Ziel des Rechners und der Menge, die er aus dem Risiko gerechnet hat (auf 0,001 abgerundet). Gebühr und Slippage sind die der Risiko-Einstellungen; Kurs- und Mengenschritt kennt der Rechner nicht (Kursschritt höchstens 0,01, steht unter „Annahmen und Grenzen“). Die Wahl der Regeln liegt pro Gerät (`storageKey("calc-manage")`). Test: `tests/unit/views.risiko.manage.test.tsx`.
