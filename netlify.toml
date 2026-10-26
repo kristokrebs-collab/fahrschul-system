@@ -13,6 +13,9 @@
 [build.environment]
   # Node 22 LTS (Stripe SDK 23 and the Netlify Functions need ≥ 20)
   NODE_VERSION = "22"
+  # `tsc -b` of this project peaks at ≈ 2.7 GB (measured); Node's default heap limit on the build image can be lower, and the deploy
+  # then died after ≈ 90 s without an error in the checks. 4 GB leaves room.
+  NODE_OPTIONS = "--max-old-space-size=4096"
 
 # ── Netlify Functions (P09–P12): `trading-journal/netlify/functions` (relative to `base`) ──────────────────────────────
 # Every function declares its own route in code (`export const config = { path: "/api/v1/…" }`) – no redirect needed,
