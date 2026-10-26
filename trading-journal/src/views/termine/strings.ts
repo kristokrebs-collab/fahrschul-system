@@ -16,6 +16,8 @@ export const TERMINE = {
   today: "Heute",
   empty: "In diesem Zeitraum liegt kein Termin der gewählten Arten.",
   emptyDay: "An diesem Tag liegt kein Termin der gewählten Arten.",
+  moreDays: (n: number) => `Weitere ${n} ${n === 1 ? "Tag" : "Tage"} anzeigen`,
+  fewerDays: "Nur die nächsten Tage zeigen",
   source: "Quelle",
   rule: "Regel",
   checked: "geprüft am",
@@ -59,6 +61,8 @@ export const BRIEFING = {
   noTime: "keine Zeit",
   loading: "Märkte werden geladen …",
   note2: "Kein Trade-Vorschlag: das Briefing ordnet, was heute ansteht.",
+  moreLines: (n: number) => `Alle ${n} Zeilen anzeigen`,
+  fewerLines: "Weniger zeigen",
 } as const;
 
 export const PHASEN = {

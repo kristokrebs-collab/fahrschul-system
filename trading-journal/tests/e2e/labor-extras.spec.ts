@@ -96,7 +96,7 @@ test.describe("Labor · Belastung, Bericht, Filter", () => {
     await expect(rows.first().locator("td").first()).toHaveText(/^\d+$/);
     await expect(page.getByTestId("labor-manage-table")).toContainText("Ausgestoppt vor dem Ziel");
     await expect(page.getByTestId("labor-manage-more-row")).toHaveCount(8);
-    await expect(page.getByTestId("labor-manage-foot")).toContainText("Keine professionelle Finanzberatung.");
+    await expect(page.getByTestId("labor-manage-foot")).not.toContainText("Finanzberatung");
     await expectNoHorizontalScroll(page);
     const res = await new AxeBuilder({ page }).include('[data-testid="labor-extra-manage"]').withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
     expect(res.violations.map((v) => `${v.id}: ${v.nodes.slice(0, 2).map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);

@@ -122,7 +122,7 @@ describe("Aktien page", () => {
     wrap();
     expect(screen.getByRole("heading", { level: 1, name: "Aktien" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Inhalt dieser Seite" });
-    expect(within(nav).getAllByRole("button").map((l) => l.textContent)).toEqual(["Scanner", "Watchlist", "News", "Analyse", "Kongress"]);
+    expect(within(nav).getAllByRole("button").map((l) => l.textContent)).toEqual(["Scanner", "Watchlist", "News", "Analyse", "DCF-Rechner", "Kaufthese", "Kongress"]);
     expect(screen.getByTestId("aktien-results-idle")).toBeInTheDocument();
     expect(screen.getByTestId("aktien-watch-empty")).toBeInTheDocument();
     expect(screen.getByTestId("aktien-news-empty")).toBeInTheDocument();
@@ -184,7 +184,7 @@ describe("Aktien page", () => {
     expect(within(flag).getByTestId("aktien-hit-stand")).toHaveTextContent("letzte Kerze");
     expect(hits[1]).toHaveAttribute("data-setup", "rsi");
     expect(within(hits[1]!).getByTestId("aktien-why")).toHaveTextContent("RSI(14) lag zuvor bei");
-    expect(within(screen.getByTestId("aktien-results")).getByTestId("aktien-note")).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(within(screen.getByTestId("aktien-results")).getByTestId("aktien-note")).not.toHaveTextContent("Finanzberatung");
   });
 
   it("sorts the hits as the trader chooses and says what the rank is", async () => {
@@ -306,7 +306,7 @@ describe("Aktien page", () => {
     expect(screen.getAllByTestId("aktien-story").filter((s) => s.getAttribute("data-new") === "1")).toHaveLength(3);
     expect(screen.getByTestId("aktien-news-visit")).toHaveTextContent("3 Meldungen neu seit dem letzten Besuch");
     expect(screen.getByTestId("aktien-news-stand")).toHaveTextContent("Quelle: Yahoo Finance");
-    expect(within(screen.getByTestId("aktien-news")).getByTestId("aktien-note")).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(within(screen.getByTestId("aktien-news")).getByTestId("aktien-note")).not.toHaveTextContent("Finanzberatung");
     // only tickers travel to the function
     for (const c of world.calls.filter((x) => x.path === "/stocks/news")) expect(Object.keys(c.query)).toEqual(["symbols"]);
     fireEvent.click(screen.getByTestId("aktien-news-markread"));

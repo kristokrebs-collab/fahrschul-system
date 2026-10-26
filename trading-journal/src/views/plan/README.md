@@ -56,3 +56,7 @@ Slippage-Annahme des Plans daneben („gedeckt“ / „zu niedrig angenommen“)
 Abruf sagt „keine Daten“ mit Grund und ist nie ein grünes Licht; für Aktien gibt es keine Quelle (die Karte sagt das, die App schätzt nichts). Test-IDs: `hplan-exec` ·
 `hplan-exec-run` · `hplan-exec-result` (`data-tone`) · `hplan-exec-headline` · `hplan-exec-failed` · `hplan-exec-stocks` · `hplan-exec-stand`. Tests:
 `views.plan.execution.test.tsx`, e2e `execution.spec.ts`.
+
+## Feinschliff Runde 8
+- `Progress` ist die klebende Schrittleiste (statt der „Inhalt“-Leiste): fünf Knöpfe mit Zahl, Wort und Zustand, ein Tipp bringt die Karte unter die Leiste (`revealCard`, `PROGRESS_SCROLL_MARGIN`).
+- Schrittkarten: „Angenommen (n)“ als Falte (`details`, zu), eine Quellenzeile, kein eigener Hinweis; der Satz „Keine professionelle Finanzberatung.“ steht einmal am Seitenende. „Danach“ trägt Zeitmaschine (`hosted`) und gespeicherte Pläne.

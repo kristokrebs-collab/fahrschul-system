@@ -73,6 +73,9 @@ test.describe("Termine", () => {
     await card.getByTestId("termine-chip-funding").click();
     await expect(card.getByTestId("termine-chip-funding")).toHaveAttribute("aria-pressed", "true");
     await expect(card.getByText("Funding-Abrechnungen").first()).toBeVisible();
+    // the list shows the next seven days; one button brings the rest of the three weeks
+    await expect(card.getByText("Funding-Abrechnungen")).toHaveCount(7);
+    await card.getByTestId("termine-more").click();
     // three weeks, one folded line a day (a day of a clock change may shift the window by an hour: 20 – 22)
     const folded = await card.getByText("Funding-Abrechnungen").count();
     expect(folded).toBeGreaterThanOrEqual(20);
@@ -190,7 +193,7 @@ test.describe("Termine", () => {
     }
     await expect(card.getByTestId("briefing-events")).toContainText(/Funding-Abrechnungen um /);
     await expect(card.getByTestId("briefing-stand")).toContainText("Stand ");
-    await expect(card).toContainText("Keine professionelle Finanzberatung.");
+    await expect(card).not.toContainText("Finanzberatung"); // the one sentence stands at the end of the page
     await screenshot(page, info, "termine-briefing");
     await expectNoHorizontalScroll(page);
     expect(errors).toEqual([]);
@@ -208,7 +211,7 @@ test.describe("Termine", () => {
     for (const v of await card.getByTestId("phase-row").evaluateAll((els) => els.map((e) => e.getAttribute("data-verdict")))) expect(["klar", "tendenz", "offen", "wenig"]).toContain(v);
     await expect(card.getByTestId("phasen-total")).toContainText(/Trades/);
     await expect(card.getByTestId("phasen-chance")).toContainText("keine Ursachen und keine Prognose");
-    await expect(card).toContainText("Keine professionelle Finanzberatung.");
+    await expect(card).not.toContainText("Finanzberatung"); // the one sentence stands at the end of the page
 
     await card.getByRole("radio", { name: "Letzter Backtest" }).click();
     await expect(card.getByTestId("phasen-empty")).toContainText("In dieser Sitzung ist kein Backtest gelaufen", { timeout: 20_000 });
@@ -224,9 +227,10 @@ test.describe("Termine", () => {
     await seed(page);
     await openMarkt(page);
     const nav = page.getByRole("navigation", { name: "Inhalt dieser Seite" });
-    for (const name of ["Heute wichtig", "Termine", "Ereignisphasen"]) await expect(nav.getByRole("button", { name })).toBeVisible();
+    for (const name of ["Jetzt", "Einordnung", "Marken & Alarme", "Termine", "Beobachten"]) await expect(nav.getByRole("button", { name })).toBeVisible();
     await nav.getByRole("button", { name: "Termine" }).click();
-    await expect(page.getByTestId("termine-card")).toBeInViewport({ timeout: 10_000 });
+    // the chip brings the part „Termine“ under the strip – its first card is the briefing
+    await expect(page.getByTestId("briefing-card")).toBeInViewport({ timeout: 10_000 });
 
     await page.getByTestId("assistant-button").click();
     const dialog = page.getByRole("dialog", { name: "Assistent" });

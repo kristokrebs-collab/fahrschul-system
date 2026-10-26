@@ -46,7 +46,7 @@ describe("empty states", () => {
     expect(screen.getByTestId("discovery-panel")).toHaveAttribute("data-status", "idle");
     expect(screen.getByTestId("discovery-source")).toHaveTextContent("Noch nichts zu prüfen");
     expect(screen.getByTestId("discovery-start")).toBeDisabled();
-    expect(screen.getByTestId("discovery-disclaimer")).toHaveTextContent("Beobachtung, keine Ursache; kein Versprechen für die Zukunft. Keine professionelle Finanzberatung.");
+    expect(screen.getByTestId("discovery-disclaimer")).toHaveTextContent("Beobachtung, keine Ursache; kein Versprechen für die Zukunft.");
   });
 
   it("too few trades: names the minimum and the actual number, nothing is computed", () => {

@@ -8,7 +8,6 @@ import { clockIn, dateTimeIn, formMarket, moneyText, planOfSettings, priceText, 
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { useJournal } from "@/store/journalStore";
-import { NO_ADVICE_TEXT } from "@/ui/AnalysisNote";
 import { discardPlan } from "./actions";
 import { usePlanForm } from "./planStore";
 
@@ -79,7 +78,7 @@ export function SavedPlans({ className }: { className?: string }) {
         </ul>
       )}
       <p className="num border-t border-line pt-3 text-[11.5px] leading-relaxed text-mute" data-testid="hplan-saved-note">
-        {NO_ADVICE_TEXT} Quelle und Stand der Kerzen stehen bei jedem Plan.
+        Quelle und Stand der Kerzen stehen bei jedem Plan.
       </p>
     </Card>
   );

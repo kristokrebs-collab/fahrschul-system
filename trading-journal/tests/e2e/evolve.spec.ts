@@ -84,7 +84,7 @@ test.describe("Labor · Hintergrund-Optimierer", () => {
     // the learning card is there, with its honesty about missing data
     await scrollUntilVisible(page, page.getByTestId("evolve-learned"));
     await expect(page.getByTestId("evolve-learned")).toContainText("Was habe ich gelernt?");
-    await expect(page.getByTestId("evolve-learned")).toContainText("Keine professionelle Finanzberatung");
+    await expect(page.getByTestId("evolve-learned")).not.toContainText("Finanzberatung");
     await expectNoHorizontalScroll(page);
     await screenshot(page, info, "evolve-learned");
     expect(errors).toEqual([]);

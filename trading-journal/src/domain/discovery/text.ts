@@ -8,7 +8,9 @@ import type { CellStats, Cond, DiscoveryCounts, DiscoveryResult, Finding, Reason
 export const TIER_LABEL: Readonly<Record<Tier, string>> = { confirmed: "bestätigt", hint: "Hinweis", rejected: "verworfen (Zufall)" };
 
 /** Printed under every analysis and every finding. */
-export const DISCLAIMER = "Beobachtung, keine Ursache; kein Versprechen für die Zukunft. Keine professionelle Finanzberatung.";
+/** The pages carry the one „Keine professionelle Finanzberatung.“ at their end; the panel on a page says only this lead. */
+export const DISCLAIMER_LEAD = "Beobachtung, keine Ursache; kein Versprechen für die Zukunft.";
+export const DISCLAIMER = `${DISCLAIMER_LEAD} Keine professionelle Finanzberatung.`;
 
 const dec = (v: number, d: number): string => v.toFixed(d).replace(".", ",").replace("-", "−");
 

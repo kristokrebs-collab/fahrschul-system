@@ -25,6 +25,8 @@ import { useNowMinute } from "./useNow";
 
 const DAY = 86_400_000;
 const LIST_DAYS = 21;
+/** Days of the list shown at first; the rest sits behind one button (the list is three weeks of NYSE open / close otherwise). */
+const SHOW_DAYS = 7;
 const WEEKDAY = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"] as const;
 const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"] as const;
 
@@ -277,6 +279,7 @@ export function TermineCard() {
   const [form, setForm] = useState(false);
   const [monthShift, setMonthShift] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
+  const [allDays, setAllDays] = useState(false);
 
   const own = useMemo(() => ownEventsOf(eventsRaw).items, [eventsRaw]);
   const kinds = useMemo(() => KIND_GROUPS.filter((g) => groups.includes(g.id)).flatMap((g) => [...g.kinds]), [groups]);
@@ -395,7 +398,7 @@ export function TermineCard() {
         {view === "liste" ? (
           <div className="grid gap-4" data-testid="termine-list">
             {listDays.length === 0 && <p className="text-[12.5px] text-mute">{T.empty}</p>}
-            {listDays.map((g) => (
+            {(allDays ? listDays : listDays.slice(0, SHOW_DAYS)).map((g) => (
               <section key={g.day} aria-label={dayTitle(g.day)} className="grid gap-1.5" data-day={g.day}>
                 <h3 className="label">
                   {g.day === today ? `${T.today} · ` : ""}
@@ -408,6 +411,11 @@ export function TermineCard() {
                 </ul>
               </section>
             ))}
+            {listDays.length > SHOW_DAYS && (
+              <Button size="sm" className="w-fit pointer-coarse:min-h-11" aria-expanded={allDays} onClick={() => setAllDays((v) => !v)} data-testid="termine-more">
+                {allDays ? T.fewerDays : T.moreDays(listDays.length - SHOW_DAYS)}
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid gap-3" data-testid="termine-month">

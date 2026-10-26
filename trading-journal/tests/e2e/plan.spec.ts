@@ -139,7 +139,7 @@ test.describe("Handelsplan", () => {
       await expect(tid(page, `hplan-${id}-assumed`)).toBeAttached();
       await expect(tid(page, `hplan-${id}-state`)).toHaveAttribute("data-status", "done");
       const note = tid(page, `hplan-${id}-note`);
-      await expect(note).toContainText("Keine professionelle Finanzberatung.");
+      await expect(note).not.toContainText("Finanzberatung");
       await expect(note).toContainText("Quelle: Binance USDⓈ-M · Kerzen bis ");
     }
     // der Satz der ganzen Seite steht genau einmal am Ende (die Selbstprüfung der App verlangt das)
@@ -236,15 +236,15 @@ test.describe("Handelsplan", () => {
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
-  test("kein seitliches Scrollen, nichts abgeschnitten, alle Schritte über die Abschnittsleiste erreichbar", async ({ page }, info) => {
+  test("kein seitliches Scrollen, nichts abgeschnitten, alle Schritte über die Schrittleiste erreichbar", async ({ page }, info) => {
     await openPlan(page);
     await expectCalculated(page);
     await page.waitForTimeout(700);
     await expectNoHorizontalScroll(page);
     const clipped = await clippedTexts(layer(page));
     expect(clipped, "texts cut off by their own box").toEqual([]);
-    // the section strip reaches every step
-    for (const [id, label] of [["hplan-size", "3 Größe"], ["hplan-ticket", "5 Ticket"]] as const) {
+    // the progress bar (it is the strip of this page) reaches every step
+    for (const [id, label] of [["hplan-size", /Zu Schritt 3/], ["hplan-ticket", /Zu Schritt 5/]] as const) {
       await layer(page).getByRole("button", { name: label }).first().click();
       await expect(tid(page, id)).toBeInViewport({ timeout: 10_000 });
     }
@@ -386,7 +386,7 @@ test.describe("Handelsplan · Aktien", () => {
     // jeder Schritt: Satz, Quelle, Stand
     for (const id of STEPS) {
       const note = tid(page, `hplan-${id}-note`);
-      await expect(note).toContainText("Keine professionelle Finanzberatung.");
+      await expect(note).not.toContainText("Finanzberatung");
       await expect(note).toContainText("Quelle: Yahoo Finance (inoffiziell) · Kerzen bis ");
     }
     // die Kerzen kamen von der Aktien-Quelle (5 Minuten, AAPL, ein Zeitraum von Yahoo), sonst ging nichts hinaus

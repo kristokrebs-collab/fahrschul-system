@@ -20,7 +20,7 @@ export const MARKT = {
     weight: "Gewicht",
     score: "Score",
     plan: "Plan",
-    htf: "Höherer Timeframe",
+    htf: "Höhere Zeiteinheit",
     loading: "Rechne Boxen …",
     open: "Details",
     /** the two ways out of a setup (review F2) */
@@ -31,7 +31,7 @@ export const MARKT = {
   chart: {
     title: "Box-Chart",
     note: "Boxen, Ziele und RSI-Trendlinien. Ein Ausbruch zählt erst mit dem Kerzenschluss.",
-    tf: "Timeframe",
+    tf: "Zeiteinheit",
     legendBox: "Box",
     legendBrokenUp: "gebrochen ↑",
     legendBrokenDown: "gebrochen ↓",
@@ -42,7 +42,7 @@ export const MARKT = {
   },
   state: {
     title: "Box-Status",
-    note: "Phase der neuesten Box je Timeframe.",
+    note: "Phase der neuesten Box je Zeiteinheit.",
     top: "Oberkante",
     bottom: "Unterkante",
     pos: "Position",

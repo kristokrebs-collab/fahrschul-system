@@ -199,3 +199,6 @@ against the lab's own calculation: the file is read in the browser (`readFileTex
 (`labor-tv-ind-select`, pre-filled by `guessColumn`, ambiguous names left empty), the chart's inputs are set (`labor-tv-ind-in-<param>`) and the verdict (`labor-tv-ind-result`,
 `data-verdict` equal / differs / open / few) comes with the figures and the five largest deviations. It is an observation for this file and these inputs, no certificate; the columns
 never feed a run. See `src/domain/tvimport/README.md`.
+
+## Feinschliff Runde 8
+- Jeder Abschnitt aus einem eigenen Chunk (Passt zu dir, Belastung, Forward, Optimierer, TradingView, Entwürfe, Muster-Entdecker, Zeitmaschine) hat einen `PendingBlock` in der gemessenen Endgröße; „Bewusst nicht unterstützt“ (TradingView) ist eine Falte; die Annahmen-Karte klebt neben dem Versuchsaufbau (`lg:sticky`).

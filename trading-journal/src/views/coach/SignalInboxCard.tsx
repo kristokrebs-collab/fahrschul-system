@@ -31,7 +31,7 @@ export const INBOX_STRINGS = {
   title: "Signal-Posteingang",
   note: "Was die App gemeldet hat – ruhig sortiert, mit deinem Vermerk dazu.",
   emptyTitle: "Noch nichts eingegangen",
-  emptyText: `Ab jetzt hält die App jedes Signal fest, das sie auslöst (gültiger Einstieg, Box-Setup, bestätigte Schlüsselmarke, Ausbruch …) – mit Zeit, Markt und Richtung, nur auf diesem Gerät, die letzten ${SIGNAL_ARCHIVE_CAP}, höchstens ${SIGNAL_ARCHIVE_DAYS} Tage. Was passierte, bevor es das gab, oder während die App geschlossen war, lässt sich nicht nachtragen.`,
+  emptyText: `Hier landet jedes Signal, das die App auslöst: gültiger Einstieg, Box-Setup, bestätigte Schlüsselmarke, Ausbruch. Gespeichert werden Zeit, Markt und Richtung, nur auf diesem Gerät (die letzten ${SIGNAL_ARCHIVE_CAP}, höchstens ${SIGNAL_ARCHIVE_DAYS} Tage).`,
   nothingMatches: "Kein Eintrag passt zu diesem Filter.",
   skipTitle: "Warum ausgelassen?",
   skipHint: "Eine kurze Auswahl genügt – sie bleibt als dein Vermerk am Signal stehen und fließt in die Auswertung ein.",

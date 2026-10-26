@@ -31,6 +31,7 @@ export const TV = {
   zoneHint: "So steht die Uhrzeit im Chart von TradingView (Standard bei Krypto: UTC).",
   noRun: "Noch kein Labor-Lauf. Starte oben einen Lauf mit demselben Markt und Zeitraum; die Datei bleibt geladen.",
   readFailed: "Die Datei konnte nicht gelesen werden.",
+  notSupported: (n: number) => `Bewusst nicht unterstützt (${n})`,
 } as const;
 
 const TONE: Record<AdapterStatus, BadgeTone> = { supported: "win", forward: "warn", unsupported: "mute" };
@@ -43,23 +44,52 @@ const ZONES = [
 const ERRORS_SHOWN = 8;
 const PAIRS_SHOWN = 6;
 
+function AdapterRow({ a }: { a: (typeof TV_ADAPTERS)[number] }) {
+  return (
+    <li className="grid gap-1.5 rounded-xl border border-line bg-ink-950/40 px-3.5 py-3" data-testid="labor-tv-adapter" data-adapter={a.id} data-status={a.status}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <h3 className="min-w-0 text-[13px] font-semibold leading-snug">{a.title}</h3>
+        <Badge tone={TONE[a.status]} dot>
+          {STATUS_LABEL[a.status]}
+        </Badge>
+      </div>
+      <p className="text-[12.5px] leading-relaxed text-fg/85">{a.what}</p>
+      <p className="text-[12px] leading-relaxed text-mute">{a.limits}</p>
+    </li>
+  );
+}
+
+/**
+ * What works comes first (supported, forward test); what is deliberately not offered sits in one fold below – the rows stay in
+ * the document either way (`details`), so a search or a screen reader still finds every way and its reason.
+ */
 export function AdapterStatusCard({ className }: { className?: string }) {
+  const works = TV_ADAPTERS.filter((a) => a.status !== "unsupported");
+  const not = TV_ADAPTERS.filter((a) => a.status === "unsupported");
   return (
     <Card title={TV.statusTitle} note={TV.statusNote} className={className} data-testid="labor-tv-status">
-      <ul className="grid gap-3">
-        {TV_ADAPTERS.map((a) => (
-          <li key={a.id} className="grid gap-1.5 rounded-xl border border-line bg-ink-950/40 px-3.5 py-3" data-testid="labor-tv-adapter" data-adapter={a.id} data-status={a.status}>
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-              <h3 className="min-w-0 text-[13px] font-semibold leading-snug">{a.title}</h3>
-              <Badge tone={TONE[a.status]} dot>
-                {STATUS_LABEL[a.status]}
-              </Badge>
-            </div>
-            <p className="text-[12.5px] leading-relaxed text-fg/85">{a.what}</p>
-            <p className="text-[12px] leading-relaxed text-mute">{a.limits}</p>
-          </li>
-        ))}
-      </ul>
+      <div className="grid gap-3">
+        <ul className="grid gap-3">
+          {works.map((a) => (
+            <AdapterRow key={a.id} a={a} />
+          ))}
+        </ul>
+        {not.length > 0 && (
+          <details className="group grid gap-3 text-[12.5px]" data-testid="labor-tv-unsupported">
+            <summary className="flex min-h-9 cursor-pointer select-none list-none items-center gap-2 text-mute transition-colors hover:text-fg pointer-coarse:min-h-11 [&::-webkit-details-marker]:hidden">
+              <span aria-hidden="true" className="inline-block transition-transform duration-200 group-open:rotate-90">
+                ›
+              </span>
+              {TV.notSupported(not.length)}
+            </summary>
+            <ul className="grid gap-3">
+              {not.map((a) => (
+                <AdapterRow key={a.id} a={a} />
+              ))}
+            </ul>
+          </details>
+        )}
+      </div>
     </Card>
   );
 }

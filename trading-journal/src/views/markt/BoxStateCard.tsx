@@ -206,7 +206,7 @@ export function BoxStateCard({ view }: { view: BoxesView }) {
     <Card
       title={S.title}
       note={S.note}
-      action={<Segmented<BoxTf> size="sm" aria-label="Timeframe" options={TFS} value={tf} onChange={setTf} />}
+      action={<Segmented<BoxTf> size="sm" aria-label="Zeiteinheit" options={TFS} value={tf} onChange={setTf} />}
       className="h-full"
       data-testid="markt-state"
     >

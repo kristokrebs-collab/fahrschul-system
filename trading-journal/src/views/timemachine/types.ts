@@ -51,6 +51,8 @@ export interface TimeMachineProps {
   note?: string;
   /** false = no card frame (the host is a sheet that has its own); default true */
   framed?: boolean;
+  /** the host page carries the one "Keine professionelle Finanzberatung." of the page (`AnalysisNote`): the card then shows only its own sentence */
+  hosted?: boolean;
   /** the market kind; "stocks" leaves funding out of the words (a stock has none). Absent = crypto. */
   market?: "crypto" | "stocks";
   className?: string;

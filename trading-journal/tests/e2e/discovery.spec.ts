@@ -78,7 +78,7 @@ test.describe("Labor · Muster-Entdecker", () => {
     await expect(card).toHaveAttribute("data-source", "journal");
     await expect(card.getByTestId("discovery-empty")).toContainText("mindestens 80 Trades mit bekanntem R");
     await expect(card.getByTestId("discovery-start")).toBeDisabled();
-    await expect(card.getByTestId("discovery-disclaimer")).toContainText("Keine professionelle Finanzberatung.");
+    await expect(card.getByTestId("discovery-disclaimer")).not.toContainText("Finanzberatung");
     await card.getByTestId("discovery-method-toggle").click();
     await expect(card.getByTestId("discovery-method")).toContainText("Permutationstest");
     await expectNoHorizontalScroll(page);

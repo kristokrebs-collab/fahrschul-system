@@ -1,19 +1,19 @@
 /** German copy of the optimiser (Hintergrund-Optimierer). Short, calm, honest sentences. */
-export const DISCLAIMER = "Vergangene Ergebnisse sind keine Prognose. Keine professionelle Finanzberatung.";
+export const DISCLAIMER = "Vergangene Ergebnisse sind keine Prognose.";
 
 export const EVOLVE = {
   section: {
     title: "Hintergrund-Optimierer",
     sub: "Verbessert deine Strategien Schritt für Schritt, prüft sich selbst gegen Zufall – und schlägt nur vor. Du entscheidest.",
   },
-  title: "Hintergrund-Optimierer",
+  title: "Suchlauf",
   lead: "Probiert kleine, erklärbare Änderungen an deinen Regeln aus – ein Filter mehr, eine Schwelle verschoben, ein anderer Ausstieg – und bewertet jede Variante nur auf Zeiträumen, die dem Training nachfolgen.",
   openNote: "Läuft nur, solange die App offen ist.",
   openNoteMore: "Schließt du den Tab, ist die Suche beendet; nichts läuft im Hintergrund weiter und nichts wird nachgeholt.",
   neverAuto: "Ändert nie von selbst: jede Änderung ist ein Vorschlag, den du pro Vorschlag annimmst oder ablehnst. Es werden keine Orders gesendet.",
   strategies: "Strategien",
   strategiesHint: (max: number) => `Bis zu ${max} gleichzeitig. Jede hat ihre eigene Bestenliste und ihr eigenes Protokoll; die Rechenzeit wird fair geteilt.`,
-  noStrategies: "Noch keine Strategie zum Verbessern. Baue im Labor unter „Versuchsaufbau“ eine „Eigene Idee“.",
+  noStrategies: "Baue im Labor unter „Versuchsaufbau“ eine „Eigene Idee“ – dann kann der Optimierer sie verbessern.",
   invalid: (why: string) => `Läuft so nicht: ${why}`,
   noCandles: "Kerzen noch nicht geladen",
   hasCandles: (n: number, to: string) => `${n} Kerzen bis ${to}`,
@@ -69,7 +69,7 @@ export const EVOLVE = {
   proposals: {
     title: "Verbesserungsvorschläge",
     sub: "Strategie v2 gegenüber v1 – gerechnet auf den Testfenstern, mit Bestätigungsfenster und Mehrfachtest-Korrektur.",
-    empty: "Noch kein Vorschlag. Starte eine Runde – der Optimierer sagt dir auch, wenn nichts Besseres zu finden war.",
+    empty: "Starte eine Runde – der Optimierer sagt dir auch, wenn nichts Besseres zu finden war.",
     nothing: (trials: number) => `Nach ${trials} getesteten Varianten gibt es nichts, das die jetzige Version auf den Testfenstern klar schlägt. Das ist ein ehrliches Ergebnis: Nicht jede Idee lässt sich mit kleinen Änderungen verbessern.`,
     failed: (name: string, why: string) => `${name}: ${why}`,
     changes: "Was wurde geändert",

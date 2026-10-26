@@ -84,7 +84,7 @@ test.describe("Kongress-Tracker", () => {
     await expect(cav).toContainText("Mitglied ist nicht gleich Absicht");
     await expect(cav).toContainText("Die App sendet nie Orders");
     await expect(page.getByTestId("kongress-senate").getByRole("link", { name: /efdsearch\.senate\.gov/ })).toHaveAttribute("href", "https://efdsearch.senate.gov/search/");
-    await expect(page.getByTestId("aktien-kongress").getByTestId("aktien-note")).toContainText("Keine professionelle Finanzberatung.");
+    await expect(page.getByTestId("aktien-kongress").getByTestId("aktien-note")).not.toContainText("Finanzberatung");
     await expect(page.getByTestId("kongress-stand")).toContainText("Quelle: House Clerk");
 
     // one member: the skill's example, row by row

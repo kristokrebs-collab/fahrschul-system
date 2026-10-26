@@ -69,7 +69,7 @@ describe("MissedCard", () => {
     const card = screen.getByTestId("missed-card");
     expect(card).toHaveAttribute("data-total", "0");
     expect(card).toHaveTextContent(MISSED_STRINGS.emptyTitle);
-    expect(card).toHaveTextContent("lässt sich Vergangenes nicht nachtragen");
+    expect(card).toHaveTextContent("Vergangenes lässt sich nicht nachtragen");
     expect(card).toHaveTextContent("nur solange die App offen ist");
     expect(screen.queryByTestId("missed-row")).toBeNull();
     // the limits are stated even when there is nothing yet

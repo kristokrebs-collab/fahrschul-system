@@ -1,8 +1,8 @@
 /** German copy of the forward test (F23). Short, natural sentences; every number comes from a deterministic function. */
 export const FORWARD = {
-  section: { title: "Forward-Test", sub: "Eine Strategie als virtuelles Konto laufen lassen: ab jetzt, auf neuen geschlossenen Kerzen, mit Kosten wie im Labor." },
-  lead: "Ein virtuelles Konto handelt keine echten Order. Es nimmt feste Regeln, ein Startkapital und ein Risiko je Trade und rechnet jede Kerze nach, die ab dem Start schließt – nie rückwirkend. Die Regeln ändern sich nach dem Start nicht; eine Änderung ist eine neue Version und ein neues Konto.",
-  honest: "Gerechnet wird, wenn die App offen ist. War sie zu, rechnet sie beim nächsten Öffnen alle fehlenden Kerzen nach (genau so, als wäre sie die ganze Zeit offen gewesen) – nur melden kann sie in der Zwischenzeit nichts.",
+  section: { title: "Forward-Test", sub: "Eine Strategie als virtuelles Konto laufen lassen – ab jetzt, auf neuen geschlossenen Kerzen, mit denselben Kosten wie im Labor." },
+  lead: "Ein virtuelles Konto handelt keine echten Orders. Es nimmt feste Regeln, ein Startkapital und ein Risiko je Trade und rechnet jede Kerze, die ab dem Start schließt – nie rückwirkend. Die Regeln sind beim Start eingefroren; eine Änderung ist eine neue Version und ein neues Konto.",
+  honest: "Gerechnet wird, solange die App offen ist. War sie zu, rechnet sie beim nächsten Öffnen alle fehlenden Kerzen nach – gemeldet wird in der Zwischenzeit nichts.",
   newTitle: "Neues virtuelles Konto",
   rules: "Regeln",
   ruleEditor: (name: string) => `Aktueller Stand im Editor: ${name}`,
@@ -22,7 +22,7 @@ export const FORWARD = {
   started: "Virtuelles Konto gestartet",
   startedDetail: "Es zählt ab der aktuellen Kerze; früher geschlossene Kerzen kommen nicht vor.",
   failed: "Das Konto konnte nicht gespeichert werden.",
-  empty: "Noch kein virtuelles Konto. Wähle oben Regeln und starte eines – dann siehst du hier, wie die Idee auf Kerzen läuft, die sie nie gesehen hat.",
+  empty: "Wähle oben Regeln und starte ein Konto – dann siehst du hier, wie die Idee auf Kerzen läuft, die sie nie gesehen hat.",
   accountsTitle: "Deine virtuellen Konten",
   count: (n: number, max: number) => `${n} von ${max}`,
   status: { running: "Läuft", paused: "Pausiert", ended: "Beendet" },

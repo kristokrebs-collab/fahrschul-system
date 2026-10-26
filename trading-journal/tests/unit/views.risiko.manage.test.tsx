@@ -62,7 +62,7 @@ describe("Positionsrechner · Verwaltung", () => {
     expect(steps.querySelector("[data-step=partial]")!.textContent).toMatch(/\(50 %\) mit Limit-Order verkaufen/);
     // der Verlust am Stop in den Beispielen ist der Verlust des Rechners (50 USDT bei 1 % von 5 000), ohne Schönfärberei
     expect(within(card).getByTestId("risk-manage-pnl-stop")).toHaveTextContent(/−(49|50),\d\d USDT/);
-    expect(within(card).getByText("Keine professionelle Finanzberatung.")).toBeInTheDocument();
+    expect(card).not.toHaveTextContent("Finanzberatung");
     // die Wahl bleibt auf dem Gerät
     expect(useCalcManage.getState().spec.breakEven.on).toBe(true);
     expect(JSON.parse(localStorage.getItem(CALC_MANAGE_KEY)!).partial.on).toBe(true);

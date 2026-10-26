@@ -72,7 +72,7 @@ test.describe("Strategie-Studio", () => {
     await expect(result.getByTestId("studio-kpis")).toContainText("Trefferquote");
     await expect(result.getByTestId("studio-kpis")).toContainText("Max. Drawdown");
     await expect(result.getByTestId("studio-sample")).toBeVisible();
-    await expect(page.getByTestId("studio-backtest")).toContainText("Keine professionelle Finanzberatung.");
+    await expect(page.getByTestId("studio-backtest")).not.toContainText("Finanzberatung");
     await expect(page.getByTestId("studio-backtest")).toContainText("zeigt die Vergangenheit, keine Prognose");
     await expectNoHorizontalScroll(page);
     await shot(page, info, "studio-2-backtest");

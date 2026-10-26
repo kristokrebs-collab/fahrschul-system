@@ -178,7 +178,7 @@ export function ThesisPanel({ ticker: tickerProp = "", now = Date.now, monitor =
               />
             </div>
           ) : (
-            <EmptyState title="Noch keine These" text={TH.noTheses} line={false} />
+            <EmptyState title="Noch keine These" text={TH.noThesesHint} line={false} />
           )}
         </div>
       </div>

@@ -16,12 +16,12 @@ import { clockIn, dateTimeIn } from "@/domain/plan";
 import { cn } from "@/lib/cn";
 import { tvSymbolToBinance } from "@/market/symbol";
 import { Card } from "@/primitives/Card";
-import { SectionNav } from "@/primitives/SectionNav";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
 import { useUi } from "@/store/uiStore";
-import { AnalysisNote, NO_ADVICE_TEXT } from "@/ui/AnalysisNote";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { Button } from "@/primitives/Button";
+import { SectionTitle } from "@/views/analyse/ui";
 import { Cell } from "@/views/labor/ui";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { EntryStep, useStand } from "./EntryStep";
@@ -35,18 +35,10 @@ import { SavedPlans } from "./SavedPlans";
 import { SizeStep } from "./SizeStep";
 import { TimeMachineSlot } from "./Slots";
 import { TicketStep } from "./TicketStep";
+import { PROGRESS_SCROLL_MARGIN } from "./ui";
 import { usePlanModel, type PlanVm } from "./usePlanModel";
 
 export const PLAN_LEAD_FILL = { storageKey: storageKey("fill-plan"), highlight: "fünf Schritten" } as const;
-
-const NAV = [
-  { id: "hplan-entry", label: "1 Einstieg" },
-  { id: "hplan-exit", label: "2 Ausstieg" },
-  { id: "hplan-size", label: "3 Größe" },
-  { id: "hplan-risk", label: "4 Risiko-Check" },
-  { id: "hplan-ticket", label: "5 Ticket" },
-  { id: "hplan-saved", label: "Gespeichert" },
-] as const;
 
 /** First visit: take the app's market and the account of the header switch (a stored form is left alone). */
 function usePlanDefaults(): void {
@@ -92,7 +84,7 @@ function ChartCard({ vm }: { vm: PlanVm }) {
         past={model.entry.past}
       />
       <p className="num border-t border-line pt-3 text-[11.5px] leading-relaxed text-mute" data-testid="hplan-picture-note">
-        {NO_ADVICE_TEXT} {stand}
+        {stand}
       </p>
     </Card>
   );
@@ -104,7 +96,7 @@ function TimeMachineCard({ vm }: { vm: PlanVm }) {
   const s = model.session;
   const stand = useStand(vm);
   return (
-    <Card className="min-w-0" innerClassName="gap-4 p-4 sm:p-5" data-testid="hplan-timemachine" aria-labelledby="hplan-tm-h">
+    <Card className={cn("min-w-0", PROGRESS_SCROLL_MARGIN)} innerClassName="gap-4 p-4 sm:p-5" data-testid="hplan-timemachine" aria-labelledby="hplan-tm-h">
       <header>
         <h2 id="hplan-tm-h" className="text-[17px] font-semibold tracking-tight">
           Zeitmaschine
@@ -141,7 +133,7 @@ function TimeMachineCard({ vm }: { vm: PlanVm }) {
         </p>
       )}
       <p className="num border-t border-line pt-3 text-[11.5px] leading-relaxed text-mute" data-testid="hplan-timemachine-note">
-        {NO_ADVICE_TEXT} {stand} · Zeiten {s.zone}: {clockIn(s.openMs, s.tz)} Uhr Beginn, Stand {dateTimeIn(vm.now, s.tz)} Uhr.
+        {stand} · Zeiten {s.zone}: {clockIn(s.openMs, s.tz)} Uhr Beginn, Stand {dateTimeIn(vm.now, s.tz)} Uhr.
       </p>
     </Card>
   );
@@ -191,10 +183,9 @@ export function PlanView({ className }: { className?: string }) {
       <PageHeader title="Handelsplan" lead="Vom Einstiegssignal bis zum Ticket – in fünf Schritten, mit deinen Limits. Die App rechnet und kopiert; sie sendet nie eine Order." leadFill={PLAN_LEAD_FILL} />
       <LinkLine />
       <Progress steps={vm.model.steps} progress={vm.model.progress} />
-      <SectionNav items={NAV} />
       <SeeAlso at="plan.page" />
       <div className="grid min-w-0 gap-5 lg:grid-cols-12 lg:items-start">
-        <aside className="min-w-0 lg:sticky lg:top-[132px] lg:order-2 lg:col-span-5" aria-label="Bild zum Plan">
+        <aside className="min-w-0 lg:sticky lg:top-[168px] lg:order-2 lg:col-span-5" aria-label="Bild zum Plan">
           <ChartCard vm={vm} />
         </aside>
         <div className="grid min-w-0 gap-5 lg:order-1 lg:col-span-7">
@@ -213,6 +204,7 @@ export function PlanView({ className }: { className?: string }) {
           <Section index={4}>
             <TicketStep vm={vm} />
           </Section>
+          <SectionTitle title="Danach" sub="Den Plan an den echten Kerzen durchspielen und speichern." className="pt-2" />
           <Section index={5}>
             <TimeMachineCard vm={vm} />
           </Section>

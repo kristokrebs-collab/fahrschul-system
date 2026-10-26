@@ -159,7 +159,8 @@ describe("Kongress-Tracker – what is always on screen", () => {
     const senate = screen.getByTestId("kongress-senate");
     expect(senate).toHaveTextContent("keinen automatischen Abruf");
     expect(within(senate).getByRole("link", { name: /efdsearch\.senate\.gov/ })).toHaveAttribute("href", "https://efdsearch.senate.gov/search/");
-    expect(within(card).getByTestId("aktien-note")).toHaveTextContent("Keine professionelle Finanzberatung.");
+    // the one „Keine professionelle Finanzberatung.“ stands at the end of the page, not on the card
+    expect(within(card).getByTestId("aktien-note")).not.toHaveTextContent("Finanzberatung");
     expect(card).toHaveTextContent("Offene Finanzoffenlegung des House Clerk");
     // nothing was asked for before the section came on screen, and the card has no way to place an order
     expect(world.calls).toEqual([]);

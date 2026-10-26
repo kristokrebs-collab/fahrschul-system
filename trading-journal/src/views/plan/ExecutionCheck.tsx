@@ -13,7 +13,6 @@ import { checkExecution, type FindingId, type Tone } from "@/domain/execution";
 import { cn } from "@/lib/cn";
 import { loadBook, defaultBookDeps, type BookResult } from "@/market/execution/book";
 import { Button } from "@/primitives/Button";
-import { NO_ADVICE_TEXT } from "@/ui/AnalysisNote";
 import { EXEC_STRINGS as S, SPREAD_RULE, TONE_WORD, TURNOVER_RULE, assumptionLine, bandLine, baseOf, failureText, headline, legLine, quoteOf, spreadLine, turnoverLine } from "./executionModel";
 
 const TONE_DOT: Record<Tone, string> = { ok: "bg-win", warn: "bg-warn", bad: "bg-loss", unknown: "bg-faint-line" };
@@ -150,7 +149,7 @@ export function ExecutionCheck({ plan, slippagePct, crypto }: { plan: TicketPlan
             </p>
           )}
           <p className="num text-[11.5px] leading-relaxed text-mute" data-testid="hplan-exec-stand">
-            <span data-testid="hplan-exec-no-advice">{NO_ADVICE_TEXT}</span> Quelle: {S.source} ({ok.levels} Stufen{ok.route === "proxy" ? ", über den EU-Proxy der App" : ", direkt"}) · Stand {clock(ok.asOf, plan.tz)} Uhr · abgerufen {clock(ok.receivedAt, plan.tz)} Uhr · Größe {qtyText(plan.qty, plan.lot)} {base}.
+            Quelle: {S.source} ({ok.levels} Stufen{ok.route === "proxy" ? ", über den EU-Proxy der App" : ", direkt"}) · Stand {clock(ok.asOf, plan.tz)} Uhr · abgerufen {clock(ok.receivedAt, plan.tz)} Uhr · Größe {qtyText(plan.qty, plan.lot)} {base}.
           </p>
           <p className="text-[11.5px] leading-snug text-mute">
             {S.moment} {S.noBacktest}

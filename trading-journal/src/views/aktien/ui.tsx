@@ -7,7 +7,6 @@ import { cn } from "@/lib/cn";
 import { Input } from "@/primitives/Input";
 import { SourceStand, type StandPart } from "@/ui/SourceStand";
 import { SOURCE_NAME, type Stamp } from "@/market/stocks/types";
-import { NO_ADVICE_TEXT } from "@/ui/AnalysisNote";
 
 /** The label of a source id as the trader knows it. */
 export const sourceName = (id: string): string => SOURCE_NAME[id] ?? (id === "binance" ? "Binance USDⓈ-M" : id === "proxy" ? "Binance USDⓈ-M (EU-Proxy)" : id);
@@ -99,11 +98,11 @@ export function Figure({ label, value, sub, testId }: { label: string; value: Re
   );
 }
 
-/** "Keine professionelle Finanzberatung." – the last line of a result card, with what the card says first. */
+/** The last line of a result card: what the card says about its numbers (the one „Keine professionelle Finanzberatung.“ stands at the end of the page). */
 export function CardNote({ lead, className }: { lead: string; className?: string }) {
   return (
     <p className={cn("text-[11.5px] leading-relaxed text-mute", className)} data-testid="aktien-note">
-      {lead} {NO_ADVICE_TEXT}
+      {lead}
     </p>
   );
 }

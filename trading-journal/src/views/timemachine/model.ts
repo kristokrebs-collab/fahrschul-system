@@ -20,7 +20,7 @@ export function barsOf(candles: readonly TimeMachineCandle[]): Bar[] {
 export type InputOf = { ok: true; input: TmInput } | { ok: false; why: string };
 
 export function inputOf(p: TimeMachineProps): InputOf {
-  if (!isTmInterval(p.interval)) return { ok: false, why: `Der Zeitrahmen „${String(p.interval)}“ wird nicht unterstützt.` };
+  if (!isTmInterval(p.interval)) return { ok: false, why: `Der Zeiteinheit „${String(p.interval)}“ wird nicht unterstützt.` };
   const input: TmInput = {
     symbol: p.symbol,
     plan: { side: p.side, entry: p.entry, stop: p.stop, target: p.target },

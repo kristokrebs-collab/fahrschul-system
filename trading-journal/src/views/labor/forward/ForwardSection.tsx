@@ -38,7 +38,7 @@ export function ForwardSection() {
         </span>
       </div>
       {!accounts.length ? (
-        <EmptyState title="Noch kein virtuelles Konto" text={F.empty} />
+        <EmptyState title="Noch kein virtuelles Konto" text={F.empty} line={false} />
       ) : (
         <div className="grid grid-cols-1 gap-4" data-testid="forward-list">
           {accounts.map((a, i) => (

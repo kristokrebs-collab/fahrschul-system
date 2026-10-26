@@ -186,7 +186,7 @@ export default function ManageBody() {
                 )}
                 <p className="max-w-[72ch] text-[11.5px] leading-snug text-faint">{M.trade}</p>
                 <p className="max-w-[72ch] text-[11.5px] leading-snug text-faint" data-testid="labor-manage-foot">
-                  {M.foot} Keine professionelle Finanzberatung.
+                  {M.foot}
                 </p>
               </>
             )}

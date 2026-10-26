@@ -8,7 +8,7 @@
  * Lazy: loaded by `MarktView` on its own chunk. Motion: none of its own (the cell reveals); the switch and the chips use
  * the shared tokens. Mobile: one column, chips wrap, touch targets ≥ 44 px on coarse pointers.
  */
-import { memo, useState } from "react";
+import { memo, useState, type CSSProperties } from "react";
 import { KEY_TF_MS, tfLabel } from "@/domain/keylevels";
 import { describeLine, emptyText, KIND_HINT, KIND_LABEL, type TrendKind, type TrendLineView, type TrendSeries, type TrendSlot, type TrendTone } from "@/domain/trendlines";
 import { cn } from "@/lib/cn";
@@ -65,7 +65,7 @@ function Row({ item, running }: { item: TrendTfItem; running: boolean }) {
   const a = item.analysis;
   const label = tfLabel(item.tf);
   return (
-    <li className="grid gap-3 rounded-xl border border-line bg-ink-950/30 p-3" data-testid="trend-row" data-tf={item.tf} data-status={a ? a.status : "locked"}>
+    <li className="grid content-start gap-3 rounded-xl border border-line bg-ink-950/30 p-3" data-testid="trend-row" data-tf={item.tf} data-status={a ? a.status : "locked"}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="num inline-flex items-center rounded-md border border-line-2 px-1.5 py-px font-mono text-[10.5px] text-mute">{label}</span>
         {a ? (
@@ -144,7 +144,7 @@ export const TrendStructureCard = memo(function TrendStructureCard() {
                   data-locked={it.avail.ok ? undefined : ""}
                   className={cn(
                     "num min-h-8 rounded-full border px-3 font-mono text-[12px] transition-colors duration-200 pointer-coarse:min-h-11 pointer-coarse:min-w-11",
-                    on ? "border-transparent bg-fg font-medium text-ink-900" : "border-line-2 text-mute hover:border-white/30 hover:text-fg",
+                    on ? "border-line-2 bg-ink-750 font-medium text-fg" : "border-line-2 text-mute hover:border-white/30 hover:text-fg",
                     disabled && "cursor-not-allowed opacity-40 hover:border-line-2 hover:text-mute",
                   )}
                 >
@@ -175,7 +175,8 @@ export const TrendStructureCard = memo(function TrendStructureCard() {
             {TREND.none}
           </p>
         ) : (
-          <ul className="grid gap-2" data-testid="trend-rows">
+          // the list keeps the room of its rows while the candles load (a row measures 575 px at 390, 250 px from sm; gap 8 px)
+          <ul className="grid content-start gap-2 min-h-[calc(var(--rows)*583px)] sm:min-h-[calc(var(--rows)*258px)]" style={{ "--rows": selected.length } as CSSProperties} data-testid="trend-rows">
             {selected.map((it) => (
               <Row key={it.tf} item={it} running={running} />
             ))}
