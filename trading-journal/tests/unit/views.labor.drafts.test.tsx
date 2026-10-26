@@ -13,6 +13,7 @@ import { MAX_PLAYBOOK_BYTES, playbookText } from "@/domain/playbook";
 import type { BinanceRest } from "@/market/sources/binance";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { MotionRoot } from "@/motion/MotionRoot";
+import { useJournal } from "@/store/journalStore";
 import { __resetLabor, __setHistoryDeps, useLabor } from "@/views/labor";
 import DraftsSection from "@/views/labor/DraftsSection";
 import { useVersions } from "@/views/labor/versionsStore";
@@ -220,5 +221,165 @@ describe("Playbook austauschen", () => {
     expect(useLabor.getState().result?.name).toBe("Fremde Idee");
     // the foreign marker stays on the draft, also after a re-read from storage
     expect(JSON.parse(localStorage.getItem(Object.keys(localStorage).find((k) => k.endsWith("labor-drafts"))!)!).items[0].origin.kind).toBe("playbook");
+  });
+});
+
+describe("Playbook · Fassungen, Checkliste und Journal (F45)", () => {
+  const ID = "pb-k3x9q2m7ab";
+  const fileOf = (level: number, rev: number, extra: Record<string, unknown> = {}): string => playbookText(idea(level, "x"), { title: "Fremde Idee", author: "Mia", id: ID, rev, ...extra });
+  const read = async (text: string) => {
+    fireEvent.change(await screen.findByTestId("playbook-input"), { target: { value: text } });
+    fireEvent.click(screen.getByTestId("playbook-check"));
+    return screen.getByTestId("playbook-preview");
+  };
+  const pickDraft = (name: string): void => {
+    fireEvent.click(screen.getByTestId("playbook-pick"));
+    fireEvent.click(screen.getByRole("option", { name }));
+  };
+  const exportText = (): Record<string, unknown> => JSON.parse((screen.getByTestId("playbook-text") as HTMLTextAreaElement).value) as Record<string, unknown>;
+
+  it("Export eines eigenen Entwurfs: Kennung und Fassung 1; erst Kopieren merkt sich den Export; geänderte Regeln geben Fassung 2, gleiche Regeln dieselbe Nummer", async () => {
+    const write = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: write }, configurable: true });
+    const id = saveAs(40, "Meine Idee");
+    renderDrafts();
+    await screen.findByTestId("playbook-title");
+    // Editor-Stand: einmalig, ohne Fassungsnummer
+    expect(screen.getByTestId("playbook-rev")).toHaveTextContent("Ohne Fassungsnummer");
+    expect(exportText()).not.toHaveProperty("rev");
+    pickDraft("Meine Idee");
+    expect(screen.getByTestId("playbook-rev")).toHaveTextContent("Erster Export dieses Entwurfs: Fassung 1");
+    const first = exportText();
+    expect(first).toMatchObject({ rev: 1 });
+    expect(String(first.id)).toMatch(/^pb-[a-z0-9]{10}$/);
+    // Vorschau allein ändert nichts
+    expect(useLabor.getState().drafts.find((d) => d.id === id)!.exported).toBeUndefined();
+    fireEvent.change(screen.getByTestId("playbook-checklist"), { target: { value: "News geprüft\n\nSpread normal" } });
+    expect(exportText().checklist).toEqual(["News geprüft", "Spread normal"]);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("playbook-copy"));
+    });
+    await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
+    const exported = useLabor.getState().drafts.find((d) => d.id === id)!.exported!;
+    expect(exported).toMatchObject({ id: first.id, rev: 1 });
+    // die Regeln bleiben: dieselbe Nummer
+    expect(screen.getByTestId("playbook-rev")).toHaveTextContent("als Fassung 1 weitergegeben");
+    expect(exportText()).toMatchObject({ id: first.id, rev: 1 });
+    // die Regeln ändern sich: dieselbe Kennung, Fassung 2, mit Notiz
+    act(() => {
+      useLabor.getState().replaceDraftConfig(id, idea(33, "Meine Idee"));
+    });
+    expect(screen.getByTestId("playbook-rev")).toHaveTextContent("seit Fassung 1 geändert: Diese Datei wird Fassung 2");
+    fireEvent.change(screen.getByTestId("playbook-changes"), { target: { value: "tieferes Niveau" } });
+    expect(exportText()).toMatchObject({ id: first.id, rev: 2, changes: "tieferes Niveau" });
+  });
+
+  it("ein fremder Entwurf bekommt keine eigene Fassungsnummer", async () => {
+    renderDrafts();
+    const preview = await read(fileOf(48, 1));
+    await act(async () => {
+      fireEvent.click(within(preview).getByTestId("playbook-create"));
+    });
+    pickDraft("Fremde Idee");
+    expect(screen.getByTestId("playbook-rev")).toHaveTextContent("stammt aus einem fremden Playbook");
+    expect(exportText()).not.toHaveProperty("rev");
+  });
+
+  it("Import: eine Datei mit Fassung und Checkliste zeigt Fassung, Notiz und Checkliste; als Entwurf angelegt merkt sich der Entwurf Kennung und Fassung", async () => {
+    renderDrafts();
+    const preview = await read(fileOf(48, 1, { checklist: ["News geprüft", "Spread normal"], changes: "erste Fassung" }));
+    expect(preview).toHaveTextContent("Fassung 1");
+    expect(within(preview).getByTestId("playbook-preview-changes")).toHaveTextContent("Neu in dieser Fassung: erste Fassung");
+    const list = within(preview).getByTestId("playbook-preview-checklist");
+    expect(list).toHaveTextContent("Checkliste des Autors (2)");
+    expect(list).toHaveTextContent("News geprüft");
+    expect(list).toHaveTextContent("Prüfpunkte von Hand – das Labor rechnet sie nicht.");
+    expect(within(preview).queryByTestId("playbook-update")).toBeNull();
+    await act(async () => {
+      fireEvent.click(within(preview).getByTestId("playbook-create"));
+    });
+    expect(useLabor.getState().drafts[0]!.origin).toMatchObject({ kind: "playbook", pid: ID, rev: 1, changes: "erste Fassung", checklist: ["News geprüft", "Spread normal"] });
+  });
+
+  it("dieselbe Datei in Fassung 2: erkannt als neuere Fassung des Entwurfs, mit dem Unterschied in Klartext; nichts passiert vor dem Klick", async () => {
+    renderDrafts();
+    let preview = await read(fileOf(48, 1));
+    await act(async () => {
+      fireEvent.click(within(preview).getByTestId("playbook-create"));
+    });
+    const d = useLabor.getState().drafts[0]!;
+    const before = JSON.stringify(d.config);
+
+    preview = await read(fileOf(35, 2, { changes: "tieferes RSI-Niveau" }));
+    const update = within(preview).getByTestId("playbook-update");
+    expect(update).toHaveAttribute("data-relation", "newer");
+    expect(update).toHaveTextContent("Neuere Fassung eines Playbooks, das du schon hast: Dein Entwurf „Fremde Idee“ hat Fassung 1, diese Datei Fassung 2.");
+    expect(within(update).getByTestId("playbook-update-diff")).toHaveTextContent("Long · RSI Niveau: 48 → 35");
+    expect(within(update).queryByTestId("playbook-update-local")).toBeNull();
+    expect(update).toHaveTextContent("Die App abonniert nichts");
+    // vor dem Klick bleibt alles, wie es war – auch die Regeln und die Versionen
+    expect(JSON.stringify(useLabor.getState().drafts[0]!.config)).toBe(before);
+    expect(useVersions.getState().map[d.id]).toHaveLength(1);
+    // „als eigenen Entwurf“ bleibt möglich, aber nachrangig
+    expect(within(preview).getByTestId("playbook-create")).toHaveTextContent("Als eigenen neuen Entwurf anlegen");
+
+    fireEvent.click(within(update).getByTestId("playbook-update-apply"));
+    const now = useLabor.getState().drafts[0]!;
+    expect(useLabor.getState().drafts).toHaveLength(1);
+    expect(now.name).toBe("Fremde Idee");
+    expect(JSON.stringify(now.config)).not.toBe(before);
+    expect(now.origin).toMatchObject({ pid: ID, rev: 2, changes: "tieferes RSI-Niveau" });
+    // als neue Version mit Notiz, die alte bleibt wiederherstellbar
+    const versions = useVersions.getState().map[d.id]!;
+    expect(versions).toHaveLength(2);
+    expect(versions[1]!.note).toBe("Fassung 2 von Mia: tieferes RSI-Niveau");
+    expect(within(screen.getByTestId("playbook-preview")).getByTestId("playbook-update")).toHaveTextContent("Fassung 2 übernommen");
+  });
+
+  it("hat der Leser den Entwurf selbst geändert, warnt die Karte; eine ältere Fassung wird nicht zum Übernehmen angeboten", async () => {
+    renderDrafts();
+    let preview = await read(fileOf(48, 2));
+    await act(async () => {
+      fireEvent.click(within(preview).getByTestId("playbook-create"));
+    });
+    const d = useLabor.getState().drafts[0]!;
+    act(() => {
+      useLabor.getState().replaceDraftConfig(d.id, idea(41, d.name));
+    });
+    preview = await read(fileOf(35, 3));
+    expect(within(preview).getByTestId("playbook-update-local")).toHaveTextContent("Du hast diesen Entwurf seit dem Import selbst geändert.");
+    expect(within(preview).getByTestId("playbook-update-diff")).toHaveTextContent("RSI Niveau: 41 → 35");
+    preview = await read(fileOf(60, 1));
+    const older = within(preview).getByTestId("playbook-update");
+    expect(older).toHaveAttribute("data-relation", "older");
+    expect(older).toHaveTextContent("ältere Fassung (1) als die deines Entwurfs „Fremde Idee“ (2)");
+    expect(within(older).queryByTestId("playbook-update-apply")).toBeNull();
+  });
+
+  it("ein anderes Playbook mit anderer Kennung ist keine Fassung: normaler Import", async () => {
+    renderDrafts();
+    let preview = await read(fileOf(48, 1));
+    await act(async () => {
+      fireEvent.click(within(preview).getByTestId("playbook-create"));
+    });
+    preview = await read(playbookText(idea(55, "y"), { title: "Andere Idee", id: "pb-zzzzzzzzzz", rev: 7 }));
+    expect(within(preview).queryByTestId("playbook-update")).toBeNull();
+    expect(within(preview).getByTestId("playbook-create")).toHaveTextContent("Als fremden Entwurf anlegen");
+  });
+
+  it("Ins Journal: eine Entscheidungsgrundlage mit der Checkliste des Autors – erst nach dem Klick, und ohne Trades", async () => {
+    renderDrafts();
+    const preview = await read(fileOf(48, 2, { checklist: ["News geprüft", "Spread normal"], description: "RSI im Trend" }));
+    const trades = useJournal.getState().trades.length;
+    expect(useJournal.getState().settings.setups.some((x) => x.name === "Fremde Idee")).toBe(false);
+    await act(async () => {
+      fireEvent.click(within(preview).getByTestId("playbook-journal"));
+    });
+    await waitFor(() => expect(useJournal.getState().settings.setups.some((x) => x.name === "Fremde Idee")).toBe(true));
+    expect(useJournal.getState().settings.setups.filter((x) => x.name === "Fremde Idee")).toHaveLength(1);
+    const s = useJournal.getState().settings.setups.find((x) => x.name === "Fremde Idee")!;
+    expect(s.checklist.map((c) => c.text)).toEqual(["News geprüft", "Spread normal"]);
+    expect(s.desc).toContain("Aus einem Playbook von Mia (Fassung 2)");
+    expect(useJournal.getState().trades).toHaveLength(trades);
   });
 });

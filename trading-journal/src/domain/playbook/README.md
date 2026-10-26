@@ -21,3 +21,11 @@ unknown top-level fields (ignored), texts that were shortened, the lab's own war
 fields are cleaned of control characters and bounded; foreign text in a message is reduced to a safe, bounded name.
 
 Tests: `tests/unit/lab.playbook.test.ts` (round trip incl. every template, refusals, prototype pollution, huge / deep input, clamps).
+
+## Fassungen und Checkliste (F45, `update.ts`)
+Format `tj-playbook` bleibt Version 1; vier **optionale** Wurzelfelder kamen dazu (ältere Dateien bleiben gültig, ältere App-Versionen warnen nur „unbekanntes Feld“):
+`id` (`pb-…`, stabil über alle Fassungen), `rev` (1 … 9999), `changes` (≤ 300 Zeichen, was neu ist) und `checklist` (≤ 12 Punkte zu ≤ 100 Zeichen, von Hand zu prüfen – keine Regeln, die das Labor rechnet; als Text gelesen, nie als Markup). `id` und `rev` gelten nur zusammen; ein kaputter Wert wird mit Warnung verworfen, nie abgelehnt.
+- `newPlaybookId(random)` / `nextRevision(letzterExport, schlüssel)`: die erste Fassung ist 1, gleiche Regeln behalten die Nummer, geänderte Regeln zählen eine hoch. Nur **eigene** Entwürfe bekommen Kennung und Fassung (der Entwurf merkt sich den letzten Export in `exported`); fremde Entwürfe und der Editor-Stand exportieren einmalig.
+- `playbookRelation(link, regelnDesEntwurfs, datei)`: `none` / `other` (anderes Playbook) / `newer` / `same` / `same-rev-changed` (gleiche Nummer, andere Regeln) / `older`; mit dem Unterschied in Klartext (`diffConfigs`, der Name des Entwurfs gehört dem Leser) und `localEdits` (der Entwurf weicht von dem ab, was übernommen wurde). **Nichts wird von selbst übernommen**; ein Update ist eine neue Datei, die man selbst einliest – es gibt kein Abo und keinen Abruf.
+- `setupFromPlaybook(pb, vorhandene, farbe, id)`: die Checkliste wird die einer Entscheidungsgrundlage (Journal), die Regeln in Worten die Einstiegs- und Ausstiegskriterien, der Ursprung („Aus einem Playbook von … (Fassung n) – fremde Regeln, nicht von dir geprüft“) steht in der Beschreibung. Tests: `tests/unit/lab.playbook.update.test.ts`.
+
