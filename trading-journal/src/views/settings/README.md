@@ -98,3 +98,16 @@ Laufzeit: `src/market/archive/backfill.ts` / `backfillStore.ts`, Rechenkern: `@/
 Unter der Feed-Tabelle der Live-Daten-Karte (lazy nachgeladen): je Reihe, die die App gerade im Speicher hält (Kerzen je Zeiteinheit, Open-Interest-Historie, Long/Short-Verhältnisse, Funding-Historie),
 wie viele Punkte, bis wann und ob eine Lücke darin ist (`seriesGaps` aus `@/domain/missed/quality`: Abstand > 1,5 × der übliche Schritt). Läuft ohne Klick und ohne Abruf, jede Zeile wählt nur ihre
 Zusammenfassung (`useFeedSelect` mit Gleichheitsprüfung – eine laufende Kerze rendert nichts neu). Geprüft wird, was die App hat, nicht die Börse; nichts wird aufgefüllt. Test: `views.settings.feedgaps.test.tsx`.
+
+## Gruppen und Kleingedrucktes (Feinschliff Runde 8)
+
+- `SettingsGroup { section; title; sub }` (`SettingsGroup.tsx`): fünf Gruppen im Formular – **Grundlagen** (Konten, Backtest-Referenz) · **Märkte und Signale**
+  (Chart-Level, Live-Daten, Einstiegs-Check, Lage-Ampel, Hyblock) · **Regeln und Disziplin** (Fehler-Tags, Grundregeln, Disziplin-Grenzen) · **Sichern und
+  Speichern** (Daten, Datenarchiv, Version & Speicher) · **Aussehen und Hilfe** (Darstellung, Einführung, Weitere Einstellungen). Titel `h2` (`.label !text-fg`,
+  Signalpunkt) mit einem Satz darunter, `data-section` = Ziel der Abschnittsleiste (fünf Chips statt sechzehn). Kein Gruppentitel BEGINNT mit einer Kartenüberschrift
+  (Leiste und Funktionsfinder finden Karten über den Anfang ihrer Überschrift: `anchor.heading`); `tests/unit/views.settings.groups.test.tsx` hält das fest.
+- `MoreInfo { summary }` (`MoreInfo.tsx`): das Kleingedruckte einer Karte als natives `details` – Datenarchiv („Was gespeichert wird – und was nicht“), Börsenhistorie
+  nachladen („Genauer: Trennung, Zeitfenster, Datenschutz“), Screenshot-Import („So funktioniert der Import“). Der Text bleibt im DOM (Vorleser, Suche, Specs lesen ihn
+  geschlossen), Tastatur und Touch (≥ 44 px) gehen, bewegt sich nur das Chevron (150 ms, transform, aus bei reduzierter Bewegung). Die Datenarchiv-Karte ist dadurch bei 390 px
+  441 px kürzer (1 669 → 1 228), bei 1280 px 104 px (832 → 728).
+- Der lazy Datenarchiv-Platzhalter ist ein `Skeleton` in der Höhe der Karte (1 228 / 728 px abzüglich Kopf), nichts darunter springt beim Nachladen.

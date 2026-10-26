@@ -19,3 +19,11 @@ cloud (`cloudEnabled() && !hasClaudeRuntime()`), the extra cells: `PlanCard` (us
 owns the sheets, so `withHost={false}`). Without cloud the page is `CloudUnavailableCard` alone – honest, nothing invented.
 The e2e specs (`cloud.spec.ts`, `preise.spec.ts`, `exchange.spec.ts`) run on `/#konto` of the cloud edition of the
 production build (Supabase mock); `/dev/konto.html` stays for manual work under `npm run dev`.
+
+## Feinschliff Runde 8
+
+- Angemeldet hat die Seite eine Abschnittsleiste (`KontoNav` in `KontoPage.tsx`, `nav` von `KontoView`): Anmeldung · Sicherheit · Deine Daten · Tarif (wenn Zahlungen an) · Börse · API (wenn Börsen-Sync
+  an). Ziele sind `data-section` an den Zellen (`konto-login`, `konto-sicherheit`, `konto-daten`, `konto-tarif`; `ExchangeSection`: `konto-boerse`, `konto-api`).
+- „Siehe auch“ vor den rechtlichen Links: Tarife im Vergleich · Preise und Abo (Konto ↔ Preise).
+- `AuthCard` lädt als Skeleton in der Form der angemeldeten Karte (Avatar-Zeile, drei Angaben, Knöpfe) – vorher sprang die Seite beim Laden der Sitzung bei 390 px um 142 px (CLS 0,093 → 0,007).
+- Fehler des Börsen-Status nennen den Grund: „Der Börsen-Status ließ sich nicht laden. Grund: …“.

@@ -1,3 +1,4 @@
+import { FeatureLinks } from "@/app/FeatureLinks";
 import { LegalLinks } from "@/legal/LegalLinks";
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
@@ -124,7 +125,7 @@ export function PreiseView({ className }: PreiseViewProps) {
   const plan = useEffectivePlan();
   const signedIn = useCloudSession((s) => s.phase === "signedIn");
   return (
-    <div className={cn("grid grid-cols-1 gap-6", className)} data-testid="preise-view" data-mode={mode}>
+    <div className={cn("grid grid-cols-1 gap-5", className)} data-testid="preise-view" data-mode={mode}>
       <PageHeader
         title={PREISE.title}
         lead={PREISE.lead}
@@ -162,6 +163,15 @@ export function PreiseView({ className }: PreiseViewProps) {
       <Cell index={3}>
         <PricingFaq />
       </Cell>
+      {signedIn && mode === "open" && (
+        <FeatureLinks
+          lead="Siehe auch"
+          items={[
+            { id: "konto-cloud", label: "Konto und Abo verwalten" },
+            { id: "empfehlung", label: "Freunde einladen" },
+          ]}
+        />
+      )}
       <LegalLine />
     </div>
   );

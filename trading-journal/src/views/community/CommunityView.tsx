@@ -1,7 +1,9 @@
+import { FeatureLinks } from "@/app/FeatureLinks";
 import { cn } from "@/lib/cn";
 import { useCloudSession } from "@/cloud/session";
 import { Reveal } from "@/motion/Reveal";
 import { Button } from "@/primitives/Button";
+import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { useCommunityBoot } from "@/social/hooks";
 import { communityEnabled, loadCommunity, useSocial } from "@/social/store";
 import { COMMUNITY } from "@/social/strings";
@@ -16,6 +18,15 @@ import { NoCloudState } from "./NoCloudState";
 import { SharesCard } from "./SharesCard";
 import { SignedOutState } from "./SignedOutState";
 import { YouCard } from "./YouCard";
+
+/** The cards of the signed-in page, for its "Inhalt" strip (found by their test ids). */
+const NAV: readonly SectionNavItem[] = [
+  { id: "you-card", label: "Du" },
+  { id: "leaderboard-card", label: "Rangliste" },
+  { id: "groups-card", label: "Gruppen" },
+  { id: "shares-card", label: "Links und Belege" },
+  { id: "feedback-card", label: "Feedback" },
+];
 
 export const COMMUNITY_LEAD_FILL = { storageKey: storageKey("fill-community"), highlight: COMMUNITY.leadHighlight } as const;
 
@@ -66,6 +77,16 @@ export function CommunityView({ className }: CommunityViewProps) {
         </Reveal>
       ) : (
         <>
+          <SectionNav items={NAV} className="lg:col-span-12" />
+          {/* the proof and the chart cases are found by chance otherwise: the first sits in „Meine Links“, the second in a group */}
+          <FeatureLinks
+            className="lg:col-span-12"
+            items={[
+              { id: "ergebnisbeleg", label: "Ergebnisbeleg" },
+              { id: "chartfaelle", label: "Chartfälle" },
+              { id: "reviews", label: "Reviews" },
+            ]}
+          />
           <Reveal index={0} className="min-w-0 lg:col-span-5">
             <YouCard />
           </Reveal>

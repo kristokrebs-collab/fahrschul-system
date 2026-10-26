@@ -189,16 +189,20 @@ export function LeaderboardCard({ className }: { className?: string }) {
         )}
 
         {loading ? (
-          <div className="grid gap-2">
-            <div className="grid grid-cols-3 gap-2">
+          // the shape of the loaded board (podium, then the rows 4 – 10, 16 px apart like the real lists): a typical board is
+          // ≈ 180 px of podium and 7 × 53 px of rows, so the cards below it move by the least
+          <>
+            <div className="grid grid-cols-3 gap-2" aria-hidden="true">
               {[0, 1, 2].map((i) => (
-                <Skeleton key={i} className="h-36 rounded-2xl" />
+                <Skeleton key={i} className="h-[183px] rounded-2xl" />
               ))}
             </div>
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-11 rounded-xl" />
-            ))}
-          </div>
+            <div className="grid gap-0.5" aria-hidden="true">
+              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-[52px] rounded-xl" />
+              ))}
+            </div>
+          </>
         ) : board.error && !data ? (
           <p className="text-[13px] text-loss">{board.error.message}</p>
         ) : !rows.length ? (

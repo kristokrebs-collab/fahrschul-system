@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useState, type FormEvent } from "react";
 import { cn } from "@/lib/cn";
+import { textLink } from "@/lib/textLink";
 import { checkCode, clearCode, useBilling, useBillingMode } from "@/billing/store";
 import { TextScramble } from "@/motion/TextScramble";
 import { spring, tween } from "@/motion/tokens";
@@ -51,7 +52,7 @@ export function CodeField({ className }: { className?: string }) {
             )}
             <button
               type="button"
-              className="touch-hit ml-auto text-[12.5px] text-mute underline decoration-line-2 underline-offset-4 hover:text-fg"
+              className={cn(textLink, "ml-auto text-[12.5px]")}
               onClick={() => {
                 clearCode();
                 setValue("");

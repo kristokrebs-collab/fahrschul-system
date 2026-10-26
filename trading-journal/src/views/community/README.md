@@ -60,3 +60,10 @@ Tests: `tests/unit/social.ui.test.tsx`, `tests/e2e/community.spec.ts`.
   the hypothesis; scale from the visible bars only), `NewCaseSheet` (symbol, candle size, anchor candle, horizon, open for), `useCaseBars` (loads candles
   on demand via `loadLabData`, cached per key, retry in state).
 Tests: `tests/unit/views.community.{proof,cases}.test.tsx`, e2e `tests/e2e/community-belege.spec.ts` (mobile + desktop, axe).
+
+## Feinschliff Runde 8
+
+- Angemeldet: Abschnittsleiste (Du · Rangliste · Gruppen · Links und Belege · Feedback, Ziele über die Test-Ids der Karten) und „Auch hier“ mit Ergebnisbeleg · Chartfälle · Reviews – der Beleg steht in
+  „Deine Links“, die Chartfälle in der Gruppe, beides fand man vorher nur zufällig.
+- Ladezustände in Endgröße: die Rangliste lädt als Podium (183 px) + sieben Zeilen (52 px) in der Abstandsfolge der echten Liste, „Wo du stehst“ als 104-px-Platzhalter (die Karten darunter verschieben sich
+  um das Wenigste; die Länge einer echten Rangliste hängt von den Daten ab, der Platzhalter ist eine typische Größe).

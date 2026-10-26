@@ -1,9 +1,9 @@
 import { AnimatePresence, motion, type TargetAndTransition, type Transition } from "motion/react";
-import { Fragment, useCallback, useDeferredValue, useMemo, type ReactNode } from "react";
+import { useCallback, useDeferredValue, useMemo, type ReactNode } from "react";
+import { FeatureLinks } from "@/app/FeatureLinks";
 import { aggregate } from "@/domain/agg";
 import { EMOTIONS } from "@/domain/defaults";
-import { RollingDigits } from "@/motion/RollingDigits";
-import { spring, stagger, tween } from "@/motion/tokens";
+import { spring, tween } from "@/motion/tokens";
 import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button, Card, EmptyState } from "@/primitives";
@@ -11,7 +11,7 @@ import { useEnriched, useJournal } from "@/store/journalStore";
 import { openScreenshotImport } from "@/journal/ocr/store";
 import { storageKey } from "@/store/storage";
 import { useUi, type SortKey } from "@/store/uiStore";
-import { LeadFill } from "@/views/setups/LeadFill";
+import { PageHeader as SharedPageHeader } from "@/views/setups/PageHeader";
 import { AutoHeight } from "./AutoHeight";
 import { KpiStrip } from "./KpiStrip";
 import { TradeFilters } from "./TradeFilters";
@@ -92,7 +92,8 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
     body = (
       <EmptyState
         title="Noch keine Trades"
-        text="Klick auf „Trade eintragen“, um loszulegen."
+        text="Trag deinen ersten Trade ein – oder lies ihn mit „Screenshot importieren“ aus einem Bild."
+        line={false}
         action={
           <Button variant="primary" size="sm" className="mt-2" onClick={newTrade} {...ctaMotion}>
             Trade eintragen
@@ -140,18 +141,21 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
         }
       />
       <Card>
-        <TradeFilters
-          filter={liveFilter}
-          onChange={setTradeFilter}
-          setups={settings.setups}
-          count={rows.length}
-          closed={closed}
-          suggestions={suggestions}
-          extra={extra}
-          onExtraChange={setTradeExtra}
-          mistakeTags={mistakeTags}
-          showStrength={hasSignals || extra.strength !== "all"}
-        />
+        {/* a journal without trades has nothing to filter: the bar would only stand over an empty list */}
+        {all.length > 0 && (
+          <TradeFilters
+            filter={liveFilter}
+            onChange={setTradeFilter}
+            setups={settings.setups}
+            count={rows.length}
+            closed={closed}
+            suggestions={suggestions}
+            extra={extra}
+            onExtraChange={setTradeExtra}
+            mistakeTags={mistakeTags}
+            showStrength={hasSignals || extra.strength !== "all"}
+          />
+        )}
         <AutoHeight className="relative">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
@@ -167,73 +171,32 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
           </AnimatePresence>
         </AutoHeight>
       </Card>
+      {/* what happens to a trade after it is in the list (its sheets) and the other ways to get trades in */}
+      <FeatureLinks
+        items={
+          state === "empty"
+            ? [
+                { id: "csv-import", label: "CSV-Import" },
+                { id: "backup", label: "Backup einspielen" },
+              ]
+            : [
+                { id: "replay", label: "Trade-Replay" },
+                { id: "was-waere-wenn", label: "Was wäre wenn" },
+                { id: "csv-import", label: "CSV-Import" },
+                { id: "berichte", label: "Berichte" },
+              ]
+        }
+      />
     </div>
   );
 }
 
-// px, not em: a unit change (em → 0) would make motion measure every word before animating (same as setups' PageHeader)
-const WORD_FROM = { opacity: 0, y: 10, filter: "blur(4px)" };
-const WORD_SHOWN = { opacity: 1, y: 0, filter: "blur(0px)", transitionEnd: { filter: "none" } };
-const DOT_FROM = { scale: 0 };
-const DOT_SHOWN = { scale: 1 };
-
-/** The ember starts once the lead has faded in (same beat as the setups / settings headers). */
-const FILL_AFTER_LEAD_S = 0.25;
-const leadDelay = (i: number) => Math.min(i, stagger.max) * stagger.words;
-
-/** `i`-th word of the title (count and lead follow as the next steps): blur-fade up, `stagger.words` apart. */
-function wordTransition(i: number): Transition {
-  const delay = leadDelay(i);
-  return { default: { ...tween.reveal, delay }, y: { ...spring.enter, delay } };
-}
+const tradeUnit = (n: number) => (n === 1 ? "Trade" : "Trades");
 
 /**
- * Bundle `aT`: `h1` 28 px with the signal dot + lead. `count` is appended as a muted mono figure (NEW) that rolls
- * when trades are added or deleted (`RollingDigits`, label `{n} Trades`).
- *
- * Page enter (21st.dev "Words Stagger"): the signal dot pops (`spring.pop`), the words rise 10 px out of a 4 px blur
- * 30 ms apart, the count and the lead follow. Only the inner spans animate – the `h1` itself is never transparent,
- * and under reduced motion everything renders in place (`initial={false}`). With `leadFill` the lead is the shared
- * pulse subtitle recipe (`LeadFill`: pixel fill with a signal-red ember once per session, then the marker wipe).
+ * The page header of the journal: the shared `PageHeader` (signal dot, word stagger, lead recipe, count pill – the
+ * count rolls when trades are added or deleted, label `{n} Trades`), so every page opens the same way.
  */
 export function PageHeader({ title, lead, count, action, leadFill }: { title: string; lead: string; count?: number; action?: ReactNode; leadFill?: { storageKey: string; highlight?: string } }) {
-  const reduced = useReducedFx();
-  const words = title.split(" ");
-  const from = <T,>(target: T): T | false => (reduced ? false : target);
-  return (
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="text-[28px] font-semibold tracking-tight [text-wrap:balance]">
-          <motion.span
-            className="mr-2 inline-block size-2 -translate-y-1 rounded-full bg-signal align-middle"
-            aria-hidden="true"
-            initial={from(DOT_FROM)}
-            animate={DOT_SHOWN}
-            transition={spring.pop}
-          />
-          {words.map((word, i) => (
-            <Fragment key={i}>
-              {i > 0 && " "}
-              <motion.span className="inline-block" initial={from(WORD_FROM)} animate={WORD_SHOWN} transition={wordTransition(i)}>
-                {word}
-              </motion.span>
-            </Fragment>
-          ))}
-          {count != null && (
-            <motion.span className="ml-2 inline-block align-middle" initial={from(WORD_FROM)} animate={WORD_SHOWN} transition={wordTransition(words.length)}>
-              <RollingDigits value={count} aria-label={`${count} Trades`} className="num font-mono text-[15px] font-medium text-mute" />
-            </motion.span>
-          )}
-        </h1>
-        <motion.div className="mt-1 max-w-[62ch] text-[13.5px] text-mute" initial={from(WORD_FROM)} animate={WORD_SHOWN} transition={wordTransition(words.length + 1)}>
-          {leadFill ? (
-            <LeadFill text={lead} storageKey={leadFill.storageKey} highlight={leadFill.highlight} delayMs={Math.round((leadDelay(words.length + 1) + FILL_AFTER_LEAD_S) * 1000)} />
-          ) : (
-            <p>{lead}</p>
-          )}
-        </motion.div>
-      </div>
-      {action}
-    </div>
-  );
+  return <SharedPageHeader title={title} lead={lead} count={count} countUnit={tradeUnit} action={action} leadFill={leadFill} />;
 }

@@ -106,7 +106,7 @@ export function ExchangeConnectionsCard({ className }: ExchangeConnectionsCardPr
           <Loading />
         ) : !status ? (
           <div className="grid gap-3">
-            <Notice tone="warn">{error?.message ?? EX.notConfigured}</Notice>
+            <Notice tone="warn">{error ? `Der Börsen-Status ließ sich nicht laden. Grund: ${error.message}` : EX.notConfigured}</Notice>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => void loadExchangeStatus()}>
                 Erneut versuchen

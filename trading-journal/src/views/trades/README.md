@@ -64,3 +64,10 @@ Rückschaufehler-Hinweis, die konservative Reihenfolge innerhalb einer Kerze, di
 Der Knopf „Zeitmaschine“ im Trade-Detail (neben „Was wäre wenn“, gleiche Sperre `replay`) öffnet das Blatt `@/views/timemachine/TradeSheet` (eigener Chunk über `DeferredHosts` → `TimeMachineMount`, Store `sheetStore.ts` wie `whatIfStore`): der Plan des Trades
 (Richtung, Ø-Einstieg, Stop, Ziel – ohne Ziel eine Annahme von 1 / 2 / 3 R, ausdrücklich so genannt), die Kerzen **vor dem Einstieg** (nur geschlossene, Zeitrahmen 15m / 1h / 4h / 1T wählbar), das Ergebnis der Karte und daneben
 „Was wirklich passiert ist“. Ohne Stop, Einstieg oder Zeit, bei einem Markt, den die Börse nicht kennt, oder zu wenig Kerzen vor dem Einstieg steht ein Satz mit dem Grund da. Nichts wird im Journal gespeichert.
+
+## Feinschliff Runde 8
+
+- Die Kopfzeile ist die gemeinsame `PageHeader` der Seiten (`@/views/setups/PageHeader`): Punkt, Wort-Staffel, Lead-Rezept und die Zahl als Pille „13 Trades“ (rollt beim
+  Hinzufügen/Löschen). `PageHeader` aus `TradesView` bleibt als dünne Hülle exportiert (gleiche Props).
+- Ein Journal ohne Trades zeigt **keine Filterleiste** (es gäbe nichts zu filtern) und den Leerzustand ohne die Zeile „Bereit für den ersten Eintrag.“; darunter „Auch hier“:
+  CSV-Import und Backup einspielen. Mit Trades stehen unter der Karte die Anschlüsse Trade-Replay · Was wäre wenn · CSV-Import · Berichte (`FeatureLinks`, Register-Ids).

@@ -76,3 +76,10 @@ Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): e
 ## Transaktionsbuch (F70, `ledger/`)
 
 Letzter Abschnitt der Seite (lazy, eigener Chunk, `data-testid="ledger-card"`, Chip „Transaktionsbuch“ in der „Inhalt“-Leiste), unabhängig von Zeitraum und Fokus des Berichts, folgt dem Konto-Schalter der Seite (Gesamt / Makro / Scalp). Eine **Hilfsrechnung ohne Steuerberatung** (der Kopf steht auf der Karte, im CSV und im Druck): das Journal als Buch mit FIFO-Zuordnung, Jahreszusammenfassung, wählbarer Zeitzone und Zuordnung (je Position / je Markt), den sichtbaren Hinweisen (Lücke im Bestand, mögliche Dubletten, fehlende Gebühr / Funding / Zeit, Abweichung vom Journal, Klärliste, noch Offenes) und CSV (Buch, FIFO-Zuordnung) und Druck (`LedgerPrint`, derselbe Mechanismus wie das PDF der Berichte: `html.tj-report-printing` + `print.css`). Domain, Regeln, Grenzen: `src/domain/ledger/README.md`. Tests: `views.berichte.ledger.test.tsx`, `tests/e2e/ledger.spec.ts`.
+
+## Feinschliff Runde 8
+
+- `experimentVisible(page)` (`WeekReview.tsx`): die Seite fragt zuerst, ob die Wochenexperiment-Karte überhaupt etwas zeigt (angenommenes Experiment der Woche, oder eine noch nicht
+  beendete Woche mit Trades). Sonst gibt es keine leere 5er-Spalte neben dem Wochenreview (es nimmt die ganze Zeile) und keinen „Experiment“-Chip, der nach drei Sekunden wieder verschwindet.
+- Unter den Karten „Siehe auch“: Kennzahlen · Aufschlüsselung · Gebühren und Funding (Analyse); in „Zielerreichung“ ohne Ziele führen „Plan im Coach“ und „Ziel anlegen“ weiter.
+- Textlinks („Neuester“, „Laufend“, „Alle anzeigen“) nutzen das gemeinsame `textLink` (`src/lib/textLink.ts`).

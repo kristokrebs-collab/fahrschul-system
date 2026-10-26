@@ -8,6 +8,7 @@ import { TextScramble } from "@/motion/TextScramble";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { RingGauge } from "@/primitives/RingGauge";
+import { Skeleton } from "@/primitives/Skeleton";
 import { fmtDd, fmtPct, fmtR, METRIC_LABEL, ORIGIN_HINT, ORIGIN_LABEL } from "@/social/format";
 import { percentileIn, useLocalStats } from "@/social/hooks";
 import { metricValue, MIN_TRADES, SOCIAL_METRICS, type SocialMetric } from "@/social/metrics";
@@ -133,6 +134,7 @@ export function YouCard({ className }: { className?: string }) {
           </div>
         </div>
 
+        {!dist && board.load === "loading" && !board.data && <Skeleton className="h-[104px] rounded-xl" />}
         {dist && (
           <div className="grid gap-2 rounded-xl border border-line bg-ink-950/40 px-3.5 pb-2.5 pt-3">
             <div className="flex items-baseline justify-between gap-2">

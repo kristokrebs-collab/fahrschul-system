@@ -20,3 +20,8 @@ Every CTA is real: Checkout redirect, login first when signed out, portal for an
 Wiring (P14): register `preise` (PAGES, key `p`, …) with `React.lazy(() => import("@/views/preise"))` and mount
 `BillingHost` once in `App`. Until then: dev harness `dev/preise.html` (`#preise` / `#konto`, `?cloud=off`) on the Vite
 dev server; e2e `tests/e2e/preise.spec.ts` (`PW_PREISE_URL=/#preise`, `PW_KONTO_URL=/#konto` once routed).
+
+## Feinschliff Runde 8
+
+- Seitenraster `gap-5` wie alle Seiten (vorher `gap-6`), der Lead ist sprachlich geklärt („Starte kostenlos und wechsle erst, wenn du mehr aus deinem Journal holen willst – jederzeit kündbar.“).
+- Angemeldet (Abo-Modus offen): „Siehe auch“ unter den Tarifen – Konto und Abo verwalten · Freunde einladen (Preise ↔ Konto).

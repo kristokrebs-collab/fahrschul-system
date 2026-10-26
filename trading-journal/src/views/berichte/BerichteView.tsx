@@ -18,10 +18,12 @@ import { ACCOUNT_LABELS } from "@/domain/defaults";
 import { BERICHTE_HIGHLIGHT, BERICHTE_LEAD, BERICHTE_TITLE, withReportSeen } from "@/domain/coach";
 import { FOCUS_LABEL, KIND_LABEL, REPORT_FOCI, REPORT_KINDS, periodOf, shiftPeriod, type ReportFocus, type ReportKind } from "@/domain/reports";
 import { cn } from "@/lib/cn";
+import { textLink } from "@/lib/textLink";
 import { tradeTime } from "@/lib/dates";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
 import { Card } from "@/primitives/Card";
+import { FeatureLinks } from "@/app/FeatureLinks";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
 import { Skeleton } from "@/primitives/Skeleton";
@@ -37,7 +39,7 @@ import { ExportCard } from "./ExportCard";
 import { useReportPage } from "./hooks";
 import { ReportHero } from "./ReportHero";
 import { MonthBenefitCard } from "./MonthBenefitCard";
-import { ExperimentCard, WeekReviewCard } from "./WeekReview";
+import { ExperimentCard, experimentVisible, WeekReviewCard } from "./WeekReview";
 import { CompareCard, GoalsCard, MistakesCard, PerformanceCard, PsychCard, ReportRiskCard, StrategyCard } from "./sections";
 
 // F70: das Transaktionsbuch (Hilfsrechnung) – eigener Chunk, geladen mit der Seite
@@ -107,6 +109,7 @@ export function BerichteView({ className }: { className?: string }) {
   }, [key, saveSettings]);
 
   const show = (s: Exclude<ReportFocus, "all">) => focus === "all" || focus === s;
+  const showExperiment = focus === "all" && kind === "week" && experimentVisible(page);
   // the cards on the page right now (they follow the focus and the kind of report), for the "Inhalt" strip
   const nav: SectionNavItem[] = [
     { id: "report-hero", label: "Bericht" },
@@ -123,7 +126,7 @@ export function BerichteView({ className }: { className?: string }) {
           ...(focus === "all" ? [{ id: "report-goals", label: "Ziele" }] : []),
           ...(focus === "all" && kind === "week" ? [{ id: "week-review", label: "Wochenreview" }] : []),
         ]),
-    ...(focus === "all" && kind === "week" ? [{ id: "week-experiment", label: "Experiment" }] : []),
+    ...(showExperiment ? [{ id: "week-experiment", label: "Experiment" }] : []),
     ...(focus === "all" && kind === "month" ? [{ id: "benefit-card", label: "Monatsnutzen" }] : []),
     { id: "ledger-card", label: "Transaktionsbuch" },
   ];
@@ -146,11 +149,11 @@ export function BerichteView({ className }: { className?: string }) {
           </span>
           <Arrow dir="next" label="Nächster Zeitraum" onClick={() => setPeriod(next.key, "up")} disabled={!canNext} />
           {newest && newest !== period.key ? (
-            <button type="button" onClick={() => setPeriod(newest, newest > period.key ? "up" : "down")} className="touch-hit ml-1 text-[12px] text-mute underline decoration-line-2 underline-offset-4 hover:text-fg" data-testid="report-newest">
+            <button type="button" onClick={() => setPeriod(newest, newest > period.key ? "up" : "down")} className={cn(textLink, "ml-1 text-[12px]")} data-testid="report-newest">
               Neuester
             </button>
           ) : running.key !== period.key ? (
-            <button type="button" onClick={() => setPeriod(running.key, "up")} className="touch-hit ml-1 text-[12px] text-mute underline decoration-line-2 underline-offset-4 hover:text-fg" data-testid="report-running">
+            <button type="button" onClick={() => setPeriod(running.key, "up")} className={cn(textLink, "ml-1 text-[12px]")} data-testid="report-running">
               Laufend
             </button>
           ) : null}
@@ -224,14 +227,14 @@ export function BerichteView({ className }: { className?: string }) {
             </Cell>
           )}
           {focus === "all" && kind === "week" && (
-            <Cell index={0} span="lg:col-span-7">
+            <Cell index={0} span={showExperiment ? "lg:col-span-7" : "lg:col-span-12"}>
               <WeekReviewCard page={page} />
             </Cell>
           )}
         </>
       )}
       {/* also for a week without trades: an accepted experiment of that week is read there („zu wenig Daten“) */}
-      {focus === "all" && kind === "week" && (
+      {showExperiment && (
         <Cell index={1} span="lg:col-span-5">
           <ExperimentCard page={page} />
         </Cell>
@@ -255,6 +258,16 @@ export function BerichteView({ className }: { className?: string }) {
           <LedgerSection acc={page.acc} />
         </Suspense>
       </div>
+      {/* the same figures, looked at over the whole journal instead of one period */}
+      <FeatureLinks
+        className="lg:col-span-12"
+        lead="Siehe auch"
+        items={[
+          { id: "kennzahlen", label: "Kennzahlen" },
+          { id: "analyse-aufschluesselung", label: "Aufschlüsselung" },
+          { id: "analyse-kosten", label: "Gebühren und Funding" },
+        ]}
+      />
       <AnalysisNote className="lg:col-span-12" lead="Berechnet aus deinem Journal – eine Rückschau, keine Prognose." />
     </div>
   );

@@ -4,6 +4,7 @@ import { ED } from "@/domain/edition";
 import type { Rule } from "@/domain/types";
 import type { FeedId, ProviderHealth, StatusLabel } from "@/market/types";
 import { cn } from "@/lib/cn";
+import { textLink } from "@/lib/textLink";
 import { HoldButton } from "@/motion/HoldButton";
 import { MorphSelect } from "@/motion/pulse/MorphSelect";
 import { PulseDot } from "@/motion/PulseDot";
@@ -14,6 +15,7 @@ import { revealInvalid } from "@/primitives/fieldFx";
 import { Card } from "@/primitives/Card";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
+import { Skeleton } from "@/primitives/Skeleton";
 import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { storageKey } from "@/store/storage";
@@ -34,6 +36,7 @@ import { MistakesCard } from "./MistakesCard";
 import { RulesCard } from "./RulesCard";
 import { SignalCheckCard } from "./SignalCheckCard";
 import { StorageCard } from "./StorageCard";
+import { SettingsGroup } from "./SettingsGroup";
 import { SettingsNav } from "./SettingsNav";
 import { SymbolField } from "./SymbolField";
 
@@ -42,7 +45,7 @@ const ArchiveCard = lazy(() => import("./ArchiveCard"));
 
 export const SETTINGS_STRINGS = {
   title: "Einstellungen",
-  lead: "Startkapital, deine Chart-Level und die Backtest-Werte, mit denen deine Trades verglichen werden.",
+  lead: "Startkapital, Datenquellen, Regeln, Sicherung und Darstellung – alles, was bestimmt, wie dein Journal rechnet und aussieht.",
   save: "Speichern",
   saving: "Speichert …",
   saved: "Gespeichert",
@@ -95,6 +98,15 @@ export const SETTINGS_STRINGS = {
 } as const;
 
 /** Subtitle recipe: pixel fill once per session, then the marker on the key word. */
+/** The five groups of the page (titles never start with a card heading – the strip and the register find cards by it). */
+const G = {
+  basics: { title: "Grundlagen", sub: "Konten und die Referenzwerte, mit denen deine Trades verglichen werden." },
+  markets: { title: "Märkte und Signale", sub: "Chart-Level, Kursquellen und die Prüfung vor dem Einstieg." },
+  rules: { title: "Regeln und Disziplin", sub: "Was du dir vornimmst – und woran du Fehler erkennst." },
+  keep: { title: "Sichern und Speichern", sub: "Backup, lokales Archiv und Speicher dieses Geräts." },
+  look: { title: "Aussehen und Hilfe", sub: "Modus, Akzent, Einführung und die Einstellungen anderer Seiten." },
+} as const;
+
 export const SETTINGS_LEAD_FILL = { storageKey: storageKey("fill-settings"), highlight: "Startkapital" } as const;
 
 export interface SettingsViewProps {
@@ -246,66 +258,86 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
           void save();
         }}
       >
-        <AccountsCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
-        <BacktestCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
+        <SettingsGroup section="s-grundlagen" title={G.basics.title} sub={G.basics.sub} className="[&>div:first-child]:pt-1">
+          <AccountsCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
+          <BacktestCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
+        </SettingsGroup>
+
         {/* Chart-Level and Live-Daten span the page (design pass v3): side by side the 9-field level card stood ~1000 px
             empty next to the feed table; the table runs in two columns from xl */}
-        <div className="min-w-0 lg:col-span-2">
-          <TriggerCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
-        </div>
+        <SettingsGroup section="s-maerkte" title={G.markets.title} sub={G.markets.sub}>
+          <div className="min-w-0 lg:col-span-2">
+            <TriggerCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
+          </div>
 
-        <div className="min-w-0 lg:col-span-2">
-          <LiveDataCard health={health} statusLabels={statusLabels} onRefresh={onRefresh} onReconnect={onReconnect} onClearCache={onClearCache} />
-        </div>
+          <div className="min-w-0 lg:col-span-2">
+            <LiveDataCard health={health} statusLabels={statusLabels} onRefresh={onRefresh} onReconnect={onReconnect} onClearCache={onClearCache} />
+          </div>
 
-        {/* `Card` puts `className` on its inner surface, so a full-width card needs a spanning grid item around it */}
-        <div className="min-w-0 lg:col-span-2">
-          <SignalCheckCard draft={draft} onChange={set} onPatch={patch} changed={changed} invalid={invalidField} />
-        </div>
+          {/* `Card` puts `className` on its inner surface, so a full-width card needs a spanning grid item around it */}
+          <div className="min-w-0 lg:col-span-2">
+            <SignalCheckCard draft={draft} onChange={set} onPatch={patch} changed={changed} invalid={invalidField} />
+          </div>
 
-        {/* Lage-Ampel (decision 23): applied at once, `settings.signals.lage` */}
-        <div className="min-w-0 lg:col-span-2">
-          <LageCard />
-        </div>
+          {/* Lage-Ampel (decision 23): applied at once, `settings.signals.lage` */}
+          <div className="min-w-0 lg:col-span-2">
+            <LageCard />
+          </div>
 
-        <div className="min-w-0 lg:col-span-2">
-          <HyblockCard draft={draft} onChange={set} onTest={onTestHyblock} />
-        </div>
+          <div className="min-w-0 lg:col-span-2">
+            <HyblockCard draft={draft} onChange={set} onTest={onTestHyblock} />
+          </div>
+        </SettingsGroup>
 
-        {/* pairs of similar height (design pass v3): Daten | Fehler-Tags, Grundregeln | Disziplin-Grenzen */}
-        <DataCardMemo onImport={openImport} />
+        {/* the tags stand tall on the left, the rules and the limits are stacked on the right: no card is half empty next to a gap */}
+        <SettingsGroup section="s-regeln-gruppe" title={G.rules.title} sub={G.rules.sub}>
+          <div className="flex min-w-0 flex-col lg:row-span-2 [&>*]:flex-1">
+            <MistakesCard rows={draft.mistakes} onChange={setMistakes} trades={trades} changed={changed.has("mistakes")} />
+          </div>
+          <div className="flex min-w-0 flex-col [&>*]:flex-1">
+            <RulesCardMemo rules={draft.rules} onChange={setRules} trades={trades} changed={changed.has("rules")} />
+          </div>
+          <div className="flex min-w-0 flex-col [&>*]:flex-1">
+            <LimitsCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
+          </div>
+        </SettingsGroup>
 
-        <MistakesCard rows={draft.mistakes} onChange={setMistakes} trades={trades} changed={changed.has("mistakes")} />
+        {/* what lives on this device: the backup, the local archive and the storage – three full rows, none of them half empty next to a gap */}
+        <SettingsGroup section="s-sichern" title={G.keep.title} sub={G.keep.sub}>
+          <div className="min-w-0 lg:col-span-2">
+            <DataCardMemo onImport={openImport} />
+          </div>
 
-        <RulesCardMemo rules={draft.rules} onChange={setRules} trades={trades} changed={changed.has("rules")} />
+          {/* F26: the local data archive – a setting about this device's storage (on / off, size, deletion), so it lives here */}
+          <div className="min-w-0 lg:col-span-2">
+            <Suspense
+              fallback={
+                // the card's own height with the switch off (measured: 728 px at 1280, 1 228 px at 390, minus its head), so nothing below it jumps
+                <Card title="Datenarchiv" data-testid="settings-archive-loading">
+                  <Skeleton className="h-[1130px] lg:h-[640px]" />
+                  <span className="sr-only">Lade …</span>
+                </Card>
+              }
+            >
+              <ArchiveCard />
+            </Suspense>
+          </div>
 
-        <LimitsCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
+          <div className="min-w-0 lg:col-span-2">
+            <StorageCard />
+          </div>
+        </SettingsGroup>
 
         {/* P13: theme (Hell / Dunkel / System, accents) and the guided tour – a pair of similar height */}
-        <ThemeCard />
-        <OnboardingCard />
+        <SettingsGroup section="s-aussehen" title={G.look.title} sub={G.look.sub}>
+          <ThemeCard />
+          <OnboardingCard />
 
-        {/* F26: the local data archive – a setting about this device's storage (on / off, size, deletion), so it lives here */}
-        <div className="min-w-0 lg:col-span-2">
-          <Suspense
-            fallback={
-              <Card title="Datenarchiv" data-testid="settings-archive-loading">
-                <p className="text-[12px] text-mute">Lade …</p>
-              </Card>
-            }
-          >
-            <ArchiveCard />
-          </Suspense>
-        </div>
-
-        {/* P14: the settings that live on their pages (Konto, Preise, Box-, Risiko-Einstellungen) */}
-        <div className="min-w-0 lg:col-span-2">
-          <MoreSettingsCard />
-        </div>
-
-        <div className="min-w-0 lg:col-span-2">
-          <StorageCard />
-        </div>
+          {/* P14: the settings that live on their pages (Konto, Preise, Box-, Risiko-Einstellungen) */}
+          <div className="min-w-0 lg:col-span-2">
+            <MoreSettingsCard />
+          </div>
+        </SettingsGroup>
 
         <div className="flex justify-end lg:col-span-2">
           <SaveButton phase={pagePhase} onClick={onSave} />
@@ -416,7 +448,7 @@ const TriggerCard = memo(function TriggerCard(props: DraftCardProps) {
       </div>
       <p className="mt-4 text-[11.5px] leading-snug text-faint" data-testid="settings-keylevels-hint">
         Mehr Level, eigene Zeiteinheiten und Regeln (Berührung, Schluss, Retest …):{" "}
-        <button type="button" onClick={() => navigate("markt")} className="touch-hit text-mute underline-offset-2 hover:text-fg hover:underline">
+        <button type="button" onClick={() => navigate("markt")} className={textLink}>
           Schlüsselmarken auf der Markt-Seite
         </button>
         .

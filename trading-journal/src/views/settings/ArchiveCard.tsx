@@ -27,6 +27,7 @@ import { useUi } from "@/store/uiStore";
 import { ARCHIVE_STRINGS as S, SIZE_LABEL, bytesText, durationText, gapSummary, groupBySymbol, rangeText, rowLabel, totalsOf, type RowView } from "./archiveModel";
 import { exportAllFile, exportRowFile } from "./archiveExport";
 import { BackfillSection } from "./BackfillSection";
+import { MoreInfo } from "./MoreInfo";
 import { useArchiveData } from "./useArchiveData";
 
 const BIG_POINTS = 150_000;
@@ -219,10 +220,12 @@ export const ArchiveCard = memo(function ArchiveCard({ className }: { className?
   return (
     <Card title={S.title} note={S.note} className={className} data-testid="settings-archive-card">
       <div className="grid gap-4">
-        <div className="grid gap-1.5 text-[12px] leading-relaxed text-mute">
-          <p data-testid="archive-what">{S.what}</p>
+        <div className="grid gap-1 text-[12px] leading-relaxed text-mute">
           <p data-testid="archive-local">{S.local}</p>
-          <p data-testid="archive-limit">{S.limit}</p>
+          <MoreInfo summary="Was gespeichert wird – und was nicht">
+            <p data-testid="archive-what">{S.what}</p>
+            <p data-testid="archive-limit">{S.limit}</p>
+          </MoreInfo>
         </div>
 
         <SwitchRow id="archive-on" label={S.switch} help={cfg.on ? S.switchOn(cfg.everyMin) : S.switchOff} checked={cfg.on} onChange={(on) => setArchiveCfg({ on })} disabled={unavailable && !cfg.on} />

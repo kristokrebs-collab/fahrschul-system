@@ -11,9 +11,9 @@ import { ExchangeConnectionsCard } from "./ui/ExchangeConnectionsCard";
 import { ReconcileCard, useReconcileCount } from "./ui/ReconcileCard";
 import { SyncInbox } from "./ui/SyncInbox";
 
-function Cell({ index, span, children }: { index: number; span: string; children: ReactNode }) {
+function Cell({ index, span, section, children }: { index: number; span: string; section?: string; children: ReactNode }) {
   return (
-    <Reveal index={index} className={cn("min-w-0", span)}>
+    <Reveal index={index} className={cn("min-w-0", span)} data-section={section}>
       {children}
     </Reveal>
   );
@@ -44,7 +44,7 @@ export function ExchangeSection({ startIndex = 5, withHost = true }: ExchangeSec
   const showRecon = signedIn && recon > 0;
   return (
     <>
-      <Cell index={startIndex} span="lg:col-span-12">
+      <Cell index={startIndex} span="lg:col-span-12" section="konto-boerse">
         <ExchangeConnectionsCard />
       </Cell>
       {showInbox && (
@@ -58,7 +58,7 @@ export function ExchangeSection({ startIndex = 5, withHost = true }: ExchangeSec
         </Cell>
       )}
       {signedIn && (
-        <Cell index={startIndex + 3} span="lg:col-span-12">
+        <Cell index={startIndex + 3} span="lg:col-span-12" section="konto-api">
           <ApiAccessCard />
         </Cell>
       )}

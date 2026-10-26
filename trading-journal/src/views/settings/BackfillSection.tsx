@@ -20,6 +20,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
 import { useJournal } from "@/store/journalStore";
+import { MoreInfo } from "./MoreInfo";
 import { BACKFILL_STRINGS as S, DAYS_LABEL, previewText, problemLines, progressFraction, progressText, runSummary } from "./backfillModel";
 
 type Days = "7" | "14" | "30";
@@ -91,11 +92,13 @@ export const BackfillSection = memo(function BackfillSection() {
       <h3 id="archive-backfill-h" className="label">
         {S.title}
       </h3>
-      <div className="grid gap-1.5 text-[12px] leading-relaxed text-mute">
+      <div className="grid gap-1 text-[12px] leading-relaxed text-mute">
         <p data-testid="backfill-lead">{S.lead}</p>
-        <p data-testid="backfill-separate">{S.separate}</p>
-        <p data-testid="backfill-window">{S.window}</p>
-        <p data-testid="backfill-noserver">{S.noServer}</p>
+        <MoreInfo summary="Genauer: Trennung, Zeitfenster, Datenschutz">
+          <p data-testid="backfill-separate">{S.separate}</p>
+          <p data-testid="backfill-window">{S.window}</p>
+          <p data-testid="backfill-noserver">{S.noServer}</p>
+        </MoreInfo>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

@@ -137,4 +137,18 @@ describe("Wochenreview und Wochenexperiment", () => {
     expect(screen.queryByTestId("week-experiment")).toBeNull();
     expect(screen.queryByTestId("week-review")).toBeNull();
   });
+
+  it("a finished week without an experiment leaves no gap: no card, no chip, the review takes the whole row", async () => {
+    renderView();
+    await screen.findByTestId("week-experiment");
+    // a week that is long over (no accepted experiment, the next week is over too): nothing to propose
+    await act(async () => {
+      useBerichteUi.getState().setPeriod("2026-W19", "down");
+    });
+    await waitFor(() => expect(screen.getByTestId("berichte-view")).toHaveAttribute("data-key", "2026-W19"));
+    const review = await screen.findByTestId("week-review");
+    expect(screen.queryByTestId("week-experiment")).toBeNull();
+    expect(review.closest(".lg\\:col-span-12")).not.toBeNull();
+    expect(review.closest(".lg\\:col-span-7")).toBeNull();
+  });
 });

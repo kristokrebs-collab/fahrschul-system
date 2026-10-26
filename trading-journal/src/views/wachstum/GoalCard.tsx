@@ -134,7 +134,7 @@ export function GoalsCard({ goals, week, className }: { goals: readonly GoalProg
   return (
     <Card
       title="Aktive Ziele"
-      note={week.total ? G.week(week.met, week.total, week.daysLeft) : "Prozessziele zuerst – sie liegen in deiner Hand."}
+      note={week.total ? G.week(week.met, week.total, week.daysLeft) : "Was du diese Woche erreichen willst."}
       action={
         <Button size="sm" variant="primary" onClick={openGoal} data-testid="goal-add">
           {G.add}

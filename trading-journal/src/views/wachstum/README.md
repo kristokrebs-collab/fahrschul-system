@@ -140,3 +140,9 @@ sync / editor gating, late fill, settings, the card), `tests/e2e/checkin.spec.ts
 ## Inhalt-Leiste (Auffindbarkeit)
 
 Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Sechs Chips (Heute, Serien, Ziele, Challenges & Gewohnheiten, Psyche, Fortschritt; `Section section=…` → `data-section`). Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.
+
+## Feinschliff Runde 8
+
+- Doppelungen in den Texten entfernt: Die Karte „Laufende Serien“ sagt „Aktuelle Länge und Bestwert je Serie.“ (der Abschnitt darüber trägt „Belohnt wird, wie du tradest …“), „Aktive Ziele“ ohne Wochenstand
+  „Was du diese Woche erreichen willst.“ (der Abschnitt sagt „Prozessziele zuerst …“).
+- Textlinks und kleine Aktionen (Challenge aufgeben, Gewohnheit archivieren, „Anpassen“ im Check-in) mit derselben Hover-/Fokus-Behandlung (`textLink`, 200 ms Farbe).

@@ -6,6 +6,7 @@
  */
 import { motion } from "motion/react";
 import { useEffect, useRef, type ReactNode } from "react";
+import { FeatureLinks } from "@/app/FeatureLinks";
 import type { ChartRow } from "@/domain/coach/nlq";
 import type { GroupRow, Report } from "@/domain/reports";
 import { cn } from "@/lib/cn";
@@ -384,7 +385,10 @@ export function GoalsCard({ report, className }: { report: Report; className?: s
           ))}
         </ul>
       ) : (
-        <Empty text={GOAL_HINT} />
+        <>
+          <Empty text={GOAL_HINT} />
+          <FeatureLinks lead="Weiter" items={[{ id: "coach-plan", label: "Plan im Coach" }, { id: "ziele", label: "Ziel anlegen" }]} />
+        </>
       )}
     </Card>
   );

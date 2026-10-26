@@ -1,4 +1,5 @@
 import { Badge } from "@/primitives/Badge";
+import { MoreInfo } from "@/views/settings/MoreInfo";
 import { SHOT_EXTRACT_STATE_TEXT, useShotExtractState } from "./availability";
 
 /**
@@ -17,6 +18,7 @@ export function ExtractSettingsNote() {
           {state === "ready" ? "KI verfügbar" : state === "checking" ? "KI wird geprüft" : state === "server-error" ? "KI: Status unbekannt" : "KI nicht verfügbar"}
         </Badge>
       </div>
+      <MoreInfo summary="So funktioniert der Import" className="text-[12.5px]">
       <p className="text-[12.5px] leading-relaxed text-mute" data-testid="settings-shot-local">
         Ohne Konto und ohne Schlüssel: Unter „Alle Trades → Screenshot importieren“ liest die Texterkennung deines Browsers Order-, Positions- und Trade-Historien direkt auf deinem Gerät – die Bilder werden weder gespeichert noch gesendet. Du siehst alle erkannten Trades in einer Vorschau, korrigierst Gelbes und trägst sie mit einem Klick ein (mit „Rückgängig“). Beim ersten Mal lädt der Browser einmalig die Erkennungsdateien (rund 8 MB).
       </p>
@@ -24,6 +26,7 @@ export function ExtractSettingsNote() {
         Optional zusätzlich: Eine KI liest Einstieg, Ausstieg, Stop, Ziele, Menge, Hebel, Gebühren, Funding und Ergebnis aus Börsen-Screenshots, auch aus Orderhistorien („Long öffnen“, „Short schließen“ …). Fehlt die Eröffnung im Bild, bleibt der Einstieg leer – du kannst ihn aus dem Ergebnis berechnen lassen, als gekennzeichnete Annahme. Unsicheres wird markiert, nichts wird erfunden oder automatisch gespeichert – du prüfst den Entwurf im Editor. Die Bilder werden nur zum Auslesen gesendet.
         Ohne den Import trägst du die Werte wie gewohnt von Hand ein; deine Screenshots bleiben in jedem Fall am Trade.
       </p>
+      </MoreInfo>
       <p className="text-[12.5px] leading-relaxed text-faint" data-testid="settings-shot-extract-state">
         {SHOT_EXTRACT_STATE_TEXT[state]}
       </p>

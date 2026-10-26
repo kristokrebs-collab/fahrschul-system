@@ -249,7 +249,11 @@ describe("TradesView", () => {
     seed([]);
     mount();
     expect(screen.getByText("Noch keine Trades")).toBeInTheDocument();
-    expect(screen.getByText("Klick auf „Trade eintragen“, um loszulegen.")).toBeInTheDocument();
+    expect(screen.getByText(/Trag deinen ersten Trade ein/)).toBeInTheDocument();
+    // nothing to filter yet: no filter bar over the empty list, and no second "ready for the first entry" line
+    expect(screen.queryByTestId("journal-filters")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Trades durchsuchen" })).toBeNull();
+    expect(screen.queryByText("Bereit für den ersten Eintrag.")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Trade eintragen" }));
     expect(useUi.getState().editor.open).toBe(true);
   });

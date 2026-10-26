@@ -66,7 +66,7 @@ function Running({ p }: { p: ChallengeProgress }) {
             </Button>
           </span>
         ) : (
-          <button type="button" className="min-h-9 rounded-lg px-2 text-[11px] text-faint hover:text-fg pointer-coarse:min-h-11" onClick={() => setAsk(true)}>
+          <button type="button" className="min-h-9 rounded-lg px-2 text-[11px] text-faint transition-colors duration-200 hover:text-fg pointer-coarse:min-h-11" onClick={() => setAsk(true)}>
             {CH.drop}
           </button>
         )}

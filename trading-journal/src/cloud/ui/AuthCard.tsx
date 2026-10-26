@@ -37,12 +37,13 @@ export function AuthCard({ className }: { className?: string }) {
   );
 }
 
+/** The signed-in card's shape (avatar row, three facts, two button rows on a phone): the page does not jump when the session arrives. */
 function Loading() {
   return (
-    <div className="grid gap-3" aria-busy="true">
-      <Skeleton className="h-6 w-2/3" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-9 w-40" />
+    <div className="grid gap-4" aria-busy="true">
+      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-[72px] w-full" />
+      <Skeleton className="h-[88px] w-full sm:h-10" />
     </div>
   );
 }

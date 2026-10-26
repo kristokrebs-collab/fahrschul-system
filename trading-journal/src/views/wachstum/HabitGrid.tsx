@@ -71,7 +71,7 @@ function Row({ row, columns, todayKey }: { row: HabitRow; columns: readonly stri
         ))}
       </HeatGridReveal>
       <div className="flex justify-end">
-        <button type="button" className="min-h-8 rounded px-1 text-[10.5px] text-faint hover:text-fg pointer-coarse:min-h-11" onClick={() => void archiveHabit(h.id)}>
+        <button type="button" className="min-h-8 rounded px-1 text-[10.5px] text-faint transition-colors duration-200 hover:text-fg pointer-coarse:min-h-11" onClick={() => void archiveHabit(h.id)}>
           {H.archive}
         </button>
       </div>

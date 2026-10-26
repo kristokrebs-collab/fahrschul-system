@@ -74,7 +74,7 @@ export function StreakBoard({ streaks, className }: { streaks: readonly Streak[]
     if (best) celebrateStreak(refs.current[best.key], { streak: best.current });
   }, [streaks, seen, markSeen]);
   return (
-    <Card title="Laufende Serien" note="Prozess, nicht Profit: nur wie du tradest, zählt." className={className} data-testid="growth-streaks">
+    <Card title="Laufende Serien" note="Aktuelle Länge und Bestwert je Serie." className={className} data-testid="growth-streaks">
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         {streaks.map((s, i) => (
           <StreakBadge

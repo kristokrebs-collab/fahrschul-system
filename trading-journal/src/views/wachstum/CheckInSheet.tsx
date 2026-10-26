@@ -17,6 +17,7 @@ import { checkinConfigOf, dayKeyIn, deviceTimeZone, effectiveTimeZone } from "@/
 import { activeHabits, growthOf } from "@/domain/growth";
 import { CHECKIN_EMOTIONS, checkinOf, checkinRawOf, checkinStatusOf, cleanEmotions, emotionTone, ENERGY_LABELS, MOOD_LABELS, moodOf, STRESS_LABELS, EMPTY_CHECKIN, type CheckIn, type Level5 } from "@/domain/psych";
 import { cn } from "@/lib/cn";
+import { textLink } from "@/lib/textLink";
 import { Sheet } from "@/motion/Sheet";
 import { StaggerItem } from "@/motion/Stagger";
 import { spring } from "@/motion/tokens";
@@ -298,7 +299,7 @@ export function CheckInSheet() {
             type="button"
             aria-expanded={custom}
             onClick={() => setCustom((o) => !o)}
-            className="justify-self-start text-[12px] text-mute underline-offset-2 hover:underline pointer-coarse:min-h-11"
+            className={cn(textLink, "justify-self-start text-[12px] pointer-coarse:min-h-11")}
             data-testid="checkin-customize"
           >
             {custom ? DAILY.settings.close : DAILY.settings.open}

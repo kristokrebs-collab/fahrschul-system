@@ -1,7 +1,7 @@
 /** German copy of the pricing page (P10). */
 export const PREISE = {
   title: "Preise",
-  lead: "Starte kostenlos. Upgrade, wenn dein Journal mehr können soll als du – jederzeit kündbar.",
+  lead: "Starte kostenlos und wechsle erst, wenn du mehr aus deinem Journal holen willst – jederzeit kündbar.",
   leadHighlight: "jederzeit kündbar",
   heroEyebrow: "Trade Journal Pro",
   heroLead: "Trade mit",

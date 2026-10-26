@@ -147,6 +147,17 @@ function ResultBlock({ e, r, byId }: { e: Experiment; r: ExperimentResult; byId:
   );
 }
 
+/**
+ * Whether `ExperimentCard` renders anything on this page: the experiment accepted for THIS week, or – while the week is not
+ * over and has trades – the hypothesis for the next one. The page asks first, so a week without either leaves no empty
+ * 5-column gap beside the Wochenreview and no "Experiment" chip in the strip that vanishes after three seconds.
+ */
+export function experimentVisible(page: ReportPage): boolean {
+  const { period, settings, report, now } = page;
+  if (period.kind !== "week") return false;
+  return !!experimentForWeek(settings, period.key) || (shiftPeriod(period, 1).to > now && !report.empty);
+}
+
 export function ExperimentCard({ page, className }: { page: ReportPage; className?: string }) {
   const { report, period, settings, enriched, events, days, view, acc, now } = page;
   const saveSettings = useJournal((s) => s.saveSettings);
