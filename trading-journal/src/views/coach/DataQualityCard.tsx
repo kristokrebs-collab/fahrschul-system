@@ -26,7 +26,7 @@ export const QUALITY_STRINGS = {
   unknownShare: "Zeitanteil, in dem die App offen war: unbekannt. Die Aufzeichnung dazu beginnt erst jetzt und füllt sich, solange die App läuft; Vergangenes lässt sich nicht ableiten.",
   noDelay: "Noch kein Alarm mit bekanntem Kerzenschluss gespeichert – die Verspätung lässt sich erst danach lesen.",
   delayNote: "Verspätung = Alarmzeit minus Schluss der Kerze, auf der das Signal beruht. Beim Einstiegs-Check sind darin die 60 Sekunden Wartezeit gegen Nachzeichnen enthalten; eine falsch gehende Geräteuhr zeigt sich hier ebenfalls als Verspätung.",
-  logNote: "Das Zustellprotokoll hält nur die letzten 200 Zeilen auf diesem Gerät. Die Meldungen des Einstiegs-Checks und der Box-zu-Box-Auswertung stehen darin als gesendete Zeilen; „Doppelte“, „außerhalb der Aktivzeit“ und „kein Kanal“ gibt es nur bei den Schlüsselmarken, nur dort sind Aktivzeiten und Kanäle einstellbar.",
+  logNote: "Das Zustellprotokoll hält nur die letzten 200 Zeilen auf diesem Gerät. Die Meldungen des Einstiegs-Checks, der Box-zu-Box-Auswertung und der Squeeze-Beobachtung stehen darin als gesendete Zeilen; „Doppelte“, „außerhalb der Aktivzeit“ und „kein Kanal“ gibt es nur bei den Schlüsselmarken, nur dort sind Aktivzeiten und Kanäle einstellbar.",
   gapsHint: "Lädt die Stunden-Kerzen der letzten 14 Tage deiner Signal-Märkte und sucht Lücken. Ob eine Lücke an der Börse (Wartung, kein Handel) oder an der Verbindung liegt, sagt die Prüfung nicht.",
   gapsNone: "Noch nicht geprüft.",
   noMarkets: "Es gibt noch keinen Markt zum Prüfen – sobald die App Signale festhält oder ein Markt gewählt ist, steht er hier.",
@@ -156,7 +156,7 @@ export function DataQualityCard({ now, className }: { now: number; className?: s
           <div data-testid="quality-delivery" data-sent={d.sent} data-duplicate={d.duplicate} data-hours={d.hours}>
             <KV label="Gesendet" value={d.sent} />
             <p className="num font-mono text-[10.5px] leading-snug text-faint" data-testid="quality-delivery-sources" data-key={d.bySource.key} data-signal={d.bySource.signal} data-box={d.bySource.box}>
-              davon Schlüsselmarken {d.bySource.key} · Einstiegs-Check {d.bySource.signal} · Box-zu-Box {d.bySource.box}
+              davon Schlüsselmarken {d.bySource.key} · Einstiegs-Check {d.bySource.signal} · Box-zu-Box und Squeeze {d.bySource.box}
             </p>
             <KV label="Doppelte unterdrückt" value={d.duplicate} />
             <KV label="Abgelehnt: außerhalb der Aktivzeit" value={d.hours} />

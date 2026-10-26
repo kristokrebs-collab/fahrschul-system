@@ -13,7 +13,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { LIVE_WINDOW_MS, LOADING_TEXT, mtfAutoChecks, OFFLINE_TEXT, RETRO_LOADING, STALE_TEXT, toSignalSnapshot, type MtfItem, type Side, type SignalSnapshot } from "@/domain/signals";
-import { entryRulesOf } from "@/market/signalRules";
 import { checkTradeAt, getLageConfig, getSignalConfig, retroCheck, toTradeSnapshot, useSignalCheck, type LiveSignals, type RetroResult } from "@/market/signals";
 import { TextShimmer } from "@/motion/TextShimmer";
 import { tween } from "@/motion/tokens";
@@ -63,8 +62,7 @@ export async function resolveTradeSignal(date: string, side: Side, timeoutMs = S
   try {
     const snap = await Promise.race([checkTradeAt(t, side), timeout]);
     if (!snap) return undefined;
-    // the version of the rules this check ran with goes onto the trade with it (F31) – the same reference the screen showed
-    return snap.rules ? snap : { ...snap, rules: entryRulesOf({ cfg: getSignalConfig(), lage: { cfg: getLageConfig() } }) };
+    return snap.rules ? snap : await withStoredRules(snap);
   } catch {
     return undefined;
   } finally {
@@ -171,15 +169,47 @@ function StoredView({ stored, side, onCheck, onAuto }: { stored: SignalSnapshot 
   );
 }
 
-/** The snapshot with the version of the rules the check ran with (F31): stored on the trade with the rest. */
-function withRules(snap: SignalSnapshot, live: LiveSignals): SignalSnapshot {
-  return { ...snap, rules: entryRulesOf(live) };
+type RulesModule = typeof import("@/market/signalRules");
+
+/**
+ * The module that gives a check its Regelstand (F31: fingerprint of the settings + the running number). Loaded when the section is
+ * first drawn – the trade editor is part of the first page, the fingerprinting and its registry are not. Until it is there the
+ * check shows without a Regelstand line; a failed load leaves it that way.
+ */
+function useRulesModule(): RulesModule | null {
+  const [mod, setMod] = useState<RulesModule | null>(null);
+  useEffect(() => {
+    let alive = true;
+    import("@/market/signalRules").then(
+      (m) => alive && setMod(m),
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return mod;
+}
+
+/** The snapshot to store, with the reference of the rules it ran with (the same one the screen showed); without it when it cannot be read. */
+async function withStoredRules(snap: SignalSnapshot): Promise<SignalSnapshot> {
+  try {
+    const { entryRulesOf } = await import("@/market/signalRules");
+    return { ...snap, rules: entryRulesOf({ cfg: getSignalConfig(), lage: { cfg: getLageConfig() } }) };
+  } catch {
+    return snap;
+  }
 }
 
 function LiveView({ side, onAuto }: { side: Side; onAuto: (a: MtfAuto | null) => void }) {
   const check = useSignalCheck();
   const live = check.snapshot;
-  const snap = useMemo(() => (live ? withRules(toTradeSnapshot(live, side), live) : null), [live, side]);
+  const rulesMod = useRulesModule();
+  const snap = useMemo(() => {
+    if (!live) return null;
+    const s = toTradeSnapshot(live, side);
+    return rulesMod ? { ...s, rules: rulesMod.entryRulesOf(live) } : s;
+  }, [live, side, rulesMod]);
   useReportAuto(snap, onAuto);
   if (!snap) return <LoadingLine text={check.state === "offline" ? (check.message ?? OFFLINE_TEXT) : (check.message ?? LOADING_TEXT)} busy={check.state === "loading"} />;
   // a provisional live entry counts down to its base candle's close (stored snapshots record only the state)
@@ -194,6 +224,7 @@ function LiveView({ side, onAuto }: { side: Side; onAuto: (a: MtfAuto | null) =>
 }
 
 function RetroView({ minute, side, onAuto }: { minute: number; side: Side; onAuto: (a: MtfAuto | null) => void }) {
+  const rulesMod = useRulesModule();
   const [attempt, setAttempt] = useState(0);
   const [got, setGot] = useState<{ minute: number; attempt: number; result: RetroResult } | null>(null);
   useEffect(() => {
@@ -211,10 +242,14 @@ function RetroView({ minute, side, onAuto }: { minute: number; side: Side; onAut
   const result = got && got.minute === minute && got.attempt === attempt ? got.result : null;
   const snap = useMemo(() => {
     if (!result?.signals) return null;
-    if (result.status === "live") return withRules(toTradeSnapshot(result.signals as LiveSignals, side), result.signals as LiveSignals);
+    if (result.status === "live") {
+      const live = result.signals as LiveSignals;
+      const s = toTradeSnapshot(live, side);
+      return rulesMod ? { ...s, rules: rulesMod.entryRulesOf(live) } : s;
+    }
     const cfg = getSignalConfig();
-    return toSignalSnapshot(result.signals, side, cfg, { mode: "retro", symbol: result.symbol ?? undefined, source: result.source ?? undefined, rules: entryRulesOf({ cfg, lage: result.signals.lage }) });
-  }, [result, side]);
+    return toSignalSnapshot(result.signals, side, cfg, { mode: "retro", symbol: result.symbol ?? undefined, source: result.source ?? undefined, rules: rulesMod?.entryRulesOf({ cfg, lage: result.signals.lage }) });
+  }, [result, side, rulesMod]);
   useReportAuto(snap, onAuto);
   if (!result) return <LoadingLine text={RETRO_LOADING} busy />;
   if (snap) return <SignalSummary snap={snap} side={side} />;

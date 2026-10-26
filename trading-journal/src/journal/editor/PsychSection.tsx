@@ -6,7 +6,7 @@ import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Field, Input, Textarea } from "@/primitives";
 import { EXIT_REASONS, type JournalForm } from "./form";
-import { VoiceNote } from "./VoiceNote";
+import { VoiceNote } from "./LazyVoiceNote";
 
 export const SCALE_LABELS = {
   stress: ["Entspannt", "Locker", "Angespannt", "Gestresst", "Unter Strom"],

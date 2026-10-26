@@ -1,5 +1,5 @@
 import { animate, motion, useTransform } from "motion/react";
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import type { FeedHealth, FeedId, HealthState, ProviderHealth, Source, StatusLabel } from "@/market/types";
 import { BINANCE_FAMILY_FEEDS, WS_FEEDS } from "@/market/feeds";
 import { mmss } from "@/market/mapping";
@@ -18,8 +18,10 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Card } from "@/primitives/Card";
 import { Segmented } from "@/primitives/Segmented";
 import { useUi } from "@/store/uiStore";
-import { FeedGaps } from "./FeedGaps";
 import { ActionButton, GlyphLink, GlyphRefresh, GlyphTrash } from "./fx";
+
+// the gap display (F27) reads the series of the feeds – loaded with the card's first draw, not with the first page
+const FeedGaps = lazy(() => import("./FeedGaps").then((m) => ({ default: m.FeedGaps })));
 
 export const LIVE_STRINGS = {
   title: "Live-Daten",
@@ -408,7 +410,11 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
         <p className="rounded-xl border border-dashed border-line-2 p-4 text-[12.5px] text-mute">{LIVE_STRINGS.noHealth}</p>
       )}
 
-      {health && <FeedGaps labels={FEED_LABELS} className="mt-4" />}
+      {health && (
+        <Suspense fallback={null}>
+          <FeedGaps labels={FEED_LABELS} className="mt-4" />
+        </Suspense>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2 pointer-coarse:gap-3.5">
         <ActionButton size="sm" icon={<GlyphRefresh />} spinIcon onRun={onRefresh}>

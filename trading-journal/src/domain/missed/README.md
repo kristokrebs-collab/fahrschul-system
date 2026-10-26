@@ -59,3 +59,14 @@ and the trader's inbox marks `seenAt`, `skip` (+ `skipAt`), `tradeId`. Still thi
 
 Tests: `tests/unit/missed.domain.test.ts`, `tests/unit/views.coach.missed.test.tsx`, `tests/unit/views.coach.signalchain.test.tsx`, `tests/unit/views.coach.signalOutcomes.test.ts`; the recording points are asserted in
 `market.signals`, `market.boxes` and `market.keylevels` tests.
+
+## Signalprotokoll (F25 · F28 · F31, `prereq.ts`, `rules.ts`, `history.ts`)
+
+The event grew three more additive fields (version stays `1`): `prereq` (the conditions that held when the app raised the signal – `{ id, label, met: true | false | null }`, at most 24, written by `entryPrereq` / `boxPrereq` /
+`keyPrereq` from the snapshot, the graded reasons of a setup or the level's own rule, never recomputed later), `rules` (`{ kind, hash, n, since }`) and `log` (the trader's own changes with their time – seen, skip / unskip, watch /
+unwatch, link / unlink; the newest 20). **Regelstand** = `fingerprint` (FNV-1a, 8 hex) of the canonical string of the settings that change the evaluation (`signalCfgKey` + the Lage gate for the entry check, the grade and box
+settings for Box-zu-Box, the level's own rule for a key level) plus a running number per kind (and per level) from the device's registry (`registerRule`, `tj2-rule-versions`, written by `@/market/ruleVersions`): the same
+settings keep their number, the next change starts the next one; what changed is NOT stored. `signalHistory` builds the dated lines of one signal (the same box / key level around it, the trader's log, the linked journal trade, the end
+of the window, the evaluated outcome) and marks what is derived from journal, candles or clock. The balance can group by `rules`; a signal without a Regelstand falls into „Ohne Regelstand“. `seriesGaps` / `usualStep`
+(`quality.ts`) are the gap check of the running display in the settings, `deliveryQuality.bySource` counts the sent lines by origin. Tests: `missed.protocol.test.ts` (hand-worked fingerprints, lines, parsing),
+`views.coach.signalprotocol.test.tsx`, `views.settings.feedgaps.test.tsx`.

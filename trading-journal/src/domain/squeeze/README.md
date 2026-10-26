@@ -22,3 +22,8 @@ Archiv (aufeinanderfolgende Messpunkte = ein Fall) und was der Markpreis 4 h / 2
 Gegenbeispiele gezählt, Stichprobenwort wie in der Signalbilanz (keine / zu wenig / dünn / tragfähig); ohne Preis am Ende kein Ergebnis.
 `config.ts`: `settings.squeeze` (`{ v: 1, fundingPct, oiRisePct, oiHours, longPct, minMet, alerts }`, versioniert, Passthrough,
 Alarm **aus** bis zum ausdrücklichen Einschalten). Tests: `squeeze.domain.test.ts` (Handrechnung, synthetisches Archiv).
+
+`fromHistory.ts` (F26/F07): bringt die **nachgeladene Börsenhistorie** (`…Hist`-Reihen) in dieselbe Form wie die gesammelten Messwerte, damit
+`evaluate` / `history` sie ohne Sonderfall lesen – als **eigene Stichprobe**, nie mit dem gesammelten Archiv zusammengelegt. Das Funding ist dort die
+letzte Abrechnung innerhalb von 9 Stunden (`FUNDING_MAX_AGE_MS`; ohne Abrechnung in der Spanne: keine Daten, nicht der Wert davor), Lücken bleiben
+Lücken. Tests: `squeeze.domain.test.ts`, `views.markt.squeeze.history.test.tsx`.

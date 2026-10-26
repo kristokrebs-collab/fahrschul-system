@@ -31,7 +31,8 @@ async function mockHistory(page: Page, opts: { delayMs?: number } = {}): Promise
     const u = new URL(route.request().url());
     const p = u.pathname;
     const hist = ["/futures/data/openInterestHist", "/futures/data/globalLongShortAccountRatio", "/futures/data/topLongShortPositionRatio", "/futures/data/topLongShortAccountRatio", "/fapi/v1/fundingRate", "/fapi/v1/markPriceKlines"];
-    if (!hist.includes(p)) return route.fallback();
+    // the app's own feeds ask the same endpoints without a window (`limit` only): the market mock of `seed` answers those
+    if (!hist.includes(p) || !u.searchParams.has("startTime")) return route.fallback();
     calls += 1;
     if (opts.delayMs) await new Promise((r) => setTimeout(r, opts.delayMs));
     const symbol = u.searchParams.get("symbol") ?? "BTCUSDT";
@@ -64,9 +65,10 @@ async function openCard(page: Page): Promise<void> {
 async function chooseSmall(page: Page): Promise<void> {
   const sec = page.getByTestId("archive-backfill");
   await sec.getByRole("radio", { name: "7 Tage" }).click();
-  for (const b of await sec.locator("ul[aria-label='Symbole'] button[aria-pressed='true']").all()) {
-    if ((await b.textContent()) !== "BTCUSDT") await b.click();
-  }
+  // the list of pressed buttons shrinks with every click: read the names first, then press each by name
+  const pressed = sec.locator("ul[aria-label='Symbole'] button[aria-pressed='true']");
+  const names = (await pressed.allTextContents()).map((t) => t.trim()).filter((t) => t !== "BTCUSDT");
+  for (const name of names) await sec.locator("ul[aria-label='Symbole'] button[aria-pressed='true']", { hasText: name }).click();
   await expect(sec.getByTestId("backfill-preview")).toContainText("23 Abrufe für 1 Symbol");
 }
 
@@ -116,7 +118,7 @@ test.describe("Börsenhistorie nachladen (F26/F07)", () => {
     const card = page.getByTestId("settings-archive-card");
     await expect(card.locator('[data-testid="archive-row"][data-kind="backfill"]')).toHaveCount(6, { timeout: 20_000 });
     await expect(card.locator('[data-testid="archive-row"][data-kind="backfill"] [data-testid="archive-row-badge"]')).toHaveCount(6);
-    await expect(card.locator('[data-testid="archive-row"][data-kind!="backfill"]')).toHaveCount(0);
+    await expect(card.locator('[data-testid="archive-row"]:not([data-kind="backfill"])')).toHaveCount(0);
     await expect(card.getByTestId("archive-loaded-total")).toContainText("nicht mit dem Gesammelten vermischt");
     await expect(card.getByRole("switch", { name: "Archiv sammeln" })).toHaveAttribute("aria-checked", "false");
     expect(await stored(page, CFG_KEY)).toBeNull();

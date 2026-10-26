@@ -9,7 +9,7 @@
  * second re-renders nothing.
  */
 import { memo, useMemo } from "react";
-import { seriesGaps, type SeriesGaps } from "@/domain/missed";
+import { seriesGaps, type SeriesGaps } from "@/domain/missed/quality";
 import { cn } from "@/lib/cn";
 import { useFeedSelect } from "@/market";
 import { ddmmHHmm } from "@/market/format";

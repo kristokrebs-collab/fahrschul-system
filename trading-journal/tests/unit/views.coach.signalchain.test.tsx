@@ -359,7 +359,7 @@ describe("DataQualityCard (F27)", () => {
     expect(s).toHaveAttribute("data-key", "1");
     expect(s).toHaveAttribute("data-signal", "2");
     expect(s).toHaveAttribute("data-box", "1");
-    expect(s).toHaveTextContent("davon Schlüsselmarken 1 · Einstiegs-Check 2 · Box-zu-Box 1");
+    expect(s).toHaveTextContent("davon Schlüsselmarken 1 · Einstiegs-Check 2 · Box-zu-Box und Squeeze 1");
   });
 
   it("checks the candles only on request and lists the holes", async () => {

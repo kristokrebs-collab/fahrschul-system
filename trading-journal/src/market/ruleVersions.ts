@@ -6,7 +6,9 @@
  * Browser storage can be empty or blocked (private window): the registry then lives in memory for the session, and a signal
  * still carries its fingerprint (the number may then be 1 again in the next session – the fingerprint is the fact).
  */
-import { fingerprint, parseRuleVersions, registerRule, RULE_VERSIONS_VERSION, type RuleRef, type RuleVersion, type SignalSource } from "@/domain/missed";
+// from the module itself, not the `@/domain/missed` barrel: this file is part of the first load (the trade editor), the barrel is not
+import type { RuleRef, SignalSource } from "@/domain/missed/archive";
+import { fingerprint, parseRuleVersions, registerRule, RULE_VERSIONS_VERSION, type RuleVersion } from "@/domain/missed/rules";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 
 export const RULE_VERSIONS_KEY = storageKey("rule-versions");

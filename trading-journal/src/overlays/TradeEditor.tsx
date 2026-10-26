@@ -27,7 +27,7 @@ import { jsonEqual } from "@/store/merge3";
 import { pushToast, useUi, type AccFilter, type TradeDraft } from "@/store/uiStore";
 import { ExecutionSection } from "@/journal/editor/ExecutionSection";
 import { PsychSection } from "@/journal/editor/PsychSection";
-import { VoiceNote } from "@/journal/editor/VoiceNote";
+import { VoiceNote } from "@/journal/editor/LazyVoiceNote";
 import { dropEmptyJournalKeys, fillFix, journalDefaults, journalFromTrade, journalKey, journalRecord, journalReset, openRemainderMessage, statusAfterFills, validateJournal, type JournalForm } from "@/journal/editor/form";
 import { ShotsField } from "@/journal/screenshots/ShotsField";
 import { RatingDots } from "@/journal/ui/RatingDots";

@@ -554,3 +554,14 @@ Tests: `archive.db.test.ts`, `archive.collector.test.ts`, `archive.runner.test.t
 Box-Alarme an ist und der Tab im Hintergrund – ein System-Hinweis. Gemeldet wird der **Beginn** je Symbol und Seite (nicht, solange es gilt; höchstens einmal in 6 h; der erste Blick nach
 dem Start merkt sich nur). `host.tsx` hängt als `SqueezeMount` in `DeferredHosts` und lädt nur bei Alarm an **und** laufendem Archiv. Karte und Texte: `src/views/markt/README.md`.
 
+
+## Börsenhistorie, Orderbuch, Signalprotokoll (F26 · F07 · F44 · F25 · F28 · F31)
+
+- `archive/backfill.ts` (+ `backfillStore.ts`, `backfillLog.ts`): der Lauf von „Börsenhistorie nachladen“ – ein Abruf zugleich mit Pause, Fortschritt nach jedem Fenster, Abbruch nach der Pause, 429 beendet den Lauf,
+  Weg über `RestRoute` (`sources/route.ts`: direkt, bei 451 / CORS / Netzwerk / 429 über den EU-Proxy). Schreibt in eigene Reihen (`…Hist`), nie in die des Sammlers. `sources/binance.ts` kennt dafür `markPriceKlines`
+  und `depth`. Reine Regeln: `@/domain/archive/backfill`.
+- `execution/book.ts`: `loadBook(symbol)` – ein Orderbuch-Schnappschuss (`/fapi/v1/depth`, 1000 Stufen) und der 24-Stunden-Umsatz auf Klick; Fehler kommen mit Grund zurück (nie geworfen, nie ersetzt). Rechenkern: `@/domain/execution`.
+- `signalRecord.ts` (dynamisch geladen von `signals/notify.ts`, `boxes/alerts.ts`, `keylevels/alerts.ts`): schreibt zu jedem Signal die Voraussetzungen (`@/domain/missed/prereq`) und den Regelstand; `signalRules.ts`
+  und `ruleVersions.ts` geben einer Einstellungsmenge ihren Fingerabdruck und die laufende Nummer (`tj2-rule-versions`, nur dieses Gerät). Der Einstiegs-Check hängt den Regelstand auch an den Snapshot am Trade
+  (`overlays/SignalSection.tsx`, beim Speichern). Nichts davon gehört zur Erstladung (`ruleVersions.ts` importiert bewusst aus den Einzelmodulen von `@/domain/missed`, nicht aus dem Barrel).
+Tests: `archive.backfill.*.test.ts`, `execution.market.test.ts`, `market.signalRecord.test.ts`.

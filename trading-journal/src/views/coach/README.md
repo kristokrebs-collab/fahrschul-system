@@ -104,3 +104,11 @@ Phones: one column in the same order, no horizontal scroll at 390 px. Every cell
 ## Inhalt-Leiste (Auffindbarkeit)
 
 Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Zehn Chips für die Karten von „Fragen“ bis „Datenqualität“ (gefunden über ihre `data-testid`). Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.
+
+## Signalprotokoll und Quellenzeilen (F25 · F28 · F27)
+
+`SignalDetail.tsx` sits in the expanded inbox entry: the **Voraussetzungen** list (a word per line – erfüllt / nicht erfüllt / keine Daten – never colour alone), the **Regelstand** (with a warning line when the settings have changed
+since) and the dated **Verlauf** (`signalHistory`). `BasisLine.tsx`: `JournalBasis` (one line under the page header – the journal on this device, how many trades, the oldest and the newest) and `ArchiveBasis` (the signal archive:
+how many events, the oldest and newest signal) at the end of Posteingang, Verpasste Chancen and Signalbilanz; both through `SourceStand`, a missing time says „keine Daten“. The balance has a group „Regelstand“. The quality card
+counts the sent log lines by origin (`quality-delivery-sources`). Test-IDs: `detail-protocol` · `detail-prereq` · `detail-rules` · `detail-history` · `coach-basis` · `inbox-basis` · `balance-basis-line` · `missed-basis`.
+Tests: `views.coach.signalprotocol.test.tsx`, `views.coach.signalchain.test.tsx`, `views.coach.missed.test.tsx`, `views.coach.test.tsx`.

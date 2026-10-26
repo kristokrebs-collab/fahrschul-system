@@ -39,6 +39,19 @@ describe("LiveDataCard · ratio feeds", () => {
     }
   });
 
+  it("the gap display (F27) arrives with the card, lazily, and lists every series – without a provider each row says keine Daten geladen", async () => {
+    render(<LiveDataCard health={base} />);
+    const gaps = await screen.findByTestId("feed-gaps", {}, { timeout: 10_000 }); // the chunk is transformed on first use
+    expect(gaps).toHaveTextContent("Lücken in den geladenen Reihen");
+    expect(within(gaps).getAllByRole("listitem")).toHaveLength(14);
+    expect(within(gaps).getAllByText("keine Daten geladen")).toHaveLength(14);
+  });
+
+  it("no health snapshot, no gap display (nothing to compare it with)", () => {
+    render(<LiveDataCard health={null} />);
+    expect(screen.queryByTestId("feed-gaps")).toBeNull();
+  });
+
   it("a healthy ratio feed shows its newest point and the countdown to the next data; a failing one the cause, count and retry", () => {
     const now = T + 60_000;
     expect(feedLineText(feedLine(base.feeds.topAccountRatio5m, ctxOf(base)), now)).toBe("nächste Daten in 5:22");

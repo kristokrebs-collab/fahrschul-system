@@ -79,3 +79,9 @@ trade editor, the trade detail, the guard host, toasts and confetti.
 ## Inhalt-Leiste (Auffindbarkeit)
 
 Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Fünf Chips für Jetzt, Vor dem Trade, Portfolio, Muster, Einstellungen (`Section section=…` → `data-section` am Abschnittstitel). Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.
+
+## Quelle und Stand (F27)
+
+`LivePriceStand.tsx` under the calculator's live price: „Quelle: … · letzter Kurs hh:mm“ from the newer of the `aggTrade` / `ticker24h` feeds (the two that drive `priceMv`), rounded down to the minute so the line renders once a minute; no price → „keine Daten“.
+`LiquidationCard` ends with `liq-source`: how many legs are journal trades / venue positions (`liqBasis` in `model.ts`), with the time of the last venue request (`usePositionsStore.at`), and per price whether the venue or
+the trade gave it or the tier table calculated it. Tests: `views.risiko.source.test.tsx`, `views.risiko.test.tsx`.

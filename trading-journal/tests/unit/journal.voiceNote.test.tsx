@@ -67,6 +67,15 @@ describe("joinNote", () => {
   });
 });
 
+describe("LazyVoiceNote", () => {
+  it("the button is not part of the first load: it arrives with its chunk, and then works like VoiceNote", async () => {
+    const { VoiceNote: Lazy } = await import("@/journal/editor/LazyVoiceNote");
+    render(<Lazy value="" onChange={() => {}} label="Begründung" testId="lazy-voice" />);
+    expect(await screen.findByTestId("lazy-voice-mic", {}, { timeout: 10_000 })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("lazy-voice")).toHaveTextContent(VOICE_STRINGS.note);
+  });
+});
+
 describe("VoiceNote", () => {
   it("says where the recognition happens and that nothing is recorded, before any tap", () => {
     render(<Harness />);
