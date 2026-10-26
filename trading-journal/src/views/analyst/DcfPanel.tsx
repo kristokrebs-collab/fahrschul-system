@@ -21,8 +21,7 @@ import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import { useMediaQuery } from "@/motion/useMediaQuery";
 import { Segmented } from "@/primitives/Segmented";
-import { AnalysisNote } from "@/ui/AnalysisNote";
-import { SecErrorBox, NumField, Sub, TextField, Disclosure } from "./parts";
+import { SecErrorBox, NumField, PanelNote, Sub, TextField, Disclosure } from "./parts";
 import { loadAnalysis } from "./data";
 import { DCF } from "./strings";
 import type { DcfPanelProps } from "./types";
@@ -49,7 +48,7 @@ function assumptionLines(f: SimpleAssumptions, cur: string): string[] {
   ];
 }
 
-export function DcfPanel({ ticker: tickerProp = "", seed = null, className, bare, fetchImpl, now }: DcfPanelProps) {
+export function DcfPanel({ ticker: tickerProp = "", seed = null, className, bare, hosted, fetchImpl, now }: DcfPanelProps) {
   const [form, setForm] = useState<SimpleAssumptions>(() => (seed ? simpleFromSeed(seed) : EMPTY_SIMPLE));
   const [seedInfo, setSeedInfo] = useState<DcfSeed | null>(seed);
   const [applied, setApplied] = useState<DcfSeed | null>(seed);
@@ -410,7 +409,7 @@ export function DcfPanel({ ticker: tickerProp = "", seed = null, className, bare
         <span className="text-[12px] text-mute">Keine Kaufempfehlung.</span>
       </div>
       <div data-testid="dcf-note">
-        <AnalysisNote lead={DCF.disclaimer} />
+        <PanelNote lead={DCF.disclaimer} hosted={hosted} />
       </div>
     </div>
   );

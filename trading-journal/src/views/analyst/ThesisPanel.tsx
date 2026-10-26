@@ -21,8 +21,7 @@ import { EmptyState } from "@/primitives/EmptyState";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import { useJournal } from "@/store/journalStore";
-import { AnalysisNote } from "@/ui/AnalysisNote";
-import { Sub } from "./parts";
+import { PanelNote, Sub } from "./parts";
 import { ThesisEditor } from "./ThesisEditor";
 import { TH } from "./strings";
 import { useThesisMonitor, writeTheses } from "./thesisStore";
@@ -36,7 +35,7 @@ export const THESIS_SECTIONS = [
   { id: "thesis-versions", label: "Versionen" },
 ] as const;
 
-export function ThesisPanel({ ticker: tickerProp = "", now = Date.now, monitor = true, className, bare, fetchImpl }: ThesisPanelProps) {
+export function ThesisPanel({ ticker: tickerProp = "", now = Date.now, monitor = true, className, bare, hosted, fetchImpl }: ThesisPanelProps) {
   const raw = useJournal((s) => s.settings.theses);
   const cfg = useMemo(() => thesesCfgOf(raw), [raw]);
   const [picked, setPicked] = useState<string | null>(null);
@@ -185,7 +184,7 @@ export function ThesisPanel({ ticker: tickerProp = "", now = Date.now, monitor =
       </div>
 
       <div data-testid="thesis-note">
-        <AnalysisNote lead={TH.disclaimer} />
+        <PanelNote lead={TH.disclaimer} hosted={hosted} />
       </div>
     </div>
   );
