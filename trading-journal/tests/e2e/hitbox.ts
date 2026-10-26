@@ -39,6 +39,8 @@ export async function auditHitBoxes({ selector, root, min = 44 }: { selector: st
   const short = (el: Element | null): string => (el ? `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}「${label(el)}」` : "nothing");
   const visible = (el: HTMLElement): boolean => {
     if (el.closest('[inert], [aria-hidden="true"], [hidden]')) return false;
+    // the content of a closed <details> is not on screen (it keeps a layout box, but nothing can be tapped there); only its own <summary> is
+    for (let n = el.parentElement; n; n = n.parentElement) if (n.tagName === "DETAILS" && !(n as HTMLDetailsElement).open && !(el.tagName === "SUMMARY" && el.parentElement === n)) return false;
     if ((el as HTMLButtonElement).disabled || el.getAttribute("aria-disabled") === "true") return false;
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return false;
