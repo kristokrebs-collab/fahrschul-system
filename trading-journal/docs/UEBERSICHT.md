@@ -62,7 +62,7 @@ ein Weg durch die Oberfläche). Der Stand sagt ehrlich, ob die Funktion nur teil
 
 ### Heute vorbereiten
 
-_Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 7 Funktionen
+_Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 8 Funktionen
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
@@ -73,10 +73,11 @@ _Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 7 Funktionen
 | Prüfen, ob du gerade handeln solltest | Bereit-Check vor dem Trade | Wachstum › Bereit für den nächsten Trade? | fertig |
 | Dich benachrichtigen lassen, wenn eine Marke erreicht wird | Alarme & Zustellprotokoll | Markt › Alarme & Zustellprotokoll | teilweise |
 | Sehen, was heute in deinen Trades auffällt | Heute im Coach | Coach › Heute | fertig |
+| Den Tag mit Terminen, Märkten und Marken überblicken | Morgenbriefing „Heute wichtig“ | Markt › Heute wichtig | teilweise |
 
 ### Trade prüfen & Chart
 
-_Einstieg prüfen, Chancen finden, den Chart lesen._ · 13 Funktionen
+_Einstieg prüfen, Chancen finden, den Chart lesen._ · 14 Funktionen
 
 **Einstieg prüfen**
 
@@ -95,6 +96,7 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 13 Funktionen
 | Deine Beobachtungsliste nach Setups absuchen | Chancen-Scanner | Markt › Watchlist-Scanner | teilweise |
 | Prüfen, was nach ähnlichen Lagen geschah | Ähnliche Situationen | Markt › Ähnliche Situationen | fertig |
 | Sehen, wie die Top-Trader positioniert sind | Top-Trader-Positionierung | Übersicht › Top Trader · Binance | fertig |
+| Termine sehen, die für den Handel zählen | Ereigniskalender | Markt › Termine | teilweise |
 
 **Chart & Einstellungen**
 
@@ -225,7 +227,7 @@ _Warum du verlierst, was du verpasst, was du ändern kannst._ · 16 Funktionen
 
 ### Auswerten & Berichte
 
-_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 28 Funktionen
+_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 30 Funktionen
 
 **Berichte**
 
@@ -236,6 +238,7 @@ _Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 28 Funktionen
 | Sehen, was dir das Journal im Monat gebracht hat | Persönlicher Monatsnutzen | Berichte › Persönlicher Monatsnutzen | fertig |
 | Berichte als PDF, CSV oder Markdown speichern | Berichte exportieren | Berichte › Export | fertig |
 | Einen kurzen Rückblick auf Woche oder Monat lesen | Rückblick | Übersicht › Rückblick | fertig |
+| Käufe, Verkäufe, Gebühren und Funding als Buch prüfen | Transaktionsbuch | Berichte › Transaktionsbuch | teilweise |
 
 **Kennzahlen & Vergleiche**
 
@@ -259,6 +262,7 @@ _Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 28 Funktionen
 | Gute und schlechte Tage im Kalender sehen | P&L-Kalender | Übersicht › P&L-Kalender | fertig |
 | Prüfen, ob starke Signale besser abschneiden | Ergebnis nach Signal-Stärke | Übersicht › Ergebnis nach Signal-Stärke | fertig |
 | Sehen, wie diszipliniert du gehandelt hast | Disziplin-Auswertung | Übersicht › Disziplin | fertig |
+| Prüfen, wie die Trades rund um Termine liefen | Ereignisphasen und Terminfilter | Markt › Ereignisphasen | teilweise |
 
 **Verlauf & Verteilung**
 

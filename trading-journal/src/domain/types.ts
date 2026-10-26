@@ -326,6 +326,12 @@ export interface Settings {
    * saved. Arrays of objects with an id, so the cloud / two-tab merge works per thesis and per version.
    */
   theses?: unknown;
+  /**
+   * Ereigniskalender (F43): the trader's OWN appointments (name, time, importance). Versioned passthrough
+   * (`{ v: 1, items: [{ id, title, at, importance, note }] }`, see `@/domain/events/own`); absent until the first one is entered.
+   * An id list, so the cloud / two-tab merge works per appointment.
+   */
+  events?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */

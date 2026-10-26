@@ -181,6 +181,9 @@ const netExplainer = explain("net", view, settings);        // { title, what, fo
 keylevels/    own key levels (touch · running break · close · N closes · buffer · retest), `evaluateLevel(level, candles, now)`,
               the five fixed levels derived from `settings.market` (nothing copied), `settings.keyLevels` (versioned passthrough),
               day plan (range / long / short / wait), alert stages + Zustellprotokoll – see src/domain/keylevels/README.md
+events/       Ereigniskalender (F43): Funding-Raster, Deribit-Verfall, NYSE-Zeiten/-Feiertage, FOMC-Liste (Fed, mit Abrufdatum), eigene Termine (`settings.events`), Ereignisphasen-Analyse,
+              Labor-Filter „Keine Einstiege rund um Termine“, Morgenbriefing – see src/domain/events/README.md
+ledger/       Transaktionsbuch (F70, Hilfsrechnung ohne Steuerberatung): Zeilen aus dem Journal, FIFO-Zuordnung, Jahreszusammenfassung, Abgleich-Hinweise, CSV – see src/domain/ledger/README.md
 decision/     `explainDecision`: required conditions · optional confirmations · contradictions · missing data, „zu spät“
               (`lateEntry`, `settings.signals.lateMaxR`, default 0.5 R); a high score never overrides a failed required condition
 ```

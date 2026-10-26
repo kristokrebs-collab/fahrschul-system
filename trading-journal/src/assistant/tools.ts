@@ -160,6 +160,7 @@ const TOPIC_LABEL: Readonly<Record<string, string>> = {
   library: "Strategie-Bibliothek",
   discovery: "Muster der Gewinner und Verlierer",
   evolve: "Hintergrund-Optimierer",
+  briefing: "Morgenbriefing",
 };
 
 /** German label of a learned topic key. */
@@ -391,6 +392,7 @@ export const INTEREST_QUESTION: Readonly<Record<string, string>> = {
   library: "Gibt es eine Strategie mit Bollinger?",
   discovery: "Was haben meine Gewinner gemeinsam?",
   evolve: "Was hat der Optimierer gefunden?",
+  briefing: "Was ist heute wichtig?",
 };
 
 /** Chips for the greeting and help: the most asked topics first, then a few safe defaults. */

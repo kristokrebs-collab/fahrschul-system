@@ -44,6 +44,8 @@ interface ExtrasState {
   setFilterParam(key: "rsiLimit" | "trendLen", value: number): void;
   /** the pattern of the Muster-Entdecker as a filter (switches it on); `null` removes it */
   setPattern(spec: PatternFilterSpec | null): void;
+  /** the event filter (F43): minutes before / after and the kinds of appointment */
+  setEventParam(patch: Pick<FilterSelection, "eventMinutes" | "eventKinds">): void;
 }
 
 const SEL_KEY = storageKey("labor-filters");
@@ -81,6 +83,11 @@ export const useExtras = create<ExtrasState>()((set, get) => ({
   },
   setFilterParam(key, value) {
     const next = sanitizeFilters({ ...get().selection, [key]: value });
+    writeSelection(next);
+    set({ selection: next, filters: get().filters.status === "running" ? get().filters : idle() });
+  },
+  setEventParam(patch) {
+    const next = sanitizeFilters({ ...get().selection, ...patch });
     writeSelection(next);
     set({ selection: next, filters: get().filters.status === "running" ? get().filters : idle() });
   },

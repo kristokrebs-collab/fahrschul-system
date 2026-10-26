@@ -8,6 +8,8 @@
  */
 import { runBacktest } from "../../backtest/engine";
 import { patternMask } from "../../discovery/filter";
+import { DEFAULT_EVENT_KINDS, EVENT_MINUTES } from "../../events/filterKinds";
+import { eventMask } from "../../events/filterMask";
 import type { Window } from "../../backtest/optimize";
 import type { LabStrategy, Params, Prepared } from "../../backtest/strategies/types";
 import { HIST_MS, type EngineCfg } from "../../backtest/types";
@@ -58,7 +60,7 @@ export interface FilterCompare {
   overlap: { blocked: number; multi: number } | null;
 }
 
-const NAME: Readonly<Record<FilterId, string>> = { rsi: "RSI-Zone", trend: "Höherer Trend", retest: "Retest", topTrader: "Top-Trader-Quote", pattern: "Muster-Filter" };
+const NAME: Readonly<Record<FilterId, string>> = { rsi: "RSI-Zone", trend: "Höherer Trend", retest: "Retest", topTrader: "Top-Trader-Quote", pattern: "Muster-Filter", event: "Terminfilter" };
 
 /** The runs to make for the chosen filters: none · each alone · all · all without one (when that is a new combination). */
 export function variantPlan(active: readonly FilterId[]): FilterVariant[] {
@@ -79,6 +81,7 @@ export function buildMasks<F>(prep: Prepared<F>, sel: FilterSelection, active: r
   if (active.includes("rsi")) m.rsi = rsiMask(prep.bars, sel.rsiLimit);
   if (active.includes("trend")) m.trend = trendMask(prep.bars, prep.interval, execSec, sel.trendLen);
   if (active.includes("pattern") && sel.pattern) m.pattern = patternMask(prep.bars, execSec, sel.pattern);
+  if (active.includes("event")) m.event = eventMask(prep.bars, execSec, sel.eventMinutes ?? EVENT_MINUTES.def, sel.eventKinds ?? DEFAULT_EVENT_KINDS);
   return m;
 }
 

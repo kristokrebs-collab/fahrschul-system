@@ -13,7 +13,7 @@
  * Opening a finished report marks it seen (`settings.coach.reports.seen`, after a short look – flipping through does
  * not count). Registered by the integrator (P14) as page `berichte`.
  */
-import { useEffect, useMemo, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, type ReactNode } from "react";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
 import { BERICHTE_HIGHLIGHT, BERICHTE_LEAD, BERICHTE_TITLE, withReportSeen } from "@/domain/coach";
 import { FOCUS_LABEL, KIND_LABEL, REPORT_FOCI, REPORT_KINDS, periodOf, shiftPeriod, type ReportFocus, type ReportKind } from "@/domain/reports";
@@ -21,8 +21,10 @@ import { cn } from "@/lib/cn";
 import { tradeTime } from "@/lib/dates";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
+import { Card } from "@/primitives/Card";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
+import { Skeleton } from "@/primitives/Skeleton";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
 import { useUi, type AccFilter } from "@/store/uiStore";
@@ -37,6 +39,9 @@ import { ReportHero } from "./ReportHero";
 import { MonthBenefitCard } from "./MonthBenefitCard";
 import { ExperimentCard, WeekReviewCard } from "./WeekReview";
 import { CompareCard, GoalsCard, MistakesCard, PerformanceCard, PsychCard, ReportRiskCard, StrategyCard } from "./sections";
+
+// F70: das Transaktionsbuch (Hilfsrechnung) – eigener Chunk, geladen mit der Seite
+const LedgerSection = lazy(() => import("./ledger/LedgerSection"));
 
 export const BERICHTE_LEAD_FILL = { storageKey: storageKey("fill-berichte"), highlight: BERICHTE_HIGHLIGHT } as const;
 /** A finished report counts as opened after this long on screen. */
@@ -120,6 +125,7 @@ export function BerichteView({ className }: { className?: string }) {
         ]),
     ...(focus === "all" && kind === "week" ? [{ id: "week-experiment", label: "Experiment" }] : []),
     ...(focus === "all" && kind === "month" ? [{ id: "benefit-card", label: "Monatsnutzen" }] : []),
+    { id: "ledger-card", label: "Transaktionsbuch" },
   ];
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="berichte-view" data-kind={kind} data-key={period.key}>
@@ -236,6 +242,19 @@ export function BerichteView({ className }: { className?: string }) {
           <MonthBenefitCard page={page} />
         </Cell>
       )}
+      {/* F70: independent of the period and the focus – the whole journal as a ledger */}
+      {/* no `Cell` (Reveal): the ledger grows with every 50 rows and a reveal waits for 15 % of its element in view – a card that tall would stay at opacity 0 */}
+      <div className="flex min-w-0 flex-col lg:col-span-12 [&>*]:flex-1">
+        <Suspense
+          fallback={
+            <Card title="Transaktionsbuch" data-testid="ledger-loading">
+              <Skeleton height={160} />
+            </Card>
+          }
+        >
+          <LedgerSection acc={page.acc} />
+        </Suspense>
+      </div>
       <AnalysisNote className="lg:col-span-12" lead="Berechnet aus deinem Journal – eine Rückschau, keine Prognose." />
     </div>
   );

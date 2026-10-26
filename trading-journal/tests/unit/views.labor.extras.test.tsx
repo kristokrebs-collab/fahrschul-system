@@ -131,7 +131,7 @@ describe("Labor · Belastung, Bericht, Filter", () => {
     fireEvent.click(await screen.findByTestId("labor-extra-toggle-filters", {}, { timeout: 15_000 }));
     const filters = await screen.findByTestId("labor-filters", {}, { timeout: 15_000 });
     const items = within(filters).getAllByTestId("labor-filter");
-    expect(items.map((i) => i.getAttribute("data-filter"))).toEqual(["rsi", "trend", "retest", "topTrader"]);
+    expect(items.map((i) => i.getAttribute("data-filter"))).toEqual(["rsi", "trend", "retest", "topTrader", "event"]);
     const top = items[3]!;
     expect(top).toHaveAttribute("data-available", "false");
     expect(within(top).getByTestId("labor-filter-reason")).toHaveTextContent("etwa die letzten 30 Tage");

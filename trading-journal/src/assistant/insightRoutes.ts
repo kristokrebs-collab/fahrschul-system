@@ -12,7 +12,7 @@
  */
 import { has, tokensOf } from "./fuzzy";
 
-export const INSIGHT_TOOL_IDS = ["audit", "stress", "forward", "trend", "signals", "quality", "benefit", "situation", "fit", "demands", "library", "discovery", "evolve"] as const;
+export const INSIGHT_TOOL_IDS = ["audit", "stress", "forward", "trend", "signals", "quality", "benefit", "situation", "fit", "demands", "library", "discovery", "evolve", "briefing"] as const;
 export type InsightToolId = (typeof INSIGHT_TOOL_IDS)[number];
 export const isInsightTool = (t: string): t is InsightToolId => (INSIGHT_TOOL_IDS as readonly string[]).includes(t);
 
@@ -136,6 +136,17 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
       (strategy && better && (own || has(t, "optimier", "weiterentwickel"))) ||
       (strategy && proposals) ||
       ((has(t, "optimierer", "hintergrund") || proposals) && has(t, "gelernt", "treffer", "bewaehrt"))
+    );
+  }),
+  // 9 · the Morgenbriefing „Heute wichtig“: the day's appointments, markets, key levels, alarms and check-in – „Morgenbriefing“,
+  //     „Was ist heute wichtig?“, „Was steht heute an?“, „Termine heute“
+  rule("briefing", "briefing", "Morgenbriefing", (t) => {
+    const today = has(t, "=heute", "tagesueberblick");
+    return (
+      has(t, "morgenbriefing", "briefing", "morgennotiz", "tagesbriefing", "morningnote", "premarket", "vorboerslich") ||
+      (has(t, "=morning") && has(t, "=note", "=brief")) ||
+      (today && has(t, "wichtig", "ansteht", "anstehen", "termin", "ereignis", "=events", "=event", "kalender")) ||
+      (today && has(t, "=steht") && has(t, "=an"))
     );
   }),
 ];
