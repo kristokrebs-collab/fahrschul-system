@@ -20,6 +20,21 @@ const PINNED = Date.UTC(2026, 9, 14, 10, 30);
 
 const BERLIN = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 const local = (ms: number): string => BERLIN.format(new Date(ms)).replace(" ", "T");
+/**
+ * An instant whose Berlin wall-clock text names exactly one instant. In the repeated hour of the autumn clock change (02:00–03:00
+ * twice) the text is ambiguous and the app reads the first one, an hour off: the seed then would not match the signal it is meant to.
+ * Moves back by whole hours until the text is unique (never more than the two hours of the repeat).
+ */
+function unambiguous(ms: number): number {
+  let at = ms;
+  for (let i = 0; i < 3; i++) {
+    const text = local(at);
+    const same = [-2, -1, 0, 1, 2].filter((k) => local(at + k * HOUR) === text).length;
+    if (same === 1) return at;
+    at -= HOUR;
+  }
+  return at;
+}
 
 function trade(id: string, at: number, r: number): Record<string, unknown> {
   const entry = 60_000;
@@ -82,7 +97,7 @@ test.describe("Signal-Kette", () => {
   test("Posteingang, Ausgelassen mit Grund, Bilanz mit automatischen Ausgängen und Qualität", async ({ page }) => {
     const errors = collectErrors(page);
     const now = Date.now();
-    const tradeAt = now - DAY - 7 * HOUR;
+    const tradeAt = unambiguous(now - DAY - 7 * HOUR);
     const items = [
       event("traded", tradeAt + 10 * MIN, {}),
       event("fresh", now - 2 * HOUR, { barClose: now - 2 * HOUR - 70_000 }),
