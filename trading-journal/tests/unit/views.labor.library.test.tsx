@@ -10,7 +10,7 @@ import type { BinanceRest } from "@/market/sources/binance";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { __resetLabor, __setHistoryDeps, LaborView, useLabor } from "@/views/labor";
-import { __resetExtras } from "@/views/labor/extrasStore";
+import { __resetExtras, useExtras } from "@/views/labor/extrasStore";
 import { __resetLibrary } from "@/views/labor/LibraryHost";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
@@ -242,6 +242,8 @@ describe("Labor · Parameter-Raster", { timeout: 120_000 }, () => {
     const grid = await screen.findByTestId("labor-grid", {}, { timeout: 15_000 });
     expect(grid).toHaveTextContent("nur zwei Zahlen der Regeln um ±25 % verschoben");
     expect(within(grid).queryByTestId("labor-grid-table")).toBeNull();
+    // the first choice of the two numbers is set by an effect after the card mounted – a click before it would run on no number
+    await waitFor(() => expect(useExtras.getState().gridSel.x).not.toBe(""));
     await act(async () => {
       fireEvent.click(within(grid).getByTestId("labor-grid-run"));
     });
