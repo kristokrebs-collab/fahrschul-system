@@ -35,6 +35,7 @@ import {
   updateConnection,
   useExchange,
 } from "../store";
+import { SCOPE_TEXT } from "../csv/scope";
 import { CONNECT, EX } from "../strings";
 import type { ExchangeConnection, ExchangeStatus, JournalAccount, SyncRun } from "../types";
 import { FactList, MaskedKey, Notice, VENUE_NAME, VenueTile } from "./parts";
@@ -123,11 +124,32 @@ export function ExchangeConnectionsCard({ className }: ExchangeConnectionsCardPr
             </Button>
           </div>
         ) : conn ? (
-          <Connected conn={conn} status={status} />
+          <>
+            <Connected conn={conn} status={status} />
+            <ScopeNote />
+          </>
         ) : (
-          <Hero status={status} />
+          <>
+            <Hero status={status} />
+            <ScopeNote />
+          </>
         )}
       </Card>
+    </div>
+  );
+}
+
+/** F42: what the sync reads and what it does not – in the words of the code (`csv/scope.ts`). */
+function ScopeNote() {
+  return (
+    <div className="mt-5 grid gap-1.5 border-t border-line pt-3 text-[11.5px] leading-snug text-mute" data-testid="exchange-scope">
+      <span className="label">Was der Sync abdeckt</span>
+      <p>{SCOPE_TEXT.syncReads}</p>
+      <ul className="grid gap-1">
+        <li>{SCOPE_TEXT.syncSpot}</li>
+        <li>{SCOPE_TEXT.syncCoinM}</li>
+        <li>{SCOPE_TEXT.syncHedge}</li>
+      </ul>
     </div>
   );
 }

@@ -17,6 +17,7 @@
  */
 import { aggregateFills, type CsvFill, type CsvFormat, type CsvTrade, type ParseResult } from "./model";
 import { cell, findCol, normalizePair, parseBuySell, parseNum, parseSide, parseTime, type CsvTable } from "./parse";
+import { isHedgeLeg, isInverseContract, noRejections, reject, rejectionWarnings } from "./scope";
 
 /** Share of `patterns` (each one header alternative) found in the header. */
 function score(header: readonly string[], required: RegExp[][], bonus: RegExp[][] = []): number {
@@ -121,10 +122,17 @@ export const binanceFormat: CsvFormat = {
       qty: col(t, /^(quantity|qty|executed)$/i),
       fee: col(t, /^fee$/i),
       id: col(t, /trade ?id|^id$/i),
+      // F42: a „Position Side“ column marks the hedge mode (LONG / SHORT legs of one symbol) – not supported
+      posSide: col(t, /^position ?side$/i),
     };
     const fills: CsvFill[] = [];
+    const rej = noRejections();
     let skipped = 0;
     t.rows.forEach((r, i) => {
+      const symbol = cell(r, ci.symbol);
+      // F42: Coin-M (BTCUSD_PERP …) and hedge-mode legs would be read as linear one-way fills: left out, counted, said
+      if (isInverseContract("binance", symbol)) return reject(rej, "inverse", symbol);
+      if (isHedgeLeg(cell(r, ci.posSide))) return reject(rej, "hedge", symbol);
       const side = parseBuySell(cell(r, ci.side));
       const price = parseNum(cell(r, ci.price));
       const qty = parseNum(cell(r, ci.qty));
@@ -135,7 +143,7 @@ export const binanceFormat: CsvFormat = {
       }
       fills.push({
         id: cell(r, ci.id) || `r${i}`,
-        symbol: cell(r, ci.symbol),
+        symbol,
         side,
         qty: Math.abs(qty),
         price,
@@ -148,7 +156,7 @@ export const binanceFormat: CsvFormat = {
     return {
       trades: agg.trades,
       skipped: skipped + agg.skipped,
-      warnings: open ? [`${open} Position(en) am Dateiende noch offen – als offen importiert.`] : [],
+      warnings: [...(open ? [`${open} Position(en) am Dateiende noch offen – als offen importiert.`] : []), ...rejectionWarnings(rej)],
     };
   },
 };
@@ -179,8 +187,14 @@ export const bybitFormat: CsvFormat = {
       id: col(t, /order ?id/i),
     };
     const out: CsvTrade[] = [];
+    const rej = noRejections();
     let skipped = 0;
     for (const r of t.rows) {
+      // F42: inverse contracts (BTCUSD, ETHUSD …, quantity in USD contracts, P&L in coin) are not read as linear
+      if (isInverseContract("bybit", cell(r, ci.symbol))) {
+        reject(rej, "inverse", cell(r, ci.symbol));
+        continue;
+      }
       const dir = cell(r, ci.dir);
       // the closing order: "Close Long" / "Sell" closes a long; "Close Short" / "Buy" closes a short
       const side: "long" | "short" | null = /long/i.test(dir)
@@ -216,7 +230,7 @@ export const bybitFormat: CsvFormat = {
         market: "perp",
       });
     }
-    return { trades: out, skipped, warnings: ci.opened < 0 ? ["Bybit exportiert nur die Schließzeit – Einstieg = Ausstiegszeit."] : [] };
+    return { trades: out, skipped, warnings: [...(ci.opened < 0 ? ["Bybit exportiert nur die Schließzeit – Einstieg = Ausstiegszeit."] : []), ...rejectionWarnings(rej)] };
   },
 };
 
@@ -256,8 +270,14 @@ export const okxFormat: CsvFormat = {
       id: col(t, /position id|pos id/i),
     };
     const out: CsvTrade[] = [];
+    const rej = noRejections();
     let skipped = 0;
     for (const r of t.rows) {
+      // F42: coin-margined swaps (BTC-USD-SWAP, quantity in contracts, P&L in coin) are not read as linear
+      if (isInverseContract("okx", cell(r, ci.inst))) {
+        reject(rej, "inverse", cell(r, ci.inst));
+        continue;
+      }
       const side = parseSide(cell(r, ci.side));
       const entry = parseNum(cell(r, ci.entry), dec(t));
       const closedAt = parseTime(cell(r, ci.closed), { assume: "utc" });
@@ -292,7 +312,7 @@ export const okxFormat: CsvFormat = {
         market: /swap|perp|futures/i.test(inst) || !/-.*-/.test(inst) ? "perp" : "spot",
       });
     }
-    return { trades: out, skipped, warnings: [] };
+    return { trades: out, skipped, warnings: rejectionWarnings(rej) };
   },
 };
 

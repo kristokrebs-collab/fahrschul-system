@@ -90,7 +90,7 @@ export const RISIKO = {
   },
   liq: {
     title: "Liquidation",
-    note: "Näherung mit deiner Tier-Tabelle. Jede Börse rechnet etwas anders.",
+    note: "Näherung mit deiner Tier-Tabelle. Jede Börse rechnet etwas anders. Gerechnet wird je Position für lineare USDT-Perps im Einweg-Modus – Spot (ohne Hebel), Coin-M und die Gegenposition eines Hedge-Modus sind nicht abgebildet.",
     planned: "Geplant (Rechner)",
     nearest: "Nächste Liquidation",
     distance: "Abstand",
