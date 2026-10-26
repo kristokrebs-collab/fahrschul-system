@@ -427,7 +427,7 @@ test.describe("Aktien", () => {
     await go(page);
     const nav = page.getByRole("navigation", { name: "Inhalt dieser Seite" });
     await expect(nav.getByRole("button")).toHaveText(["Scanner", "Watchlist", "News", "Analyse", "Kongress"]);
-    await expect(page.getByTestId("aktien-analyse")).toContainText("Kommt gleich");
+    for (const id of ["analyst-panel", "dcf-panel", "thesis-panel"]) await expect(page.getByTestId("aktien-analyse").getByTestId(id)).toBeVisible();
     await expect(page.getByTestId("aktien-kongress")).toContainText("Kommt gleich");
     await expect(page.locator("#aktien-watchlist-h")).toHaveText("Watchlist");
     await expect(page.getByTestId("aktien-watchlist")).toContainText("0 / 50");

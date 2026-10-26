@@ -2,7 +2,7 @@
  * The Aktien page (F67 scanner, watchlist, F68 news part) in jsdom, on the real stock contract with a fake API behind it
  * (the wire format of the four functions, parsed by the real client): the scan with its honest counts, the sentence of every
  * hit, the rank switch, the chart preview, the watchlist writes into `settings.watchlist`, the keyword-rated and merged
- * headlines with "Neu seit dem letzten Besuch", the slots ("Kommt gleich"), the plan link that exists only with a plan page,
+ * headlines with "Neu seit dem letzten Besuch", the analyst panels and the Congress slot ("Kommt gleich"), the plan link that exists only with a plan page,
  * and the reasons shown when the data cannot be had.
  */
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -126,8 +126,11 @@ describe("Aktien page", () => {
     expect(screen.getByTestId("aktien-results-idle")).toBeInTheDocument();
     expect(screen.getByTestId("aktien-watch-empty")).toBeInTheDocument();
     expect(screen.getByTestId("aktien-news-empty")).toBeInTheDocument();
-    // the analyst and congress parts are built elsewhere: they say "Kommt gleich" until then
-    expect(await screen.findByTestId("aktien-analyse")).toHaveTextContent("Kommt gleich");
+    // the analyst section hosts the three panels (numbers, DCF, thesis); the Congress tracker says "Kommt gleich" until it exists
+    const analyse = await screen.findByTestId("aktien-analyse");
+    expect(await within(analyse).findByTestId("analyst-panel")).toBeInTheDocument();
+    expect(await within(analyse).findByTestId("dcf-panel")).toBeInTheDocument();
+    expect(await within(analyse).findByTestId("thesis-panel")).toBeInTheDocument();
     expect(await screen.findByTestId("aktien-kongress")).toHaveTextContent("Kommt gleich");
     expect(screen.getByText(/Die App sendet nie Orders/)).toBeInTheDocument();
     expect(world.calls).toEqual([]); // opening the page asks for nothing: a scan starts only when the trader starts it

@@ -298,9 +298,9 @@ _Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 30 Funktionen
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
-| Sehen, was eine Firma zuletzt gemeldet hat | Zahlen-Analyst | Analyse | teilweise |
-| Den Wert einer Aktie als Spanne durchrechnen | DCF-Rechner | Analyse | fertig |
-| Eine Kaufthese festhalten und gegen neue Zahlen prüfen | Kaufthese | Analyse | teilweise |
+| Sehen, was eine Firma zuletzt gemeldet hat | Zahlen-Analyst | Aktien › Analyse · Zahlen | teilweise |
+| Den Wert einer Aktie als Spanne durchrechnen | DCF-Rechner | Aktien › Analyse · Bewertung | fertig |
+| Eine Kaufthese festhalten und gegen neue Zahlen prüfen | Kaufthese | Aktien › Analyse · These | teilweise |
 
 ### Üben & Wachsen
 
