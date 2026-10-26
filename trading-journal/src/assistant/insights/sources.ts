@@ -6,6 +6,7 @@
  */
 import type { ToolEnv } from "../tools";
 import type { DiscoveryMemory } from "@/views/discovery/lastResult";
+import type { TimeMachineMemory } from "@/views/timemachine/lastResult";
 import type { ExtraInput, ForwardInput, LabRunInput, SignalsInput, SimilarInput } from "./types";
 import type { StressRows } from "@/domain/lab/stress/types";
 import type { FilterCompare } from "@/domain/lab/filters";
@@ -26,6 +27,12 @@ export async function labRun(env: Env): Promise<LabRunInput | null> {
 export async function discoveryMemory(env: Env): Promise<DiscoveryMemory | null> {
   if (env.insight && "discovery" in env.insight) return env.insight.discovery ?? null;
   return (await import("@/views/discovery/lastResult")).lastDiscovery();
+}
+
+/** The last finished run of the Zeitmaschine in this session, or `null` – nothing is computed here. */
+export async function timeMachineMemory(env: Env): Promise<TimeMachineMemory | null> {
+  if (env.insight && "timemachine" in env.insight) return env.insight.timemachine ?? null;
+  return (await import("@/views/timemachine/lastResult")).lastTimeMachine();
 }
 
 /** The stress scenarios the trader has computed for the shown run (`idle` when none). */

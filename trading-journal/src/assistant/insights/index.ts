@@ -1,7 +1,7 @@
 /**
  * The assistant's evaluation tools (lazy chunk, loaded by `engine.ts` when a question is routed to one of them): the answers of
  * the finished analyses – Prüfbericht and Belastung of the last lab run, Forward-Test, Trendlinien, Signale, Monatsnutzen,
- * ähnliche Situationen, „Passt zu dir?“, Strategie-Bibliothek. Each tool imports its own source on demand (a second dynamic
+ * ähnliche Situationen, „Passt zu dir?“, Strategie-Bibliothek, Zeitmaschine. Each tool imports its own source on demand (a second dynamic
  * import per topic), takes every figure from the existing deterministic function and only ever OPENS a place in the app.
  * See `src/assistant/README.md` → „Auswertungen“.
  */
@@ -40,5 +40,7 @@ export async function runInsight(tool: InsightToolId, question: string, env: Too
       return (await import("./discovery")).discoveryAnswer(norm, env);
     case "evolve":
       return (await import("./evolve")).evolveAnswer(norm, env);
+    case "timemachine":
+      return (await import("./timemachine")).timemachineAnswer(norm, env);
   }
 }
