@@ -17,6 +17,7 @@ import type { SignalOutcome } from "@/domain/missed/outcome";
 import type { SimilarResult, SimUnit } from "@/domain/similar";
 import type { TrendView } from "@/market/trendlines/store";
 import type { DiscoveryMemory } from "@/views/discovery/lastResult";
+import type { TimeMachineMemory } from "@/views/timemachine/lastResult";
 
 /** The last finished Labor run as the store holds it (`null` = none). */
 export interface LabRunInput {
@@ -69,6 +70,8 @@ export interface InsightInputs {
   similar?: SimilarInput;
   /** the last finished search of the Muster-Entdecker (`null` = none this session) */
   discovery?: DiscoveryMemory | null;
+  /** the last finished run of the Zeitmaschine (`null` = none this session) */
+  timemachine?: TimeMachineMemory | null;
   /** `settings.evolve` as stored (the optimiser's proposals, counters and learning), `undefined` = none */
   evolve?: unknown;
   /** what the Morgenbriefing reads (F43): the stores' values and the clock of the briefing */

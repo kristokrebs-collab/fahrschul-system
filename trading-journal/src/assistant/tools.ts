@@ -163,6 +163,7 @@ const TOPIC_LABEL: Readonly<Record<string, string>> = {
   discovery: "Muster der Gewinner und Verlierer",
   evolve: "Hintergrund-Optimierer",
   briefing: "Morgenbriefing",
+  timemachine: "Zeitmaschine",
 };
 
 /** German label of a learned topic key. */
@@ -395,6 +396,7 @@ export const INTEREST_QUESTION: Readonly<Record<string, string>> = {
   discovery: "Was haben meine Gewinner gemeinsam?",
   evolve: "Was hat der Optimierer gefunden?",
   briefing: "Was ist heute wichtig?",
+  timemachine: "Wie stehen die Chancen für meinen Plan?",
 };
 
 /** Chips for the greeting and help: the most asked topics first, then a few safe defaults. */

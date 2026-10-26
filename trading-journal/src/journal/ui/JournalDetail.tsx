@@ -16,6 +16,7 @@ import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useEnriched, useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
+import { openTimeMachine } from "@/views/timemachine/sheetStore";
 import { openReplay } from "@/views/trades/replay/replayStore";
 import { openWhatIf } from "@/views/trades/whatif/whatIfStore";
 import { openTraining } from "@/views/ueben/trainingStore";
@@ -223,6 +224,10 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
         {/* F33 / F38: other rules on the same candles; practise this kind of situation without the future */}
         <ActionButton onClick={() => (replayOk ? openWhatIf(t.id, { fromDetail: true }) : openUpgrade("replay"))} icon="M4 7h10M4 12h16M4 17h7M17 4l3 3-3 3">
           Was wäre wenn
+        </ActionButton>
+        {/* Zeitmaschine: this trade's plan played through 10 000 simulated sessions and every earlier occasion – only candles before the entry */}
+        <ActionButton onClick={() => (replayOk ? openTimeMachine(t.id, { fromDetail: true }) : openUpgrade("replay"))} icon="M12 7v5l3.5 2M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4">
+          Zeitmaschine
         </ActionButton>
         <ActionButton onClick={() => (replayOk ? openTraining({ tradeId: t.id, fromDetail: true }) : openUpgrade("replay"))} icon="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 12l8-4.5M12 12v9M12 12L4 7.5">
           Üben

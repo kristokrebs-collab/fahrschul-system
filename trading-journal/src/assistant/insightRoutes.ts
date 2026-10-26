@@ -12,7 +12,7 @@
  */
 import { has, tokensOf } from "./fuzzy";
 
-export const INSIGHT_TOOL_IDS = ["audit", "stress", "forward", "trend", "signals", "quality", "benefit", "situation", "fit", "demands", "library", "discovery", "evolve", "briefing"] as const;
+export const INSIGHT_TOOL_IDS = ["audit", "stress", "forward", "trend", "signals", "quality", "benefit", "situation", "fit", "demands", "library", "discovery", "evolve", "briefing", "timemachine"] as const;
 export type InsightToolId = (typeof INSIGHT_TOOL_IDS)[number];
 export const isInsightTool = (t: string): t is InsightToolId => (INSIGHT_TOOL_IDS as readonly string[]).includes(t);
 
@@ -148,6 +148,18 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
       (today && has(t, "wichtig", "ansteht", "anstehen", "termin", "ereignis", "=events", "=event", "kalender")) ||
       (today && has(t, "=steht") && has(t, "=an"))
     );
+  }),
+  // 9 · the Zeitmaschine: how often an entry / stop / target plan hit the target first (only quotes the last finished run – never starts one).
+  //     „Wie oft erreicht mein Trade das Ziel?“ stays a journal question: the Zeitmaschine needs its own word, or „Ziel“ + „Stop“ + „zuerst“
+  rule("timemachine", "timemachine", "Zeitmaschine", (t) => {
+    const plan = has(t, "plan", "aufbau");
+    const monte = has(t, "monte") && has(t, "carlo");
+    const first = has(t, "ziel") && has(t, "stop") && has(t, "zuerst");
+    const own = has(t, ...OWN);
+    const play = has(t, "durchspiel", "durchrechn", "simulier") && (plan || has(t, "setup", "trade"));
+    const odds = has(t, "chance", "chancen", "wahrscheinlich") && plan;
+    // „mein Plan“ is the plan of the Zeitmaschine, „meine Trades“ are the journal
+    return has(t, "zeitmaschine") || (monte && plan) || odds || (first && (!own || plan)) || (play && (!own || plan));
   }),
 ];
 

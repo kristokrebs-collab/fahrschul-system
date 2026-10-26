@@ -178,3 +178,10 @@ Tests: `views.evolve.labor.test.tsx`, e2e `evolve.spec.ts`.
 ## Inhalt-Leiste (Auffindbarkeit)
 
 Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Chips für die Abschnitte, die gerade da sind (Diagnose, Passt zu dir?, Belastung, Robustheit erst nach einem fertigen Lauf, Vergleich ab dem ersten gespeicherten Lauf); `Section section=…` setzt `data-section` am Titel. Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.
+
+## Zeitmaschine (Abschnitt ganz unten)
+Abschnitt `Zeitmaschine` (`tm-section`, lazy chunk `@/views/timemachine/LaborSection`, nach dem Muster-Entdecker, Chip in der Inhalt-Leiste): ein Plan per Hand (Markt, Richtung, Einstieg, Stop, Ziel, Zeitrahmen 15m / 1h / 4h / 1T, Zeitraum), die
+Kerzen über denselben Lader wie der Lauf (`loadLabData`, Cache zuerst, nur geschlossene Kerzen), Kosten wie im Versuchsaufbau (Gebührenstufe, Slippage, Funding pauschal – nicht die echte Funding-Historie), darunter die Karte
+`TimeMachineCard` (10 000 Sitzungen + jeder frühere Vorfall, Worker mit Fortschritt und Abbruch). Weitere Einstellungen (Zeitstopp, Läufe, Seed, Ziehen, Schwankung, Trend, Suche nach früheren Vorfällen, Break-even, Trailing)
+hinter dem „+“. Ein geänderter Preis rechnet auf denselben Kerzen neu; Markt, Zeitrahmen oder Zeitraum verlangen neue Kerzen. Details: `src/views/timemachine/README.md`, `src/domain/timemachine/README.md`.
+Tests: `tests/unit/views.timemachine.test.tsx`, e2e `tests/e2e/timemachine.spec.ts`.

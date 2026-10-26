@@ -12,6 +12,7 @@
  *   TradingView     AdapterStatusCard (6) · TvCompareCard (6)                                 (lazy chunk, always; F14)
  *   Versionen …     VersionsCard · PlaybookCard (DraftsSection, 12)                            (lazy chunk, always; F15 / F13 / F45)
  *   Muster-Entdecker DiscoverySection (12): patterns of a backtest / the journal vs. chance        (lazy chunk, always; Auftrag B)
+ *   Zeitmaschine    TimeMachineSection (12): a hand-typed plan played through 10 000 simulated sessions and every earlier occasion (lazy chunk, always)
  * Above the set-up, when an idea came from the journal ("Diese Idee testen", F12): IdeaCard (12).
  * Every cell reveals once (`Reveal`, ends at `transform: none`), section titles rise letter by letter. The replay
  * sheet of a backtest trade is mounted here (`LabReplayHost`). Registered by the integrator (P14) as page `labor`.
@@ -55,6 +56,8 @@ const DraftsSection = lazy(() => import("./DraftsSection"));
 const DiscoverySection = lazy(() => import("./DiscoverySection"));
 /** F66: the background optimiser – its own chunk (the panel, the worker and the search load with it). */
 const EvolveSection = lazy(() => import("@/views/evolve/EvolveSection"));
+/** Zeitmaschine: the plan form + the card (charts, worker) – its own chunks, fetched when the page is shown. */
+const TimeMachineSection = lazy(() => import("@/views/timemachine/LaborSection"));
 
 export const LABOR_LEAD_FILL = { storageKey: storageKey("fill-labor"), highlight: LABOR.highlight } as const;
 
@@ -76,7 +79,7 @@ export function LaborView({ className }: { className?: string }) {
   const custom = useLabor((s) => s.cfg.strategy === "custom");
   const hasIdea = useLabor((s) => s.idea != null);
   const busy = status === "loading" || status === "running";
-  const ids = { setup: useId(), run: useId(), diagnose: useId(), fit: useId(), extras: useId(), forward: useId(), robust: useId(), compare: useId(), tv: useId(), drafts: useId(), discovery: useId(), evolve: useId() };
+  const ids = { setup: useId(), run: useId(), diagnose: useId(), fit: useId(), extras: useId(), forward: useId(), robust: useId(), compare: useId(), tv: useId(), drafts: useId(), discovery: useId(), evolve: useId(), timemachine: useId() };
   const T = LABOR.sections;
   // the sections that exist right now (the ones below a run only after a finished run), for the "Inhalt" strip
   const shown = hasResult && !busy;
@@ -91,6 +94,7 @@ export function LaborView({ className }: { className?: string }) {
     { id: "tv", label: T.tv.title },
     { id: "drafts", label: DRAFTS.section.title },
     { id: "discovery", label: "Muster-Entdecker" },
+    { id: "timemachine", label: "Zeitmaschine" },
   ];
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="labor-view" data-status={status}>
@@ -202,6 +206,13 @@ export function LaborView({ className }: { className?: string }) {
         <Cell index={0} span="lg:col-span-12">
           <Suspense fallback={null}>
             <DiscoverySection />
+          </Suspense>
+        </Cell>
+      </Section>
+      <Section id={ids.timemachine} section="timemachine" title="Zeitmaschine" sub="Den Plan 10 000 Mal durchspielen – und gegen jedes frühere Mal halten, als er ausgelöst hätte.">
+        <Cell index={0} span="lg:col-span-12">
+          <Suspense fallback={null}>
+            <TimeMachineSection />
           </Suspense>
         </Cell>
       </Section>
