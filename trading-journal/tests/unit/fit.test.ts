@@ -4,7 +4,8 @@
  * are built FROM UTC instants so the tests do not depend on the time zone.
  */
 import { describe, expect, it } from "vitest";
-import { compareFit, drawdownDepth, journalProfile, strategyFacts } from "@/domain/fit";
+import { barLabel, compareFit, drawdownDepth, journalProfile, parseTimeframe, strategyFacts, type FitRunInput } from "@/domain/fit";
+import type { DayNotes } from "@/domain/types";
 import type { BehaviorEvent } from "@/domain/coach/events";
 import { COACH_SETTINGS, ct, enrichC } from "./coach.fixtures";
 import { D, H, MON, idea, journalRaw, local } from "./fit.fixtures";
@@ -103,9 +104,9 @@ describe("compareFit – hand-computed", () => {
   const r = compareFit(s, j);
   const by = (id: string) => r.items.find((i) => i.id === id)!;
 
-  it("eight statements in a fixed order, no score anywhere", () => {
+  it("eleven statements in a fixed order, no score anywhere", () => {
     expect(r.status).toBe("ok");
-    expect(r.items.map((i) => i.id)).toEqual(["winRate", "hold", "streak", "drawdown", "frequency", "window", "risk", "discipline"]);
+    expect(r.items.map((i) => i.id)).toEqual(["winRate", "hold", "streak", "drawdown", "frequency", "window", "risk", "discipline", "cadence", "ruleload", "timebudget"]);
     expect(Object.keys(r)).toEqual(["status", "reason", "strategy", "profile", "items"]);
     expect(JSON.stringify(r)).not.toMatch(/score|Score|Empfehlung|empfehle/);
   });
@@ -169,7 +170,167 @@ describe("compareFit – hand-computed", () => {
       trades: journalE().map((t, i) => ({ entryTime: new Date(t.date).getTime(), exitTime: new Date(t.exitDate!).getTime(), r: t.r!, pnl: i % 2 === 0 ? 200 : -100 })),
     });
     const m = compareFit(mirror, jj);
-    expect(m.items.map((i) => `${i.id}:${i.kind}`)).toEqual(["winRate:match", "hold:match", "streak:match", "drawdown:match", "frequency:match", "window:match", "risk:match", "discipline:match"]);
+    expect(m.items.map((i) => `${i.id}:${i.kind}`)).toEqual(["winRate:match", "hold:match", "streak:match", "drawdown:match", "frequency:match", "window:match", "risk:match", "discipline:match", "cadence:unknown", "ruleload:unknown", "timebudget:unknown"]);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------------------------ effort */
+
+describe("Prüftakt, Regelumfang, Zeitbudget (F49)", () => {
+  const withIdea = (extra: Partial<FitRunInput>) => strategyFacts({ ...idea(), ...extra });
+  /** the same journal, with a checklist: three global rules + the items of the setup „s_good“ every fixture trade carries */
+  const LIST = { ...COACH_SETTINGS, rules: [1, 2, 3].map((n) => ({ id: `r${n}`, text: `Regel ${n}` })) };
+  const checklistLen = LIST.rules.length + (LIST.setups.find((x) => x.id === "s_good")?.checklist ?? []).length;
+  const j = journalProfile(enrichC(journalRaw(), LIST), LIST);
+  const item = (id: string, s = withIdea({ interval: "4h", rules: { conds: 3, exits: 2 } }), prof = j) => compareFit(s, prof).items.find((i) => i.id === id)!;
+
+  describe("candle sizes", () => {
+    it("reads the sizes the journal and the lab write", () => {
+      expect(parseTimeframe("15m")).toBe(15 * 60_000);
+      expect(parseTimeframe("1H")).toBe(H);
+      expect(parseTimeframe("4h")).toBe(4 * H);
+      expect(parseTimeframe(" 1D ")).toBe(D);
+      expect(parseTimeframe("1w")).toBe(7 * D);
+      expect(parseTimeframe("90min")).toBe(90 * 60_000);
+      for (const bad of ["", "h", "4", "4 stunden", "0h", null, undefined, 4, "4hh"]) expect(parseTimeframe(bad)).toBeNull();
+    });
+    it("names them in the words of the card", () => {
+      expect(barLabel(15 * 60_000)).toBe("15 Min");
+      expect(barLabel(4 * H)).toBe("4 Std");
+      expect(barLabel(D)).toBe("1 Tag");
+      expect(barLabel(2 * D)).toBe("2 Tage");
+      expect(barLabel(90 * 60_000)).toBe("90 Min");
+    });
+  });
+
+  describe("the idea's side", () => {
+    it("the candle it decides on and the parts it is made of; the templates have no rule list", () => {
+      const s = withIdea({ interval: "15m", rules: { conds: 4, exits: 2 } });
+      expect(s.bar).toEqual({ ms: 15 * 60_000, label: "15 Min" });
+      expect(s.rules).toEqual({ conds: 4, exits: 2 });
+      expect(strategyFacts(idea()).bar).toBeNull(); // no interval given: unknown, never guessed
+      expect(strategyFacts(idea()).rules).toBeNull();
+      expect(withIdea({ interval: "wöchentlich" }).bar).toBeNull();
+    });
+  });
+
+  describe("the journal's side", () => {
+    it("24 trades on 4h candles; every trade carries the checklist (global rules + the setup's items)", () => {
+      expect(j.timeframe).toEqual({ n: 24, medianMs: 4 * H, label: "4 Std" });
+      expect(j.checklist).toEqual({ n: 24, median: checklistLen });
+      expect(checklistLen).toBeGreaterThanOrEqual(3);
+      // without any checklist the statement has nothing to compare: zero items are no checklist
+      expect(journalProfile(journalE(), COACH_SETTINGS).checklist).toEqual({ n: 0, median: null });
+    });
+    it("the usual candle is an actual size, not a mean between two", () => {
+      const mixed = enrichC([...Array.from({ length: 6 }, (_, i) => ct(local(MON + i * D), { id: `a${i}`, p: 100, timeframe: "1h" })), ...Array.from({ length: 6 }, (_, i) => ct(local(MON + (10 + i) * D), { id: `b${i}`, p: 100, timeframe: "4h" }))]);
+      expect(journalProfile(mixed, COACH_SETTINGS).timeframe).toEqual({ n: 12, medianMs: H, label: "1 Std" }); // the lower middle, not 2,5 h
+    });
+    it("counts the days that said how much time they have, and only those", () => {
+      const checkin = (min: number | undefined, extra: Record<string, unknown> = {}) => ({ note: "", updatedAt: "x", checkin: { energy: 3, ...(min != null ? { availableMin: min } : {}), ...extra } });
+      const days = {
+        "2026-01-05": checkin(30),
+        "2026-01-06": checkin(60),
+        "2026-01-07": checkin(60),
+        "2026-01-08": checkin(120),
+        "2026-01-09": checkin(240),
+        "2026-01-10": checkin(undefined), // answered, but not the time
+        "2026-01-11": { note: "nur eine Notiz", updatedAt: "x" }, // no check-in at all
+      } as unknown as DayNotes;
+      expect(journalProfile(journalE(), COACH_SETTINGS, [], days).budget).toEqual({ n: 5, medianMin: 60 });
+      expect(j.budget).toEqual({ n: 0, medianMin: null });
+    });
+  });
+
+  describe("Prüftakt", () => {
+    it("friction: the idea looks 16 times as often as the trader's usual candle (96 against 6 a day)", () => {
+      const it15 = item("cadence", withIdea({ interval: "15m" }));
+      expect(it15.kind).toBe("friction");
+      expect(it15.text).toContain("auf jeder 15 Min-Kerze (96-mal am Tag)");
+      expect(it15.text).toContain("4 Std-Kerzen (6-mal am Tag)");
+      expect(it15.text).toContain("etwa 16-mal so oft hinschauen");
+      expect(it15.evidence).toEqual([
+        { label: "Idee", value: "15 Min-Kerzen · 96 Prüfpunkte am Tag" },
+        { label: "Du (Median)", value: "4 Std-Kerzen · 6 am Tag · 24 Trades mit Kerzengröße" },
+      ]);
+      expect(it15.caveat).toContain("Wie lange ein Blick dauert, weiß die App nicht");
+    });
+    it("the same candle, or one up to 3 times as fast: no friction – 4 times as fast is the edge", () => {
+      expect(item("cadence", withIdea({ interval: "4h" })).kind).toBe("match");
+      expect(item("cadence", withIdea({ interval: "2h" })).kind).toBe("match"); // twice as fast
+      expect(item("cadence", withIdea({ interval: "1h" })).kind).toBe("friction"); // 4 times: the factor is inclusive
+    });
+    it("a slower idea is no burden, and it says so", () => {
+      const slow = item("cadence", withIdea({ interval: "1d" }));
+      expect(slow.kind).toBe("match");
+      expect(slow.text).toContain("Die Idee prüft seltener als du");
+    });
+    it("unknown without a candle of the idea, or with too few readable candles in the journal – with the reason", () => {
+      expect(item("cadence", withIdea({})).kind).toBe("unknown");
+      expect(item("cadence", withIdea({})).text).toContain("nennt keine Kerzengröße");
+      const few = enrichC(Array.from({ length: 24 }, (_, i) => ct(local(MON + i * D), { id: `n${i}`, p: 100, timeframe: i < 4 ? "4h" : "" })));
+      const w = item("cadence", withIdea({ interval: "15m" }), journalProfile(few, LIST));
+      expect(w.kind).toBe("unknown");
+      expect(w.text).toContain("Bei 4 deiner Trades ist eine Kerzengröße eingetragen; ab 10");
+    });
+  });
+
+  describe("Regelumfang", () => {
+    it("friction from twice the usual checklist and at least three more parts", () => {
+      const big = item("ruleload", withIdea({ interval: "4h", rules: { conds: checklistLen * 2, exits: 3 } }));
+      expect(big.kind).toBe("friction");
+      expect(big.text).toContain(`${checklistLen * 2 + 3} Regelteilen`);
+      expect(big.evidence[0]!.value).toContain(`${checklistLen * 2 + 3} Regelteile (${checklistLen * 2} Bedingungen + 3 Ausstiegsregeln)`);
+      expect(big.evidence[1]!.value).toContain(`${checklistLen} Punkte je Checkliste · 24 Trades mit Checkliste`);
+      expect(big.caveat).toContain("verschiedene Dinge");
+    });
+    it("a plain idea is within the usual: no friction", () => {
+      expect(item("ruleload", withIdea({ interval: "4h", rules: { conds: checklistLen, exits: 1 } })).kind).toBe("match");
+    });
+    it("needs twice AND three more: a short checklist does not turn two extra parts into friction", () => {
+      const short = enrichC(Array.from({ length: 24 }, (_, i) => ct(local(MON + i * D), { id: `s${i}`, p: 100, setups: [] })), LIST);
+      const prof = journalProfile(short, LIST);
+      expect(prof.checklist).toEqual({ n: 24, median: 3 }); // only the three global rules
+      expect(item("ruleload", withIdea({ interval: "4h", rules: { conds: 6, exits: 0 } }), prof).kind).toBe("friction"); // 6 = twice 3 and 3 more
+      expect(item("ruleload", withIdea({ interval: "4h", rules: { conds: 5, exits: 0 } }), prof).kind).toBe("match"); // 5 is not twice 3
+      const one = { ...LIST, rules: [LIST.rules[0]!] };
+      const tiny = journalProfile(enrichC(Array.from({ length: 24 }, (_, i) => ct(local(MON + i * D), { id: `t${i}`, p: 100, setups: [] })), one), one);
+      expect(tiny.checklist.median).toBe(1);
+      expect(item("ruleload", withIdea({ interval: "4h", rules: { conds: 3, exits: 0 } }), tiny).kind).toBe("match"); // 3 = three times 1, but only 2 more: below the 3-part margin
+    });
+    it("unknown for the fixed templates and for a journal without checklists – with the reason", () => {
+      const tpl = item("ruleload", withIdea({ interval: "4h" }));
+      expect(tpl.kind).toBe("unknown");
+      expect(tpl.text).toContain("feste Logik");
+      const bare = { ...COACH_SETTINGS, rules: [], setups: [] };
+      const none = journalProfile(enrichC(Array.from({ length: 24 }, (_, i) => ct(local(MON + i * D), { id: `z${i}`, p: 100, setups: [] })), bare), bare);
+      const w = item("ruleload", withIdea({ interval: "4h", rules: { conds: 5, exits: 1 } }), none);
+      expect(w.kind).toBe("unknown");
+      expect(w.text).toContain("steht eine Checkliste; ab 10");
+    });
+  });
+
+  describe("Zeitbudget", () => {
+    const days = Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`2026-01-0${i + 1}`, { note: "", updatedAt: "x", checkin: { energy: 3, availableMin: i < 4 ? 60 : 120 } }])) as unknown as DayNotes;
+    const budgeted = journalProfile(journalE(), COACH_SETTINGS, [], days);
+
+    it("sets the two figures side by side and leaves the verdict to the trader", () => {
+      const t = item("timebudget", withIdea({ interval: "1h" }), budgeted);
+      expect(t.kind).toBe("unknown"); // never a friction or a match: the length of a look is not known
+      expect(t.text).toContain("auf jede 1 Std-Kerze (24-mal am Tag)");
+      expect(t.text).toContain("im Median 1 Std am Tag");
+      expect(t.text).toContain("ob die Zeit reicht, entscheidest du");
+      expect(t.evidence).toEqual([
+        { label: "Idee", value: "24 Prüfpunkte am Tag (1 Std-Kerzen) · 2,5 Trades pro Woche" },
+        { label: "Du (Median)", value: "1 Std am Tag laut Check-in · 6 Tage" },
+      ]);
+    });
+    it("asks for the check-in field when there are not enough answers", () => {
+      const t = item("timebudget", withIdea({ interval: "1h" }));
+      expect(t.kind).toBe("unknown");
+      expect(t.text).toContain("an 0 Tagen angegeben");
+      expect(t.text).toContain("Verfügbare Zeit");
+    });
   });
 });
 

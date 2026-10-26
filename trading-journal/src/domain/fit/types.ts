@@ -19,6 +19,10 @@ export const MIN_RISK = 10;
 export const MIN_PLAN = 10;
 /** Journal span (days) before a weekly trade frequency means anything. */
 export const MIN_SPAN_DAYS = 14;
+/** Trades with a readable time frame / with a checklist, and check-in days with an answer, before the effort statements compare. */
+export const MIN_TIMEFRAME = 10;
+export const MIN_CHECKLIST = 10;
+export const MIN_BUDGET = 5;
 
 /** Thresholds of the statements (one place, documented in README.md). */
 export const FIT_RULES = {
@@ -41,6 +45,11 @@ export const FIT_RULES = {
   stopShare: 0.9,
   widenedShare: 0.05,
   planShare: 0.7,
+  /** the idea checks its rules at least this many times as often as the trader's usual candle (Prüftakt) */
+  cadenceFactor: 4,
+  /** the idea has at least this factor of rule parts of the trader's usual checklist AND at least `ruleMinExtra` more (Regelumfang) */
+  ruleFactor: 2,
+  ruleMinExtra: 3,
 } as const;
 
 export interface Share {
@@ -77,6 +86,13 @@ export interface StrategyFacts {
   weekday: number[];
   session: Record<SessionKey, number>;
   sumR: number;
+  /** The candle the idea decides on (`4h` → 14 400 000 ms): the rules are checked at the end of each one. `null` = unknown. */
+  bar: { ms: number; label: string } | null;
+  /**
+   * What the trader has to check: entry conditions and exit rules of the idea (Break-even, trailing, partial, time stop …).
+   * `null` for the fixed templates (Box, MCB), whose logic is not a list of rules.
+   */
+  rules: { conds: number; exits: number } | null;
 }
 
 export interface JournalProfile {
@@ -90,6 +106,12 @@ export interface JournalProfile {
   win: Share;
   hold: { n: number; medianMs: number | null };
   longestLosing: number;
+  /** The candle sizes of the trades (`Trade.timeframe`, readable ones only): how many, the median, its label. */
+  timeframe: { n: number; medianMs: number | null; label: string | null };
+  /** Checklist items per trade (the rules + the setups' items) among the closed trades that have a checklist. */
+  checklist: { n: number; median: number | null };
+  /** Minutes the trader says they have per day (check-in „Verfügbare Zeit“), among the days that answered. */
+  budget: { n: number; medianMin: number | null };
   drawdown: { n: number; depthR: number };
   /** risk per trade in percent of the start capital of the account */
   risk: { n: number; medianPct: number | null };
@@ -106,7 +128,7 @@ export interface JournalProfile {
 }
 
 export type FitKind = "match" | "friction" | "unknown";
-export type FitId = "winRate" | "hold" | "streak" | "drawdown" | "frequency" | "window" | "risk" | "discipline";
+export type FitId = "winRate" | "hold" | "streak" | "drawdown" | "frequency" | "window" | "risk" | "discipline" | "cadence" | "ruleload" | "timebudget";
 
 export interface FitEvidence {
   label: string;
@@ -134,6 +156,6 @@ export interface FitReport {
   reason: string | null;
   strategy: StrategyFacts | null;
   profile: JournalProfile | null;
-  /** in a fixed order: win rate, hold, streak, drawdown, frequency, window, risk, discipline */
+  /** in a fixed order: win rate, hold, streak, drawdown, frequency, window, risk, discipline, cadence, ruleload, timebudget */
   items: FitItem[];
 }

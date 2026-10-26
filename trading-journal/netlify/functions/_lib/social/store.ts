@@ -4,7 +4,7 @@
  */
 import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { socialStats, WINDOW_DAYS, type MetricTrade, type SocialStats } from "../../../../src/social/metrics";
+import { isOriginClass, socialStats, WINDOW_DAYS, type MetricTrade, type SocialStats } from "../../../../src/social/metrics";
 import { pseudonymFrom } from "../../../../src/social/pseudonym";
 import type { GroupKind, GroupRole, MemberFigures, ShareLevel, SocialMe } from "../../../../src/social/contract";
 import { HttpError } from "../http";
@@ -116,6 +116,8 @@ export interface MemberStatsRow {
   discipline: number | string | null;
   consistency: number | string | null;
   eligible: boolean;
+  max_dd_r: number | string | null;
+  origin: string | null;
 }
 
 /** numeric columns arrive as strings from PostgREST */
@@ -131,11 +133,13 @@ export function figuresOf(r: MemberStatsRow): MemberFigures {
     winRate: numOrNull(r.win_rate),
     discipline: numOrNull(r.discipline),
     consistency: numOrNull(r.consistency),
+    drawdownR: numOrNull(r.max_dd_r),
+    origin: isOriginClass(r.origin) ? r.origin : null,
     computedAt: r.computed_at,
   };
 }
 
-const STATS_COLUMNS = "user_id,computed_at,window_days,trades,r_trades,expectancy_r,win_rate,discipline,consistency,eligible";
+const STATS_COLUMNS = "user_id,computed_at,window_days,trades,r_trades,expectancy_r,win_rate,discipline,consistency,eligible,max_dd_r,origin";
 
 export async function statsOf(ids: readonly string[]): Promise<Map<string, MemberStatsRow>> {
   const out = new Map<string, MemberStatsRow>();
@@ -148,7 +152,7 @@ export async function statsOf(ids: readonly string[]): Promise<Map<string, Membe
 }
 
 /** The journal fields the figures read – nothing else of a trade is ever loaded (data minimisation). */
-const TRADE_FIELDS = "r:data->r,status:data->>status,date:data->>date,followedPlan:data->followedPlan,mistakes:data->mistakes";
+const TRADE_FIELDS = "r:data->r,status:data->>status,date:data->>date,followedPlan:data->followedPlan,mistakes:data->mistakes,origin:data->origin";
 const PAGE = 1000;
 
 /** The user's closed-or-open trades of the window from the synced journal (tombstones excluded). */
@@ -189,6 +193,8 @@ export async function computeStats(userId: string, now: number = Date.now()): Pr
         discipline: s.discipline,
         consistency: s.consistency,
         eligible: s.eligible,
+        max_dd_r: s.drawdownR,
+        origin: s.origin,
       },
       { onConflict: "user_id" },
     );

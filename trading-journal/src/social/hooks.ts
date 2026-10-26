@@ -6,7 +6,7 @@ import { useCloudSession } from "@/cloud/session";
 import { useJournal } from "@/store/journalStore";
 import type { CommunityDistribution } from "./contract";
 import { clearInviteFromUrl, parseInvite } from "./links";
-import { metricValue, percentileOf, socialStats, type SocialMetric, type SocialStats } from "./metrics";
+import { betterThanPct, metricValue, socialStats, type SocialMetric, type SocialStats } from "./metrics";
 import { checkInvite, communityEnabled, loadBoard, loadCommunity, loadShares, resetSocial, useSocial } from "./store";
 
 /** The trader's own R-based figures, computed on this device over the local journal (same code as the server). */
@@ -52,10 +52,10 @@ export function useCommunityBoot(): void {
 export function percentileIn(dist: readonly CommunityDistribution[] | undefined, metric: SocialMetric, value: number | null): number | null {
   const d = dist?.find((x) => x.metric === metric);
   if (!d || value == null) return null;
-  return percentileOf(value, d);
+  return betterThanPct(metric, value, d);
 }
 
 /** My value of a metric: the server's figures when present, else the local preview. */
-export function myValue(metric: SocialMetric, server: { expectancyR: number | null; discipline: number | null; consistency: number | null; winRate: number | null } | null, local: SocialStats): number | null {
+export function myValue(metric: SocialMetric, server: { expectancyR: number | null; discipline: number | null; consistency: number | null; winRate: number | null; drawdownR?: number | null } | null, local: SocialStats): number | null {
   return metricValue(server ?? local, metric);
 }

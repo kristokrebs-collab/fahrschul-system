@@ -5,12 +5,13 @@
  * 1. Figures per candidate from the synced journal (`member_stats`, R-based, last 90 days) – within a time budget;
  *    whoever is not reached keeps yesterday's figures (≤ 3 days old still count).
  * 2. Ranks per metric among eligible ranking opt-ins (≥ MIN_TRADES R trades) → `leaderboard_snapshots` of today
- *    (replaced, so a re-run is idempotent).
+ *    (replaced, so a re-run is idempotent). Each row carries the trader's drawdown and the class of their records;
+ *    the drawdown ranks ascending (less is better).
  * 3. Distributions per metric (`community_stats`) – only from K_ANON traders on (k-anonymity), rounded coarser.
  * 4. Snapshots older than `KEEP_DAYS` are purged.
  */
-import { AGG_DECIMALS, metricValue, quantiles, rankRows, SOCIAL_METRICS, STAT_METRICS, type StatMetric } from "../../../../src/social/metrics";
-import { computeStats, dbFail, numOrNull, sb, statsOf } from "./store";
+import { AGG_DECIMALS, metricValue, quantiles, RANK_ORDER, rankRows, SOCIAL_METRICS, STAT_METRICS, type StatMetric } from "../../../../src/social/metrics";
+import { computeStats, dbFail, numOrNull, sb, statsOf, type MemberStatsRow } from "./store";
 
 export const KEEP_DAYS = 35;
 /** Figures older than this do not rank (a user the job could not reach for days). */
@@ -52,6 +53,9 @@ async function candidates(): Promise<Candidate[]> {
   }
 }
 
+/** The figures of a stored row as `metricValue` reads them. */
+const figuresOf = (r: MemberStatsRow) => ({ expectancyR: numOrNull(r.expectancy_r), discipline: numOrNull(r.discipline), consistency: numOrNull(r.consistency), winRate: numOrNull(r.win_rate), drawdownR: numOrNull(r.max_dd_r) });
+
 export async function runSocialAggregate(opts: AggregateOptions = {}): Promise<AggregateResult> {
   const now = opts.now ?? Date.now();
   const clock = opts.clock ?? Date.now;
@@ -85,13 +89,22 @@ export async function runSocialAggregate(opts: AggregateOptions = {}): Promise<A
   if (delErr) dbFail("leaderboard_snapshots delete", delErr);
   for (const metric of SOCIAL_METRICS) {
     const rows = rankRows(
-      eligible
-        .map((r) => ({ userId: r.user_id, trades: r.r_trades, value: metricValue({ expectancyR: numOrNull(r.expectancy_r), discipline: numOrNull(r.discipline), consistency: numOrNull(r.consistency), winRate: numOrNull(r.win_rate) }, metric) }))
-        .filter((r): r is { userId: string; trades: number; value: number } => r.value != null),
+      eligible.map((r) => ({ userId: r.user_id, trades: r.r_trades, value: metricValue(figuresOf(r), metric) })).filter((r): r is { userId: string; trades: number; value: number } => r.value != null),
+      RANK_ORDER[metric],
     );
     result.ranked[metric] = rows.length;
+    const byUser = new Map(eligible.map((r) => [r.user_id, r]));
     for (let i = 0; i < rows.length; i += PAGE) {
-      const chunk = rows.slice(i, i + PAGE).map((r) => ({ day, metric, user_id: r.userId, rank: r.rank, value: r.value, trades: r.trades }));
+      const chunk = rows.slice(i, i + PAGE).map((r) => ({
+        day,
+        metric,
+        user_id: r.userId,
+        rank: r.rank,
+        value: r.value,
+        trades: r.trades,
+        dd: numOrNull(byUser.get(r.userId)?.max_dd_r),
+        origin: byUser.get(r.userId)?.origin ?? null,
+      }));
       const { error } = await sb().from("leaderboard_snapshots").insert(chunk);
       if (error) dbFail("leaderboard_snapshots insert", error);
     }
@@ -101,7 +114,7 @@ export async function runSocialAggregate(opts: AggregateOptions = {}): Promise<A
   const { error: csDel } = await sb().from("community_stats").delete().eq("day", day);
   if (csDel) dbFail("community_stats delete", csDel);
   for (const metric of STAT_METRICS) {
-    const values = eligible.map((r) => metricValue({ expectancyR: numOrNull(r.expectancy_r), discipline: numOrNull(r.discipline), consistency: numOrNull(r.consistency), winRate: numOrNull(r.win_rate) }, metric)).filter((v): v is number => v != null);
+    const values = eligible.map((r) => metricValue(figuresOf(r), metric)).filter((v): v is number => v != null);
     const q = quantiles(values, AGG_DECIMALS[metric]);
     if (!q) continue;
     const { error } = await sb().from("community_stats").insert({ day, metric, ...q });

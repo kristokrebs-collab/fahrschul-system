@@ -156,6 +156,15 @@ payments are not set up). All writes are audited where they matter (`social.*`).
 | `social-aggregate.mts` | `@daily` (published deploys) | `social_candidates()` = opt-ins + members sharing stats only; figures over 90 days (Expectancy R, discipline, consistency, min. 20 R trades), today's snapshots, `community_stats` (quantiles only with n ≥ 10), purge after 35 days, time budget |
 | `feedback.mts` | POST `/api/v1/feedback` `{ kind: "bug" \| "idea" \| "praise" \| "report" \| "other", message, page?, target? }` | feedback (anonymous allowed: 5 / 10 min per IP hash fail-closed) and reports (login, one per target, only for targets the reporter can see; 3 reports by different people hide a comment for everyone but its author and the group's owner / mentors) |
 
+Belege, Ranglisten, Chartfälle (F57 / F50 / F71 / F47): a `proof` share is a frozen list of closed trades in R (`SharedProofSchema`,
+≤ 500 trades, ≤ 400 days, `proofProblem()` checks period / order / scope; `social-share` body limit 32 KB); the figures are never trusted
+from the client – the reader's device recomputes them. `social-leaderboard?origin=api|csv|manual|auto|mixed` filters the global board by the
+data origin (re-ranked, previous rank only from the same class; 400 `invalid_origin`); `metric=drawdown` ranks ascending.
+`_lib/social/cases.ts`: `POST groups/:id/cases` (10 / 10 min, ≤ 20 per group, ≤ 10 open), `POST …/cases/:id/hypothesis` (30 / 10 min, once –
+409 `already_hypothesis`, 409 `case_closed`), `PATCH …/cases/:id` (close), `DELETE …/cases/:id`; the feed carries `cases` with the hypotheses the
+caller may see (`can_see_hypothesis`). The outcome of a case is never stored – each device computes it from public candles. Operator: run migrations
+0009 (before the deploy) and 0010.
+
 Tests: `tests/unit/functions.social.test.ts` (in-memory PostgREST fake: shares + public read + revoke / expiry, strict
 redaction, groups / invites / roles / mentor visibility, comments + mentions, goals, team seats, opt-in + immediate
 withdrawal, k-anonymity, aggregate, feedback + reports, public-read rate limit). `account.ts` `EXPORT_TABLES` lists the P12 tables

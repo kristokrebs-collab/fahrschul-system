@@ -95,8 +95,11 @@ export const EXPORT_TABLES: ExportTable[] = [
   { table: "feedback", userColumn: "user_id", columns: "id,kind,message,page,target_type,target_id,status,created_at" },
   // review DSGVO-01: API tokens (never the hash), the user's daily leaderboard ranks, invites the user created
   { table: "api_tokens", userColumn: "user_id", columns: "id,name,prefix,scopes,last_used_at,created_at,revoked_at" },
-  { table: "leaderboard_snapshots", userColumn: "user_id", columns: "day,metric,rank,value,trades" },
+  { table: "leaderboard_snapshots", userColumn: "user_id", columns: "day,metric,rank,value,trades,dd,origin" },
   { table: "group_invites", userColumn: "created_by", columns: "code,group_id,role,max_uses,uses,expires_at,created_at" },
+  // F47 (0010_cases): the Chartfälle the user posted and the hypotheses they wrote
+  { table: "group_cases", userColumn: "author_id", columns: "id,group_id,pair,interval,anchor_ms,horizon,question,closes_at,closed_at,created_at" },
+  { table: "case_hypotheses", userColumn: "user_id", columns: "case_id,direction,confidence,reason,created_at" },
 ];
 
 const SECRET_KEY = /secret|password|passphrase|token|api[-_]?key|authorization|cookie|jwt|_enc$/i;

@@ -107,7 +107,7 @@ export const LABOR = {
   /** "Warum so schwach?" (F73) */
   fit: {
     title: "Passt zu dir?",
-    note: "Der Lauf gegen dein Journal: Trefferquote, Haltedauer, Verlustserien, Drawdown, Frequenz, Zeitfenster, Risiko und Regeltreue – mit beiden Zahlen nebeneinander. Es gibt keine Gesamtnote und keine Empfehlung.",
+    note: "Der Lauf gegen dein Journal: Trefferquote, Haltedauer, Verlustserien, Drawdown, Frequenz, Zeitfenster, Risiko, Regeltreue, Prüftakt, Regelumfang und Zeitbudget – mit beiden Zahlen nebeneinander. Es gibt keine Gesamtnote und keine Empfehlung.",
     kind: { friction: "Reibung", match: "Passt", unknown: "Nicht beurteilbar" },
     group: { friction: "Reibungspunkte", match: "Übereinstimmungen", unknown: "Nicht beurteilbar" },
     sampleIdea: (name: string, n: number, from: string, to: string) => `Idee „${name}“: ${n} Trades im Test (${from} bis ${to}).`,

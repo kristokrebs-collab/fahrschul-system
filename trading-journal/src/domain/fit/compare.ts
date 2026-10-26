@@ -9,7 +9,7 @@
 import { expectedLongestLosingStreak } from "../analytics/streaks";
 import { holdLabel } from "../excursion";
 import type { SessionKey } from "../insights/time";
-import { FIT_RULES, MIN_DRAWDOWN, MIN_HOLD, MIN_JOURNAL, MIN_PLAN, MIN_RISK, MIN_STRATEGY, MIN_WINDOW, type FitEvidence, type FitItem, type FitKind, type FitReport, type JournalProfile, type Share, type StrategyFacts } from "./types";
+import { FIT_RULES, MIN_BUDGET, MIN_CHECKLIST, MIN_DRAWDOWN, MIN_HOLD, MIN_JOURNAL, MIN_PLAN, MIN_RISK, MIN_STRATEGY, MIN_TIMEFRAME, MIN_WINDOW, type FitEvidence, type FitItem, type FitKind, type FitReport, type JournalProfile, type Share, type StrategyFacts } from "./types";
 
 const de = (x: number, d: number): string => Math.abs(x).toFixed(d).replace(".", ",");
 const pct = (x: number): string => `${Math.round(x * 100)} %`;
@@ -158,6 +158,66 @@ function discipline(_s: StrategyFacts, j: JournalProfile): FitItem {
   return item("discipline", title, "match", `${base} Bei dir: ${pct(d.stopSet.share)} der Trades mit Stop, ${d.widened === 0 ? "kein Stop weiter weg gestellt" : `${d.widened} von ${j.n} Trades mit weiter weg gestelltem Stop`}.${planNote}`, ev, caveat);
 }
 
+const perDay = (ms: number): string => de(86_400_000 / ms, (86_400_000 / ms) % 1 ? 1 : 0);
+const minutesText = (min: number): string => (min >= 60 ? `${de(min / 60, min % 60 ? 1 : 0)} Std` : `${Math.round(min)} Min`);
+
+/** Execution effort, part 1: how often the idea's rules are checked against how often the trader's usual candle closes. */
+function cadence(s: StrategyFacts, j: JournalProfile): FitItem {
+  const title = "Prüftakt";
+  if (!s.bar) return unknown("cadence", title, "Der Lauf nennt keine Kerzengröße, auf der er entscheidet.");
+  if (j.timeframe.n < MIN_TIMEFRAME || j.timeframe.medianMs == null || j.timeframe.label == null) {
+    return unknown("cadence", title, `Bei ${j.timeframe.n} deiner Trades ist eine Kerzengröße eingetragen; ab ${MIN_TIMEFRAME} vergleiche ich den Takt.`);
+  }
+  const ratio = j.timeframe.medianMs / s.bar.ms;
+  const ev: FitEvidence[] = [
+    { label: "Idee", value: `${s.bar.label}-Kerzen · ${perDay(s.bar.ms)} Prüfpunkte am Tag` },
+    { label: "Du (Median)", value: `${j.timeframe.label}-Kerzen · ${perDay(j.timeframe.medianMs)} am Tag · ${j.timeframe.n} Trades mit Kerzengröße` },
+  ];
+  const caveat = "Ein Prüfpunkt ist das Ende einer Kerze, an dem die Regeln neu gelten – nicht jeder führt zu einem Trade. Wie lange ein Blick dauert, weiß die App nicht. Deine Kerzengröße ist die, die du je Trade eingetragen hast.";
+  if (ratio >= FIT_RULES.cadenceFactor) {
+    return item("cadence", title, "friction", `Die Idee prüft ihre Regeln auf jeder ${s.bar.label}-Kerze (${perDay(s.bar.ms)}-mal am Tag); deine Trades laufen im Median auf ${j.timeframe.label}-Kerzen (${perDay(j.timeframe.medianMs)}-mal am Tag). Das ist etwa ${de(ratio, ratio < 10 ? 1 : 0)}-mal so oft hinschauen.`, ev, caveat);
+  }
+  if (ratio <= 1 / FIT_RULES.cadenceFactor) {
+    return item("cadence", title, "match", `Die Idee prüft seltener als du: ${s.bar.label}-Kerzen (${perDay(s.bar.ms)}-mal am Tag) gegen ${j.timeframe.label}-Kerzen bei deinen Trades (${perDay(j.timeframe.medianMs)}-mal am Tag) – weniger Hinschauen, als du gewohnt bist.`, ev, caveat);
+  }
+  return item("cadence", title, "match", `Prüftakt im selben Bereich: ${s.bar.label}-Kerzen bei der Idee, ${j.timeframe.label}-Kerzen im Median bei deinen Trades.`, ev, caveat);
+}
+
+/** Rule complexity: the parts the idea is made of against the points of the trader's usual checklist. */
+function ruleload(s: StrategyFacts, j: JournalProfile): FitItem {
+  const title = "Regelumfang";
+  if (!s.rules) return unknown("ruleload", title, "Die Vorlagen Box-zu-Box und MCB-Leiter haben eine feste Logik, keine Liste von Regeln – dafür gibt es keine Zählung. Bei „Eigene Idee“ und beim Regel-Baukasten zählt der Vergleich Bedingungen und Ausstiegsregeln.");
+  if (j.checklist.n < MIN_CHECKLIST || j.checklist.median == null) return unknown("ruleload", title, `Bei ${j.checklist.n} deiner Trades steht eine Checkliste; ab ${MIN_CHECKLIST} vergleiche ich ihren Umfang.`);
+  const total = s.rules.conds + s.rules.exits;
+  const mine = j.checklist.median;
+  const ev: FitEvidence[] = [
+    { label: "Idee", value: `${total} Regelteile (${s.rules.conds} ${s.rules.conds === 1 ? "Bedingung" : "Bedingungen"} + ${s.rules.exits} ${s.rules.exits === 1 ? "Ausstiegsregel" : "Ausstiegsregeln"})` },
+    { label: "Du (Median)", value: `${de(mine, mine % 1 ? 1 : 0)} Punkte je Checkliste · ${j.checklist.n} Trades mit Checkliste` },
+  ];
+  const caveat = "Verglichen werden verschiedene Dinge: Bedingungen und Ausstiegsregeln einer Idee gegen die Punkte deiner Checklisten. Beides ist, was bei einem Trade bewusst zu prüfen ist; die Zahlen sagen nichts über die Qualität der Regeln.";
+  if (total >= mine * FIT_RULES.ruleFactor && total - mine >= FIT_RULES.ruleMinExtra) {
+    return item("ruleload", title, "friction", `Die Idee besteht aus ${total} Regelteilen; deine Checklisten haben im Median ${de(mine, mine % 1 ? 1 : 0)} Punkte. Sie verlangt mehr als doppelt so viele Dinge, die gleichzeitig stimmen müssen.`, ev, caveat);
+  }
+  return item("ruleload", title, "match", `Der Umfang der Idee (${total} Regelteile) liegt im Bereich deiner üblichen Checklisten (Median ${de(mine, mine % 1 ? 1 : 0)} Punkte).`, ev, caveat);
+}
+
+/**
+ * Time budget: set side by side, NOT judged – what the idea asks for (looks per day, trades per week) and the minutes the
+ * trader says they have (check-in). How long a look takes is unknown, so the verdict stays with the trader.
+ */
+function timebudget(s: StrategyFacts, j: JournalProfile): FitItem {
+  const title = "Zeitbudget";
+  if (!s.bar) return unknown("timebudget", title, "Der Lauf nennt keine Kerzengröße, auf der er entscheidet.");
+  if (j.budget.n < MIN_BUDGET || j.budget.medianMin == null) {
+    return unknown("timebudget", title, `Im Check-in hast du an ${j.budget.n} ${j.budget.n === 1 ? "Tag" : "Tagen"} angegeben, wie viel Zeit du hast (Feld „Verfügbare Zeit“ in den Check-in-Einstellungen); ab ${MIN_BUDGET} Tagen stelle ich es der Idee gegenüber.`);
+  }
+  const ev: FitEvidence[] = [
+    { label: "Idee", value: `${perDay(s.bar.ms)} Prüfpunkte am Tag (${s.bar.label}-Kerzen)${s.perWeek != null ? ` · ${de(s.perWeek, 1)} Trades pro Woche` : ""}` },
+    { label: "Du (Median)", value: `${minutesText(j.budget.medianMin)} am Tag laut Check-in · ${j.budget.n} Tage` },
+  ];
+  return item("timebudget", title, "unknown", `Die Idee verlangt einen Blick auf jede ${s.bar.label}-Kerze (${perDay(s.bar.ms)}-mal am Tag); du gibst im Check-in im Median ${minutesText(j.budget.medianMin)} am Tag an. Wie lange ein Blick und ein Trade dauern, weiß die App nicht – ob die Zeit reicht, entscheidest du.`, ev, "Beide Zahlen stehen nur nebeneinander; es gibt keine Zeit je Blick, aus der sich ein Urteil rechnen ließe. Deine Zeit stammt aus den Tagen, an denen du sie im Check-in angegeben hast.");
+}
+
 export function compareFit(strategy: StrategyFacts | null, profile: JournalProfile): FitReport {
   if (profile.n === 0) return { status: "journalNone", reason: "Dein Journal enthält noch keinen abgeschlossenen Trade. Ohne eigene Trades gibt es nichts, womit sich eine Idee vergleichen ließe.", strategy, profile, items: [] };
   if (profile.n < MIN_JOURNAL) return { status: "journalFew", reason: `Dein Journal hat ${trades(profile.n)} abgeschlossen. Ab ${MIN_JOURNAL} bilde ich ein Profil – darunter wären die Zahlen Zufall.`, strategy, profile, items: [] };
@@ -167,8 +227,8 @@ export function compareFit(strategy: StrategyFacts | null, profile: JournalProfi
     reason: null,
     strategy,
     profile,
-    items: [winRate(strategy, profile), hold(strategy, profile), streak(strategy, profile), drawdown(strategy, profile), frequency(strategy, profile), windows(strategy, profile), risk(strategy, profile), discipline(strategy, profile)],
+    items: [winRate(strategy, profile), hold(strategy, profile), streak(strategy, profile), drawdown(strategy, profile), frequency(strategy, profile), windows(strategy, profile), risk(strategy, profile), discipline(strategy, profile), cadence(strategy, profile), ruleload(strategy, profile), timebudget(strategy, profile)],
   };
 }
 
-export { MIN_DRAWDOWN, MIN_HOLD, MIN_JOURNAL, MIN_STRATEGY, MIN_WINDOW };
+export { MIN_BUDGET, MIN_CHECKLIST, MIN_DRAWDOWN, MIN_HOLD, MIN_JOURNAL, MIN_STRATEGY, MIN_TIMEFRAME, MIN_WINDOW };

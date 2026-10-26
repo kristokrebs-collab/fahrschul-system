@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import { cloudEnabled } from "@/cloud/env";
 import { useCloudSession } from "@/cloud/session";
@@ -19,7 +19,10 @@ import { sendFeedback, toUiError, type UiError } from "@/social/store";
 import { S, SHARED } from "@/social/strings";
 import { Glyph } from "@/social/ui/glyphs";
 import { PayloadCard } from "@/social/ui/ShareCards";
+import { PROOF_PAGE } from "@/social/proofStrings";
 import { PageHeader } from "@/views/setups/PageHeader";
+
+const ProofPage = lazy(() => import("./ProofPage").then((m) => ({ default: m.ProofPage })));
 
 export interface SharedViewProps {
   /** The token of `#share/<token>` (P14's router: `parseShareHash(location.hash)`). */
@@ -97,9 +100,10 @@ export function SharedView({ token, onOpenApp, className }: SharedViewProps) {
     void sendFeedback({ kind: "report", message: SHARED.reportReason, page: "share", target: { type: "share", id: token } });
   };
 
+  const isProof = state.phase === "ok" && state.data.payload.kind === "proof";
   return (
     <div className={cn("mx-auto grid w-full max-w-[760px] gap-5", className)} data-testid="shared-view" data-phase={state.phase}>
-      <PageHeader title={SHARED.title} lead={SHARED.redacted} />
+      <PageHeader title={isProof ? PROOF_PAGE.title : SHARED.title} lead={isProof ? PROOF_PAGE.lead : SHARED.redacted} />
       {state.phase === "loading" && (
         <div className="grid place-items-center gap-3 rounded-2xl border border-line bg-ink-900 px-5 py-14" aria-busy="true">
           <DotMatrixText text="" preset="wave" cycles={Infinity} presetTone="mute" decorative />
@@ -122,10 +126,16 @@ export function SharedView({ token, onOpenApp, className }: SharedViewProps) {
       )}
       {state.phase === "ok" && (
         <>
-          <Reveal index={0} className="relative min-w-0 overflow-hidden rounded-2xl">
-            <SpotlightSweep tone="signal" />
-            <PayloadCard p={state.data.payload} big className="bg-[radial-gradient(120%_70%_at_0%_0%,var(--color-ink-750)_0%,var(--color-ink-850)_55%)] p-5 sm:p-7" />
-          </Reveal>
+          {state.data.payload.kind === "proof" ? (
+            <Suspense fallback={<div className="h-64 rounded-2xl border border-line bg-ink-900/60" aria-hidden="true" />}>
+              <ProofPage proof={state.data.payload} createdAt={state.data.createdAt} />
+            </Suspense>
+          ) : (
+            <Reveal index={0} className="relative min-w-0 overflow-hidden rounded-2xl">
+              <SpotlightSweep tone="signal" />
+              <PayloadCard p={state.data.payload} big className="bg-[radial-gradient(120%_70%_at_0%_0%,var(--color-ink-750)_0%,var(--color-ink-850)_55%)] p-5 sm:p-7" />
+            </Reveal>
+          )}
           <Reveal index={1} className="flex flex-wrap items-center justify-between gap-3">
             <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-faint">
               {SHARED.sharedOn(dateLabel(state.data.createdAt))}

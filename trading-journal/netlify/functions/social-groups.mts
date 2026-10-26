@@ -17,16 +17,22 @@
  *   DELETE /api/v1/social/groups/:id/reviews/:rid/comments/:cid
  *   POST   /api/v1/social/groups/:id/goals `{ studentId, draft }`  → 201 `{ id }` (mentor → student)
  *   PATCH  /api/v1/social/groups/:id/goals/:gid `{ status }`       (the student adopts / declines)
+ *   POST   /api/v1/social/groups/:id/cases `{ pair, interval, anchorMs, horizon, question, openHours }` → 201 `{ id }`
+ *          (Chartfall – public candles only; mentor groups: owners / mentors)
+ *   POST   /api/v1/social/groups/:id/cases/:cid/hypothesis `{ direction, confidence, reason }` → 201 `{ hypothesis }`
+ *          (written once, stamped by the database, hidden from the others until the case is closed)
+ *   PATCH  /api/v1/social/groups/:id/cases/:cid `{ close: true }` · DELETE …/cases/:cid (author, owner / mentor)
  *   GET    /api/v1/social/invite/:code                             → `InvitePreview`
  *   POST   /api/v1/social/invite/:code `{ shareLevel }`            → 201 `{ group }` (team: takes a seat)
  */
 import type { Config } from "@netlify/functions";
 import { z } from "zod";
-import { CommentSchema, CreateGroupSchema, GoalPatchSchema, GoalSchema, InviteSchema, MemberPatchSchema, ReviewPatchSchema, ReviewSchema, SHARE_LEVELS } from "../../src/social/contract";
+import { CasePatchSchema, CommentSchema, CreateCaseSchema, CreateGroupSchema, GoalPatchSchema, GoalSchema, HypothesisSchema, InviteSchema, MemberPatchSchema, ReviewPatchSchema, ReviewSchema, SHARE_LEVELS } from "../../src/social/contract";
 import { audit } from "./_lib/audit";
 import { requireUser } from "./_lib/auth";
 import { clientIp, handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
+import { closeCase, deleteCase, postCase, postHypothesis } from "./_lib/social/cases";
 import {
   answerGoal,
   createGroup,
@@ -119,6 +125,21 @@ export default handler(async (req, ctx) => {
     }
     case "PATCH groups/:/goals/:":
       await answerGoal(user.id, seg[1]!, seg[3]!, (await readJson(req, GoalPatchSchema, SMALL)).status);
+      return json({ ok: true });
+    case "POST groups/:/cases": {
+      await enforceRateLimit(rateKey("social-case", user.id), 10, 600);
+      return json(await postCase(user.id, seg[1]!, await readJson(req, CreateCaseSchema, SMALL)), { status: 201 });
+    }
+    case "POST groups/:/cases/:/hypothesis": {
+      await enforceRateLimit(rateKey("social-hypothesis", user.id), 30, 600);
+      return json({ hypothesis: await postHypothesis(user.id, seg[1]!, seg[3]!, await readJson(req, HypothesisSchema, SMALL)) }, { status: 201 });
+    }
+    case "PATCH groups/:/cases/:":
+      await readJson(req, CasePatchSchema, SMALL);
+      await closeCase(user.id, seg[1]!, seg[3]!);
+      return json({ ok: true });
+    case "DELETE groups/:/cases/:":
+      await deleteCase(user.id, seg[1]!, seg[3]!);
       return json({ ok: true });
     case "GET invite/:":
       await enforceRateLimit(rateKey("social-invite-check", user.id), 30, 3600, { failClosed: true });

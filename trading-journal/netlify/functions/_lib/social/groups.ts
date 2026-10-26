@@ -27,6 +27,7 @@ import type {
 import { HttpError } from "../http";
 import { requireFeature, requireLimit } from "../plan";
 import { assignSeat, releaseSeat, seatUsage } from "../stripe";
+import { casesOf, dropMemberCases } from "./cases";
 import {
   canSeeReview,
   dbFail,
@@ -249,6 +250,7 @@ export async function feed(userId: string, groupId: string, now = Date.now()): P
   const manager = isManager(detail.role);
   return {
     group: detail,
+    cases: await casesOf(userId, { id: groupId, kind: detail.kind }, detail.role, now),
     reviews: reviews.map(
       (r): ReviewInfo => ({
         id: r.id,
@@ -377,8 +379,9 @@ export async function joinGroup(userId: string, code: string, shareLevel: ShareL
 
 /* ------------------------------------------------------------------ members */
 
-/** Removes a member and everything they posted in the group (reviews, comments, goals); team seat released. */
+/** Removes a member and everything they posted in the group (reviews, comments, goals, cases, hypotheses); team seat released. */
 async function dropMember(group: GroupRow, memberId: string): Promise<void> {
+  await dropMemberCases(group.id, memberId);
   const { data: revs, error: rErr } = await sb().from("group_reviews").select("id").eq("group_id", group.id).limit(5000);
   if (rErr) dbFail("group_reviews read", rErr);
   const reviewIds = ((revs ?? []) as { id: string }[]).map((r) => r.id);

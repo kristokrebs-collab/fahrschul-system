@@ -20,7 +20,7 @@ import groupsFn from "../../netlify/functions/social-groups.mts";
 import boardFn from "../../netlify/functions/social-leaderboard.mts";
 import feedbackFn from "../../netlify/functions/feedback.mts";
 import aggregateFn, { config as aggregateConfig } from "../../netlify/functions/social-aggregate.mts";
-import type { FeedResponse, GroupsResponse, LeaderboardResponse, SharedTrade } from "../../src/social/contract";
+import type { CaseInfo, FeedResponse, GroupsResponse, LeaderboardResponse, SharedProof, SharedTrade } from "../../src/social/contract";
 
 const ctx = { ip: "203.0.113.9" } as Parameters<typeof shareFn>[1];
 const A = "11111111-1111-4111-8111-111111111111";
@@ -44,6 +44,7 @@ const UNIQUE: Record<string, { keys: string[]; when?: (r: Row) => boolean }[]> =
   groups: [{ keys: ["id"] }],
   group_members: [{ keys: ["group_id", "user_id"] }],
   group_invites: [{ keys: ["code"] }],
+  case_hypotheses: [{ keys: ["case_id", "user_id"] }],
   shares: [{ keys: ["token"] }],
   team_seats: [{ keys: ["member_id"] }],
   member_stats: [{ keys: ["user_id"] }],
@@ -94,6 +95,15 @@ function defaults(db: Db, table: string, row: Row): Row {
       r.status ??= "open";
       r.created_at ??= iso();
       break;
+    case "group_cases":
+      id();
+      r.question ??= "";
+      r.closed_at ??= null;
+      r.created_at ??= new Date(Date.now() + ++db.seq).toISOString();
+      break;
+    case "case_hypotheses":
+      r.created_at = iso(); // the database clock, like the trigger of migration 0010
+      break;
     case "shares":
       id();
       r.views ??= 0;
@@ -135,9 +145,16 @@ function cascade(db: Db, table: string, gone: Row[]): void {
   if (table === "groups") {
     const ids = new Set(gone.map((g) => g.id));
     for (const t of ["group_members", "group_invites", "group_goals"]) db.tables[t] = (db.tables[t] ?? []).filter((r) => !ids.has(r.group_id));
+    const cases = (db.tables.group_cases ?? []).filter((r) => ids.has(r.group_id));
+    db.tables.group_cases = (db.tables.group_cases ?? []).filter((r) => !ids.has(r.group_id));
+    cascade(db, "group_cases", cases);
     const reviews = (db.tables.group_reviews ?? []).filter((r) => ids.has(r.group_id));
     db.tables.group_reviews = (db.tables.group_reviews ?? []).filter((r) => !ids.has(r.group_id));
     cascade(db, "group_reviews", reviews);
+  }
+  if (table === "group_cases") {
+    const ids = new Set(gone.map((r) => r.id));
+    db.tables.case_hypotheses = (db.tables.case_hypotheses ?? []).filter((h) => !ids.has(h.case_id));
   }
   if (table === "group_reviews") {
     const ids = new Set(gone.map((r) => r.id));
@@ -181,6 +198,11 @@ function query(db: Db, table: string) {
           }
         }
         if (clash(rows, row)) return { data: null, error: { code: "23505" } };
+        // the trigger of migration 0010: no hypothesis once the case is closed
+        if (table === "case_hypotheses") {
+          const c = (db.tables.group_cases ?? []).find((x) => x.id === row.case_id);
+          if (c && (c.closed_at != null || Date.parse(String(c.closes_at)) <= Date.now())) return { data: null, error: { code: "23514" } };
+        }
         rows.push(row);
         affected.push(row);
       }
@@ -266,6 +288,8 @@ function fakeDb(): Db {
       group_reviews: [],
       comments: [],
       group_goals: [],
+      group_cases: [],
+      case_hypotheses: [],
       shares: [],
       feedback: [],
       member_stats: [],
@@ -413,6 +437,64 @@ describe("share links", () => {
     expect((await call(sharedFn, "GET", `/api/v1/social/shared/${"E".repeat(22)}`)).status).toBe(404);
     expect((await call(sharedFn, "GET", `/api/v1/social/shared/${"T".repeat(22)}`)).status).toBe(404);
     expect((await call(sharedFn, "GET", "/api/v1/social/shared/kurz")).status).toBe(404);
+  });
+
+  describe("Ergebnisbeleg (F57)", () => {
+    const PROOF: SharedProof = {
+      v: 1,
+      kind: "proof",
+      strategy: "Breakout 4h",
+      basis: "live",
+      from: "2026-09-01",
+      to: "2026-10-01",
+      scope: { only: null, inPeriod: 4, open: 1 },
+      trades: [
+        ["2026-09-03", 1.5, 0.04, "api"],
+        ["2026-09-10", -1, 0.05, "api"],
+        ["2026-09-20", -1.2, null, "manual"],
+        ["2026-09-28", null, null, "csv"],
+      ],
+    };
+    const post = (payload: unknown) => call<{ share: { id: string; token: string; title: string; kind: string }; error?: { code: string } }>(shareFn, "POST", "/api/v1/social/share", { user: A, body: { payload, expiresInDays: 0 } });
+
+    it("stores the complete list, serves it publicly, and every loss stays in it", async () => {
+      const res = await post(PROOF);
+      expect(res.status).toBe(201);
+      expect(res.body.share).toMatchObject({ kind: "proof", title: "Beleg · Breakout 4h · 4 Trades" });
+      const pub = await call<{ kind: string; payload: SharedProof }>(sharedFn, "GET", `/api/v1/social/shared/${res.body.share.token}`);
+      expect(pub.status).toBe(200);
+      expect(pub.body.payload).toEqual(PROOF);
+      expect(pub.body.payload.trades.filter((t) => (t[1] ?? 0) < 0)).toHaveLength(2);
+      // the owner revokes: the page is gone at once
+      expect((await call(shareFn, "DELETE", `/api/v1/social/share/${res.body.share.id}`, { user: A })).status).toBe(200);
+      expect((await call(sharedFn, "GET", `/api/v1/social/shared/${res.body.share.token}`)).status).toBe(404);
+    });
+
+    it("refuses anything outside the schema: money, pairs, notes, times", async () => {
+      expect((await post({ ...PROOF, pnl: 420 })).status).toBe(422);
+      expect((await post({ ...PROOF, scope: { ...PROOF.scope, balance: 20000 } })).status).toBe(422);
+      expect((await post({ ...PROOF, trades: [["2026-09-03 10:00", 1, 0, "api"]] })).status).toBe(422); // a time of day
+      expect((await post({ ...PROOF, trades: [["2026-09-03", 1, 0, "api", "BTCUSDT"]] })).status).toBe(422); // a fifth field
+      expect((await post({ ...PROOF, trades: [["2026-09-03", 1, 0, "binance"]] })).status).toBe(422); // an exchange name
+      expect(db.tables.shares).toHaveLength(0);
+    });
+
+    it("refuses a list that cannot be a complete period: outside the period, out of order, fewer than the period says, no selection but gaps", async () => {
+      expect((await post({ ...PROOF, trades: [...PROOF.trades, ["2026-10-05", 1, 0, "api"]], scope: { only: null, inPeriod: 5, open: 0 } })).status).toBe(422);
+      expect((await post({ ...PROOF, trades: [PROOF.trades[1], PROOF.trades[0], PROOF.trades[2], PROOF.trades[3]] })).status).toBe(422);
+      expect((await post({ ...PROOF, scope: { only: null, inPeriod: 9, open: 0 } })).status).toBe(422); // "all trades" with 5 missing ones
+      expect((await post({ ...PROOF, scope: { only: "Breakout", inPeriod: 3, open: 0 } })).status).toBe(422); // fewer in the period than listed
+      expect((await post({ ...PROOF, to: "2025-01-01" })).status).toBe(422);
+      expect((await post({ ...PROOF, from: "2024-01-01" })).status).toBe(422); // longer than 400 days
+      // a named selection of a bigger period is fine
+      expect((await post({ ...PROOF, scope: { only: "Breakout", inPeriod: 9, open: 0 } })).status).toBe(201);
+    });
+
+    it("holds up to 500 trades and not one more", async () => {
+      const many = (n: number): SharedProof => ({ ...PROOF, scope: { only: null, inPeriod: n, open: 0 }, trades: Array.from({ length: n }, (_, i) => ["2026-09-15", i % 3 ? 1.25 : -1, 0.045, "manual"] as SharedProof["trades"][number]) });
+      expect((await post(many(500))).status).toBe(201);
+      expect((await post(many(501))).status).toBe(422);
+    });
   });
 
   it("the public read is rate-limited per IP", async () => {
@@ -589,6 +671,198 @@ describe("groups", () => {
   });
 });
 
+
+/* ------------------------------------------------------------------ Chartfälle (F47) */
+
+describe("Chartfälle mit Hypothese vorab", () => {
+  const H4 = 14_400_000;
+  /** a closed 4h candle on the exchange grid, 3 days ago */
+  const anchor = () => Math.floor((Date.now() - 3 * 86_400_000) / H4) * H4;
+  const caseBody = (o: Record<string, unknown> = {}) => ({ pair: "BTCUSDT", interval: "4h", anchorMs: anchor(), horizon: 12, question: "Hält die Box?", openHours: 24, ...o });
+  const HYP = { direction: "up", confidence: 70, reason: "Ausbruch über die Box mit Volumen" };
+  const base = (id: string) => `/api/v1/social/groups/${id}`;
+  const postCase = (user: string, id: string, body: unknown) => call<{ id: string; error?: { code: string } }>(groupsFn, "POST", `${base(id)}/cases`, { user, body });
+  const hypo = (user: string, id: string, cid: string, body: unknown = HYP) => call<{ hypothesis: { author: string; createdAt: string }; error?: { code: string } }>(groupsFn, "POST", `${base(id)}/cases/${cid}/hypothesis`, { user, body });
+  const casesOf = async (user: string, id: string): Promise<CaseInfo[]> => (await feedOf(user, id)).body.cases ?? [];
+
+  async function groupWith(kind: "group" | "mentor" = "group"): Promise<{ id: string; code: string }> {
+    const id = (await createGroup(A, kind)).body.group.id;
+    const code = (await invite(A, id, kind === "mentor" ? "student" : "member")).body.invite.code;
+    return { id, code };
+  }
+
+  it("a member posts a case of public candles; the others see it, strangers get 404", async () => {
+    const { id, code } = await groupWith();
+    await join(B, code);
+    const res = await postCase(A, id, caseBody());
+    expect(res.status).toBe(201);
+    const row = db.tables.group_cases![0]!;
+    expect(row).toMatchObject({ pair: "BTCUSDT", interval: "4h", horizon: 12, question: "Hält die Box?", author_id: A });
+    expect(Date.parse(String(row.closes_at)) - Date.now()).toBeGreaterThan(23 * 3_600_000);
+    const seen = (await casesOf(B, id))[0]!;
+    expect(seen).toMatchObject({ pair: "BTCUSDT", horizon: 12, me: false, closed: false, hypotheses: 0, mine: null, revealed: [] });
+    expect(seen.author).toMatch(/^\p{L}+ \p{L}+ \d{2,3}$/u); // a pseudonym, never an e-mail
+    expect(JSON.stringify(seen)).not.toMatch(/@|example/);
+    expect((await postCase(C, id, caseBody())).status).toBe(404);
+    expect((await feedOf(C, id)).status).toBe(404);
+  });
+
+  it("refuses what is not a case: off the candle grid, not closed yet, unknown size or horizon, a bad symbol, extra fields", async () => {
+    const { id } = await groupWith();
+    expect((await postCase(A, id, caseBody({ anchorMs: anchor() + 1000 }))).status).toBe(422); // off the grid
+    expect((await postCase(A, id, caseBody({ anchorMs: Math.floor(Date.now() / H4) * H4 }))).status).toBe(422); // the forming candle
+    expect((await postCase(A, id, caseBody({ interval: "5m" }))).status).toBe(422);
+    expect((await postCase(A, id, caseBody({ horizon: 7 }))).status).toBe(422);
+    expect((await postCase(A, id, caseBody({ pair: "btc usdt" }))).status).toBe(422);
+    expect((await postCase(A, id, caseBody({ anchorMs: 1000 }))).status).toBe(422);
+    expect((await postCase(A, id, caseBody({ note: "Konto 20k" }))).status).toBe(422);
+    expect((await postCase(A, id, caseBody({ pair: "ethusdt" }))).status).toBe(201); // case-insensitive input, stored upper-case
+    expect(db.tables.group_cases![0]!.pair).toBe("ETHUSDT");
+  });
+
+  it("at most 10 open cases per person", async () => {
+    const { id } = await groupWith();
+    for (let i = 0; i < 10; i++) expect((await postCase(A, id, caseBody())).status).toBe(201);
+    const over = await postCase(A, id, caseBody());
+    expect(over.status).toBe(409);
+    expect(over.body.error!.code).toBe("too_many_cases");
+  });
+
+  it("a hypothesis is written once and stays hidden from the others until the case is closed", async () => {
+    const { id, code } = await groupWith();
+    await join(B, code);
+    await join(C, code);
+    const cid = (await postCase(A, id, caseBody())).body.id;
+    const first = await hypo(B, id, cid);
+    expect(first.status).toBe(201);
+    expect(db.tables.case_hypotheses).toHaveLength(1);
+    const again = await hypo(B, id, cid, { ...HYP, direction: "down" });
+    expect(again.status).toBe(409);
+    expect(again.body.error!.code).toBe("already_hypothesis");
+    expect(db.tables.case_hypotheses![0]!.direction).toBe("up"); // nothing was changed
+
+    // open: the others see THAT there is a hypothesis, not what it says
+    const asA = (await casesOf(A, id))[0]!;
+    expect(asA).toMatchObject({ hypotheses: 1, mine: null, revealed: [], closed: false });
+    const asB = (await casesOf(B, id))[0]!;
+    expect(asB.mine).toMatchObject({ direction: "up", confidence: 70, me: true });
+    expect(JSON.stringify(await casesOf(C, id))).not.toContain("Ausbruch über die Box");
+
+    // the author closes: now the group reads what B wrote, with the time the database stamped
+    expect((await call(groupsFn, "PATCH", `${base(id)}/cases/${cid}`, { user: A, body: { close: true } })).status).toBe(200);
+    const closed = (await casesOf(C, id))[0]!;
+    expect(closed.closed).toBe(true);
+    expect(closed.revealed).toHaveLength(1);
+    expect(closed.revealed[0]).toMatchObject({ direction: "up", confidence: 70, reason: "Ausbruch über die Box mit Volumen", me: false });
+    expect(Date.parse(closed.revealed[0]!.createdAt)).toBeLessThanOrEqual(Date.now());
+    // no hypothesis after the close – also not from the person who has none yet
+    const late = await hypo(C, id, cid);
+    expect(late.status).toBe(409);
+    expect(late.body.error!.code).toBe("case_closed");
+  });
+
+  it("a case closes by itself when its time is up", async () => {
+    const { id, code } = await groupWith();
+    await join(B, code);
+    const cid = (await postCase(A, id, caseBody())).body.id;
+    await hypo(B, id, cid);
+    db.tables.group_cases![0]!.closes_at = new Date(Date.now() - 1000).toISOString();
+    const seen = (await casesOf(A, id))[0]!;
+    expect(seen.closed).toBe(true);
+    expect(seen.revealed).toHaveLength(1);
+    expect((await hypo(A, id, cid)).body.error!.code).toBe("case_closed");
+  });
+
+  it("validates a hypothesis: one of three directions, a confidence step, a reason of 10 to 280 characters, nothing else", async () => {
+    const { id } = await groupWith();
+    const cid = (await postCase(A, id, caseBody())).body.id;
+    expect((await hypo(A, id, cid, { ...HYP, direction: "sideways" })).status).toBe(422);
+    expect((await hypo(A, id, cid, { ...HYP, confidence: 55 })).status).toBe(422);
+    expect((await hypo(A, id, cid, { ...HYP, confidence: 100 })).status).toBe(422);
+    expect((await hypo(A, id, cid, { ...HYP, reason: "zu kurz" })).status).toBe(422);
+    expect((await hypo(A, id, cid, { ...HYP, reason: "x".repeat(281) })).status).toBe(422);
+    expect((await hypo(A, id, cid, { ...HYP, pnl: 1 })).status).toBe(422);
+    expect(db.tables.case_hypotheses).toHaveLength(0);
+    expect((await hypo(A, id, "nicht-vorhanden")).status).toBe(404);
+    expect((await hypo(A, id, uuid(777))).status).toBe(404);
+  });
+
+  it("mentor group: only owners and mentors post; a student reads the mentors' hypotheses and their own, never another student's", async () => {
+    const { id, code } = await groupWith("mentor");
+    await join(B, code);
+    await join(C, code);
+    expect((await postCase(B, id, caseBody())).status).toBe(403); // a student does not post cases
+    const cid = (await postCase(A, id, caseBody())).body.id;
+    await hypo(A, id, cid, { ...HYP, reason: "Die Mentorin sieht den Ausbruch" });
+    await hypo(B, id, cid, { ...HYP, direction: "down", reason: "Schüler B erwartet einen Rücksetzer" });
+    await hypo(C, id, cid, { ...HYP, direction: "flat", reason: "Schülerin C erwartet Seitwärts" });
+    await call(groupsFn, "PATCH", `${base(id)}/cases/${cid}`, { user: A, body: { close: true } });
+
+    const reasonsFor = async (user: string) => (await casesOf(user, id))[0]!.revealed.map((h) => h.reason).sort();
+    expect(await reasonsFor(A)).toEqual(["Schüler B erwartet einen Rücksetzer", "Schülerin C erwartet Seitwärts"]); // the mentor's own is "mine"
+    expect(await reasonsFor(B)).toEqual(["Die Mentorin sieht den Ausbruch"]); // not C's
+    expect((await casesOf(B, id))[0]!.mine).toMatchObject({ direction: "down" });
+    expect(await reasonsFor(C)).toEqual(["Die Mentorin sieht den Ausbruch"]); // not B's
+    expect(JSON.stringify(await casesOf(B, id))).not.toContain("Schülerin C");
+  });
+
+  it("who may close or delete: the author and owners / mentors – nobody else", async () => {
+    const { id, code } = await groupWith();
+    await join(B, code);
+    await join(C, code);
+    const cid = (await postCase(B, id, caseBody())).body.id;
+    expect((await call(groupsFn, "PATCH", `${base(id)}/cases/${cid}`, { user: C, body: { close: true } })).status).toBe(403);
+    expect((await call(groupsFn, "DELETE", `${base(id)}/cases/${cid}`, { user: C })).status).toBe(403);
+    expect((await call(groupsFn, "PATCH", `${base(id)}/cases/${cid}`, { user: C, body: { close: false } })).status).toBe(422);
+    expect((await call(groupsFn, "PATCH", `${base(id)}/cases/${cid}`, { user: A, body: { close: true } })).status).toBe(200); // the owner
+    expect((await call(groupsFn, "DELETE", `${base(id)}/cases/${cid}`, { user: B })).status).toBe(200);
+    expect(db.tables.group_cases).toHaveLength(0);
+    expect(db.tables.case_hypotheses).toHaveLength(0);
+    expect((await call(groupsFn, "DELETE", `${base(id)}/cases/${cid}`, { user: B })).status).toBe(404);
+  });
+
+  it("leaving the group takes the person's hypotheses and cases along; deleting the group takes all", async () => {
+    const { id, code } = await groupWith();
+    await join(B, code);
+    await join(C, code);
+    const cA = (await postCase(A, id, caseBody())).body.id;
+    const cB = (await postCase(B, id, caseBody())).body.id;
+    await hypo(B, id, cA);
+    await hypo(C, id, cA);
+    await hypo(C, id, cB);
+    expect((await call(groupsFn, "DELETE", `${base(id)}/members/${B}`, { user: B })).status).toBe(200);
+    expect(db.tables.group_cases!.map((c) => c.id)).toEqual([cA]); // B's case is gone with B
+    expect(db.tables.case_hypotheses!.map((h) => h.user_id)).toEqual([C]); // B's hypothesis too, and the ones on B's case
+    expect((await call(groupsFn, "DELETE", base(id), { user: A })).status).toBe(200);
+    expect(db.tables.group_cases).toHaveLength(0);
+    expect(db.tables.case_hypotheses).toHaveLength(0);
+  });
+
+  it("a case can be reported by the members of its group – only", async () => {
+    const { id, code } = await groupWith();
+    await join(B, code);
+    const cid = (await postCase(A, id, caseBody({ question: "Kauf meinen Kurs!" }))).body.id;
+    const report = (user: string, target: string) => call(feedbackFn, "POST", "/api/v1/feedback", { user, body: { kind: "report", message: "Werbung im Fall", target: { type: "case", id: target } } });
+    expect((await report(B, cid)).status).toBe(201);
+    expect(db.tables.feedback![0]).toMatchObject({ target_type: "case", target_id: cid });
+    expect((await report(C, cid)).status).toBe(404); // not in the group: no blind reporting
+    expect((await report(B, uuid(999))).status).toBe(404);
+    expect((await report(B, "kein-uuid")).status).toBe(404);
+  });
+
+  it("without migration 0010 the group still works: no cases, and posting says why", async () => {
+    const { id } = await groupWith();
+    delete db.tables.group_cases;
+    delete db.tables.case_hypotheses;
+    const feedRes = await feedOf(A, id);
+    expect(feedRes.status).toBe(200);
+    expect(feedRes.body.cases).toEqual([]);
+    const post = await postCase(A, id, caseBody());
+    expect(post.status).toBe(503);
+    expect(post.body.error!.code).toBe("cases_not_ready");
+  });
+});
+
 /* ------------------------------------------------------------------ figures, rankings, k-anonymity */
 
 function seedTrader(user: string, n: number, r: (i: number) => number): void {
@@ -632,7 +906,7 @@ describe("leaderboard", () => {
 
     db.tables.profiles!.find((p) => p.id === users[9])!.privacy = { leaderboard: true };
     res = await runSocialAggregate();
-    expect(res.stats).toEqual(["expectancy", "discipline", "consistency", "winrate"]);
+    expect(res.stats).toEqual(["expectancy", "discipline", "consistency", "winrate", "drawdown"]);
     const exp = db.tables.community_stats!.find((r) => r.metric === "expectancy")!;
     expect(exp.n).toBe(10);
     expect(Number(exp.p10)).toBeLessThanOrEqual(Number(exp.p90));
@@ -645,6 +919,37 @@ describe("leaderboard", () => {
     expect(board.body.rows[0]!.rank).toBe(1);
     expect(board.body.rows.find((r) => r.me)).toBeTruthy();
     expect(board.body.community.find((c) => c.metric === "expectancy")!.n).toBe(10);
+  });
+
+  it("drawdown (F71): ranks ascending, sits beside every row, and the data class limits a board", async () => {
+    const users = Array.from({ length: 4 }, (_, i) => `bbbbbbbb-0000-4000-8000-${String(i).padStart(12, "0")}`);
+    for (const u of users) db.tables.profiles!.push({ id: u, plan: "free", plan_status: "none", privacy: { leaderboard: true } });
+    // same trades for everybody except the order of the losses: the deepest drop differs, the origin differs
+    const loss = (i: number, u: number) => (u === 0 ? (i < 3 ? -1 : 1) : u === 1 ? (i % 4 === 0 ? -1 : 1) : u === 2 ? (i === 9 ? -4 : 1) : i % 2 ? -1 : 1);
+    for (const [u, user] of users.entries()) for (let i = 0; i < 24; i++) trade(user, `t_${u}_${i}`, loss(i, u), 30 - i, u === 0 || u === 1 ? { origin: { kind: "api" } } : u === 2 ? { origin: { kind: "csv" } } : {});
+    await runSocialAggregate();
+    const stats = (u: number) => db.tables.member_stats!.find((r) => r.user_id === users[u])!;
+    expect(stats(0)).toMatchObject({ max_dd_r: 3, origin: "api" });
+    expect(stats(2)).toMatchObject({ max_dd_r: 4, origin: "csv" });
+    expect(stats(3)).toMatchObject({ max_dd_r: 1, origin: "manual" });
+
+    const board = await call<LeaderboardResponse>(boardFn, "GET", "/api/v1/social/leaderboard?metric=drawdown", { user: users[0] });
+    expect(board.body.rows.map((r) => r.value)).toEqual([1, 1, 3, 4]); // smaller is better, the best first
+    expect(board.body.rows.map((r) => r.rank)).toEqual([1, 1, 3, 4]);
+    expect(board.body.rows.find((r) => r.me)).toMatchObject({ value: 3, drawdownR: 3, origin: "api" });
+    // the drawdown stands beside the other metrics too
+    const exp = await call<LeaderboardResponse>(boardFn, "GET", "/api/v1/social/leaderboard?metric=expectancy", { user: users[0] });
+    expect(exp.body.rows.every((r) => typeof r.drawdownR === "number" && r.origin != null)).toBe(true);
+    // the data class: only traders whose records mostly came that way, re-ranked among them
+    const api = await call<LeaderboardResponse>(boardFn, "GET", "/api/v1/social/leaderboard?metric=drawdown&origin=api", { user: users[0] });
+    expect(api.body.origin).toBe("api");
+    expect(api.body.rows.map((r) => r.origin)).toEqual(["api", "api"]);
+    expect(api.body.rows.map((r) => r.rank)).toEqual([1, 2]);
+    expect((await call<LeaderboardResponse>(boardFn, "GET", "/api/v1/social/leaderboard?metric=drawdown&origin=auto", { user: users[0] })).body.rows).toHaveLength(0);
+    expect((await call(boardFn, "GET", "/api/v1/social/leaderboard?metric=drawdown&origin=demo", { user: users[0] })).status).toBe(400);
+    // withdrawal still works at once for every class
+    db.tables.profiles!.find((p) => p.id === users[0])!.privacy = {};
+    expect((await call<LeaderboardResponse>(boardFn, "GET", "/api/v1/social/leaderboard?metric=drawdown&origin=api", { user: users[1] })).body.rows.map((r) => r.me)).toEqual([true]);
   });
 
   it("under 20 R trades: figures yes, ranking no", async () => {

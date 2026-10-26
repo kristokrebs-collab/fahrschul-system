@@ -15,6 +15,8 @@ import { addGoalFromDraft } from "@/domain/growth/goals";
 import { hasClaudeRuntime } from "@/store/capability";
 import { pushToast } from "@/store/uiStore";
 import {
+  closeCaseApi,
+  deleteCaseApi,
   deleteCommentApi,
   deleteGroupApi,
   deleteInvite,
@@ -29,7 +31,9 @@ import {
   patchGoal,
   patchMemberApi,
   patchReview,
+  postCaseApi,
   postCommentApi,
+  postHypothesisApi,
   postFeedback,
   postGoal,
   postGroup,
@@ -40,6 +44,7 @@ import {
   postShare,
 } from "./api";
 import type {
+  CreateCaseRequest,
   FeedbackRequest,
   FeedResponse,
   GoalInfo,
@@ -48,6 +53,7 @@ import type {
   InviteInfo,
   InvitePreview,
   LeaderboardResponse,
+  HypothesisRequest,
   MentorGoalDraft,
   ShareInfo,
   ShareLevel,
@@ -55,7 +61,8 @@ import type {
   SharedTrade,
   SocialMe,
 } from "./contract";
-import type { SocialMetric } from "./metrics";
+import type { OriginFilter, SocialMetric } from "./metrics";
+import { CASES } from "./caseStrings";
 import { S } from "./strings";
 
 export interface UiError {
@@ -75,7 +82,7 @@ const EMPTY_SLOT = { data: null, load: "idle", error: null } as const;
 
 /** The Community page's own sheets (mounted once at the page root – a sheet inside a card would take the card's
  * transform as its containing block). */
-export type CommunitySheet = { kind: "create" } | { kind: "join" } | { kind: "pick" } | { kind: "goal"; groupId: string; studentId: string };
+export type CommunitySheet = { kind: "create" } | { kind: "join" } | { kind: "pick" } | { kind: "goal"; groupId: string; studentId: string } | { kind: "proof" } | { kind: "case"; groupId: string };
 
 /** What the share sheet shows (`openShare`). */
 export type ShareTarget = { kind: "trade"; tradeId: string } | { kind: "setup"; setupId: string } | { kind: "stats" };
@@ -90,6 +97,8 @@ export interface SocialState {
   feeds: Record<string, Slot<FeedResponse>>;
   boards: Record<string, Slot<LeaderboardResponse>>;
   metric: SocialMetric;
+  /** The global ranking limited to traders whose records mostly came one way (`all` = everybody). */
+  origin: OriginFilter;
   /** Rank the active group instead of everybody. */
   groupBoard: boolean;
   shares: Slot<ShareInfo[]>;
@@ -118,6 +127,7 @@ const INITIAL: SocialState = {
   feeds: {},
   boards: {},
   metric: "expectancy",
+  origin: "all",
   groupBoard: false,
   shares: { ...EMPTY_SLOT },
   busy: null,
@@ -156,7 +166,7 @@ export function toUiError(e: unknown): UiError {
   return { code: "error", message: e instanceof Error && e.message ? e.message : S.failed };
 }
 
-const boardKey = (metric: SocialMetric, group: string | null) => `${metric}|${group ?? "all"}`;
+const boardKey = (metric: SocialMetric, group: string | null, origin: OriginFilter = "all") => `${metric}|${group ?? "all"}|${group ? "all" : origin}`;
 
 /** Runs an action once at a time; toasts the error; resolves the result or null. */
 async function act<T>(name: string, fn: () => Promise<T>, ok?: string | ((r: T) => string | null)): Promise<T | null> {
@@ -242,10 +252,11 @@ export async function loadBoard(metric: SocialMetric = useSocial.getState().metr
   if (!communityEnabled() || !signedIn()) return;
   const s0 = useSocial.getState();
   const group = s0.groupBoard ? s0.activeGroup : null;
-  const key = boardKey(metric, group);
+  const origin = s0.origin;
+  const key = boardKey(metric, group, origin);
   useSocial.setState((s) => ({ boards: { ...s.boards, [key]: { ...(s.boards[key] ?? EMPTY_SLOT), load: s.boards[key]?.data ? "ready" : "loading", error: null } } }));
   try {
-    const data = await fetchLeaderboard(metric, group);
+    const data = await fetchLeaderboard(metric, group, origin);
     useSocial.setState((s) => ({ boards: { ...s.boards, [key]: { data, load: "ready", error: null } }, me: data.me }));
   } catch (e) {
     useSocial.setState((s) => ({ boards: { ...s.boards, [key]: { data: s.boards[key]?.data ?? null, load: "error", error: toUiError(e) } } }));
@@ -257,6 +268,11 @@ export function setMetric(metric: SocialMetric): void {
   void loadBoard(metric);
 }
 
+export function setOrigin(origin: OriginFilter): void {
+  useSocial.setState({ origin });
+  void loadBoard();
+}
+
 export function setGroupBoard(on: boolean): void {
   useSocial.setState({ groupBoard: on });
   void loadBoard();
@@ -264,7 +280,7 @@ export function setGroupBoard(on: boolean): void {
 
 /** The board slot the UI shows right now. */
 export function useBoard(): Slot<LeaderboardResponse> {
-  return useSocial((s) => s.boards[boardKey(s.metric, s.groupBoard ? s.activeGroup : null)] ?? EMPTY_SLOT);
+  return useSocial((s) => s.boards[boardKey(s.metric, s.groupBoard ? s.activeGroup : null, s.origin)] ?? EMPTY_SLOT);
 }
 
 export function useActiveFeed(): Slot<FeedResponse> {
@@ -412,6 +428,32 @@ export async function postComment(groupId: string, reviewId: string, body: strin
 
 export async function deleteComment(groupId: string, reviewId: string, commentId: string): Promise<void> {
   if (await act("commentDelete", () => deleteCommentApi(groupId, reviewId, commentId), S.commentDeleted)) void loadFeed(groupId);
+}
+
+/* ------------------------------------------------------------------ Chartfälle (F47) */
+
+export async function postCase(groupId: string, body: CreateCaseRequest): Promise<boolean> {
+  const r = await act("case", () => postCaseApi(groupId, body), CASES.posted);
+  if (!r) return false;
+  useSocial.setState((s) => ({ pulse: s.pulse + 1 }));
+  void loadFeed(groupId);
+  return true;
+}
+
+/** Writes the hypothesis once; the card then shows the continuation and the result. */
+export async function postHypothesis(groupId: string, caseId: string, body: HypothesisRequest): Promise<boolean> {
+  const r = await act("hypothesis", () => postHypothesisApi(groupId, caseId, body), CASES.committed);
+  if (!r) return false;
+  await loadFeed(groupId);
+  return true;
+}
+
+export async function closeCase(groupId: string, caseId: string): Promise<void> {
+  if (await act("caseClose", () => closeCaseApi(groupId, caseId), CASES.closed)) void loadFeed(groupId);
+}
+
+export async function deleteCase(groupId: string, caseId: string): Promise<void> {
+  if (await act("caseDelete", () => deleteCaseApi(groupId, caseId), CASES.deleted)) void loadFeed(groupId);
 }
 
 /* ------------------------------------------------------------------ mentor goals */

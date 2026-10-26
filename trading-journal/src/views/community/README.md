@@ -49,3 +49,14 @@ journal settings), "Zum eigenen Journal" (`onOpenApp`), report (login needed). E
 
 Dev harness: `dev/community.html` (`#community`, `#trades` demo with a share button, `#share/<token>`, `?cloud=off`).
 Tests: `tests/unit/social.ui.test.tsx`, `tests/e2e/community.spec.ts`.
+
+## Belege, Rangliste mit Herkunft, Chartfälle
+- `ProofPage.tsx` (lazy from `SharedView`, public link `#share/<token>`): hero sum + drawdown dot matrix, key figures, R curve (plain SVG),
+  completeness, data origin, costs, continuation check against the earlier proof, the full trade list ("Alle zeigen"), limits. All numbers are
+  recomputed from the list (`proofFigures`). `ProofSheet.tsx` is the builder (period, Grundlage, Ergebnisart, name, preview) behind `share-proof`.
+- `LeaderboardCard.tsx`: four metrics incl. Drawdown, the filter "Herkunft der Daten", drawdown and origin beside each row. `YouCard.tsx`: four figures
+  (2 × 2 below 640 px and from 1024 px, four in a row in between) and the own origin line (`you-origin`).
+- `cases/`: `CaseFeed` (above the reviews of a group), `CaseCard` (decide → wait → result), `CaseChart` (SVG candles, the hidden future is drawn only after
+  the hypothesis; scale from the visible bars only), `NewCaseSheet` (symbol, candle size, anchor candle, horizon, open for), `useCaseBars` (loads candles
+  on demand via `loadLabData`, cached per key, retry in state).
+Tests: `tests/unit/views.community.{proof,cases}.test.tsx`, e2e `tests/e2e/community-belege.spec.ts` (mobile + desktop, axe).

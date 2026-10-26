@@ -9,9 +9,9 @@
  * State lives in the test process (`MockSocial`).
  */
 import type { Page, Route } from "@playwright/test";
-import { parseSharePayload, type CommentInfo, type GoalInfo, type GroupDetail, type GroupKind, type GroupRole, type LeaderboardRow, type MemberFigures, type MentorGoalDraft, type ShareInfo, type ShareLevel, type SharePayload, type SharedTrade, type SocialMe } from "../../../src/social/contract";
+import { CASE_INTERVAL_MS, CasePatchSchema, CreateCaseSchema, HypothesisSchema, parseSharePayload, type CaseInfo, type CommentInfo, type GoalInfo, type GroupDetail, type GroupKind, type GroupRole, type HypothesisInfo, type LeaderboardRow, type MemberFigures, type MentorGoalDraft, type ShareInfo, type ShareLevel, type SharePayload, type SharedTrade, type SocialMe } from "../../../src/social/contract";
 import { shareTitle } from "../../../src/social/format";
-import type { SocialMetric } from "../../../src/social/metrics";
+import { isOriginFilter, RANK_ORDER, type OriginClass, type SocialMetric } from "../../../src/social/metrics";
 
 export interface MockMember {
   id: string;
@@ -48,6 +48,28 @@ export interface MockGroup {
   invites: { code: string; role: "mentor" | "member" | "student"; uses: number; maxUses: number; expiresAt: string }[];
   reviews: MockReview[];
   seats?: number;
+  /** Chartfälle (F47) */
+  cases?: MockCase[];
+}
+export interface MockHypothesis {
+  userId: string;
+  direction: HypothesisInfo["direction"];
+  confidence: number;
+  reason: string;
+  createdAt: string;
+}
+export interface MockCase {
+  id: string;
+  authorId: string;
+  pair: string;
+  interval: CaseInfo["interval"];
+  anchorMs: number;
+  horizon: number;
+  question: string;
+  closesAt: string;
+  closed: boolean;
+  createdAt: string;
+  hyps: MockHypothesis[];
 }
 export interface MockShare extends ShareInfo {
   ownerId: string;
@@ -89,7 +111,7 @@ export interface MockSocial {
 
 export const OTHER_NAMES = ["Kühner Luchs 14", "Ruhige Eule 81", "Wacher Fuchs 55", "Klare Möwe 33", "Flinker Otter 72", "Geduldige Robbe 18", "Scharfer Habicht 64", "Freie Lerche 29", "Zäher Dachs 47", "Mutiger Kranich 90", "Heller Biber 36", "Treue Elster 58", "Kühle Krähe 21", "Fester Specht 83"];
 
-export const fig = (expectancyR: number, discipline: number, consistency: number, trades = 34): MemberFigures => ({ trades, expectancyR, winRate: 52, discipline, consistency, computedAt: "2026-10-12T03:00:00Z" });
+export const fig = (expectancyR: number, discipline: number, consistency: number, trades = 34, drawdownR = 3.2, origin: OriginClass = "api"): MemberFigures => ({ trades, expectancyR, winRate: 52, discipline, consistency, drawdownR, origin, computedAt: "2026-10-12T03:00:00Z" });
 
 const claimsSub = (auth: string | undefined): string | null => {
   const part = (auth ?? "").replace(/^Bearer\s+/i, "").split(".")[1];
@@ -117,7 +139,8 @@ export async function mockSocial(page: Page, opts: MockSocialOptions = {}): Prom
     feedback: [],
     calls: [],
   };
-  const others = Array.from({ length: opts.rankedOthers ?? 12 }, (_, i) => ({ pseudonym: OTHER_NAMES[i % OTHER_NAMES.length]!, f: fig(Math.round((1.1 - i * 0.09) * 100) / 100, 92 - i * 3, 78 - i * 4, 22 + i * 3) }));
+  const ORIGINS: OriginClass[] = ["api", "csv", "manual", "api"];
+  const others = Array.from({ length: opts.rankedOthers ?? 12 }, (_, i) => ({ pseudonym: OTHER_NAMES[i % OTHER_NAMES.length]!, f: fig(Math.round((1.1 - i * 0.09) * 100) / 100, 92 - i * 3, 78 - i * 4, 22 + i * 3, Math.round((1.5 + i * 0.4) * 10) / 10, ORIGINS[i % ORIGINS.length]!) }));
   const now = () => new Date().toISOString();
   const send = (route: Route, status: number, body: unknown) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   const err = (route: Route, status: number, code: string, message: string) => send(route, status, { error: { code, message } });
@@ -126,26 +149,29 @@ export async function mockSocial(page: Page, opts: MockSocialOptions = {}): Prom
   const isManager = (r: GroupRole) => r === "owner" || r === "mentor";
   const visibleReview = (g: MockGroup, me: MockMember, r: MockReview) => g.kind !== "mentor" || r.authorId === me.id || isManager(me.role);
 
-  const metricOf = (f: MemberFigures, m: SocialMetric) => (m === "expectancy" ? f.expectancyR : m === "discipline" ? f.discipline : f.consistency) ?? 0;
-  const board = (metric: SocialMetric, groupId: string | null, uid: string) => {
-    const entries: { name: string; value: number; trades: number; me: boolean }[] = [];
+  const metricOf = (f: MemberFigures, m: SocialMetric) => (m === "expectancy" ? f.expectancyR : m === "discipline" ? f.discipline : m === "drawdown" ? f.drawdownR : f.consistency) ?? 0;
+  const board = (metric: SocialMetric, groupId: string | null, uid: string, origin = "all") => {
+    const entries: { name: string; value: number; trades: number; me: boolean; dd: number | null; origin: OriginClass | null }[] = [];
     if (groupId) {
       const g = mock.groups.find((x) => x.id === groupId)!;
       const me = g.members.find((m) => m.id === uid)!;
       for (const m of g.members) {
         if (g.kind === "mentor" && !isManager(me.role) && m.id !== uid && !isManager(m.role)) continue;
         const f = m.id === uid ? mock.me.figures : m.figures;
-        if (m.shareLevel === "stats" && f) entries.push({ name: m.pseudonym, value: metricOf(f, metric), trades: f.trades, me: m.id === uid });
+        if (m.shareLevel === "stats" && f) entries.push({ name: m.pseudonym, value: metricOf(f, metric), trades: f.trades, me: m.id === uid, dd: f.drawdownR ?? null, origin: f.origin ?? null });
       }
     } else {
-      for (const o of others) entries.push({ name: o.pseudonym, value: metricOf(o.f, metric), trades: o.f.trades, me: false });
-      if (mock.me.optIn && mock.me.figures?.eligible) entries.push({ name: mock.me.pseudonym, value: metricOf(mock.me.figures, metric), trades: mock.me.figures.trades, me: true });
+      for (const o of others) entries.push({ name: o.pseudonym, value: metricOf(o.f, metric), trades: o.f.trades, me: false, dd: o.f.drawdownR ?? null, origin: o.f.origin ?? null });
+      if (mock.me.optIn && mock.me.figures?.eligible) entries.push({ name: mock.me.pseudonym, value: metricOf(mock.me.figures, metric), trades: mock.me.figures.trades, me: true, dd: mock.me.figures.drawdownR ?? null, origin: mock.me.figures.origin ?? null });
     }
-    entries.sort((a, b) => b.value - a.value || b.trades - a.trades);
-    const rows: LeaderboardRow[] = entries.map((e, i) => ({ rank: i + 1, prevRank: groupId ? null : i === 0 ? 2 : i === 1 ? 1 : i + 1, pseudonym: e.name, value: e.value, trades: e.trades, me: e.me }));
+    const dir = RANK_ORDER[metric] === "low" ? -1 : 1;
+    const kept = entries.filter((e) => groupId || origin === "all" || e.origin === origin);
+    kept.sort((a, b) => dir * (b.value - a.value) || b.trades - a.trades);
+    const rows: LeaderboardRow[] = kept.map((e, i) => ({ rank: i + 1, prevRank: groupId ? null : i === 0 ? 2 : i === 1 ? 1 : i + 1, pseudonym: e.name, value: e.value, trades: e.trades, drawdownR: e.dd, origin: e.origin, me: e.me }));
     const mineIdx = rows.findIndex((r) => r.me);
     return {
       metric,
+      origin: (groupId ? "all" : origin) as "all",
       day: rows.length ? "2026-10-12" : null,
       total: rows.length,
       rows: rows.slice(0, 25),
@@ -158,6 +184,7 @@ export async function mockSocial(page: Page, opts: MockSocialOptions = {}): Prom
               { metric: "discipline", n: 24, p10: 41, p25: 55, p50: 68, p75: 80, p90: 90, mean: 66 },
               { metric: "consistency", n: 24, p10: 30, p25: 42, p50: 55, p75: 66, p90: 77, mean: 54 },
               { metric: "winrate", n: 24, p10: 38, p25: 44, p50: 50, p75: 56, p90: 61, mean: 50 },
+              { metric: "drawdown", n: 24, p10: 1.2, p25: 2.1, p50: 3.4, p75: 5.2, p90: 8, mean: 3.9 },
             ],
       me: meObj(),
       group: groupId ? { id: groupId, name: mock.groups.find((x) => x.id === groupId)!.name } : null,
@@ -190,8 +217,20 @@ export async function mockSocial(page: Page, opts: MockSocialOptions = {}): Prom
       seats: g.kind === "team" && me.role === "owner" ? { seats: g.seats ?? 5, used: g.members.length } : null,
     };
   };
+  const hypInfo = (h: MockHypothesis, uid: string): HypothesisInfo => ({ author: nameOf(h.userId), authorId: h.userId, me: h.userId === uid, direction: h.direction, confidence: h.confidence, reason: h.reason, createdAt: h.createdAt });
+  const caseClosed = (c: MockCase) => c.closed || Date.parse(c.closesAt) <= Date.now();
+  /** Chartfälle as the server sends them: the others' hypotheses only once the case is closed; mentor groups: students see mentors' + own. */
+  const casesFor = (g: MockGroup, me: MockMember): CaseInfo[] =>
+    (g.cases ?? []).map((c) => {
+      const closed = caseClosed(c);
+      const mine = c.hyps.find((h) => h.userId === me.id);
+      const roleOf = (uid: string): GroupRole => g.members.find((m) => m.id === uid)?.role ?? "member";
+      const others = closed ? c.hyps.filter((h) => h.userId !== me.id && (g.kind !== "mentor" || isManager(me.role) || isManager(roleOf(h.userId)))) : [];
+      return { id: c.id, groupId: g.id, author: nameOf(c.authorId), authorId: c.authorId, me: c.authorId === me.id, pair: c.pair, interval: c.interval, anchorMs: c.anchorMs, horizon: c.horizon, question: c.question, closesAt: c.closesAt, closed, createdAt: c.createdAt, hypotheses: c.hyps.length, mine: mine ? hypInfo(mine, me.id) : null, revealed: others.map((h) => hypInfo(h, me.id)) };
+    });
   const feed = (g: MockGroup, me: MockMember) => ({
     group: detail(g, me),
+    cases: casesFor(g, me),
     reviews: g.reviews
       .filter((r) => visibleReview(g, me, r))
       .map((r) => ({
@@ -254,7 +293,8 @@ export async function mockSocial(page: Page, opts: MockSocialOptions = {}): Prom
         const metric = (url.searchParams.get("metric") ?? "expectancy") as SocialMetric;
         const group = url.searchParams.get("group");
         if (group && !mock.groups.some((g) => g.id === group && g.members.some((m) => m.id === uid))) return err(route, 404, "group_not_found", "Diese Gruppe gibt es nicht.");
-        return send(route, 200, board(metric, group, uid));
+        const origin = url.searchParams.get("origin") ?? "all";
+        return send(route, 200, board(metric, group, uid, isOriginFilter(origin) ? origin : "all"));
       }
       if (body.action === "optIn") mock.me.optIn = body.on === true;
       if (body.action === "reroll") mock.me.pseudonym = mock.me.pseudonym === "Stiller Falke 27" ? "Klarer Wolf 63" : "Stiller Falke 27";
@@ -363,6 +403,40 @@ export async function mockSocial(page: Page, opts: MockSocialOptions = {}): Prom
     }
     if (review && rest[2] === "comments" && method === "DELETE") {
       review.comments = review.comments.filter((c) => c.id !== rest[3]);
+      return send(route, 200, { ok: true });
+    }
+    // Chartfälle (F47): validated with the real strict schemas, the others' hypotheses hidden until the case is closed
+    if (rest[0] === "cases" && rest.length === 1 && method === "POST") {
+      if (g.kind === "mentor" && !isManager(me.role)) return err(route, 403, "not_manager", "Das dürfen nur Gruppen-Owner und Mentoren.");
+      const parsed = CreateCaseSchema.safeParse(body);
+      if (!parsed.success) return err(route, 422, "invalid_body", "Eingaben unvollständig oder ungültig.");
+      const b = parsed.data;
+      const iv = CASE_INTERVAL_MS[b.interval];
+      if (b.anchorMs % iv !== 0 || b.anchorMs + iv > Date.now()) return err(route, 422, "anchor_not_closed", "Die letzte sichtbare Kerze muss schon geschlossen sein.");
+      const c: MockCase = { id: uuid(), authorId: uid, pair: b.pair, interval: b.interval, anchorMs: b.anchorMs, horizon: b.horizon, question: b.question, closesAt: new Date(Date.now() + b.openHours * 3_600_000).toISOString(), closed: false, createdAt: now(), hyps: [] };
+      (g.cases ??= []).unshift(c);
+      return send(route, 201, { id: c.id });
+    }
+    const kase = rest[0] === "cases" ? g.cases?.find((c) => c.id === rest[1]) : undefined;
+    if (rest[0] === "cases" && !kase) return err(route, 404, "case_not_found", "Diesen Chartfall gibt es nicht (mehr).");
+    if (kase && rest[2] === "hypothesis" && method === "POST") {
+      const parsed = HypothesisSchema.safeParse(body);
+      if (!parsed.success) return err(route, 422, "invalid_body", "Eingaben unvollständig oder ungültig.");
+      if (caseClosed(kase)) return err(route, 409, "case_closed", "Dieser Chartfall ist geschlossen – Hypothesen gehen nur vorher.");
+      if (kase.hyps.some((h) => h.userId === uid)) return err(route, 409, "already_hypothesis", "Du hast schon eine Hypothese – sie lässt sich nicht ändern.");
+      const h: MockHypothesis = { userId: uid, ...parsed.data, createdAt: now() };
+      kase.hyps.push(h);
+      return send(route, 201, { hypothesis: hypInfo(h, uid) });
+    }
+    if (kase && rest.length === 2 && method === "PATCH") {
+      if (!CasePatchSchema.safeParse(body).success) return err(route, 422, "invalid_body", "Eingaben unvollständig oder ungültig.");
+      if (kase.authorId !== uid && !isManager(me.role)) return err(route, 403, "not_allowed", "Das dürfen nur Autor:in und Mentoren.");
+      kase.closed = true;
+      return send(route, 200, { ok: true });
+    }
+    if (kase && rest.length === 2 && method === "DELETE") {
+      if (kase.authorId !== uid && !isManager(me.role)) return err(route, 403, "not_allowed", "Das dürfen nur Autor:in und Mentoren.");
+      g.cases = (g.cases ?? []).filter((c) => c !== kase);
       return send(route, 200, { ok: true });
     }
     if (rest[0] === "goals" && method === "POST") {

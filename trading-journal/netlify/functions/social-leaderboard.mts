@@ -1,6 +1,7 @@
 /**
  * Rankings + the caller's community status (P12). Signed in (aal2 when 2FA is on).
- *   GET  /api/v1/social/leaderboard?metric=expectancy|discipline|consistency[&group=<id>] → `LeaderboardResponse`
+ *   GET  /api/v1/social/leaderboard?metric=expectancy|discipline|consistency|drawdown[&origin=all|api|csv|manual|auto][&group=<id>]
+ *        → `LeaderboardResponse` (`origin` limits a global board to traders whose records mostly came that way)
  *   POST /api/v1/social/leaderboard `{ action: "optIn", on }` – ranking opt-in (writes `profiles.privacy.leaderboard`;
  *        off removes the user's snapshot rows at once) · `{ action: "refresh" }` – recompute my figures now (6 / h) ·
  *        `{ action: "reroll" }` – a new pseudonym (3 / day) → `{ me }`
@@ -8,7 +9,7 @@
  */
 import type { Config } from "@netlify/functions";
 import { LeaderboardActionSchema } from "../../src/social/contract";
-import { isSocialMetric } from "../../src/social/metrics";
+import { isOriginFilter, isSocialMetric } from "../../src/social/metrics";
 import { audit } from "./_lib/audit";
 import { requireUser } from "./_lib/auth";
 import { clientIp, handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
@@ -26,7 +27,9 @@ export default handler(async (req, ctx) => {
     const metric = url.searchParams.get("metric") ?? "expectancy";
     if (!isSocialMetric(metric)) throw new HttpError(400, "invalid_metric", "Unbekannte Kennzahl.");
     const group = url.searchParams.get("group");
-    return json(group ? await groupLeaderboard(user.id, group, metric) : await globalLeaderboard(user.id, metric));
+    const origin = url.searchParams.get("origin") ?? "all";
+    if (!isOriginFilter(origin)) throw new HttpError(400, "invalid_origin", "Unbekannte Datenherkunft.");
+    return json(group ? await groupLeaderboard(user.id, group, metric) : await globalLeaderboard(user.id, metric, origin));
   }
   const body = await readJson(req, LeaderboardActionSchema, { maxBytes: 1024 });
   const ip = clientIp(req, ctx);
