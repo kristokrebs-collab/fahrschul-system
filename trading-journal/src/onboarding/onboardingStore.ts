@@ -20,7 +20,7 @@ export interface StoredOnboarding {
   v: number;
 }
 
-export const STEP_IDS = ["start", "konten", "setups", "boerse", "ziel"] as const;
+export const STEP_IDS = ["start", "konten", "setups", "boerse", "mehr", "ziel"] as const;
 export type StepId = (typeof STEP_IDS)[number];
 export const STEP_COUNT = STEP_IDS.length;
 

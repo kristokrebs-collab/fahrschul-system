@@ -5,6 +5,7 @@
  * Versuchsaufbau. Editing a price afterwards re-runs the card on the same candles; changing market, timeframe or period asks
  * for new candles first. The form is remembered in this browser as a convenience.
  */
+import { SeeAlso } from "@/app/FeatureLinks";
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
 import { normalizeWatchSymbol } from "@/domain/boxes";
 import { estimatePages } from "@/domain/backtest/history";
@@ -149,6 +150,7 @@ export default function TimeMachineSection() {
       <Card title={TM.title} note="Plan eintragen – die Zeitmaschine rechnet ihn mit echten Kerzen durch." data-testid="tm-form">
         <div className="grid gap-5">
           <p className="text-[12.5px] leading-snug text-mute">{TM.lead}</p>
+          <SeeAlso at="labor.zeitmaschine" />
           <div className="grid gap-4 sm:grid-cols-2">
             <FieldRow label={LABOR.symbol} htmlFor={`tm-sym-${uid}`} hint={symDraft != null && normalizeWatchSymbol(symDraft) == null ? <span className="text-(--color-danger-text)">{LABOR.symbolInvalid}</span> : LABOR.symbolHint}>
               <Autocomplete

@@ -14,7 +14,7 @@ import { PAGES } from "@/store/uiStore";
 export const TOUR = {
   title: "Einführung",
   rail: "Fortschritt der Einführung",
-  steps: { start: "Start", konten: "Konten", setups: "Setups", boerse: "Börse", ziel: "Ziel" },
+  steps: { start: "Start", konten: "Konten", setups: "Setups", boerse: "Börse", mehr: "Mehr", ziel: "Ziel" },
   skip: "Überspringen",
   back: "Zurück",
   next: "Weiter",
@@ -25,7 +25,7 @@ export const TOUR = {
     lead: "Ab heute zählt",
     slots: ["Gefühl", "Zufall", "FOMO", "Disziplin"],
     lines: ["Dein Journal zeigt dir, was funktioniert –", "und was du lassen solltest."],
-    hud: "In vier kurzen Schritten startklar.",
+    hud: "In fünf kurzen Schritten startklar.",
     cards: ["Journal", "Setups", "Risiko", "Ziele"],
   },
   konten: {
@@ -53,6 +53,19 @@ export const TOUR = {
     open: "Einführung beenden und Konto öffnen",
     offLead: "Der Börsen-Sync braucht das Cloud-Konto. In dieser Version ist es nicht eingerichtet.",
     offHint: "Du trägst Trades selbst ein – mit N oder dem roten Plus – oder importierst ein Backup unter Einstellungen → Daten.",
+  },
+  mehr: {
+    title: "Was es sonst noch gibt",
+    lead: "Nichts davon musst du jetzt einrichten. Alles steht unter „Funktionen“, nach Aufgabe geordnet und durchsuchbar – im Menü oder mit der Taste /.",
+    items: [
+      { name: "Handelsplan", text: "Einstieg, Stop und Ziel, Größe und Risiko-Check in fünf Schritten bis zum Ticket zum Kopieren. Die App sendet nie eine Order." },
+      { name: "Aktien", text: "Scanner, Watchlist, News und Zahlen – mit Quelle und Stand. Aktienkurse kommen aus frei zugänglichen Quellen und können verzögert sein." },
+      { name: "Labor", text: "Strategien an echter Historie testen; die Zeitmaschine spielt einen Plan durch." },
+      { name: "Datenarchiv", text: "Schreibt Marktzahlen auf diesem Gerät mit – nur, wenn du es unter Einstellungen einschaltest." },
+    ],
+    demoLead: "Erst ausprobieren? Die Demo zeigt die App in fünf kurzen Schritten mit Beispieldaten. Sie ändert dein Journal nicht.",
+    demo: "Demo mit Beispieldaten",
+    demoHint: "Beendet die Einführung und öffnet die Demo.",
   },
   ziel: {
     title: "Ein erstes Ziel",
@@ -241,7 +254,33 @@ export function StepBoerse({ onOpenAccount }: { onOpenAccount: () => void }) {
   );
 }
 
-/* ------------------------------------------------------------------------------------------------------ 5 Ziel */
+/* ------------------------------------------------------------------------------------------------------ 5 Mehr */
+
+export function StepMehr({ onDemo }: { onDemo: () => void }) {
+  return (
+    <div className="grid gap-5">
+      <StepHead title={TOUR.mehr.title} lead={TOUR.mehr.lead} />
+      <dl className="grid gap-2.5" data-testid="tour-more">
+        {TOUR.mehr.items.map((it) => (
+          <div key={it.name} className="grid gap-0.5 rounded-2xl border border-line bg-white/[0.02] px-4 py-3">
+            <dt className="text-[13.5px] font-semibold text-fg">{it.name}</dt>
+            <dd className="text-[12.5px] leading-relaxed text-mute">{it.text}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={onDemo} data-testid="tour-demo" className="touch-hit rounded-xl border border-line-2 bg-white/[0.03] px-4 py-2 text-[13px] font-semibold text-fg transition-colors hover:border-white/30">
+          {TOUR.mehr.demo}
+        </button>
+        <span className="max-w-[48ch] text-[12px] leading-relaxed text-mute">
+          {TOUR.mehr.demoLead} {TOUR.mehr.demoHint}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------------------ 6 Ziel */
 
 export function StepZiel({ value, onChange }: { value: GoalTemplateId | null; onChange: (v: GoalTemplateId | null) => void }) {
   const options: (GoalTemplateId | null)[] = [...GOAL_TEMPLATES.map((g) => g.id), null];

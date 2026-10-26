@@ -8,6 +8,7 @@
  * (smooth glide + tick flash, zero renders per tick), the R multiple flashes on change (`ValueFlash`), and a position
  * above the leverage rule or the capital shakes the result block (`useShake`) the moment it tips over.
  */
+import { SeeAlso } from "@/app/FeatureLinks";
 import { AnimatePresence, motion } from "motion/react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { boxTargetsFor, liquidationPrice, positionSize, rrCalc, rTargets, stopCandidates, symbolOf, type RiskLimits, type SizingResult } from "@/domain/risk";
@@ -350,6 +351,7 @@ export function CalculatorCard({ base }: { base: RiskBase }) {
             <CalcManage m={m} limits={limits} cur={cur} atr={atrV} />
           </Suspense>
         )}
+        <SeeAlso at="risiko.calc" inCard />
       </div>
     </RiskCard>
   );

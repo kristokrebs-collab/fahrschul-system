@@ -12,6 +12,7 @@ import { Suspense, useCallback, useMemo, useState, type ReactNode } from "react"
 import { watchlistOfSettings } from "@/domain/watchlist";
 import { cn } from "@/lib/cn";
 import { stockData } from "@/market/stocks/client";
+import { SeeAlso } from "@/app/FeatureLinks";
 import { SectionNav } from "@/primitives/SectionNav";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
@@ -81,6 +82,7 @@ export function AktienView({ className }: { className?: string }) {
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="aktien-view">
       <PageHeader className="lg:col-span-12" title={AKTIEN.title} lead={AKTIEN.lead} leadFill={AKTIEN_LEAD_FILL} />
       <SectionNav items={NAV} className="lg:col-span-12" />
+      <SeeAlso at="aktien.page" className="lg:col-span-12" />
       <Section id="aktien-scanner" title={T.scanner.title} sub={T.scanner.sub}>
         <Cell index={0} span="lg:col-span-12">
           <ScannerCard />

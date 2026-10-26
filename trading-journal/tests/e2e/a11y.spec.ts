@@ -98,7 +98,7 @@ test.describe("Barrierefreiheit (axe)", () => {
       const tour = page.getByRole("dialog", { name: "Einführung" });
       await tour.waitFor({ timeout: 20_000 });
       await expectAccessible(page, '[role="dialog"]:has([data-testid="onboarding"])', "Einführung – Start");
-      for (const step of ["konten", "setups", "boerse", "ziel"]) {
+      for (const step of ["konten", "setups", "boerse", "mehr", "ziel"]) {
         await page.getByTestId("tour-next").click();
         await expect(page.getByTestId("onboarding")).toHaveAttribute("data-step", step);
         await expectAccessible(page, '[role="dialog"]:has([data-testid="onboarding"])', `Einführung – ${step}`);

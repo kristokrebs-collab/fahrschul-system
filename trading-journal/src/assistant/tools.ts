@@ -316,7 +316,7 @@ function helloTool(arg: string, env: ToolEnv): ToolReply {
 function helpTool(env: ToolEnv): ToolReply {
   return reply({
     title: "Das kann ich",
-    text: "Frag in deinen Worten: nach Kennzahlen („Win-Rate am Montag“), Stärken und Schwächen („Was lief gut?“), Verhalten („Was kostet mich Revenge?“), dem Einstieg („Was fehlt für meinen Einstieg?“), dem Labor („Warum ist der Backtest schlecht?“, „Teste diese Idee“), Verbesserungen oder deinem Wochenexperiment. Ich öffne auch Seiten („Öffne das Labor“), das Training („Ich will üben“), zeige dir, wo eine Funktion steht („Wo finde ich den Belastungstest?“), und merke mir, was du mir sagst („Merk dir …“). Du kannst tippen oder das Mikrofon nutzen.",
+    text: "Frag in deinen Worten: nach Kennzahlen („Win-Rate am Montag“), Stärken und Schwächen („Was lief gut?“), Verhalten („Was kostet mich Revenge?“), dem Einstieg („Was fehlt für meinen Einstieg?“), dem Labor („Warum ist der Backtest schlecht?“, „Teste diese Idee“), Verbesserungen oder deinem Wochenexperiment. Ich öffne auch Seiten („Öffne das Labor“), das Training („Ich will üben“), den Handelsplan („Wie groß soll die Position sein?“), den Aktien-Scanner („Aktien scannen“) und die Demo mit Beispieldaten („Starte die Demo“), zeige dir, wo eine Funktion steht („Wo finde ich den Belastungstest?“), und merke mir, was du mir sagst („Merk dir …“). Ich sende nie eine Order und handle nie für dich. Du kannst tippen oder das Mikrofon nutzen.",
     followUps: suggestFor(env),
   });
 }

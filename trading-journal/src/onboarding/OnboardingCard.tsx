@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FeatureLinks } from "@/app/FeatureLinks";
 import { KeyCombo } from "@/app/Kbd";
 import { openShortcutSheet } from "@/app/shortcuts";
 import { Button } from "@/primitives/Button";
@@ -7,7 +8,8 @@ import { readOnboarding, startOnboarding, useOnboarding, type StoredOnboarding }
 
 export const ONBOARDING_CARD = {
   title: "Einführung & Hilfe",
-  lead: "Die Tour durch Konten, Setups, Börse und dein erstes Ziel – jederzeit noch einmal.",
+  lead: "Die Tour durch Konten, Setups, Börse, die neueren Bereiche und dein erstes Ziel – jederzeit noch einmal.",
+  news: { lead: "Neu in der App", label: "Neue Bereiche der App", items: [{ id: "handelsplan-einstieg", label: "Handelsplan" }, { id: "aktien-scanner", label: "Aktien" }, { id: "zeitmaschine", label: "Zeitmaschine" }, { id: "datenarchiv", label: "Datenarchiv" }] },
   start: "Einführung starten",
   keys: "Alle Tastenkürzel",
   demo: "Demo mit Beispieldaten",
@@ -16,6 +18,7 @@ export const ONBOARDING_CARD = {
     { keys: ["n"], label: "Neuer Trade" },
     { keys: ["t"], label: "Hell / Dunkel" },
     { keys: ["g", "t"], label: "Zu den Trades" },
+    { keys: ["g", "f"], label: "Alle Funktionen" },
     { keys: ["?"], label: "Alle Kürzel" },
   ],
   status: {
@@ -62,6 +65,7 @@ export function OnboardingCard({ className }: { className?: string }) {
             </li>
           ))}
         </ul>
+        <FeatureLinks items={ONBOARDING_CARD.news.items} lead={ONBOARDING_CARD.news.lead} label={ONBOARDING_CARD.news.label} testId="onboarding-news" className="border-t border-line pt-3" />
         <div className="flex flex-wrap gap-2.5">
           <Button variant="primary" size="sm" onClick={() => startOnboarding()}>
             {ONBOARDING_CARD.start}

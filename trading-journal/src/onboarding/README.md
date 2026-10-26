@@ -1,7 +1,7 @@
 # `src/onboarding` – first-run tour (P13)
 
-Five short steps that set the journal up for real, then get out of the way: **Start → Konten & Kapital → Setups →
-Börse → Ziel**. Only on the first run, after the intro, skippable at every step, restartable from the settings, the
+Six short steps that set the journal up for real, then get out of the way: **Start → Konten & Kapital → Setups →
+Börse → Mehr → Ziel**. Only on the first run, after the intro, skippable at every step, restartable from the settings, the
 search ("Einführung starten") and the shortcut sheet.
 
 ## Wiring (integrator)
@@ -35,17 +35,21 @@ starts for a journal WITH trades anyway (it marks the trader `seen`), but an emp
      opens the setup editor and resumes on the same step when it closes (`OnboardingHost`).
   4. *Börse* – with the cloud (P09) and the page `konto` registered: a link to connect an exchange (P11). Without: the
      honest hint "Du trägst Trades selbst ein …" – no fake connection.
-  5. *Ziel* – one process / limit goal from `GOAL_TEMPLATES` (checklist, max 3 trades a day, plan) or none; "Halten zum
+  5. *Mehr* – what else there is, in four honest lines (Handelsplan, Aktien, Labor with the Zeitmaschine, Datenarchiv – said to be off until switched on in the
+     settings) and where everything is listed ("Funktionen", menu, key `/`). One quiet button, "Demo mit Beispieldaten": it closes the tour early
+     (stored as `skipped`, never as `done`) and opens the demo – its chunk is fetched on the click. Nothing here starts by itself, and the step is not
+     shown to existing traders (their journal has trades: no tour).
+  6. *Ziel* – one process / limit goal from `GOAL_TEMPLATES` (checklist, max 3 trades a day, plan) or none; "Halten zum
      Starten" (`HoldButton`, 1.2 s) adds it through P08 `addGoalFromDraft` (`source: { kind: "onboarding" }`), fires
      `celebrateRecord` from the button and the toast "Startklar".
-- **Progress**: a horizontal `MilestoneRail` (all five fit the sheet) and the dot-matrix counter `1:5` in the header.
+- **Progress**: a horizontal `MilestoneRail` (all six fit the sheet) and the dot-matrix counter `1:6` in the header.
   Steps change with `AnimatePresence mode="wait"` (transform / opacity; reduced motion: instant).
 - The tour is a `Sheet` (bottom sheet on phones, centred from `sm`): focus trap, Escape / back / swipe close = skip.
 
 ## Files
 
 `onboardingStore.ts` (zustand + storage, `startOnboarding` / `pauseOnboarding` / `resumeOnboarding` / `finishOnboarding`
-/ `skipOnboarding` / `markSeen` / `goToStep`), `steps.tsx` (the five step views + `GOAL_TEMPLATES`, `parseAmount`),
+/ `skipOnboarding` / `markSeen` / `goToStep`), `steps.tsx` (the six step views + `GOAL_TEMPLATES`, `parseAmount`),
 `OnboardingTour.tsx` (lazy chunk), `OnboardingHost.tsx`, `OnboardingCard.tsx`.
 
 ## Tests
@@ -59,3 +63,10 @@ skip / back, no start with trades); e2e `tests/e2e/onboarding.spec.ts` (a real p
 
 In der Karte „Einführung & Hilfe“ gibt es neben dem Start der Tour den Knopf „Demo mit Beispieldaten“ (`data-testid="onboarding-demo"`). Er lädt den Demo-Chunk erst beim Klick
 (`import("@/views/demo/demoStore")`) und ändert weder den Stand der Tour noch Einstellungen oder das Journal (`src/views/demo/README.md`).
+
+## Neue Bereiche für alle, die die Tour schon kennen (Runde 8)
+
+Wer schon Trades hat, sieht die Tour nie von selbst. Für sie gibt es drei ruhige, überspringbare Wege, ohne Fenster und ohne Startseite zu berühren:
+das kleine „Neu“ an Handelsplan, Aktien und Strategie-Studio in der Navigation (verschwindet, sobald die Seite einmal geöffnet war; nur in diesem Browser,
+`storageKey("visited-pages")`, `src/app/CommandNav.tsx`), die Zeile „Neu in der App“ in der Karte „Einführung & Hilfe“ (Handelsplan, Aktien, Zeitmaschine, Datenarchiv
+als Direktlinks über das Funktionsregister) und der Knopf „Demo mit Beispieldaten“ ebendort sowie auf der Seite „Funktionen“.

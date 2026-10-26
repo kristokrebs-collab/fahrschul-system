@@ -103,11 +103,11 @@ describe("groups", () => {
     expect(stats.partial).toBe(testen.items.filter((f) => f.status === "teilweise").length);
     expect(stats.partial).toBeGreaterThan(0);
     // functions without a heading stay in one block without a title
-    expect(subGroups(groupFeatures(FEATURE_REGISTRY).find((g) => g.group.id === "heute")!.items)).toHaveLength(1);
+    expect(subGroups(groupFeatures(FEATURE_REGISTRY).find((g) => g.group.id === "community")!.items)).toHaveLength(1);
   });
 
   it("resolves 'Siehe auch' and names the place", () => {
-    expect(ids(seeAlso(featureById("tagesplan")!))).toEqual(["schluesselmarken", "checkin"]);
+    expect(ids(seeAlso(featureById("tagesplan")!))).toEqual(["schluesselmarken", "checkin", "handelsplan-einstieg"]);
     expect(placeText(featureById("tagesplan")!)).toBe("Markt › Tagesplan");
     expect(placeText(featureById("labor")!)).toBe("Labor");
     expect(placeText(featureById("eigene-idee")!)).toBe("Labor › Strategie & Kosten");

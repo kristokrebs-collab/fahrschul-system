@@ -13,21 +13,21 @@ import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { PAGES, pushToast, useUi, type Page } from "@/store/uiStore";
 import { finishOnboarding, goToStep, pauseOnboarding, skipOnboarding, STEP_COUNT, STEP_IDS, useOnboarding } from "./onboardingStore";
-import { GOAL_TEMPLATES, parseAmount, StepBoerse, StepKonten, StepSetups, StepStart, StepZiel, TOUR, type GoalTemplateId, type KontenDraft } from "./steps";
+import { GOAL_TEMPLATES, parseAmount, StepBoerse, StepKonten, StepMehr, StepSetups, StepStart, StepZiel, TOUR, type GoalTemplateId, type KontenDraft } from "./steps";
 
 /**
- * The first-run tour (P13): a `Sheet` (bottom sheet on phones, centred dialog from `sm`) with five steps – Start
+ * The first-run tour (P13): a `Sheet` (bottom sheet on phones, centred dialog from `sm`) with six steps – Start
  * (LaunchGrid, AsciiCascade wordmark, PixelTextFill claim, Typewriter), Konten und Kapital (writes `settings.capital` /
  * `currency`), Setups (shows them; "Eigene Grundlage anlegen" steps aside for the setup editor and comes back), Börse
- * (Konto when the cloud is set up, else an honest hint) and Ziel (a process goal through P08 `addGoalFromDraft`). A
- * horizontal `MilestoneRail` and the dot-matrix counter `1:5` show the progress; "Halten zum Starten" (`HoldButton`)
+ * (Konto when the cloud is set up, else an honest hint), Mehr (the late areas and the way to the demo) and Ziel (a process goal through P08 `addGoalFromDraft`). A
+ * horizontal `MilestoneRail` and the dot-matrix counter `1:6` show the progress; "Halten zum Starten" (`HoldButton`)
  * ends it with the record celebration. Skippable at every step (Escape, swipe, close, "Überspringen"); the outcome is
  * remembered (`onboardingStore`).
  */
 
 const RAIL: Milestone[] = STEP_IDS.map((id, i) => ({ id, title: TOUR.steps[id], date: `0${i + 1}` }));
 /**
- * The pulse rail lays its steps out 220 px wide for scrolling; here all five share the sheet's width. Its step numbers
+ * The pulse rail lays its steps out 220 px wide for scrolling; here all six share the sheet's width. Its step numbers
  * are real text here (small mono): mute instead of faint keeps them at AA contrast.
  */
 const RAIL_FIT = "overflow-visible pb-0 snap-none [&>li]:w-auto [&>li]:min-w-0 [&>li]:flex-1 [&>li]:pr-2 [&>li:last-child]:flex-none [&_.uppercase]:text-mute";
@@ -94,6 +94,12 @@ export function OnboardingTour() {
     if ((PAGES as readonly string[]).includes("konto")) navigate("konto" as Page);
   };
 
+  // "Demo mit Beispieldaten": closes the tour early (it counts as skipped, not as done), then opens the demo (its chunk is fetched on this click)
+  const openDemoFromTour = () => {
+    skipOnboarding();
+    void import("@/views/demo/demoStore").then((m) => m.openDemo());
+  };
+
   const addSetup = () => {
     pauseOnboarding();
     useUi.getState().openSetupEditor();
@@ -149,6 +155,7 @@ export function OnboardingTour() {
               {id === "konten" && <StepKonten draft={konten} onChange={setKonten} invalid={invalid} />}
               {id === "setups" && <StepSetups setups={setups} onAdd={addSetup} />}
               {id === "boerse" && <StepBoerse onOpenAccount={openAccount} />}
+              {id === "mehr" && <StepMehr onDemo={openDemoFromTour} />}
               {id === "ziel" && <StepZiel value={goal} onChange={setGoal} />}
             </motion.div>
           </AnimatePresence>

@@ -82,29 +82,32 @@ describe("command navigation", () => {
     expect(d).toHaveAttribute("aria-modal", "true");
     expect(within(d).getByRole("button", { name: COMMAND_NAV_STRINGS.close })).toHaveFocus();
     const links = within(d).getAllByRole("link");
-    // the finder's way to the full list first, then the four big links (digit first), then the feature pages (name, live count, digit last)
+    // the finder's way to the full list first, then the five big links of the dock (digit first), then the other pages in groups by task
+    // (name, "Neu" until the page has been opened, live count, digit last)
     expect(links.map((l) => l.textContent?.replace(/^0\d/, ""))).toEqual([
       "Alle Funktionen→",
       expect.stringMatching(/^Übersicht/),
       "Trades13",
       "Entscheidungsgrundlagen8",
+      expect.stringMatching(/^Markt/),
       expect.stringMatching(/^Einstellungen\d+$/),
-      expect.stringMatching(/^Markt.+05$/),
-      expect.stringMatching(/^Analyse\d+ %06$/),
-      expect.stringMatching(/^Risiko.+07$/),
-      expect.stringMatching(/^Coach\d+08$/),
-      expect.stringMatching(/^BerichteKW \d+09$/),
-      expect.stringMatching(/^Labor\d+10$/),
-      expect.stringMatching(/^Wachstum\d+11$/),
-      expect.stringMatching(/^Community.+12$/),
-      expect.stringMatching(/^Cockpit\d+13$/),
-      expect.stringMatching(/^Konto.+14$/),
-      expect.stringMatching(/^Preise.+15$/),
-      expect.stringMatching(/^FunktionenIndex16$/),
-      expect.stringMatching(/^Strategie-StudioText17$/),
-      expect.stringMatching(/^Handelsplan5 Schritte18$/),
-      expect.stringMatching(/^AktienScan19$/),
+      expect.stringMatching(/^HandelsplanNeu5 Schritte06$/),
+      expect.stringMatching(/^AktienNeuScan07$/),
+      expect.stringMatching(/^Risiko.+08$/),
+      expect.stringMatching(/^Analyse\d+ %09$/),
+      expect.stringMatching(/^BerichteKW \d+10$/),
+      expect.stringMatching(/^Coach\d+11$/),
+      expect.stringMatching(/^Wachstum\d+12$/),
+      expect.stringMatching(/^Labor\d+13$/),
+      expect.stringMatching(/^Strategie-StudioNeuText14$/),
+      expect.stringMatching(/^Community.+15$/),
+      expect.stringMatching(/^Cockpit\d+16$/),
+      expect.stringMatching(/^Konto.+17$/),
+      expect.stringMatching(/^Preise.+18$/),
+      expect.stringMatching(/^FunktionenIndex19$/),
     ]);
+    // the groups by task, in the order of the digits
+    expect(within(d).getAllByTestId("cmd-group").map((g) => g.getAttribute("data-group"))).toEqual(["handeln", "lernen", "strategien", "mehr"]);
     expect(within(d).getByRole("link", { name: /Übersicht/ })).toHaveAttribute("aria-current", "page");
     expect(within(d).getByRole("button", { name: COMMAND_NAV_STRINGS.newTrade })).toBeInTheDocument();
     // ⌘K again toggles it closed
@@ -151,7 +154,8 @@ describe("command navigation", () => {
 
     act(() => openCommandNav());
     fireEvent.keyDown(dialog(), { key: "4" });
-    expect(useUi.getState().page).toBe("settings");
+    // 1–5 are the dock tabs in the dock's order: Übersicht, Trades, Entscheidungsgrundlagen, Markt, Einstellungen
+    expect(useUi.getState().page).toBe("markt");
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull(), { timeout: 2500 });
   });
 

@@ -1,5 +1,5 @@
 /**
- * Page "Funktionen": a large search ("Was willst du tun?"), "Zuletzt benutzt" and "Empfohlen", ten task tiles; a tile opens its
+ * Page "Funktionen": a large search ("Was willst du tun?"), "Zuletzt benutzt" and "Empfohlen", twelve task tiles; a tile opens its
  * group (sub headings, one row per function, the details one fold away); a row opens the function. Each list says honestly
  * when it has nothing yet.
  */
@@ -52,13 +52,13 @@ describe("Funktionen page", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("names itself with an h1, asks 'Was willst du tun?' and shows the ten tasks as tiles – no function list yet", () => {
+  it("names itself with an h1, asks 'Was willst du tun?' and shows the twelve tasks as tiles – no function list yet", () => {
     renderPage();
     expect(screen.getByRole("heading", { level: 1, name: "Funktionen" })).toBeInTheDocument();
     expect(screen.getByTestId("funktionen-view")).toHaveAttribute("data-count", String(FEATURE_COUNT));
     expect(view()).toBe("tiles");
     expect(tiles().map((t) => t.getAttribute("data-group"))).toEqual(FEATURE_GROUPS.map((g) => g.id));
-    expect(tiles()).toHaveLength(10);
+    expect(tiles()).toHaveLength(12);
     for (const g of FEATURE_GROUPS) {
       expect(tile(g.id)).toHaveTextContent(g.name);
       expect(tile(g.id)).toHaveTextContent(g.lead);

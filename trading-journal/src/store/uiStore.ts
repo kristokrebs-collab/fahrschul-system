@@ -5,11 +5,13 @@ import { KEYS, readJson, writeJson } from "./storage";
 /* ---------------------------------------------------------------- types */
 
 /**
- * Every page of the app (P14). The first four keep their digits 1–4 (CommandNav) and their bundle keys; the feature
- * pages follow (markt 5, analyse 6, risiko 7, coach 8, berichte 9, …). The order is the digit order – the dock and the
- * slide direction use `NAV_ORDER`.
+ * Every page of the app, in the order of a trader's work. The first five are the dock tabs in the dock's order (digits 1–5 in the
+ * command navigation); then come the pages by task – plan and trade (Handelsplan, Aktien, Risiko), evaluate and learn (Analyse,
+ * Berichte, Coach, Wachstum), build strategies (Labor, Strategie-Studio) and the rest (Community, Cockpit, Konto, Preise,
+ * Funktionen). This order is the digit order of the command navigation, the order of its groups, the tie
+ * order of the search and the order of the `g` shortcuts in the cheat sheet – the dock and the slide direction use `NAV_ORDER`.
  */
-export const PAGES = ["overview", "trades", "setups", "settings", "markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise", "funktionen", "studio", "plan", "aktien"] as const;
+export const PAGES = ["overview", "trades", "setups", "markt", "settings", "plan", "aktien", "risiko", "analyse", "berichte", "coach", "wachstum", "labor", "studio", "community", "cockpit", "konto", "preise", "funktionen"] as const;
 export type Page = (typeof PAGES)[number];
 export type PageKey = "o" | "t" | "s" | "e" | "m" | "a" | "r" | "c" | "b" | "l" | "w" | "g" | "d" | "k" | "p" | "f" | "u" | "h" | "i";
 /** `g` + letter (shortcuts): the bundle's `o|t|s|e` plus one letter per feature page. */

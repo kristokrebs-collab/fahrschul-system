@@ -3,6 +3,7 @@
  * and mounts on the first opening; nothing is computed before (the stress scenarios and the filter comparison start with
  * their own button). Collapsed they cost the page one header line each.
  */
+import { SeeAlso } from "@/app/FeatureLinks";
 import { lazy, Suspense, useId, useState, type ReactNode } from "react";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
@@ -73,6 +74,7 @@ export function ExtrasSection() {
       </ExtraCard>
       <ExtraCard id="manage" title="Verwaltung vergleichen" sub="Break-even, Trailing, Teilziel – derselbe Lauf mit anderen Stops nach dem Einstieg, mit Median, Drawdown, Kosten und Ausstoppern.">
         <ManageBody />
+        <SeeAlso at="labor.manage" className="mt-3" />
       </ExtraCard>
     </div>
   );
