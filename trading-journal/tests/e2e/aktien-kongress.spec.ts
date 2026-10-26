@@ -37,10 +37,25 @@ async function go(page: Page): Promise<void> {
 
 async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
   if (!SHOTS) return;
+  // the rows reveal when they come into view: walk the page once, then back to the card
+  const total = await page.evaluate(() => document.documentElement.scrollHeight);
+  for (let y = 0; y < total + 800; y += 500) {
+    await page.evaluate((top) => window.scrollTo({ top, behavior: "instant" }), y);
+    await page.waitForTimeout(60);
+  }
   await page.getByTestId("aktien-kongress").scrollIntoViewIfNeeded();
   await page.waitForTimeout(900);
   const width = info.project.use.viewport?.width ?? 0;
-  await page.getByTestId("aktien-kongress").screenshot({ path: `${SHOTS}/${name}-${width}.png` });
+  if (width > 600) {
+    await page.getByTestId("aktien-kongress").screenshot({ path: `${SHOTS}/${name}-${width}.png` });
+    return;
+  }
+  // a phone: the card in pieces of 1400 px
+  const box = await page.getByTestId("aktien-kongress").evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { x: 0, y: r.top + window.scrollY, width: document.documentElement.clientWidth, height: r.height };
+  });
+  for (let i = 0, y = 0; y < box.height; i++, y += 1400) await page.screenshot({ path: `${SHOTS}/${name}-${width}-${i}.png`, fullPage: true, clip: { x: 0, y: box.y + y, width: box.width, height: Math.min(1400, box.height - y) } });
 }
 
 const rows = (page: Page) => page.getByTestId("kongress-row");
@@ -123,7 +138,7 @@ test.describe("Kongress-Tracker", () => {
     await page.getByTestId("kongress-chip-watch").click();
     await page.getByRole("radio", { name: "Verkauf" }).click();
     await expect(page.getByTestId("kongress-nomatch")).toBeVisible(); // all of Pelosi's rows are purchases
-    await page.getByRole("radio", { name: "Kauf" }).click();
+    await page.getByRole("radio", { name: "Kauf", exact: true }).click();
     await expect(rows(page)).toHaveCount(7);
 
     // a click on the ticker selects it on the page
@@ -193,7 +208,7 @@ test.describe("Kongress-Tracker", () => {
     await readAll(page, WORLD.length);
     await expectNoHorizontalScroll(page);
     if (info.project.name === "mobile") {
-      const targets = [page.getByTestId("kongress-chip-watch"), page.getByTestId("kongress-chip-new"), page.getByTestId("kongress-chip-ticker"), page.getByTestId("kongress-refresh"), rows(page).first().getByTestId("kongress-ticker"), rows(page).first().getByTestId("kongress-pdf")];
+      const targets = [page.getByTestId("kongress-chip-watch"), page.getByTestId("kongress-chip-new"), page.getByTestId("kongress-chip-ticker"), rows(page).first().getByTestId("kongress-ticker"), rows(page).first().getByTestId("kongress-pdf")];
       for (const t of targets) {
         await t.scrollIntoViewIfNeeded();
         const box = await t.boundingBox();

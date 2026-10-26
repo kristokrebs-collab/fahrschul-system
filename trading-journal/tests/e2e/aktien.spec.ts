@@ -413,7 +413,7 @@ test.describe("Aktien", () => {
     // the filters: only the new ones, only the important ones
     await page.getByRole("radio", { name: "Wichtige" }).click();
     await expect(stories).toHaveCount(2); // the bankruptcy and the earnings headline
-    await page.getByRole("radio", { name: "Alle" }).click();
+    await page.getByTestId("aktien-news").getByRole("radio", { name: "Alle" }).click(); // the Congress card has its own "Alle"
     // read: nothing is new any more
     await page.getByTestId("aktien-news-markread").click();
     await expect(page.locator('[data-testid="aktien-story"][data-new="1"]')).toHaveCount(0);

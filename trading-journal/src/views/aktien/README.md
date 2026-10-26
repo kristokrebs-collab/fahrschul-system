@@ -23,8 +23,8 @@ gap and never an invented list. The page never sends an order; every result card
 
 ## Slot contract (Analyse, Kongress)
 
-`AnalystSlot` (Quartalszahlen · DCF · Kaufthese, F68/F69) and `CongressSlot` (later) are lazy components that load `./slotsImpl`. Until a real
-section exists they say **"Kommt gleich"** (`data-testid="aktien-analyse"` / `"aktien-kongress"`). Props: `AktienSlotProps` (`types.ts`):
+`AnalystSlot` (Quartalszahlen · DCF · Kaufthese, F68/F69) and `CongressSlot` (the Congress tracker, below) are lazy components that load `./slotsImpl`, which hosts the real
+sections (`data-testid="aktien-analyse"` / `"aktien-kongress"`; a slot without a body would say **"Kommt gleich"**). Props: `AktienSlotProps` (`types.ts`):
 
 ```ts
 { watchlist: readonly WatchItem[];   // the stocks of the watchlist (no crypto pairs)
@@ -35,6 +35,22 @@ section exists they say **"Kommt gleich"** (`data-testid="aktien-analyse"` / `"a
 
 Whoever builds a section replaces the function body in `slotsImpl.tsx` (or the import in `Slots.tsx`); nothing else on the page changes.
 A slot only reads and shows; what it saves goes under its own settings key, never into `settings.watchlist`.
+
+## Kongress-Tracker (`kongress/`, section Kongress)
+
+The stock trades members of the US **House** report under the STOCK Act, read from the House Clerk's public Periodic Transaction Reports (skill `trader-pelosi`; not a point of the 74-point plan, so `fids: []` in the register and no row in `docs/COVERAGE.md`). `CongressSlotImpl` lazy-loads `kongress/CongressCard`.
+
+| module | what |
+|---|---|
+| `CongressCard.tsx` | the card: lead, the four caveats (**always on screen**: up to 45 days late, ranges, member is not intent, no signal – plus "Keine professionelle Finanzberatung."), filters (Mitglied, Ticker oder Name, Kauf/Verkauf, "Gemeldet in den letzten" 7 / 30 / 90 Tage / Dieses Jahr, chips Auf meiner Watchlist · Neu seit dem letzten Besuch · Nur mit Kürzel), the state of the sources in words (progress "Meldungen gelesen: n von m", failures with reason, copies from the cache), the rows, the Senate route (link + sentence, nothing automatic), source + index stand + fetch time. Nothing is asked before the section has been on screen once (`observeInView`; without an observer it loads at once). |
+| `TradeCard.tsx` | one row as the filing states it: member · district · owner, security, ticker (a button: selects it on the page – `useAktien.select`, the Analyse sections read it), buy / sell, option strike and expiry (only what the description states, else "nicht erkannt"), trade date, filing date, delay in days (over 45 = flagged), the amount as the printed RANGE, the description, link to the PDF; or a dashed "Nicht lesbar" card with the reason and the same link. |
+| `store.ts` | `useCongress` (memory): the index per year, the reports read (typed results with stamps), progress; decides which reports to read (`selectFilings`: window + member, newest first, at most 80 per load, "Weitere Meldungen lesen"); a new load cancels the old, a late answer never overwrites a newer one. |
+| `strings.ts` | the German copy. |
+
+Logic: `src/domain/congress` (delay, labels, windows, member match, list + filters, new-since-visit, watchlist key), data: `src/market/congress` (client, wire, index parser, PTR table parser), server: `netlify/functions/congress-*.mts` (README there). "Neu seit deinem letzten Besuch" = the document numbers the index listed at the last visit (`tj2-aktien-kongress-seen`, this device only, written when the card is left; first visit marks nothing and says so); the window choice is kept in `tj2-aktien-kongress`.
+**Not done on purpose:** no "folge Pelosi" signal, no orders, no Senate scraping, no alert on a new filing (only the mark at the next visit).
+
+Tests: `tests/unit/views.aktien.kongress.test.tsx` (the card on the whole chain: real Clerk files → real functions → client → UI), `congress.{parse,domain,client}.test.ts`, `functions.congress.test.ts`, e2e `tests/e2e/aktien-kongress.spec.ts` (mobile + desktop, axe dark + light; `tests/e2e/mocks/congress.ts` answers the two functions with the real rows of the fixture PDFs, dates moved relative to today; set `AKTIEN_SHOTS_DIR` for screenshots).
 
 ## Plan link (Handelsplan)
 

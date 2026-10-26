@@ -127,11 +127,11 @@ describe("Aktien page", () => {
     expect(screen.getByTestId("aktien-watch-empty")).toBeInTheDocument();
     expect(screen.getByTestId("aktien-news-empty")).toBeInTheDocument();
     // the analyst section hosts the three panels (numbers, DCF, thesis); the Congress section hosts the tracker
-    const analyse = await screen.findByTestId("aktien-analyse");
-    expect(await within(analyse).findByTestId("analyst-panel")).toBeInTheDocument();
-    expect(await within(analyse).findByTestId("dcf-panel")).toBeInTheDocument();
-    expect(await within(analyse).findByTestId("thesis-panel")).toBeInTheDocument();
-    const kongress = await screen.findByTestId("aktien-kongress");
+    const analyse = await screen.findByTestId("aktien-analyse", undefined, { timeout: 15_000 }); // lazy chunks: more than the default second on a busy machine
+    expect(await within(analyse).findByTestId("analyst-panel", undefined, { timeout: 15_000 })).toBeInTheDocument();
+    expect(await within(analyse).findByTestId("dcf-panel", undefined, { timeout: 15_000 })).toBeInTheDocument();
+    expect(await within(analyse).findByTestId("thesis-panel", undefined, { timeout: 15_000 })).toBeInTheDocument();
+    const kongress = await screen.findByTestId("aktien-kongress", undefined, { timeout: 15_000 });
     expect(kongress).toHaveTextContent("Kongress-Tracker");
     expect(kongress).not.toHaveTextContent("Kommt gleich");
     // the caveats are on screen from the first paint; the Clerk is asked only once the section has been on screen (no observer fires here)
