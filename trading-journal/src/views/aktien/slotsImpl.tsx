@@ -8,6 +8,7 @@
 import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import type { DcfSeed } from "@/domain/dcf";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { PendingBlock } from "@/ui/PendingCard";
 import { planHash, planPageExists } from "./ResultsCard";
 import type { AktienSlotProps } from "./types";
 
@@ -19,10 +20,18 @@ const CongressCard = lazy(() => import("@/views/aktien/kongress/CongressCard"));
 /** a stock ticker the SEC knows (letters, dot, hyphen) – a crypto pair like BTCUSDT is not one, the field stays empty then */
 const STOCK_TICKER = /^[A-Z][A-Z.-]{0,5}$/;
 
+/** The place of a panel that loads as its own chunk, in the height of the finished panel (measured): nothing below it moves. */
+const PANEL_SIZE: Record<string, string> = {
+  "aktien-analyse-zahlen-loading": "min-h-[516px] lg:min-h-[448px]",
+  "aktien-analyse-dcf-loading": "min-h-[1744px] lg:min-h-[1153px]",
+  "aktien-analyse-these-loading": "min-h-[785px] lg:min-h-[530px]",
+  "aktien-kongress-card-loading": "min-h-[1672px] lg:min-h-[889px]",
+};
+
 function Loading({ id }: { id: string }) {
   return (
-    <div className="rounded-xl border border-line-2 bg-ink-950/40 p-4 text-[12px] text-faint" data-testid={id} role="status">
-      Wird geladen …
+    <div data-testid={id} role="status" aria-label="Wird geladen …">
+      <PendingBlock size={PANEL_SIZE[id] ?? "min-h-[120px]"} />
     </div>
   );
 }

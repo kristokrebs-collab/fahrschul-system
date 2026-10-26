@@ -271,7 +271,7 @@ test.describe("Squeeze-Beobachtung (F07)", () => {
     const card = page.getByTestId("markt-squeeze");
     await expect(card.getByTestId("squeeze-empty")).toContainText("liest das Datenarchiv, und das ist aus", { timeout: 20_000 });
     await expect(card.getByTestId("squeeze-lead")).toContainText("kein Handelssignal und keine Prognose");
-    await expect(card.getByTestId("squeeze-no-advice")).toContainText("Keine professionelle Finanzberatung.");
+    await expect(card.getByTestId("squeeze-no-advice")).toContainText("kein Handelssignal");
     await expectNoHorizontalScroll(page);
     await screenshot(page, info, "squeeze-empty", false);
     await card.getByRole("button", { name: "Zum Datenarchiv" }).click();

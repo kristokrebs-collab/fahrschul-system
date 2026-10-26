@@ -24,6 +24,7 @@ import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { storageKey } from "@/store/storage";
 import { useJournal } from "@/store/journalStore";
 import { AnalysisNote } from "@/ui/AnalysisNote";
+import { PendingBlock } from "@/ui/PendingCard";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { ConfigCard } from "./ConfigCard";
 import { DiagnosisCard } from "./DiagnosisCard";
@@ -109,7 +110,8 @@ export function LaborView({ className }: { className?: string }) {
         <Cell index={0} span={custom ? "lg:col-span-8" : "lg:col-span-7"}>
           <ConfigCard signal={signal} />
         </Cell>
-        <Cell index={1} span={custom ? "lg:col-span-4" : "lg:col-span-5"}>
+        {/* the assumptions stay in view beside the long set-up form (sticky under the page strip) instead of leaving an empty card floor */}
+        <Cell index={1} span={custom ? "lg:col-span-4" : "lg:col-span-5"} className="lg:sticky lg:top-[136px] lg:self-start">
           <AssumptionsCard />
         </Cell>
       </Section>
@@ -133,7 +135,7 @@ export function LaborView({ className }: { className?: string }) {
       {hasResult && !busy && (
         <Section id={ids.fit} section="fit" title={T.fit.title} sub={T.fit.sub}>
           <Cell index={0} span="lg:col-span-12">
-            <Suspense fallback={null}>
+            <Suspense fallback={<PendingBlock size="min-h-[434px] lg:min-h-[270px]" />}>
               <FitCard />
             </Suspense>
           </Cell>
@@ -142,7 +144,7 @@ export function LaborView({ className }: { className?: string }) {
       {hasResult && !busy && (
         <Section id={ids.extras} section="extras" title={T.extras.title} sub={T.extras.sub}>
           <Cell index={0} span="lg:col-span-12">
-            <Suspense fallback={null}>
+            <Suspense fallback={<PendingBlock size="min-h-[810px] lg:min-h-[535px]" />}>
               <ExtrasSection />
             </Suspense>
           </Cell>
@@ -150,14 +152,14 @@ export function LaborView({ className }: { className?: string }) {
       )}
       <Section id={ids.forward} section="forward" title={FORWARD.section.title} sub={FORWARD.section.sub}>
         <Cell index={0} span="lg:col-span-12">
-          <Suspense fallback={null}>
+          <Suspense fallback={<PendingBlock size="min-h-[1380px] lg:min-h-[840px]" />}>
             <ForwardSection />
           </Suspense>
         </Cell>
       </Section>
       <Section id={ids.evolve} section="evolve" title={EVOLVE.section.title} sub={EVOLVE.section.sub}>
         <Cell index={0} span="lg:col-span-12">
-          <Suspense fallback={null}>
+          <Suspense fallback={<PendingBlock size="min-h-[1375px] lg:min-h-[935px]" />}>
             <EvolveSection />
           </Suspense>
         </Cell>
@@ -191,27 +193,33 @@ export function LaborView({ className }: { className?: string }) {
         </Section>
       )}
       <Section id={ids.tv} section="tv" title={T.tv.title} sub={T.tv.sub}>
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <Cell index={0} span="lg:col-span-12">
+              <PendingBlock size="min-h-[4010px] lg:min-h-[2200px]" />
+            </Cell>
+          }
+        >
           <TvSection />
         </Suspense>
       </Section>
       <Section id={ids.drafts} section="drafts" title={DRAFTS.section.title} sub={DRAFTS.section.sub}>
         <Cell index={0} span="lg:col-span-12">
-          <Suspense fallback={null}>
+          <Suspense fallback={<PendingBlock size="min-h-[1775px] lg:min-h-[1175px]" />}>
             <DraftsSection />
           </Suspense>
         </Cell>
       </Section>
       <Section id={ids.discovery} section="discovery" title="Muster-Entdecker" sub="Was haben Gewinner und Verlierer gemeinsam – und hält das gegen den Zufall?">
         <Cell index={0} span="lg:col-span-12">
-          <Suspense fallback={null}>
+          <Suspense fallback={<PendingBlock size="min-h-[710px] lg:min-h-[420px]" />}>
             <DiscoverySection />
           </Suspense>
         </Cell>
       </Section>
       <Section id={ids.timemachine} section="timemachine" title="Zeitmaschine" sub="Den Plan 10 000 Mal durchspielen – und gegen jedes frühere Mal halten, als er ausgelöst hätte.">
         <Cell index={0} span="lg:col-span-12">
-          <Suspense fallback={null}>
+          <Suspense fallback={<PendingBlock size="min-h-[1165px] lg:min-h-[625px]" />}>
             <TimeMachineSection />
           </Suspense>
         </Cell>

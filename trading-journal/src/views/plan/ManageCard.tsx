@@ -11,7 +11,6 @@ import { manageActive, moneyText, num, type ManageResult, type ManageSpec } from
 import { cn } from "@/lib/cn";
 import { Collapse } from "@/primitives/Expander";
 import { CheckboxRow } from "@/primitives/CheckboxRow";
-import { NO_ADVICE_TEXT } from "@/ui/AnalysisNote";
 import { ChipPick, FieldRow } from "@/views/labor/ui";
 import { NumInput } from "./ui";
 
@@ -26,15 +25,13 @@ export interface ManageCardProps {
   testPrefix: string;
   /** more lines for "Annahmen und Grenzen" (what the host assumed) */
   extraAssumptions?: readonly string[];
-  /** add the line "Keine professionelle Finanzberatung." (the Handelsplan's step card has its own) */
-  advice?: boolean;
   className?: string;
 }
 
 const money = (x: number, cur: string): string => `${x > 0 ? "+" : x < 0 ? "−" : ""}${moneyText(Math.abs(x))} ${cur}`;
 const rTxt = (r: number): string => `${r > 0 ? "+" : r < 0 ? "−" : ""}${num(Math.abs(r), 2)} R`;
 
-export function ManageCard({ spec, onChange, result, waiting, testPrefix, extraAssumptions = [], advice = false, className }: ManageCardProps) {
+export function ManageCard({ spec, onChange, result, waiting, testPrefix, extraAssumptions = [], className }: ManageCardProps) {
   const uid = useId();
   const p = testPrefix;
   const active = manageActive(spec);
@@ -178,7 +175,6 @@ export function ManageCard({ spec, onChange, result, waiting, testPrefix, extraA
           </details>
         </div>
       )}
-      {advice && <p className="text-[11.5px] leading-relaxed text-mute">{NO_ADVICE_TEXT}</p>}
     </section>
   );
 }

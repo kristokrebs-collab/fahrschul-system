@@ -33,7 +33,6 @@ export default function CalcManage({ m, limits, cur, atr }: { m: CalcModel; limi
       waiting="Trag Einstieg und Stop ein – dann rechnet der Rechner die Menge, und hier erscheinen die Preise und Beispielrechnungen."
       testPrefix="risk"
       extraAssumptions={["Der Rechner kennt die Schritte deiner Börse nicht: Kursschritt höchstens 0,01 und Mengenschritt 0,001 (abgerundet) angenommen."]}
-      advice
       className="mt-1"
     />
   );

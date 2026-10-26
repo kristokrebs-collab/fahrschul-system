@@ -257,6 +257,7 @@ export default function TimeMachineSection() {
             fetchedAt={loaded.fetchedAt}
             note={last ? `Letzter Schluss ${last.close.toLocaleString("de-DE", { maximumFractionDigits: 8 })} (Kerze von ${TM_INTERVAL_TEXT[form.interval]}, bis ${new Date(last.time + ivMs).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}). Die Sitzungen beginnen mit der nächsten Kerze.` : undefined}
             startMs={last ? last.time + ivMs : null}
+            hosted
           />
         </Suspense>
       )}

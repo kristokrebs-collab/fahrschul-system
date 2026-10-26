@@ -6,7 +6,7 @@
  * examples counted, sample word). The thresholds are adjustable and written at once to `settings.squeeze`; the alert is a
  * separate switch, off until the user turns it on.
  *
- * An observation, not a signal: no entry, no stop, no prediction – and „Keine professionelle Finanzberatung.“ on the card.
+ * An observation, not a signal: no entry, no stop, no prediction – the one „Keine professionelle Finanzberatung.“ of the page stands at its end.
  * Without the archive there is nothing to read; the card says so and points to where it is switched on.
  */
 import { memo, useMemo, useState } from "react";
@@ -41,7 +41,6 @@ import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
-import { NO_ADVICE_TEXT } from "@/ui/AnalysisNote";
 import { SourceStand } from "@/ui/SourceStand";
 import { SQUEEZE_STRINGS as S, boxLine, episodesLine, headline, historyEpisodesLine, missingHistory, sampleLine } from "./squeezeModel";
 import { useSqueezeData } from "./useSqueezeData";
@@ -382,7 +381,7 @@ export const SqueezeCard = memo(function SqueezeCard({ view, className }: { view
         <div className="grid gap-1 text-[12px] text-mute">
           <p>{S.startValues}</p>
           <p data-testid="squeeze-no-advice">
-            Beobachtung mit Zahlen und Schwellen, keine Prognose und kein Handelssignal. {NO_ADVICE_TEXT}
+            Beobachtung mit Zahlen und Schwellen, keine Prognose und kein Handelssignal.
           </p>
         </div>
       </div>

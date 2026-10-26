@@ -5,14 +5,14 @@
 import { useMemo, type ReactNode } from "react";
 import type { Understood, Unclear } from "@/domain/strategytext";
 import { cn } from "@/lib/cn";
-import { NO_ADVICE, PAST_NOT_FORECAST } from "./strings";
+import { PAST_NOT_FORECAST } from "./strings";
 
-/** "Keine professionelle Finanzberatung." – the last line of every result card (and, for a backtest, the one calm sentence about the past). */
+/** The last line of a backtest card: the one calm sentence about the past (the page carries the one „Keine professionelle Finanzberatung.“ at its end). */
 export function Disclaimer({ past = false, className }: { past?: boolean; className?: string }) {
+  if (!past) return null;
   return (
-    <p className={cn("text-[11.5px] leading-relaxed text-faint", className)} data-testid="studio-disclaimer">
-      {past && <>{PAST_NOT_FORECAST} </>}
-      {NO_ADVICE}
+    <p className={cn("text-[11.5px] leading-relaxed text-mute", className)} data-testid="studio-disclaimer">
+      {PAST_NOT_FORECAST}
     </p>
   );
 }

@@ -351,7 +351,13 @@ export function TimeMachineCard(props: TimeMachineProps) {
       {r && <Results r={r} run={run} props={props} />}
       <div className="grid gap-2 border-t border-line pt-3">
         <SourceStand source={props.source ?? TM.candlesOwn} parts={[{ label: "Kerzen bis", at: r?.pool.toMs ?? null, long: true }, { label: "Abruf", at: props.fetchedAt ?? null }]} testId="tm-source" />
-        <AnalysisNote lead={TM.noAdvice} />
+        {props.hosted ? (
+          <p className="max-w-[72ch] text-[12px] leading-relaxed text-mute" data-testid="analysis-lead">
+            {TM.noAdvice}
+          </p>
+        ) : (
+          <AnalysisNote lead={TM.noAdvice} />
+        )}
       </div>
     </div>
   );

@@ -134,7 +134,7 @@ export function EvolvePanel({ strategies, candles, candleStatus, onLoadCandles, 
               <span className="text-[11px] text-faint">{E.strategiesHint(MAX_STRATEGIES)}</span>
             </div>
             {!strategies.length ? (
-              <EmptyState title="Keine Strategie" text={E.noStrategies} />
+              <EmptyState title="Keine Strategie" text={E.noStrategies} line={false} />
             ) : (
               <ul className="grid gap-1.5" data-testid="evolve-strategies">
                 {strategies.map((s) => {
@@ -319,7 +319,7 @@ export function EvolvePanel({ strategies, candles, candleStatus, onLoadCandles, 
             {E.proposals.nothing(s.trials)}
           </p>
         ))}
-        {!open.length && !result ? <EmptyState title="Noch kein Vorschlag" text={E.proposals.empty} /> : null}
+        {!open.length && !result ? <EmptyState title="Noch kein Vorschlag" text={E.proposals.empty} line={false} /> : null}
         {open.map(card)}
         {decided.length > 0 && (
           <div className="grid gap-2">

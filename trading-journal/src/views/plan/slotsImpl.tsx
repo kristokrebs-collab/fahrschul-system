@@ -86,6 +86,7 @@ export function TimeMachineSlotImpl({ symbol, side, entry, stop, target, interva
             fetchedAt={current.fetchedAt}
             note={[current.setup.note, ...current.notes].join(" ")}
             framed={false}
+            hosted
             market={market}
             {...(costs ? { costs } : {})}
             options={current.setup.options}

@@ -34,7 +34,7 @@ export const MISSED_STRINGS = {
   title: "Verpasste Chancen",
   note: "Signale der App, zu denen dein Journal keinen Trade hat – regelgerecht, nicht gehandelt.",
   emptyTitle: "Noch keine Signale gespeichert",
-  emptyText: `Bisher stand ein Signal nur als Meldung auf dem Bildschirm – nichts davon wurde festgehalten, also lässt sich Vergangenes nicht nachtragen. Ab jetzt speichert die App jedes Signal, das sie auslöst (gültiger Einstieg, Box-Setup, bestätigte Schlüsselmarke) mit Zeit, Markt, Richtung und Quelle – nur auf diesem Gerät, die letzten ${SIGNAL_ARCHIVE_CAP}, höchstens ${SIGNAL_ARCHIVE_DAYS} Tage, und nur solange die App offen ist.`,
+  emptyText: `Die App speichert ab jetzt jedes Signal, das sie auslöst – mit Zeit, Markt, Richtung und Quelle, nur auf diesem Gerät (die letzten ${SIGNAL_ARCHIVE_CAP}, höchstens ${SIGNAL_ARCHIVE_DAYS} Tage) und nur solange die App offen ist. Vergangenes lässt sich nicht nachtragen.`,
   noJournal: "Ohne Trades im Journal gibt es nichts, womit sich die Signale vergleichen ließen.",
   noMissed: "Zu jedem abgeschlossenen Signal gibt es einen Trade in gleicher Richtung – oder es ist noch offen.",
   limits: `Gehandelt heißt: ein Trade gleicher Richtung auf demselben Markt, von 30 Minuten vor bis ${MISSED_WINDOW_MS / 3_600_000} Stunden nach dem Signal. Ob du ein Signal bewusst ausgelassen oder übersehen hast, weiß das Journal nicht.`,

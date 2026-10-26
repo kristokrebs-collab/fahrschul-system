@@ -117,7 +117,10 @@ export function CorrelationCard({ symbols, view, cm, clusters }: { symbols: read
             ]}
           </HeatGridReveal>
         ) : (
-          <p className="text-[12.5px] text-mute">{loading ? S.loading : view.detail ?? S.empty}</p>
+          // the matrix of the pairs that will be read keeps its room while the daily candles load (header 28 px + a 36 px row and 4 px gap per pair)
+          <p className="text-[12.5px] text-mute" style={{ minHeight: 28 + symbols.length * 40 }}>
+            {loading ? S.loading : (view.detail ?? S.empty)}
+          </p>
         )}
         <div className="grid min-w-0 content-start gap-2">
           <div className="grid gap-1.5" data-testid="corr-clusters">

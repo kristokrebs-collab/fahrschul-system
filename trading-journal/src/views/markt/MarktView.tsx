@@ -9,7 +9,7 @@
  */
 import { Gate } from "@/billing/entitlements";
 import { UpgradeTeaser } from "@/billing/ui/UpgradeTeaser";
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, useId, type ReactNode } from "react";
 import { biasText, BOX_TF_LABEL, normalizeWatchSymbol, PHASE_LABEL, type BoxTf } from "@/domain/boxes";
 import { cn } from "@/lib/cn";
 import { useRecentBoxAlerts } from "@/market/boxes/alerts";
@@ -21,10 +21,10 @@ import { Reveal } from "@/motion/Reveal";
 import { StatusPill } from "@/motion/StatusPill";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
-import { Card } from "@/primitives/Card";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
-import { Skeleton } from "@/primitives/Skeleton";
 import { AnalysisNote } from "@/ui/AnalysisNote";
+import { PendingCard } from "@/ui/PendingCard";
+import { SectionTitle } from "@/views/analyse/ui";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { useMirrorState } from "@/views/biasTest";
 import { BIAS } from "@/views/biasTest/strings";
@@ -51,23 +51,16 @@ const SqueezeCard = lazy(() => import("./SqueezeCard"));
 // F43: „Heute wichtig“ (Morgenbriefing), „Termine“ (Kalender) and „Ereignisphasen“ – own chunk, loaded with the page
 const TermineSection = lazy(() => import("@/views/termine/TermineSection"));
 
-/** The cards of the page in reading order, for its "Inhalt" strip (each card is found by its `data-testid`). */
+/**
+ * The five parts of the page for its "Inhalt" strip (`data-section` on each `SectionTitle`); the cards inside keep their own
+ * `data-testid`, so the function register still finds every one of them.
+ */
 const NAV: readonly SectionNavItem[] = [
-  { id: "markt-best", label: "Beste Setups" },
-  { id: "markt-state", label: "Box-Status" },
-  { id: "markt-chart", label: "Chart" },
-  { id: "markt-squeeze", label: "Squeeze" },
-  { id: "markt-trend", label: "Struktur" },
-  { id: "markt-similar", label: "Ähnliche Situationen" },
-  { id: "keylevels-card", label: "Marken" },
-  { id: "plan-card", label: "Tagesplan" },
-  { id: "briefing-card", label: "Heute wichtig" },
-  { id: "termine-card", label: "Termine" },
-  { id: "phasen-card", label: "Ereignisphasen" },
-  { id: "markt-rsi", label: "RSI-Linien" },
-  { id: "markt-scanner", label: "Scanner" },
-  { id: "markt-settings", label: "Einstellungen" },
-  { id: "alerts-card", label: "Alarme" },
+  { id: "now", label: "Jetzt" },
+  { id: "context", label: "Einordnung" },
+  { id: "levels", label: "Marken & Alarme" },
+  { id: "calendar", label: "Termine" },
+  { id: "watch", label: "Beobachten" },
 ];
 
 export const MARKT_LEAD_FILL = { storageKey: storageKey("fill-markt"), highlight: MARKT.leadHighlight } as const;
@@ -179,6 +172,7 @@ export function MarktView({ className }: { className?: string }) {
   // a running bias test (F62) shows only the chart: the setups, box status and alerts would tell the direction
   const test = useMirrorState("markt");
   const focus = test.frozen;
+  const ids = { now: useId(), context: useId(), levels: useId(), calendar: useId(), watch: useId() };
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="markt-view" data-state={view.state}>
       <PageHeader className="lg:col-span-12" title={MARKT.title} lead={MARKT.lead} leadFill={MARKT_LEAD_FILL} action={<HeaderStatus view={view} maskName={focus && test.blind.hideName} />} />
@@ -191,88 +185,79 @@ export function MarktView({ className }: { className?: string }) {
         <AlertBand view={view} className="lg:col-span-12" />
       )}
       {!focus && <MarktStand view={view} className="lg:col-span-12" />}
+      <section aria-labelledby={focus ? undefined : ids.now} className="contents">
+        {!focus && <SectionTitle id={ids.now} section="now" title="Jetzt" sub="Die besten Setups, der Stand der Box und der Chart des gewählten Markts." className="lg:col-span-12" />}
+        {!focus && (
+          <>
+            <Cell index={0} span="lg:col-span-7">
+              <BestSetupsCard view={view} />
+            </Cell>
+            <Cell index={1} span="lg:col-span-5">
+              <BoxStateCard view={view} />
+            </Cell>
+          </>
+        )}
+        <Cell index={2} span="lg:col-span-12">
+          <BoxChartCard view={view} />
+        </Cell>
+      </section>
       {!focus && (
         <>
-          <Cell index={0} span="lg:col-span-7">
-            <BestSetupsCard view={view} />
-          </Cell>
-          <Cell index={1} span="lg:col-span-5">
-            <BoxStateCard view={view} />
-          </Cell>
-        </>
-      )}
-      <Cell index={2} span="lg:col-span-12">
-        <BoxChartCard view={view} />
-      </Cell>
-      {!focus && (
-        <>
-          <Cell index={3} span="lg:col-span-12">
-            <Suspense
-              fallback={
-                <Card title="Squeeze-Beobachtung" data-testid="markt-squeeze-loading">
-                  <Skeleton height={160} />
-                </Card>
-              }
-            >
-              <SqueezeCard view={view} />
-            </Suspense>
-          </Cell>
-          <Cell index={3} span="lg:col-span-12">
-            <Suspense
-              fallback={
-                <Card title={TREND.title} data-testid="markt-trend-loading">
-                  <Skeleton height={180} />
-                </Card>
-              }
-            >
-              <TrendStructureCard />
-            </Suspense>
-          </Cell>
-          <Cell index={4} span="lg:col-span-12">
-            <Suspense
-              fallback={
-                <Card title="Ähnliche Situationen" data-testid="markt-similar-loading">
-                  <Skeleton height={140} />
-                </Card>
-              }
-            >
-              <SimilarCard />
-            </Suspense>
-          </Cell>
-          <Cell index={6} span="lg:col-span-7">
-            <KeyLevelsCard />
-          </Cell>
-          <Cell index={7} span="lg:col-span-5">
-            <PlanCard />
-          </Cell>
-          {/* no `Cell` (Reveal) around the section: it is three cards tall (several thousand px on a phone), and a reveal waits for
-              15 % of its element to be in view – an element that tall never gets there and would stay at opacity 0. The cards reveal themselves. */}
-          <div className="min-w-0 lg:col-span-12">
-            <Suspense
-              fallback={
-                <Card title="Termine" data-testid="termine-loading">
-                  <Skeleton height={200} />
-                </Card>
-              }
-            >
-              <TermineSection />
-            </Suspense>
-          </div>
-          <Cell index={3} span="lg:col-span-5">
-            <RsiLinesCard view={view} />
-          </Cell>
-          <Cell index={4} span="lg:col-span-7">
-            {/* plan gate `boxScanner` (P10 / P14): the watchlist scan + alarms; the box chart itself stays free */}
-            <Gate feature="boxScanner" fallback={<UpgradeTeaser feature="boxScanner" className="h-full" />}>
-              <ScannerCard />
-            </Gate>
-          </Cell>
-          <Cell index={5} span="lg:col-span-12">
-            <BoxSettingsCard />
-          </Cell>
-          <Cell index={8} span="lg:col-span-12">
-            <AlertsCard />
-          </Cell>
+          <section aria-labelledby={ids.context} className="contents">
+            <SectionTitle id={ids.context} section="context" title="Einordnung" sub="Squeeze, Preis- und RSI-Struktur und ähnliche Situationen – Beobachtungen aus Kerzen und Archiv, keine Signale." className="lg:col-span-12" />
+            <Cell index={3} span="lg:col-span-12">
+              <Suspense fallback={<PendingCard title="Squeeze-Beobachtung" testId="markt-squeeze-loading" size="min-h-[800px] lg:min-h-[470px]" />}>
+                <SqueezeCard view={view} />
+              </Suspense>
+            </Cell>
+            <Cell index={3} span="lg:col-span-12">
+              <Suspense fallback={<PendingCard title={TREND.title} testId="markt-trend-loading" size="min-h-[2680px] lg:min-h-[1260px]" />}>
+                <TrendStructureCard />
+              </Suspense>
+            </Cell>
+            <Cell index={4} span="lg:col-span-12">
+              <Suspense fallback={<PendingCard title="Ähnliche Situationen" testId="markt-similar-loading" size="min-h-[2150px] lg:min-h-[1260px]" />}>
+                <SimilarCard />
+              </Suspense>
+            </Cell>
+          </section>
+          <section aria-labelledby={ids.levels} className="contents">
+            <SectionTitle id={ids.levels} section="levels" title="Marken und Alarme" sub="Eigene Preisstufen, der Tagesplan daraus und die Meldungen dazu." className="lg:col-span-12" />
+            <Cell index={6} span="lg:col-span-7">
+              <KeyLevelsCard />
+            </Cell>
+            <Cell index={7} span="lg:col-span-5">
+              <PlanCard />
+            </Cell>
+            <Cell index={8} span="lg:col-span-12">
+              <AlertsCard />
+            </Cell>
+          </section>
+          <section aria-labelledby={ids.calendar} className="contents">
+            <SectionTitle id={ids.calendar} section="calendar" title="Termine" sub="Was heute und in den nächsten Tagen für den Handel zählt – mit Quelle, ohne Schätzung." className="lg:col-span-12" />
+            {/* no `Cell` (Reveal) around the section: it is three cards tall (several thousand px on a phone), and a reveal waits for
+                15 % of its element to be in view – an element that tall never gets there and would stay at opacity 0. The cards reveal themselves. */}
+            <div className="min-w-0 lg:col-span-12">
+              <Suspense fallback={<PendingCard title="Termine" testId="termine-loading" size="min-h-[5740px] lg:min-h-[2590px]" />}>
+                <TermineSection />
+              </Suspense>
+            </div>
+          </section>
+          <section aria-labelledby={ids.watch} className="contents">
+            <SectionTitle id={ids.watch} section="watch" title="Beobachten" sub="RSI-Linien, der Scanner über deine Watchlist und die Einstellungen der Boxen." className="lg:col-span-12" />
+            <Cell index={3} span="lg:col-span-5">
+              <RsiLinesCard view={view} />
+            </Cell>
+            <Cell index={4} span="lg:col-span-7">
+              {/* plan gate `boxScanner` (P10 / P14): the watchlist scan + alarms; the box chart itself stays free */}
+              <Gate feature="boxScanner" fallback={<UpgradeTeaser feature="boxScanner" className="h-full" />}>
+                <ScannerCard />
+              </Gate>
+            </Cell>
+            <Cell index={5} span="lg:col-span-12">
+              <BoxSettingsCard />
+            </Cell>
+          </section>
         </>
       )}
       <AnalysisNote className="lg:col-span-12" />

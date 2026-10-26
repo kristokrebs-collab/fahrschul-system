@@ -78,7 +78,7 @@ export function PlanChart({ candles, intervalMs, openMs, closeMs, tz, range, sig
 
   if (!view) {
     return (
-      <div className={cn("grid h-40 place-items-center rounded-xl border border-dashed border-line-2 bg-ink-950/40 px-4 text-center text-[12.5px] text-mute", className)} data-testid="hplan-chart-empty">
+      <div className={cn("grid h-[242px] place-items-center sm:h-[282px] rounded-xl border border-dashed border-line-2 bg-ink-950/40 px-4 text-center text-[12.5px] text-mute", className)} data-testid="hplan-chart-empty">
         Noch keine Kerzen zu zeigen.
       </div>
     );

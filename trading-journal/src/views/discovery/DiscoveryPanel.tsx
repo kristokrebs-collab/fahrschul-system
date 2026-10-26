@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PatternFilterSpec } from "@/domain/discovery/spec";
 import { runDiscovery, isDiscoveryAbort } from "@/domain/discovery/runner";
-import { breakdownText, countsSentence, DISCLAIMER } from "@/domain/discovery/text";
+import { breakdownText, countsSentence, DISCLAIMER_LEAD } from "@/domain/discovery/text";
 import { LIMITS, type DiscoveryInput, type DiscoveryResult, type DiscoveryTrade, type Finding } from "@/domain/discovery/types";
 import { cn } from "@/lib/cn";
 import { Button } from "@/primitives/Button";
@@ -285,7 +285,7 @@ export function DiscoveryPanel(props: DiscoveryPanelProps) {
       </div>
 
       <p className="rounded-xl border border-line p-3 text-[11.5px] leading-snug text-mute" data-testid="discovery-disclaimer">
-        {DISCLAIMER}
+        {DISCLAIMER_LEAD}
       </p>
     </div>
   );

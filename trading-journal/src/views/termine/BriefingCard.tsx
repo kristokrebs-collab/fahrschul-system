@@ -4,7 +4,7 @@
  * what is missing as „keine Daten“. It reads the stores the other cards read (live ticker, daily candles of the watchlist,
  * key levels, the Zustellprotokoll, the day journal); nothing is estimated, nothing is sent, no trade is suggested.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { buildBriefing, type BriefingLine, type BriefingTone } from "@/domain/events";
 import { formatClock, offsetLabel } from "@/domain/events/zone";
 import { cn } from "@/lib/cn";
@@ -14,7 +14,7 @@ import { useMultiDaily } from "@/market/multiDaily";
 import { useFeed } from "@/market/marketStore";
 import { Card } from "@/primitives/Card";
 import { useJournal } from "@/store/journalStore";
-import { NO_ADVICE_TEXT } from "@/ui/AnalysisNote";
+import { Button } from "@/primitives/Button";
 import { briefingInputOf, briefingSymbols } from "./briefingInput";
 import { useZone } from "./prefs";
 import { BRIEFING as B } from "./strings";
@@ -36,6 +36,29 @@ function Line({ line, tz }: { line: BriefingLine; tz: string }) {
   );
 }
 
+/** Lines of a section shown at first; the rest sits behind one button (eight markets that move alike are one long list). */
+const SHOW_LINES = 4;
+
+function Section({ id, title, lines, tz }: { id: string; title: string; lines: readonly BriefingLine[]; tz: string }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? lines : lines.slice(0, SHOW_LINES);
+  return (
+    <section aria-label={title} className="grid gap-2" data-testid={`briefing-${id}`}>
+      <h3 className="label">{title}</h3>
+      <ul className="grid gap-2.5">
+        {shown.map((l, i) => (
+          <Line key={`${id}-${i}`} line={l} tz={tz} />
+        ))}
+      </ul>
+      {lines.length > SHOW_LINES && (
+        <Button size="sm" className="w-fit pointer-coarse:min-h-11" aria-expanded={all} onClick={() => setAll((v) => !v)}>
+          {all ? B.fewerLines : B.moreLines(lines.length)}
+        </Button>
+      )}
+    </section>
+  );
+}
+
 export function BriefingCard() {
   const tz = useZone();
   const now = useNowMinute();
@@ -51,19 +74,11 @@ export function BriefingCard() {
     <Card title={B.title} note={B.note} data-testid="briefing-card">
       <div className="grid gap-5">
         {briefing.sections.map((s) => (
-          <section key={s.id} aria-label={s.title} className="grid gap-2" data-testid={`briefing-${s.id}`}>
-            <h3 className="label">{s.title}</h3>
-            <ul className="grid gap-2.5">
-              {s.lines.map((l, i) => (
-                <Line key={`${s.id}-${i}`} line={l} tz={tz} />
-              ))}
-            </ul>
-          </section>
+          <Section key={s.id} id={s.id} title={s.title} lines={s.lines} tz={tz} />
         ))}
         <p className="text-[11.5px] leading-snug text-faint" data-testid="briefing-stand">
           {B.stand(formatClock(briefing.generatedAt, tz), `${tz}, ${offsetLabel(briefing.generatedAt, tz)}`)} · {B.note2}
         </p>
-        <p className="text-[12px] leading-relaxed text-mute">{NO_ADVICE_TEXT}</p>
       </div>
     </Card>
   );

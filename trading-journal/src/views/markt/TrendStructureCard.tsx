@@ -144,7 +144,7 @@ export const TrendStructureCard = memo(function TrendStructureCard() {
                   data-locked={it.avail.ok ? undefined : ""}
                   className={cn(
                     "num min-h-8 rounded-full border px-3 font-mono text-[12px] transition-colors duration-200 pointer-coarse:min-h-11 pointer-coarse:min-w-11",
-                    on ? "border-transparent bg-fg font-medium text-ink-900" : "border-line-2 text-mute hover:border-white/30 hover:text-fg",
+                    on ? "border-line-2 bg-ink-750 font-medium text-fg" : "border-line-2 text-mute hover:border-white/30 hover:text-fg",
                     disabled && "cursor-not-allowed opacity-40 hover:border-line-2 hover:text-mute",
                   )}
                 >

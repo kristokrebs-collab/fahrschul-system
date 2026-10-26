@@ -107,7 +107,8 @@ describe("SqueezeCard", () => {
     render(<SqueezeCard view={noBox} />);
     expect(await screen.findByTestId("squeeze-empty")).toHaveTextContent("Der Squeeze-Monitor liest das Datenarchiv, und das ist aus");
     expect(screen.getByTestId("squeeze-lead")).toHaveTextContent("kein Handelssignal und keine Prognose");
-    expect(screen.getByTestId("squeeze-no-advice")).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(screen.getByTestId("squeeze-no-advice")).toHaveTextContent("keine Prognose und kein Handelssignal");
+    expect(screen.getByTestId("squeeze-no-advice")).not.toHaveTextContent("Finanzberatung");
     fireEvent.click(screen.getByRole("button", { name: S.archiveBtn }));
     expect(openSettings).toHaveBeenCalledWith("settings", "Datenarchiv");
   });

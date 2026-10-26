@@ -166,7 +166,7 @@ export const SimilarCard = memo(function SimilarCard() {
                     data-tf={tf}
                     className={cn(
                       "num min-h-8 rounded-full border px-3 font-mono text-[12px] transition-colors duration-200 pointer-coarse:min-h-11 pointer-coarse:min-w-11",
-                      prefs.tf === tf ? "border-transparent bg-fg font-medium text-ink-900" : "border-line-2 text-mute hover:border-white/30 hover:text-fg",
+                      prefs.tf === tf ? "border-line-2 bg-ink-750 font-medium text-fg" : "border-line-2 text-mute hover:border-white/30 hover:text-fg",
                     )}
                   >
                     {tfLabel(tf)}
@@ -215,7 +215,7 @@ export const SimilarCard = memo(function SimilarCard() {
                         data-feature={id}
                         className={cn(
                           "min-h-8 rounded-full border px-3 text-[12px] transition-colors duration-200 pointer-coarse:min-h-11",
-                          on && !why ? "border-transparent bg-fg font-medium text-ink-900" : "border-line-2 text-mute hover:border-white/30 hover:text-fg",
+                          on && !why ? "border-line-2 bg-ink-750 font-medium text-fg" : "border-line-2 text-mute hover:border-white/30 hover:text-fg",
                           why && "cursor-not-allowed opacity-40 hover:border-line-2 hover:text-mute",
                         )}
                       >

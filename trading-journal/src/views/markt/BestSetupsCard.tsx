@@ -296,7 +296,7 @@ export function BestSetupsCard({ view }: { view: BoxesView }) {
       {view.state === "off" || view.state === "error" ? (
         <p className="text-[13px] text-mute">{view.detail}</p>
       ) : loading && !best.length ? (
-        <div className="flex items-center gap-3 py-6 text-[13px] text-mute" data-testid="best-loading">
+        <div className="flex min-h-[286px] items-center gap-3 py-6 text-[13px] text-mute lg:min-h-[229px]" data-testid="best-loading">
           <DotMatrix preset="loader" size={3} gap={2} label={S.loading} />
           <span>{view.detail ?? S.loading}</span>
         </div>

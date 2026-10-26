@@ -16,6 +16,7 @@ import { SectionNav } from "@/primitives/SectionNav";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
 import { AnalysisNote } from "@/ui/AnalysisNote";
+import { PendingBlock } from "@/ui/PendingCard";
 import { SectionTitle } from "@/views/analyse/ui";
 import { Cell } from "@/views/labor/ui";
 import { PageHeader } from "@/views/setups/PageHeader";
@@ -35,6 +36,8 @@ const NAV = [
   { id: "aktien-watchlist", label: "Watchlist" },
   { id: "aktien-news", label: "News" },
   { id: "aktien-analyse", label: "Analyse" },
+  { id: "aktien-analyse-dcf", label: "DCF-Rechner" },
+  { id: "aktien-analyse-these", label: "Kaufthese" },
   { id: "aktien-kongress", label: "Kongress" },
 ] as const;
 
@@ -47,10 +50,15 @@ function Section({ id, title, sub, children }: { id: string; title: string; sub:
   );
 }
 
+/** The place of a section that loads as its own chunk, in the height of the finished section (measured): nothing below it moves. */
+const SLOT_SIZE: Record<string, string> = {
+  "aktien-analyse": "min-h-[3093px] lg:min-h-[2179px]",
+  "aktien-kongress": "min-h-[1672px] lg:min-h-[889px]",
+};
 function SlotFallback({ id }: { id: string }) {
   return (
-    <div className="rounded-xl border border-line-2 bg-ink-950/40 p-4 text-[12px] text-faint" data-testid={`${id}-loading`}>
-      Wird geladen …
+    <div data-testid={`${id}-loading`} role="status" aria-label="Wird geladen …">
+      <PendingBlock size={SLOT_SIZE[id] ?? "min-h-[200px]"} />
     </div>
   );
 }

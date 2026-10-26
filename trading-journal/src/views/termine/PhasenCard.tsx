@@ -13,7 +13,6 @@ import { Badge, type BadgeTone } from "@/primitives/Badge";
 import { Card } from "@/primitives/Card";
 import { Segmented } from "@/primitives/Segmented";
 import { useEnriched } from "@/store/journalStore";
-import { NO_ADVICE_TEXT } from "@/ui/AnalysisNote";
 import { PHASEN as P } from "./strings";
 
 type Source = "journal" | "backtest";
@@ -96,7 +95,7 @@ export function PhasenCard() {
             <p className="text-[12.5px] text-fg" data-testid="phasen-total">
               {P.total(groupLine(report.total))}
             </p>
-            <ul className="grid gap-2.5" data-testid="phasen-list">
+            <ul className="grid gap-2.5 lg:grid-cols-2" data-testid="phasen-list">
               {report.rows.map((row) => (
                 <li key={row.def.id} className="grid gap-2 rounded-xl border border-line bg-ink-950/40 p-3" data-testid="phase-row" data-phase={row.def.id} data-verdict={row.verdict} data-n-inside={row.inside.n}>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -135,7 +134,6 @@ export function PhasenCard() {
             <p className="text-[11.5px] leading-snug text-faint">{P.labHint}</p>
           </>
         )}
-        <p className="text-[12px] leading-relaxed text-mute">{NO_ADVICE_TEXT}</p>
       </div>
     </Card>
   );

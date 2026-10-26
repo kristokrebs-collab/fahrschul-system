@@ -96,7 +96,7 @@ const Mini = memo(function Mini({ s, label }: { s: RsiLineState; label: string }
 function Row({ tf, s }: { tf: BoxTf; s: RsiLineState | null }) {
   const t = rsiLineText(s);
   return (
-    <li className="grid gap-3 rounded-xl border border-line bg-ink-950/30 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" data-testid="rsi-row" data-tf={tf} data-tone={t.tone}>
+    <li className="grid min-h-[142px] content-center gap-3 rounded-xl border border-line bg-ink-950/30 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" data-testid="rsi-row" data-tf={tf} data-tone={t.tone}>
       <div className="grid min-w-0 gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <TfChip tf={tf} />

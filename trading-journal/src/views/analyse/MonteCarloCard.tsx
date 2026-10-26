@@ -39,6 +39,7 @@ import { useTheme } from "@/store/themeStore";
 import { EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
+import { Skeleton } from "@/primitives/Skeleton";
 import { useAnalyseUi, type McHorizon, type McMethod } from "./analyseStore";
 import { sampleKey, useMonteCarlo } from "./hooks";
 import { AnaCard, SEG_TOUCH, Stat, softTone, unitText } from "./ui";
@@ -344,7 +345,9 @@ export function MonteCarloCard({ view, cur }: { view: AccountView; cur: string }
           line={closed.length ? false : undefined}
         />
       ) : (
-        <div className="relative grid gap-4" data-state={mc.status}>
+        // while the worker simulates, the box already has the height of the finished card (controls, fan, four tiles,
+        // three risk rows): nothing below moves when the result arrives (measured: 838 px at 390, 637 px from sm)
+        <div className={cn("relative grid gap-4", !res && "min-h-[838px] grid-rows-[auto_auto_minmax(0,1fr)] sm:min-h-[640px]")} data-state={mc.status}>
           <div className="flex flex-wrap items-center gap-2" data-testid="mc-controls">
             <Segmented<`${McHorizon}`> size="sm" aria-label="Horizont" options={HORIZONS.map((h) => ({ v: `${h}` as const, label: `${h} Trades` }))} value={`${horizon}`} onChange={(v) => set({ mcHorizon: Number(v) as McHorizon })} className={SEG_TOUCH} />
             <Segmented<McMethod> size="sm" aria-label="Methode" options={METHODS} value={method} onChange={(v) => set({ mcMethod: v })} className={SEG_TOUCH} />
@@ -362,7 +365,10 @@ export function MonteCarloCard({ view, cur }: { view: AccountView; cur: string }
               {sample.length < 30 && <p className="text-[12px] text-warn">Aus {sample.length} Trades gezogen – ein grober Ausblick, belastbar ab etwa 30.</p>}
             </>
           ) : (
-            <div className="grid place-items-center rounded-xl border border-line bg-ink-950/60" style={{ height: FAN_H }} />
+            <>
+              <div className="grid place-items-center rounded-xl border border-line bg-ink-950/60" style={{ height: FAN_H }} />
+              <Skeleton className="h-full min-h-[120px]" />
+            </>
           )}
           {(busy || (!res && mc.status !== "error")) && (
             <motion.div

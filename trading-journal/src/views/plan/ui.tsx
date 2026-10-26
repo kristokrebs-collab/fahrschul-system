@@ -1,6 +1,6 @@
 /**
  * Building blocks of the Handelsplan: the step card (number, state, the result in one big sentence, "Angenommen", and the line
- * every section ends with – "Keine professionelle Finanzberatung." plus source and stand of the candles), a number field that
+ * every section ends with – source and stand of the candles; the one "Keine professionelle Finanzberatung." stands at the end of the page), a number field that
  * commits on leaving it, and the state marks.
  */
 import { useId, useState, type ReactNode } from "react";
@@ -9,9 +9,11 @@ import { parseNumber } from "@/lib/parse";
 import { cn } from "@/lib/cn";
 import { Input } from "@/primitives/Input";
 import { Card } from "@/primitives/Card";
-import { NO_ADVICE_TEXT } from "@/ui/AnalysisNote";
 
 export { ChipPick, FieldRow, Kpi } from "@/views/labor/ui";
+
+/** Room the sticky progress bar takes under the app header (px): a step card that is scrolled to keeps this much clear above it. */
+export const PROGRESS_SCROLL_MARGIN = "scroll-mt-[168px]";
 
 export const STATUS_WORD: Record<StepStatus, string> = { done: "Fertig", warn: "Achtung", blocked: "Gesperrt", todo: "Wartet" };
 const STATUS_TONE: Record<StepStatus, string> = {
@@ -62,22 +64,31 @@ export function standLine({ sourceLabel, until, fetchedAt, fmt }: StandProps): s
   return `Quelle: ${sourceLabel} · Kerzen bis ${until != null ? fmt(until) : "keine Daten"} · ${fetchedAt != null ? `abgerufen ${fmt(fetchedAt)}` : "nicht neu abgerufen"}`;
 }
 
-/** The sentence every section ends with. */
+/** The line every step ends with: where the candles come from and how fresh they are. */
 export function StepNote({ stand, testId }: { stand: string; testId: string }) {
   return (
     <p className="num border-t border-line pt-3 text-[11.5px] leading-relaxed text-mute" data-testid={testId}>
-      <span data-testid="hplan-no-advice">{NO_ADVICE_TEXT}</span> {stand}
+      {stand}
     </p>
   );
 }
 
-/** "Was wurde angenommen": the assumptions of a step, always visible and small. */
+/**
+ * "Was wurde angenommen": the assumptions of a step. A fold (`details`, closed): the card stays calm, the list is one tap away and
+ * stays in the document either way.
+ */
 export function Assumed({ items, testId }: { items: readonly string[]; testId: string }) {
   if (!items.length) return null;
   return (
-    <section className="grid gap-1.5 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5" data-testid={testId} aria-label="Was wurde angenommen">
-      <h3 className="text-[10px] font-semibold uppercase tracking-[0.1em] text-mute">Angenommen</h3>
-      <ul className="grid gap-1">
+    <details className="group rounded-xl border border-line bg-ink-950/40" data-testid={testId}>
+      <summary className="flex min-h-10 cursor-pointer select-none list-none items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-mute transition-colors hover:text-fg pointer-coarse:min-h-11 [&::-webkit-details-marker]:hidden">
+        <span aria-hidden="true" className="inline-block transition-transform duration-200 group-open:rotate-90">
+          ›
+        </span>
+        Angenommen
+        <span className="num font-mono font-normal normal-case tracking-normal text-faint">({items.length})</span>
+      </summary>
+      <ul className="grid gap-1 px-3 pb-2.5">
         {items.map((t, i) => (
           <li key={i} className="flex gap-2 text-[12px] leading-snug text-mute">
             <span aria-hidden="true" className="mt-[7px] size-1 shrink-0 rounded-full bg-faint-line" />
@@ -85,7 +96,7 @@ export function Assumed({ items, testId }: { items: readonly string[]; testId: s
           </li>
         ))}
       </ul>
-    </section>
+    </details>
   );
 }
 
@@ -107,7 +118,7 @@ export interface StepCardProps {
 export function StepCard({ id, n, title, lead, status, current, headline, assumed, stand, children }: StepCardProps) {
   const uid = useId();
   return (
-    <Card className="min-w-0" innerClassName="gap-4 p-4 sm:p-5" data-testid={`hplan-${id}`} data-status={status} data-current={current ? "true" : undefined} aria-labelledby={`${uid}-h`}>
+    <Card className={cn("min-w-0", PROGRESS_SCROLL_MARGIN)} innerClassName="gap-4 p-4 sm:p-5" data-testid={`hplan-${id}`} data-status={status} data-current={current ? "true" : undefined} aria-labelledby={`${uid}-h`}>
       <header className="flex items-start gap-3">
         <StepBadge n={n} status={status} />
         <div className="min-w-0 flex-1">
