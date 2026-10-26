@@ -3,7 +3,7 @@
  * Every response is validated with zod and mapped onto the `FeedValue` shapes. Numbers arrive as strings.
  */
 import { z } from "zod";
-import type { AggTrade, BookTop, Candle, FundingPoint, MarkPrice, OpenInterest, OpenInterestPoint, RatioPoint, Source, Stamped, TakerPoint, Ticker24h } from "../types";
+import type { AggTrade, BookDepth, BookTop, Candle, FundingPoint, MarkPrice, OpenInterest, OpenInterestPoint, RatioPoint, Source, Stamped, TakerPoint, Ticker24h } from "../types";
 import type { FetchInterval, KlineInterval, Period } from "../period";
 import { FETCH_INTERVAL_MS } from "../period";
 import { fetchJson, qs, type FetchLike } from "./http";
@@ -65,6 +65,19 @@ export const fundingRowSchema = z.object({ symbol: z.string().optional(), fundin
 export const fundingSchema = z.array(fundingRowSchema);
 
 export const serverTimeSchema = z.object({ serverTime: z.number() });
+
+/** `/fapi/v1/depth`: `E` = message time, `T` = transaction time (both ms); levels are `[price, quantity]` strings. */
+export const depthSchema = z.object({
+  lastUpdateId: z.number(),
+  E: z.number().optional(),
+  T: z.number().optional(),
+  bids: z.array(z.tuple([finite, finite])),
+  asks: z.array(z.tuple([finite, finite])),
+});
+
+/** Valid `limit` values of `/fapi/v1/depth`. */
+export const DEPTH_LIMITS = [5, 10, 20, 50, 100, 500, 1000] as const;
+export type DepthLimit = (typeof DEPTH_LIMITS)[number];
 
 // ------------------------------------------------------------------ mappers
 
@@ -143,6 +156,21 @@ export function binanceRest(opts: BinanceRestOptions = {}) {
       const data = rows.map((r) => mapKline(r, t));
       const last = data[data.length - 1];
       return stamp(data, last ? Math.min(t, last.closeTime ?? last.time + FETCH_INTERVAL_MS[interval]) : t, t, source);
+    },
+    /** Mark-price candles (same 12-field rows as klines; volume fields are 0). Used by the history load, never for charts. */
+    async markPriceKlines(symbol: string, interval: FetchInterval | "5m", p: { limit?: number; startTime?: number; endTime?: number } = {}): Promise<Stamped<Candle[]>> {
+      const rows = await fetchJson(url("/fapi/v1/markPriceKlines", { symbol, interval, limit: p.limit ?? 499, startTime: p.startTime, endTime: p.endTime }), klinesSchema, io);
+      const t = now();
+      const data = rows.map((r) => mapKline(r, t));
+      const last = data[data.length - 1];
+      return stamp(data, last ? Math.min(t, last.closeTime ?? last.time) : t, t, source);
+    },
+    /** One order-book snapshot: best levels first. `asOf` = the exchange's transaction time (falls back to the message time, then to receipt). */
+    async depth(symbol: string, limit: DepthLimit = 100): Promise<Stamped<BookDepth>> {
+      const d = await fetchJson(url("/fapi/v1/depth", { symbol, limit }), depthSchema, io);
+      const t = now();
+      const time = d.T ?? d.E ?? t;
+      return stamp({ bids: d.bids, asks: d.asks, time }, time, t, source);
     },
     async premiumIndex(symbol: string): Promise<Stamped<MarkPrice>> {
       const p = await fetchJson(url("/fapi/v1/premiumIndex", { symbol }), premiumIndexSchema, io);

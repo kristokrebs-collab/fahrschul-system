@@ -12,6 +12,7 @@
 import { useId, useMemo, type ReactNode } from "react";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
 import { clusterRisks, correlationClusters, correlationMatrix, riskWarnings, streakRisk, symbolOf, type RiskWarning } from "@/domain/risk";
+import { usePositionsStore } from "@/exchanges/positions";
 import { tradeTime } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import { useProvider } from "@/market";
@@ -32,7 +33,7 @@ import { useExposure, useLimitReport, useRiskBase } from "./hooks";
 import { LimitsCard } from "./LimitsCard";
 import { LiquidationCard, plannedRow } from "./LiquidationCard";
 import { MarginCard } from "./MarginCard";
-import { corrSymbols, liqRows, scenarioLegs } from "./model";
+import { corrSymbols, liqBasis, liqRows, scenarioLegs } from "./model";
 import { RiskSettingsCard } from "./RiskSettingsCard";
 import { RiskSpreadCard } from "./RiskSpreadCard";
 import { ScenarioCard } from "./ScenarioCard";
@@ -76,6 +77,8 @@ export function RisikoView({ className }: { className?: string }) {
   const rows = useMemo(() => liqRows(ex.legs, base.limits.tiers, base.capital, atrOf), [ex.legs, base.limits.tiers, base.capital, atrOf]);
   const planned = useMemo(() => plannedRow(calc, base.limits.tiers, liveSym && symbolOf(calc.pair) === liveSym ? atr4h : null), [calc, base.limits.tiers, liveSym, atr4h]);
   const legs = useMemo(() => scenarioLegs(ex.legs, rows), [ex.legs, rows]);
+  const liqSource = useMemo(() => liqBasis(ex.legs, rows), [ex.legs, rows]);
+  const exchangeAt = usePositionsStore((s) => s.at);
 
   const scoped = useMemo(() => base.enriched.filter((t) => base.acc === "all" || (t.account ?? "scalp") === base.acc), [base.enriched, base.acc]);
   const closed = useMemo(() => scoped.filter((t) => t.result !== "open").sort((a, b) => +tradeTime(a) - +tradeTime(b)), [scoped]);
@@ -123,7 +126,7 @@ export function RisikoView({ className }: { className?: string }) {
           <CalculatorCard base={base} />
         </Cell>
         <Cell index={1} span="lg:col-span-5">
-          <LiquidationCard rows={rows} planned={planned} />
+          <LiquidationCard rows={rows} planned={planned} basis={liqSource} exchangeAt={exchangeAt} />
         </Cell>
       </Section>
       <Section id={ids.portfolio} section="portfolio" title={T.portfolio.title} sub={T.portfolio.sub}>

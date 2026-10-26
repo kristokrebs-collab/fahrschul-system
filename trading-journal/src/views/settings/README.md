@@ -84,3 +84,17 @@ die Statuszeile (Läuft · letzter/nächster Abruf · Weg; Grund eines gescheite
 **Was vorliegt**: je Symbol und Reihe Einträge, Zeitraum, ≈ Größe, Lücken („1 Lücke, zusammen 3 h“ → aufklappbar mit Zeitraum, Dauer und Grund), CSV / JSON je Reihe, Löschen je Reihe (Halten = sofort, Tippen fragt „Wirklich löschen?“) und „Alles als JSON“ / „Alles löschen“.
 Lesen: `useArchiveData.ts` (eigene Verbindung, Lücken Zeile für Zeile zwischen zwei Aufgaben), Export: `archiveExport.ts`, Texte und Rechenhilfen: `archiveModel.ts`. Der Sammler selbst ist nicht Teil der Karte (`src/market/archive`). Tests: `views.settings.archive.test.tsx`, e2e `archive.spec.ts`.
 
+
+### Börsenhistorie nachladen (F26/F07, `BackfillSection.tsx`, `backfillModel.ts`)
+
+In der Datenarchiv-Karte (`data-testid="archive-backfill"`), unabhängig vom Schalter des Sammlers: drei Sätze vor dem Klick (was geladen wird und woher, getrennt gespeichert und
+als „nachgeladen“ gekennzeichnet – nie vermischt, nie geglättet; nur die etwa 30 Tage, die Binance hält; es wird nichts hochgeladen), Spanne (7 / 14 / 30 Tage) und Symbole (höchstens 8),
+die Vorschau (Abrufe, Einträge, ≈ Größe, Dauer), der Knopf, der Fortschritt (Balken auf `spring.smooth`, nur Transform; Abrufe, Einträge, Weg) mit „Abbrechen“, das Ergebnis je Reihe und Symbol
+(Probleme mit Grund) und das Protokoll der letzten Läufe. Die Reihen erscheinen in „Was vorliegt“ mit der Marke „nachgeladen“; die Squeeze-Karte (Markt) liest sie als eigene Stichprobe.
+Laufzeit: `src/market/archive/backfill.ts` / `backfillStore.ts`, Rechenkern: `@/domain/archive` (`backfill.ts`). Tests: `views.settings.backfill.test.tsx`, e2e `backfill.spec.ts`.
+
+### Lücken in den geladenen Reihen (F27, `FeedGaps.tsx`)
+
+Unter der Feed-Tabelle der Live-Daten-Karte (lazy nachgeladen): je Reihe, die die App gerade im Speicher hält (Kerzen je Zeiteinheit, Open-Interest-Historie, Long/Short-Verhältnisse, Funding-Historie),
+wie viele Punkte, bis wann und ob eine Lücke darin ist (`seriesGaps` aus `@/domain/missed/quality`: Abstand > 1,5 × der übliche Schritt). Läuft ohne Klick und ohne Abruf, jede Zeile wählt nur ihre
+Zusammenfassung (`useFeedSelect` mit Gleichheitsprüfung – eine laufende Kerze rendert nichts neu). Geprüft wird, was die App hat, nicht die Börse; nichts wird aufgefüllt. Test: `views.settings.feedgaps.test.tsx`.

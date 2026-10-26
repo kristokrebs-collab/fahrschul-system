@@ -53,7 +53,7 @@ test("`Live-Daten` shows real feed rows from the market layer; refresh / reconne
   await expect(card.getByText("Noch keine Statusdaten")).toHaveCount(0);
   const rows = card.locator("tbody tr");
   expect(await rows.count()).toBeGreaterThanOrEqual(10);
-  await expect(card.getByText("Kerzen 4h")).toBeVisible();
+  await expect(card.locator("tbody").getByText("Kerzen 4h")).toBeVisible();
   await expect(card.getByText("Mark-Preis")).toBeVisible();
   await expect(card.getByText("Gesamtstatus")).toBeVisible();
   await expect(rows.filter({ hasText: "Live" }).first()).toBeVisible();
@@ -63,7 +63,7 @@ test("`Live-Daten` shows real feed rows from the market layer; refresh / reconne
   await card.getByRole("button", { name: "Jetzt neu verbinden" }).click();
   await card.getByRole("button", { name: "Cache leeren" }).click();
   await page.waitForTimeout(1500);
-  await expect(card.getByText("Kerzen 4h")).toBeVisible();
+  await expect(card.locator("tbody").getByText("Kerzen 4h")).toBeVisible();
   await expect(rows.filter({ hasText: /Live|Verbinde/ }).first()).toBeVisible({ timeout: 15_000 });
   expect(errors, errors.join("\n")).toEqual([]);
 });

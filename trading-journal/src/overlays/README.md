@@ -215,3 +215,9 @@ visible); `HoldConfirm`, `useConfirmFocus`, `HOLD_CONFIRM_TITLE` → `@/motion/H
 - **Sheet guard for other editors**: pass `dismissGuard={() => dirty}` + `onDismissAttempt={() => showConfirm()}`. Without
   `dismissGuard` the Sheet guards itself as soon as any field inside received input and asks with its own inline
   `Änderungen verwerfen?` strip above the footer (`SHEET_DISCARD_COPY`).
+
+## Regelstand am Einstiegs-Check (F31)
+
+`SignalSection` shows the check with its **Regelstand** line (`signal-summary-rules`: fingerprint + running number of the settings the check ran with) and `resolveTradeSignal` stores the same reference on the snapshot saved with the trade
+(`signal.rules`; none when the module that gives it cannot be loaded – the snapshot is still saved). `@/market/signalRules` is loaded lazily (`useRulesModule`), so the fingerprinting stays out of the first load. A trade saved before
+this has no Regelstand (empty, not recomputed). Tests: `overlays.tradeEditor.signal.test.tsx`, `market.signalRecord.test.ts`.

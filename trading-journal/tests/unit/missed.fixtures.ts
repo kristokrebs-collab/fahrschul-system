@@ -8,5 +8,5 @@ export const signalInput = (over: Partial<SignalEventInput> = {}): SignalEventIn
 
 /** A complete stored event (every additive field `null` unless given). */
 export function signalEvent(over: Partial<SignalEvent> & Partial<SignalEventInput> = {}, id: string = over.id ?? over.key ?? "k1"): SignalEvent {
-  return { price: null, stop: null, target: null, barClose: null, name: null, setupKind: null, grade: null, rr: null, ...signalInput(over), watch: false, seenAt: null, skip: null, skipAt: null, tradeId: null, ...(over as Partial<SignalEvent>), id } as SignalEvent;
+  return { price: null, stop: null, target: null, barClose: null, name: null, setupKind: null, grade: null, rr: null, ...signalInput(over), watch: false, seenAt: null, skip: null, skipAt: null, tradeId: null, prereq: [], rules: null, log: [], ...(over as Partial<SignalEvent>), id } as SignalEvent;
 }

@@ -47,7 +47,7 @@ export function archiveToJson(rows: readonly JsonSeries[], meta: JsonExportMeta)
     format: ARCHIVE_FORMAT,
     v: 1,
     exportedAt: isoUtc(meta.exportedAt),
-    note: "Gesammelt von der Trading-Journal-App, solange sie geöffnet war. Lücken sind nie gefüllt oder geschätzt; sie stehen in „gaps“. Quelle der Rohreihen: öffentliche Binance-USDⓈ-M-Futures-Daten; Zustandsreihen: Auswertungen der App.",
+    note: "Gesammelt von der Trading-Journal-App, solange sie geöffnet war. Lücken sind nie gefüllt oder geschätzt; sie stehen in „gaps“. Quelle der Rohreihen: öffentliche Binance-USDⓈ-M-Futures-Daten; Zustandsreihen: Auswertungen der App. Reihen mit kind „backfill“ wurden auf ausdrücklichen Wunsch aus der öffentlichen Binance-Historie nachgeladen (nicht selbst gesammelt) und sind nie mit den gesammelten Reihen vermischt.",
     series: rows.map((r) => {
       const def = seriesDef(r.series);
       return {

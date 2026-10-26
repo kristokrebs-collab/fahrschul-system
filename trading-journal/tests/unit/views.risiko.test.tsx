@@ -98,6 +98,7 @@ describe("RisikoView", () => {
     expect(screen.getByTestId("risk-exposure")).toHaveAttribute("data-legs", "2");
     expect(screen.getByTestId("risk-exposure")).toHaveTextContent("Nur Journal-Daten");
     expect(within(screen.getByTestId("risk-liq")).getAllByTestId("liq-row")).toHaveLength(2);
+    expect(within(screen.getByTestId("risk-liq")).getByTestId("liq-source")).toHaveTextContent("2 Journal-Trades · Liquidationspreis: 2 gerechnet");
     expect(within(screen.getByTestId("risk-scenario")).getAllByTestId("scenario-leg")).toHaveLength(2);
     expect(within(screen.getByTestId("risk-spread")).getAllByTestId("spread-row").length).toBeGreaterThan(0);
     expect(screen.getByTestId("risk-streak")).toHaveAttribute("data-status");

@@ -155,8 +155,9 @@ function fire(side: Side, s: Signals & { cfg: SignalCfg }, now: number): void {
   const symbol = (s as { symbol?: string }).symbol ?? "";
   const tf = s.checks[0]?.tf ?? null;
   const score = v.score;
-  void import("../signalArchive").then((m) =>
-    m.recordSignalEvent({ key: `entry|${symbol}|${side}|${barOpen}`, at: now, source: "entry", kind: "entry", entry: true, symbol, side, tf, label: v.label, detail, strength: v.strength, score, ref: null, barClose: barClose(barOpen, tf) }),
+  // (F25: the recorder adds the conditions that held and the rule version – it is loaded on demand like the archive itself)
+  void import("../signalRecord").then((m) =>
+    m.recordEntrySignal({ key: `entry|${symbol}|${side}|${barOpen}`, at: now, source: "entry", kind: "entry", entry: true, symbol, side, tf, label: v.label, detail, strength: v.strength, score, ref: null, barClose: barClose(barOpen, tf) }, s, side, symbol),
   );
   if (s.cfg.notify) systemNotification(v.label, `Score ${v.score} · ${detail}`);
   writeJson(SIGNAL_LAST_KEY, { ...last, [side]: { barOpen, strength: v.strength, at: now } satisfies Notified });

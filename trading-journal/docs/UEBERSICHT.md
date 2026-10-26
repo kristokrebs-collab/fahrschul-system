@@ -77,7 +77,7 @@ _Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 8 Funktionen
 
 ### Trade prüfen & Chart
 
-_Einstieg prüfen, Chancen finden, den Chart lesen._ · 25 Funktionen
+_Einstieg prüfen, Chancen finden, den Chart lesen._ · 26 Funktionen
 
 **Einstieg prüfen**
 
@@ -127,6 +127,7 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 25 Funktionen
 | Ganze Einheiten innerhalb deiner vier Grenzen wählen | Positionsgröße im Handelsplan | Handelsplan › Größe | teilweise |
 | Prüfen, ob der Plan deine Grenzen einhält | Risiko-Check des Handelsplans | Handelsplan › Risiko-Check | fertig |
 | Den fertigen Plan als Text oder CSV mitnehmen | Ticket zum Kopieren (Handelsplan) | Handelsplan › Ticket | fertig |
+| Prüfen, ob sich meine Größe gerade sauber handeln lässt | Ausführbarkeit jetzt (Spread und Tiefe) | Handelsplan › Ticket › Ausführbarkeit jetzt | teilweise |
 | Vor dem Einstieg festlegen, wann der Stop nachgezogen wird | Verwaltung planen (Handelsplan & Positionsrechner) | Handelsplan › Ausstieg · Verwaltung nach dem Einstieg | fertig |
 
 ### Risiko & Disziplin
@@ -211,7 +212,7 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 25 Funktionen
 
 ### Aus Fehlern lernen
 
-_Warum du verlierst, was du verpasst, was du ändern kannst._ · 16 Funktionen
+_Warum du verlierst, was du verpasst, was du ändern kannst._ · 17 Funktionen
 
 **Fehler & Muster**
 
@@ -248,6 +249,7 @@ _Warum du verlierst, was du verpasst, was du ändern kannst._ · 16 Funktionen
 | Einen Trade Kerze für Kerze nachspielen | Trade-Replay | Trades – Trades → Trade öffnen → Replay | fertig |
 | Einen Trade mit anderem Stop oder Ausstieg nachrechnen | Was wäre wenn | Trades – Trades → Trade öffnen → Was wäre wenn | fertig |
 | Nachlesen, wie der Check beim Einstieg aussah | Zustand beim Einstieg | Trades – Trades → Trade öffnen → Signal beim Einstieg | teilweise |
+| Die Begründung oder eine Notiz zum Trade einsprechen | Spracheingabe für Notizen | Trades – Trade eintragen → Begründung → Diktieren | teilweise |
 
 ### Auswerten & Berichte
 
@@ -348,7 +350,7 @@ _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
 
 ### Trades eintragen & Daten
 
-_Trades hineinbekommen, ordnen, sichern und prüfen._ · 12 Funktionen
+_Trades hineinbekommen, ordnen, sichern und prüfen._ · 13 Funktionen
 
 **Eintragen & importieren**
 
@@ -375,6 +377,7 @@ _Trades hineinbekommen, ordnen, sichern und prüfen._ · 12 Funktionen
 | Das Journal sichern oder wiederherstellen | Backup & Wiederherstellung | Einstellungen › Daten | fertig |
 | Prüfen, ob die Marktdaten aktuell sind | Datenstatus | Einstellungen › Live-Daten | teilweise |
 | Marktzahlen und Analysezustände auf diesem Gerät mitschreiben | Datenarchiv | Einstellungen › Datenarchiv | teilweise |
+| Die letzten Tage Marktzahlen von Binance einmal nachholen | Börsenhistorie nachladen | Einstellungen › Datenarchiv › Börsenhistorie nachladen | teilweise |
 | Prüfen, ob Alarme und Kerzen zuverlässig angekommen sind | Daten- und Alarmqualität | Coach › Daten- und Alarmqualität | teilweise |
 
 ### Community & Teilen

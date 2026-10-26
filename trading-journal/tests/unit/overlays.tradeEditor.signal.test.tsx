@@ -171,7 +171,7 @@ describe("TradeEditor – Einstiegs-Check, Fehler, s_mtf, unsaved guard", () => 
   beforeEach(() => seed({ open: true }));
 
   it("new trade: the live check shows and is stored at save time (checkTradeAt with date + side)", async () => {
-    live.state = { state: "ok", snapshot: {}, updatedAt: 1, message: null };
+    live.state = { state: "ok", snapshot: { cfg: DEFAULT_SIGNAL_CFG }, updatedAt: 1, message: null };
     checkTradeAt.mockImplementation(async () => ({ ...SNAP, side: "short" }));
     mount();
     expect(screen.getByRole("heading", { level: 3, name: /Einstiegs-Check zum Zeitpunkt/ })).toBeInTheDocument();
@@ -182,6 +182,8 @@ describe("TradeEditor – Einstiegs-Check, Fehler, s_mtf, unsaved guard", () => 
     await waitFor(() => expect(saveTrade).toHaveBeenCalledTimes(1));
     expect(checkTradeAt).toHaveBeenCalledWith(expect.any(Number), "short");
     expect(saveTrade.mock.calls[0]?.[0].signal).toMatchObject({ side: "short", strength: 2, mode: "live" });
+    // F31: the version of the rules the check ran with is stored with the snapshot (the same reference the screen showed)
+    expect(saveTrade.mock.calls[0]?.[0].signal).toMatchObject({ rules: { kind: "entry", hash: expect.stringMatching(/^[0-9a-f]{8}$/) } });
   });
 
   it("no data / too little history: saved without a made-up snapshot", async () => {
@@ -202,7 +204,7 @@ describe("TradeEditor – Einstiegs-Check, Fehler, s_mtf, unsaved guard", () => 
   });
 
   it("s_mtf ticks itself from the snapshot (`· automatisch`) until the user touches one of its items", () => {
-    live.state = { state: "ok", snapshot: {}, updatedAt: 1, message: null };
+    live.state = { state: "ok", snapshot: { cfg: DEFAULT_SIGNAL_CFG }, updatedAt: 1, message: null };
     mount();
     fireEvent.click(screen.getByRole("button", { name: /Multi-TF Signal/ }));
     const base = screen.getByRole("checkbox", { name: /MCB-Signal auf der Basis-Timeframe/ });

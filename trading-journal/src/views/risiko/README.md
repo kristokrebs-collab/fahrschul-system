@@ -82,3 +82,8 @@ Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): e
 
 ## Verwaltung im Positionsrechner (F65)
 Unter dem Ergebnis des Rechners (`risk-calc`) steht, sobald es ein gültiges Ergebnis gibt, die Karte „Verwaltung nach dem Einstieg“ (`risk-manage`, `CalcManage.tsx`, eigener lazy Chunk): dieselbe Karte und dieselbe Rechnung (`managePlan`) wie im Handelsplan, mit Richtung, Einstieg, Stop und Ziel des Rechners und der Menge, die er aus dem Risiko gerechnet hat (auf 0,001 abgerundet). Gebühr und Slippage sind die der Risiko-Einstellungen; Kurs- und Mengenschritt kennt der Rechner nicht (Kursschritt höchstens 0,01, steht unter „Annahmen und Grenzen“). Die Wahl der Regeln liegt pro Gerät (`storageKey("calc-manage")`). Test: `tests/unit/views.risiko.manage.test.tsx`.
+## Quelle und Stand (F27)
+
+`LivePriceStand.tsx` under the calculator's live price: „Quelle: … · letzter Kurs hh:mm“ from the newer of the `aggTrade` / `ticker24h` feeds (the two that drive `priceMv`), rounded down to the minute so the line renders once a minute; no price → „keine Daten“.
+`LiquidationCard` ends with `liq-source`: how many legs are journal trades / venue positions (`liqBasis` in `model.ts`), with the time of the last venue request (`usePositionsStore.at`), and per price whether the venue or
+the trade gave it or the tier table calculated it. Tests: `views.risiko.source.test.tsx`, `views.risiko.test.tsx`.

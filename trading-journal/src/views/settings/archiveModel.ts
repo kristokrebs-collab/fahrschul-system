@@ -2,7 +2,7 @@
  * Datenarchiv view (F26) – the pure part of the card: German texts, durations and sizes, the rows grouped by symbol, the
  * totals. No React, no I/O (the card reads the store).
  */
-import { estimateBytes, gapMs, seriesDef, type Gap, type SeriesId, type SeriesInfo } from "@/domain/archive";
+import { SERIES_IDS, estimateBytes, gapMs, seriesDef, type Gap, type SeriesId, type SeriesInfo } from "@/domain/archive";
 import { n0, n1 } from "@/lib/format";
 import { ddmmHHmm } from "@/market/format";
 
@@ -11,7 +11,7 @@ export const ARCHIVE_STRINGS = {
   note: "Sammelt öffentliche Marktzahlen und Analysezustände auf diesem Gerät – nur solange die App offen ist.",
   what: "Gespeichert wird (erst nach dem Einschalten): Markpreis und zuletzt abgerechnete Funding-Rate, Open Interest und drei Long/Short-Verhältnisse der gewählten Binance-USDⓈ-M-Symbole – alle öffentlich, ohne Schlüssel – dazu die Lage-Ampel und die Box-Phasen des Markt-Symbols, wie die App sie damals zeigte.",
   local: "Nichts verlässt dein Gerät. Das Archiv ist kein Teil von Backup oder Cloud-Sync (zu groß, nur lokal); auf einem anderen Gerät beginnt es neu.",
-  limit: "Kein Server-Archiv: Es wird nur gesammelt, solange die App geöffnet ist. War sie zu, bleibt eine Lücke – sie wird nie gefüllt oder geschätzt. Binance selbst hält Verhältnisse und Open-Interest-Historie nur etwa 30 Tage vor; die App holt davon nichts nach.",
+  limit: "Kein Server-Archiv: Es wird nur gesammelt, solange die App geöffnet ist. War sie zu, bleibt eine Lücke – sie wird nie gefüllt oder geschätzt. Binance selbst hält Verhältnisse und Open-Interest-Historie nur etwa 30 Tage vor; die App holt davon von selbst nichts nach – nur auf deinen ausdrücklichen Klick („Börsenhistorie nachladen“, unten), getrennt gespeichert und gekennzeichnet.",
   switch: "Archiv sammeln",
   switchOff: "Aus (Standard) – es wird nichts gesammelt.",
   switchOn: (min: number) => `An – ein Abruf alle ${min} Minuten, solange die App offen ist.`,
@@ -86,7 +86,7 @@ export interface SymbolGroup {
 
 /** Rows grouped by symbol (symbols alphabetical, series in the table's order). */
 export function groupBySymbol(rows: readonly RowView[]): SymbolGroup[] {
-  const order = (s: SeriesId): number => ["premium", "oi", "lsAcc", "lsTopPos", "lsTopAcc", "lage", "box4h", "box1d", "box1w"].indexOf(s);
+  const order = (s: SeriesId): number => SERIES_IDS.indexOf(s); // collected series first, the loaded („nachgeladen“) ones after them
   const by = new Map<string, RowView[]>();
   for (const r of rows) by.set(r.info.symbol, [...(by.get(r.info.symbol) ?? []), r]);
   return [...by.entries()]

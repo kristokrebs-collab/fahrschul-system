@@ -7,7 +7,7 @@
  * collection on another device on by itself. Default: OFF.
  */
 import { normalizeWatchSymbol } from "../boxes/config";
-import { ARCHIVE_AUTO_SYMBOLS, ARCHIVE_MAX_SYMBOLS, SERIES, seriesDef } from "./series";
+import { ARCHIVE_AUTO_SYMBOLS, ARCHIVE_MAX_SYMBOLS, SERIES, isBackfillSeries, seriesDef } from "./series";
 import type { ArchiveCfg, SeriesId } from "./types";
 
 export const ARCHIVE_CFG_VERSION = 1 as const;
@@ -80,9 +80,12 @@ export const estimateBytes = (series: SeriesId, count: number): number => count 
 
 /**
  * Ring capacity of one series of one symbol under the size budget: the series' own cap, but never more than an equal
- * share of the budget over the `keys` series × symbol rows that exist (so a small limit trims every row alike).
+ * share of the budget over the `keys` series × symbol rows that exist (so a small limit trims every row alike). `keys`
+ * counts the COLLECTED rows only: a backfilled row („nachgeladen“) stays outside the ring – the exchange's history window
+ * bounds it and only the user's deletion removes it – so it neither shrinks the share of the others nor is trimmed itself.
  */
 export function ringCap(series: SeriesId, keys: number, maxMb: number): number {
+  if (isBackfillSeries(series)) return Number.POSITIVE_INFINITY;
   const own = seriesDef(series).cap;
   if (keys <= 0) return own;
   const avg = SERIES.reduce((s, d) => s + d.bytes, 0) / SERIES.length;

@@ -180,6 +180,11 @@ describe("alert runtime", () => {
     expect(log.every((r) => r.channels.join() === "toast")).toBe(true);
     // F32: the confirmation is archived as an entry-like hit of the own level (the preparation is not)
     expect(getSignalArchive()).toEqual([expect.objectContaining({ source: "key", kind: "confirm", entry: true, side: "long", symbol: "BTCUSDT", tf: "4h", ref: "k1" })]);
+    // F25: the conditions that held and the version of the level's definition are stored with it
+    const ev = getSignalArchive()[0]!;
+    expect(ev.prereq.map((p) => p.id)).toContain("rule");
+    expect(ev.prereq.find((p) => p.id === "basis")).toMatchObject({ met: true });
+    expect(ev.rules).toMatchObject({ kind: "key", n: 1 });
   });
 
   it("a reload in the middle of a cycle continues without repeating a stage", () => {

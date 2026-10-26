@@ -73,6 +73,8 @@ export interface DeliveryQuality {
   channels: number;
   /** key-level messages sent more than once under the same key (beyond the first) */
   repeated: number;
+  /** messages sent, per source: own key levels, the Einstiegs-Check (`signal`) and the Box-zu-Box alerts */
+  bySource: Readonly<Record<"key" | "signal" | "box", number>>;
   /** oldest line the log still holds (ms), `null` = empty */
   oldest: number | null;
   /** the window starts before the oldest line: the log is incomplete for it */
@@ -91,6 +93,7 @@ export function deliveryQuality(log: readonly DeliveryRecord[], from: number): D
     hours: inWin.filter((r) => r.outcome === "hours").length,
     channels: inWin.filter((r) => r.outcome === "channels").length,
     repeated: [...seen.values()].reduce((s, n) => s + Math.max(0, n - 1), 0),
+    bySource: { key: inWin.filter((r) => r.outcome === "sent" && r.source === "key").length, signal: inWin.filter((r) => r.outcome === "sent" && r.source === "signal").length, box: inWin.filter((r) => r.outcome === "sent" && r.source === "box").length },
     oldest,
     // a full log (200 lines) that starts after the window start has dropped older lines
     truncated: oldest != null && log.length >= 200 && oldest > from,
@@ -129,6 +132,42 @@ export function findBarGaps(times: readonly number[], intervalMs: number): BarGa
     if (step > intervalMs * 1.5) gaps.push({ from: times[i - 1]! + intervalMs, to: times[i]! - intervalMs, missing: Math.round(step / intervalMs) - 1 });
   }
   return gaps;
+}
+
+/** The holes of one series that is held in memory right now (a feed's candles or points): where, how many, how big the step is. */
+export interface SeriesGaps {
+  /** points / candles in the series */
+  points: number;
+  /** time of the first / last point (ms), `null` for an empty series */
+  first: number | null;
+  last: number | null;
+  /** the step a point should be away from the previous one (ms): given, or the most usual distance of the series; `null` when it cannot be told */
+  stepMs: number | null;
+  /** `true` = the step was read from the series itself (a feed without a fixed step, e.g. the funding rate) */
+  inferred: boolean;
+  gaps: BarGap[];
+  missing: number;
+}
+
+/** The most usual distance of neighbouring times (the mode; the smaller one on a tie), `null` for fewer than 3 points. */
+export function usualStep(times: readonly number[]): number | null {
+  if (times.length < 3) return null;
+  const count = new Map<number, number>();
+  for (let i = 1; i < times.length; i++) {
+    const d = times[i]! - times[i - 1]!;
+    if (d > 0) count.set(d, (count.get(d) ?? 0) + 1);
+  }
+  let best: number | null = null;
+  let n = 0;
+  for (const [d, c] of count) if (c > n || (c === n && best !== null && d < best)) [best, n] = [d, c];
+  return best;
+}
+
+/** Gaps of a series from its point times (ascending). `stepMs` omitted → the most usual distance is the step. */
+export function seriesGaps(times: readonly number[], stepMs?: number): SeriesGaps {
+  const step = stepMs ?? usualStep(times);
+  const gaps = step ? findBarGaps(times, step) : [];
+  return { points: times.length, first: times.length ? times[0]! : null, last: times.length ? times[times.length - 1]! : null, stepMs: step, inferred: stepMs === undefined, gaps, missing: gaps.reduce((s, g) => s + g.missing, 0) };
 }
 
 /* ------------------------------------------------------------------ the report */

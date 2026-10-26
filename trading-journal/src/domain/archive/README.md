@@ -13,3 +13,16 @@ Pure TypeScript, kein React, kein I/O. Der Speicher, der Sammler und die Ansicht
 
 Regeln: nichts wird geschätzt, nichts aufgefüllt; ein Abschnitt ohne Punkt ist eine Lücke. Der Schalter liegt NICHT in
 `settings` (Gerätesache, nicht in Backup und Cloud-Sync). Tests: `archive.domain.test.ts` (Handrechnung).
+
+## Börsenhistorie nachladen (`backfill.ts`, F26/F07)
+
+Der reine Teil der ausdrücklichen Aktion „Börsenhistorie nachladen“ (Einstellungen › Datenarchiv). `backfillRange` (ganze 5-Minuten-Schritte, nie
+älter als die rund 30 Tage der Börse minus 6 h Rand), `cutWindows` / `windowsOf` (jedes Fenster hält höchstens `limit` Schritte, damit die
+Reihenfolge der Antwort keine Rolle spielt), `planBackfill` (Abrufe, Einträge, ≈ Größe, Dauer für den Satz vor dem Klick), die Abbildung der
+Antworten auf Archivpunkte (`fundingHistPoints`, `markHistPoints`, `oiHistPoints`, `ratioHistPoints`; nicht endliche Werte fallen weg) und das
+Protokoll der Läufe (`BackfillRun`, zehn Stück). Was ankommt, ist eine **eigene Reihe** (`fundingHist`, `markHist`, `oiHist`, `lsAccHist`,
+`lsTopPosHist`, `lsTopAccHist`; Art `backfill`): außerhalb des Ringpuffers, nicht in der Größenschätzung des Sammlers, nie mit Gesammeltem
+verrechnet oder geglättet; ein nicht beantwortetes Fenster bleibt eine Lücke. Die Netzseite steht in `src/market/archive/backfill.ts` (ein
+Abruf zugleich, Pause dazwischen, Abbruch, ein 429 beendet den Lauf). Tests: `archive.backfill.domain.test.ts` (Handrechnung),
+`archive.backfill.run.test.ts` (gemockte Börse, `fake-indexeddb`), `views.settings.backfill.test.tsx`, e2e `backfill.spec.ts`. Nicht live gegen die
+Futures-Endpunkte geprüft (aus dem Sandbox-Netz antwortet Binance mit 451).

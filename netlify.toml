@@ -98,6 +98,20 @@
   status = 200
   force = true
 
+# "Börsenhistorie nachladen" (F26): the 5-minute mark-price candles of the history load
+[[redirects]]
+  from = "/api/binance/fapi/v1/markPriceKlines"
+  to = "https://fapi.binance.com/fapi/v1/markPriceKlines"
+  status = 200
+  force = true
+
+# order book snapshot of the Ausführbarkeits-Check (F44): spread and depth for the planned size, one request on a click
+[[redirects]]
+  from = "/api/binance/fapi/v1/depth"
+  to = "https://fapi.binance.com/fapi/v1/depth"
+  status = 200
+  force = true
+
 # Share edition: its own SPA fallback, BEFORE the catch-all (existing files such as /teilen/assets/* win anyway;
 # `/teilen` without slash is served as /teilen/index.html by Netlify itself – no extra rule, rules ignore the slash).
 [[redirects]]

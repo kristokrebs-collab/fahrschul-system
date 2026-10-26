@@ -159,3 +159,10 @@ connector, `TextMorph` view label, `AutoHeight` group panels / execution tabs. `
 screenshots, UI parts + share model), `tests/unit/domain.{fills,grouping,excursion}.test.ts`, the CSV tests, and
 `tests/e2e/journal-v3.spec.ts` (filters / views / grouped hedge, editor sections saved, detail facts, MAE / MFE from the
 synthetic market, a chart drawing, the replay). `P06_SHOTS=<dir>` writes the screenshots of the visual check.
+
+## Spracheingabe für Notizen (F31, `editor/VoiceNote.tsx`, `editor/LazyVoiceNote.tsx`)
+
+„Diktieren“ unter Begründung, Learnings & Notizen und der Notiz vor und nach dem Trade: ein Tipp startet die Erkennung des Browsers (`useSpeechInput` aus `@/assistant/speech`, `de-DE`, ein Satz je Tipp), jeder fertige
+Satz wird Wort für Wort angehängt (`joinNote`; was währenddessen getippt wurde, bleibt), der nächste Tipp beendet sie. Die App nimmt nichts auf und speichert kein Audio; die Karte nennt, dass die Erkennung beim
+Browser-Hersteller läuft (Chrome / Edge). Ohne Unterstützung, Erlaubnis oder Netz steht der Grund da (`speechMessage`) und das Tippen bleibt. `LazyVoiceNote` lädt das Stück erst, wenn ein Notizfeld gezeichnet wird (der
+Editor gehört zur Erstladung, die Spracherkennung nicht). Test: `journal.voiceNote.test.tsx` (nachgebaute Erkennung).

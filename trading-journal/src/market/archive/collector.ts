@@ -11,13 +11,14 @@
  * of the session (never in the file build, which has no proxy). Own pacing (one request at a time, a pause between them),
  * a 429 / 418 backs the collector off for five minutes. No keys, no custom headers, nothing leaves the device.
  */
-import { ARCHIVE_MAX_SYMBOLS, GAP_FACTOR, TICK_CAP, ringCap, type ArchiveCfg, type ArchivePoint, type Cell, type SeriesId, type TickRecord } from "@/domain/archive";
+import { ARCHIVE_MAX_SYMBOLS, GAP_FACTOR, TICK_CAP, isBackfillSeries, ringCap, type ArchiveCfg, type ArchivePoint, type Cell, type SeriesId, type TickRecord } from "@/domain/archive";
 import { isFileProtocol, IS_FILE_BUILD } from "@/edition";
 import type { BinanceRest, RatioKind } from "../sources/binance";
 import { binanceRest } from "../sources/binance";
 import { toRestError } from "../sources/http";
 import { proxyRest } from "../sources/proxy";
 import { ArchiveQuotaError, storageEstimate, type ArchiveDb } from "./db";
+import { RestRoute } from "../sources/route";
 
 /** Pause between two requests. */
 export const REQUEST_GAP_MS = 200;
@@ -70,19 +71,21 @@ export interface TickResult {
   paused: "quota" | null;
 }
 
-/** Failure kinds after which the same request is tried once through the proxy. */
-const PROXY_FALLBACK = new Set(["blocked_451", "network", "cors", "rate_limited"]);
-
 export class Collector {
-  private viaProxy = false;
+  private readonly net: RestRoute;
   private backoffUntil = 0;
   private last: TickRecord | null = null;
   private ticksSinceTrim = TRIM_EVERY_TICKS;
 
-  constructor(private readonly deps: CollectorDeps) {}
+  constructor(private readonly deps: CollectorDeps) {
+    this.net = new RestRoute(
+      () => deps.rest(),
+      () => deps.proxy(),
+    );
+  }
 
   get route(): "direct" | "proxy" {
-    return this.viaProxy ? "proxy" : "direct";
+    return this.net.route;
   }
 
   /** Device time of the newest tick of the log, `null` when there is none. */
@@ -96,24 +99,8 @@ export class Collector {
     this.last = ticks.length ? ticks[ticks.length - 1]! : null;
   }
 
-  private async call<T>(fn: (r: BinanceRest) => Promise<T>): Promise<T> {
-    const proxy = this.deps.proxy();
-    const first = this.viaProxy && proxy ? proxy : this.deps.rest();
-    try {
-      return await fn(first);
-    } catch (e) {
-      const err = toRestError(e);
-      if (!this.viaProxy && proxy && PROXY_FALLBACK.has(err.kind)) {
-        try {
-          const v = await fn(proxy);
-          this.viaProxy = true;
-          return v;
-        } catch (e2) {
-          throw toRestError(e2);
-        }
-      }
-      throw err;
-    }
+  private call<T>(fn: (r: BinanceRest) => Promise<T>): Promise<T> {
+    return this.net.call(fn);
   }
 
   /** The five reads of one symbol → points; the first failure reason (or `null`) and how many calls failed. */
@@ -223,7 +210,8 @@ export class Collector {
   /** Ring buffers: every row keeps its newest points under its own cap and the size limit. */
   async trim(maxMb: number): Promise<number> {
     const rows = await this.deps.db.overview();
-    const keys = rows.length;
+    // the backfilled rows („nachgeladen“) stay outside the ring: they neither count into the share nor are trimmed
+    const keys = rows.filter((r) => !isBackfillSeries(r.series)).length;
     const removed = await this.deps.db.trim((series) => ringCap(series, keys, maxMb));
     await this.deps.db.trimTicks(TICK_CAP);
     return removed;

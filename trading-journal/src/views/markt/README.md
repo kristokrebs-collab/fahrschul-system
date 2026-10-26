@@ -157,3 +157,11 @@ Wert, **Schwelle** und „erfüllt / nicht erfüllt / keine Daten“ (mit Grund,
 `settings.squeeze` (Funding, OI-Anstieg und -Fenster, Long-Anteil, Mindestzahl der Messwerte; Werte werden auf ihre Grenzen gesetzt); der Alarm ist ein eigener Schalter, **aus** bis zum Einschalten. Ohne Archiv sagt die Karte, was sie liest, und führt
 (`openSettingsOn`) zu Einstellungen › Datenarchiv. Regel und Grenzen: `src/domain/squeeze/README.md`; Alarm: `src/market/squeeze`. Tests: `squeeze.domain.test.ts`, `views.markt.squeeze.test.tsx`, `market.squeeze.alerts.test.ts`, e2e `archive.spec.ts`.
 
+
+### Stichprobe aus der nachgeladenen Börsenhistorie (F26/F07)
+
+Hat der Nutzer die Börsenhistorie nachgeladen (Einstellungen › Datenarchiv), zeigt die Squeeze-Karte darunter einen **eigenen Block** (`squeeze-history`, Überschrift „Stichprobe aus der nachgeladenen Börsenhistorie“) mit denselben
+Regeln, aber den nachgeladenen Reihen: frühere Fälle (`squeeze-history-episodes`, „In der nachgeladenen Historie …“), Preis nach 4 h / 24 h, Gegenbeispiele, Stichprobenwort, und eine eigene Quellenzeile
+(`squeeze-history-stand`: „Binance USDⓈ-M, öffentliche Historie (nachgeladen)“, letzter Eintrag, Historie seit, nachgeladen am). Getrennt vom Archiv oben, nie vermischt; hat das Archiv für das Symbol nichts selbst gesammelt, sagt die
+Karte das (`squeeze-history-nocollected`) statt Nullen zu zeigen; ohne nachgeladene Historie führt sie zu Einstellungen › Datenarchiv. Daten: `useSqueezeData.ts` (`loadHistoryData`), Rechenkern `@/domain/squeeze/fromHistory`.
+Tests: `views.markt.squeeze.history.test.tsx`, e2e `backfill.spec.ts`.

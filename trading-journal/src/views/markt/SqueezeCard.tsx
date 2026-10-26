@@ -32,6 +32,7 @@ import {
 } from "@/domain/squeeze";
 import { cn } from "@/lib/cn";
 import { parseNumber, toInputString } from "@/lib/parse";
+import { lastRunFor } from "@/market/archive/backfillLog";
 import { useArchiveCfg, useArchiveStatus } from "@/market/archive/store";
 import { Switch } from "@/motion/Switch";
 import { Button } from "@/primitives/Button";
@@ -42,7 +43,7 @@ import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { NO_ADVICE_TEXT } from "@/ui/AnalysisNote";
 import { SourceStand } from "@/ui/SourceStand";
-import { SQUEEZE_STRINGS as S, boxLine, episodesLine, headline, sampleLine } from "./squeezeModel";
+import { SQUEEZE_STRINGS as S, boxLine, episodesLine, headline, historyEpisodesLine, missingHistory, sampleLine } from "./squeezeModel";
 import { useSqueezeData } from "./useSqueezeData";
 
 type Hours = "1" | "4" | "24";
@@ -139,6 +140,11 @@ export const SqueezeCard = memo(function SqueezeCard({ view, className }: { view
   const reading = useMemo(() => (snap ? evaluateNow(snap.data, cfg, load.at, snap.ivMin) : null), [snap, cfg, load.at]);
   const episodes = useMemo(() => (snap ? findEpisodes(snap.data, cfg) : []), [snap, cfg]);
   const hours = useMemo(() => (snap ? coverageHours(snap.data) : 0), [snap]);
+  // the loaded Binance history is a data set of its own: evaluated on its own, never merged with the collected archive
+  const hist = load.history;
+  const histEpisodes = useMemo(() => (hist ? findEpisodes(hist.data, cfg) : []), [hist, cfg]);
+  const histMissing = useMemo(() => (hist ? missingHistory(hist.counts) : []), [hist]);
+  const histRun = symbol && hist ? lastRunFor(symbol) : null;
 
   const ctx: BoxCtx[] = useMemo(() => {
     if (view.state !== "ok" || !symbol || view.symbol !== symbol) return [];
@@ -185,6 +191,14 @@ export const SqueezeCard = memo(function SqueezeCard({ view, className }: { view
                 </Button>
               </div>
             )}
+            <p className="text-[12px] leading-relaxed text-mute" data-testid="squeeze-empty-history">
+              {S.historyNoneAny}
+            </p>
+            <div>
+              <Button size="sm" className="pointer-coarse:min-h-11" onClick={() => openSettingsOn("settings", "Datenarchiv")} data-testid="squeeze-empty-history-btn">
+                {S.historyBtn}
+              </Button>
+            </div>
           </div>
         )}
 
@@ -256,6 +270,49 @@ export const SqueezeCard = memo(function SqueezeCard({ view, className }: { view
             </div>
 
             <SourceStand source={S.source} parts={[{ label: "letzter Eintrag", at: reading.at }, { label: "Archiv seit", at: first, long: true }]} testId="squeeze-stand" />
+
+            <div className="grid gap-1 border-t border-line pt-3" data-testid="squeeze-history">
+              <span className="label">{S.historyLabel}</span>
+              {snap && snap.data.premium.length === 0 && hist && (
+                <p className="text-[12px] leading-relaxed text-mute" data-testid="squeeze-history-nocollected">
+                  {S.historyNoCollected}
+                </p>
+              )}
+              {hist ? (
+                <>
+                  <p className="text-[12px] leading-relaxed text-mute">{S.historyLead}</p>
+                  <p className="text-[12px] leading-relaxed text-mute" data-testid="squeeze-history-episodes">
+                    {historyEpisodesLine(histEpisodes, hist.hours, side)}
+                  </p>
+                  {HORIZONS.map((h) => (
+                    <p key={h} className="text-[12px] leading-relaxed text-mute" data-testid={`squeeze-history-sample-${h}`}>
+                      {sampleLine(summarize(histEpisodes, h, side), side)}
+                    </p>
+                  ))}
+                  {histMissing.length > 0 && (
+                    <p className="text-[12px] leading-relaxed text-warn" data-testid="squeeze-history-missing">
+                      {S.historyMissing(histMissing)}
+                    </p>
+                  )}
+                  <SourceStand
+                    source={S.historySource}
+                    parts={[{ label: "letzter Eintrag", at: hist.last }, { label: "Historie seit", at: hist.first, long: true }, { label: "nachgeladen", at: histRun?.t ?? null, long: true }]}
+                    testId="squeeze-history-stand"
+                  />
+                </>
+              ) : (
+                <>
+                  <p className="text-[12px] leading-relaxed text-mute" data-testid="squeeze-history-none">
+                    {S.historyNone}
+                  </p>
+                  <div>
+                    <Button size="sm" className="pointer-coarse:min-h-11" onClick={() => openSettingsOn("settings", "Datenarchiv")} data-testid="squeeze-history-btn">
+                      {S.historyBtn}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
           </>
         )}
 

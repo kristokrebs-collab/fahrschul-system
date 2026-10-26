@@ -14,7 +14,14 @@ export const SQUEEZE_STRINGS = {
   archiveOff: "Der Squeeze-Monitor liest das Datenarchiv, und das ist aus. Schalte es in den Einstellungen ein; danach braucht es Zeit (mindestens die Fensterlänge des Open Interest), bis alle drei Messwerte da sind.",
   archiveOn: "Das Archiv ist an, hat für diese Auswahl aber noch keinen Eintrag. Der erste Abruf kommt nach etwa 15 Sekunden.",
   archiveBtn: "Zum Datenarchiv",
-  unavailable: "Dieser Browser kann das Archiv hier nicht lesen (IndexedDB nicht verfügbar).",
+  historyLabel: "Stichprobe aus der nachgeladenen Börsenhistorie",
+  historyLead: "Getrennt vom Archiv oben: diese Zahlen stammen aus der öffentlichen Historie von Binance, die du in den Einstellungen nachgeladen hast (5-Minuten-Werte, Funding je Abrechnung). Beide Stichproben können denselben Zeitraum betreffen und werden nicht zusammengezählt.",
+  historyNone: "Für dieses Symbol ist keine Börsenhistorie nachgeladen. Unter Einstellungen › Datenarchiv holt „Börsenhistorie nachladen“ die letzten Tage von Binance – dann gibt es diese Stichprobe sofort, statt erst nach Wochen Laufzeit.",
+  historyNoneAny: "Oder lade die Historie nach: Unter Einstellungen › Datenarchiv holt „Börsenhistorie nachladen“ die letzten Tage von Binance, getrennt gespeichert und als nachgeladen gekennzeichnet – dann gibt es die Stichprobe sofort.",
+  historyBtn: "Börsenhistorie nachladen",
+  historySource: "Binance USDⓈ-M, öffentliche Historie (nachgeladen)",
+  historyNoCollected: "Für dieses Symbol hat das Archiv noch nichts selbst gesammelt; die Messwerte oben haben deshalb keine Daten. Die nachgeladene Historie steht unten.",
+  historyMissing: (names: readonly string[]) => `In der nachgeladenen Historie fehlt: ${names.join(", ")}. Ohne diese Reihe zählt der jeweilige Messwert als „keine Daten“.`,  unavailable: "Dieser Browser kann das Archiv hier nicht lesen (IndexedDB nicht verfügbar).",
   loading: "Lese das Archiv …",
   source: "Datenarchiv dieses Geräts (Binance USDⓈ-M, öffentlich)",
   boxOnlyLive: (sym: string) => `Den Box-Kontext gibt es nur für das Markt-Symbol (${sym}).`,
@@ -71,3 +78,16 @@ export const episodesLine = (eps: readonly Episode[], hours: number, side: Squee
   const n = eps.filter((e) => (side ? e.side === side : true)).length;
   return `Im Archiv (${fmt1(hours)} Stunden) kam dieselbe Beobachtung ${side ? `für die ${side === "long" ? "Long" : "Short"}-Seite ` : ""}in ${n} ${n === 1 ? "früheren Fall" : "früheren Fällen"} vor.`;
 };
+
+/** The same sentence for the loaded history („In der nachgeladenen Historie (… Stunden) …“). */
+export const historyEpisodesLine = (eps: readonly Episode[], hours: number, side: SqueezeSide | null): string => episodesLine(eps, hours, side).replace("Im Archiv", "In der nachgeladenen Historie");
+
+/** Names of the history series that have no point for the symbol (so the reading would say „keine Daten“ for them). */
+export function missingHistory(counts: { mark: number; funding: number; oi: number; ls: number; top: number }): string[] {
+  const out: string[] = [];
+  if (counts.mark === 0) out.push("Markpreis");
+  if (counts.funding === 0) out.push("Funding");
+  if (counts.oi === 0) out.push("Open Interest");
+  if (counts.ls === 0) out.push("Long/Short aller Konten");
+  return out;
+}

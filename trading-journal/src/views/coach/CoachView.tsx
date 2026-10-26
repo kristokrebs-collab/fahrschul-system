@@ -29,6 +29,7 @@ import { useUi, type AccFilter } from "@/store/uiStore";
 import { AnalysisNote } from "@/ui/AnalysisNote";
 import { SEG_TOUCH } from "@/views/insights/ui";
 import { PageHeader } from "@/views/setups/PageHeader";
+import { JournalBasis } from "./BasisLine";
 import { ChatCard } from "./ChatCard";
 import { DataQualityCard } from "./DataQualityCard";
 import { MissedCard } from "./MissedCard";
@@ -93,6 +94,7 @@ export function CoachView({ className }: { className?: string }) {
           { id: "was-waere-wenn", label: "Was wäre wenn" },
         ]}
       />
+      <JournalBasis trades={view.list} closed={view.closed.length} className="lg:col-span-12 -mt-2" />
       <Cell index={0} span="lg:col-span-12">
         <HeroCard lesson={c.lesson} tips={c.tips} score={c.score} />
       </Cell>

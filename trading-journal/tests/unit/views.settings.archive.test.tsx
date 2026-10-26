@@ -168,7 +168,7 @@ describe("ArchiveCard", () => {
     // the overview reloads on the bumped revision
     act(() => undefined);
     await waitFor(() => expect(screen.getAllByTestId("archive-row")).toHaveLength(2));
-    expect(screen.queryByText("ETHUSDT")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("archive-overview")).queryByText("ETHUSDT")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: S.delAll }));
     fireEvent.click(await screen.findByRole("button", { name: S.yes }));

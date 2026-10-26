@@ -452,6 +452,8 @@ describe("notification on a new valid entry", () => {
     // F32: the same signal is archived as a structured event (time, side, strength) – once (the archive loads on demand)
     await vi.waitFor(() => expect(getSignalArchive()).toHaveLength(1));
     expect(getSignalArchive()).toEqual([expect.objectContaining({ source: "entry", entry: true, side: "long", strength: 2, score: 85, label: "Starker Long-Einstieg", at: NOW + 2000 + SIGNAL_HOLD_MS })]);
+    // F25: the version of the rules the signal came from rides along (a fingerprint of the configuration, the first one is number 1)
+    expect(getSignalArchive()[0]!.rules).toMatchObject({ kind: "entry", n: 1, hash: expect.stringMatching(/^[0-9a-f]{8}$/) });
     // flicker in the same bar → no second toast
     noteSignals(sig({ long: false, short: false }, bar), NOW + 70_000);
     noteSignals(sig({ long: true, short: false }, bar), NOW + 71_000);

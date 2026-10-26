@@ -17,6 +17,7 @@ import { createAlarms, discardPlan, planToJournal, removeAlarms, savedPlanOf, sa
 import { usePlanForm } from "./planStore";
 import { StepCard } from "./ui";
 import { useStand } from "./EntryStep";
+import { ExecutionCheck } from "./ExecutionCheck";
 import type { PlanVm } from "./usePlanModel";
 
 const FLAT_STATE = { pending: "wartet auf die Uhrzeit", fired: "hat sich gemeldet", missed: "war schon vorbei" } as const;
@@ -119,6 +120,8 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
               CSV kopieren
             </Button>
           </div>
+
+          <ExecutionCheck plan={t} slippagePct={vm.limits.slippagePct} crypto={model.session.market === "crypto"} />
 
           <details className="rounded-xl border border-line bg-ink-950/40 px-3 py-2" data-testid="hplan-ticket-preview">
             <summary className="cursor-pointer select-none text-[12.5px] font-medium text-mute pointer-coarse:min-h-11 pointer-coarse:py-2">Text und CSV ansehen</summary>

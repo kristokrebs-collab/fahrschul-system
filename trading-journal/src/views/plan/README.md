@@ -47,3 +47,12 @@ Aktien und Link: `hplan-link` (`-applied`, `-ignored`, `-close`) · `hplan-stock
 
 `tests/unit/plan.manage.test.ts` (Handrechnung der Verwaltung), `views.plan.manage.test.tsx` (Karte, Ticket, „Plan → 4 Alarme“), e2e `tests/e2e/plan-manage.spec.ts`; `tests/unit/views.plan.test.tsx` (der Ablauf), `views.plan.rules.test.tsx` (Regeln wechseln, Ablehnungen, Ampel Rot, Ladefehler), `views.plan.actions.test.tsx` (Ticket, Speichern, Alarme, Journal);
 `tests/unit/market.plan.{candles,clock}.test.ts(x)`, `assistant.plan.test.ts`; e2e `tests/e2e/plan.spec.ts` (mobil + Desktop, feste Kerzen, ohne Uhr-Sprünge).
+
+## Ausführbarkeit jetzt (F44, `ExecutionCheck.tsx`, `executionModel.ts`)
+
+Im Schritt **Ticket**, unter den Kopier-Knöpfen: „Spread und Tiefe prüfen“ liest auf Klick ein Orderbuch (`@/market/execution`) und zeigt Quelle, Stand, Abrufweg
+(direkt / EU-Proxy) und Alter, den Spread in Basispunkten mit Wort, die Tiefe in drei Bändern, den Durchlauf der geplanten Größe beim Einstieg und beim Stop, die
+Slippage-Annahme des Plans daneben („gedeckt“ / „zu niedrig angenommen“) und den Anteil am 24-Stunden-Umsatz (Rechenkern: `@/domain/execution`). Ein gescheiterter
+Abruf sagt „keine Daten“ mit Grund und ist nie ein grünes Licht; für Aktien gibt es keine Quelle (die Karte sagt das, die App schätzt nichts). Test-IDs: `hplan-exec` ·
+`hplan-exec-run` · `hplan-exec-result` (`data-tone`) · `hplan-exec-headline` · `hplan-exec-failed` · `hplan-exec-stocks` · `hplan-exec-stand`. Tests:
+`views.plan.execution.test.tsx`, e2e `execution.spec.ts`.
