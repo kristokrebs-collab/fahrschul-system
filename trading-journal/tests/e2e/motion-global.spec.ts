@@ -56,7 +56,7 @@ async function recordLayoutShift(page: Page): Promise<void> {
           w.__cls += e.value;
           const s = e.sources?.[0];
           const n = s?.node as HTMLElement | undefined;
-          w.__clsWho.push(`${e.value.toFixed(4)} ${n ? `${n.tagName.toLowerCase()}${n.dataset?.testid ? `[${n.dataset.testid}]` : ""}` : "?"} ${Math.round(s?.previousRect.y ?? 0)}→${Math.round(s?.currentRect.y ?? 0)}`);
+          w.__clsWho.push(`${e.value.toFixed(4)} ${n ? `${(n.tagName ?? n.nodeName ?? "?").toLowerCase()}${n.dataset?.testid ? `[${n.dataset.testid}]` : ""}` : "?"} ${Math.round(s?.previousRect.y ?? 0)}→${Math.round(s?.currentRect.y ?? 0)}`);
         }
       }).observe({ type: "layout-shift", buffered: true });
     } catch {

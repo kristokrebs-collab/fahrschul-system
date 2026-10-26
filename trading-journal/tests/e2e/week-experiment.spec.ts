@@ -219,7 +219,7 @@ test.describe("Verpasste Chancen", () => {
     await expect(card).toBeVisible();
     await expect(card).toHaveAttribute("data-total", "0");
     await expect(card).toContainText("Noch keine Signale gespeichert");
-    await expect(card).toContainText("lässt sich Vergangenes nicht nachtragen");
+    await expect(card).toContainText("Vergangenes lässt sich nicht nachtragen");
     await expect(page.getByTestId("missed-counter")).toContainText("keine Ursache");
     await expectNoHorizontalScroll(page);
     expect(errors).toEqual([]);
