@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 import { Button } from "@/primitives/Button";
 import { Field } from "@/primitives/Field";
 import { Textarea } from "@/primitives/Input";
+import { ChipPick } from "@/views/labor/ui";
 import { Segmented } from "@/primitives/Segmented";
 import { DemoCard } from "./DemoCard";
 import { patch, useSession } from "./session";
@@ -42,10 +43,10 @@ function KitForm() {
         <Segmented<Kit["interval"]> size="sm" aria-label={K.interval} value={kit.interval} onChange={(v) => set({ interval: v })} options={seg(KIT_OPTIONS.interval)} />
       </Field>
       <Field label={K.entry} className="sm:col-span-2">
-        <Segmented<Kit["entry"]> size="sm" aria-label={K.entry} value={kit.entry} onChange={(v) => set({ entry: v })} options={seg(KIT_OPTIONS.entry)} className="max-w-full flex-wrap" />
+        <ChipPick<Kit["entry"]> id="demo-kit-entry" label={K.entry} value={kit.entry} onChange={(v) => set({ entry: v })} options={seg(KIT_OPTIONS.entry)} />
       </Field>
       <Field label={K.filter}>
-        <Segmented<Kit["filter"]> size="sm" aria-label={K.filter} value={kit.filter} onChange={(v) => set({ filter: v })} options={seg(KIT_OPTIONS.filter)} className="max-w-full flex-wrap" />
+        <ChipPick<Kit["filter"]> id="demo-kit-filter" label={K.filter} value={kit.filter} onChange={(v) => set({ filter: v })} options={seg(KIT_OPTIONS.filter)} />
       </Field>
       <Field label={K.stop}>
         <Segmented<Kit["stop"]> size="sm" aria-label={K.stop} value={kit.stop} onChange={(v) => set({ stop: v })} options={seg(KIT_OPTIONS.stop)} />
@@ -68,7 +69,7 @@ function Words({ parse }: { parse: StrategyParse | null }) {
       </Field>
       <div className="grid gap-3">
         <span className="label">{RULES.examples}</span>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-x-2 gap-y-4">
           {DEMO_IDEAS.map((i) => (
             <Button key={i.id} size="sm" onClick={() => patch({ text: i.text, answers: {} })} data-testid={`demo-example-${i.id}`}>
               {i.title}
@@ -112,7 +113,7 @@ function Words({ parse }: { parse: StrategyParse | null }) {
               {parse.asks.map((a) => (
                 <div key={a.id} className="grid gap-1.5" data-testid="demo-ask">
                   <p className="text-[12.5px] text-fg">{a.text}</p>
-                  <div className="flex flex-wrap gap-2" role="group" aria-label={a.text}>
+                  <div className="flex flex-wrap gap-x-2 gap-y-4" role="group" aria-label={a.text}>
                     {a.options.map((o) => (
                       <Button key={o.id} size="sm" variant={a.chosen === o.id ? "primary" : "ghost"} aria-pressed={a.chosen === o.id} onClick={() => patch({ answers: { ...answers, [a.id]: o.id } })}>
                         {o.label}

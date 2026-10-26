@@ -109,6 +109,7 @@ carries it (an absent key is never added), so legacy trades normalise, derive (`
 | `psych` | `{stress?, confidence? 1–5, flags?, exitReason?, preNote?, postNote?}` | non-object removed |
 | `origin` | `{kind manual\|api\|csv\|bot\|webhook, botId?}` | unknown kind → removed |
 | `boxSnap` | opaque (`BoxSnapshot`, `@/market/boxes/snapshot`) | verbatim |
+| `decision` (F24) | `{by own\|rules\|ai, via? plan\|box, ref?}` – who decided (not `origin`, which is the record's source) | `by` must be one of the three, else removed; unknown keys survive; see `provenance/README.md` |
 
 Conventions: `size` stays the notional (qty × entry); `fees`, `fundingFees`, `slippage` are costs in `settings.currency`
 (positive = paid). Whether `fills` / `fundingFees` feed the auto P&L is decided in `derive.ts` (P06) – only when present.
@@ -190,4 +191,13 @@ events/       Ereigniskalender (F43): Funding-Raster, Deribit-Verfall, NYSE-Zeit
 ledger/       Transaktionsbuch (F70, Hilfsrechnung ohne Steuerberatung): Zeilen aus dem Journal, FIFO-Zuordnung, Jahreszusammenfassung, Abgleich-Hinweise, CSV – see src/domain/ledger/README.md
 decision/     `explainDecision`: required conditions · optional confirmations · contradictions · missing data, „zu spät“
               (`lateEntry`, `settings.signals.lateMaxR`, default 0.5 R); a high score never overrides a failed required condition
+```
+
+## Herkunft der Entscheidung und Demo mit Beispieldaten (F24 / F58)
+```
+provenance/   `Trade.decision` (wer hat entschieden: eigene Entscheidung / Regelwerk-Signal / KI-Vorschlag; additiv, nie geraten), `decisionOf` mit Grund,
+              `signalHints` (nur Hinweise), `compareDecisions` (Anzahl, Trefferquote mit Wilson-Spanne, Ø R, Paare mit Benjamini-Hochberg, „zu wenig Daten“),
+              KI-Protokoll `settings.aiLog` (versioniert, Passthrough, nur Helfer / Modell / Zeit / übernommen) – see src/domain/provenance/README.md
+demo/         Rechenseite der Produktdemo: künstliche Beispiel-Kerzen (Sinus-Wellen, kein Zufall), Beispiel-CSV, Regelentwurf, Backtest, Demokonto, Alarm
+              auf den echten Funktionen der App – nichts wird gespeichert – see src/domain/demo/README.md
 ```

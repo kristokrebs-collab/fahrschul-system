@@ -99,7 +99,7 @@ test.describe("Mensch – Regelwerk – KI", () => {
     await expect(card.getByTestId("decision-pair").filter({ hasText: "zu wenig Daten" })).toHaveCount(2);
     await expect(card.getByTestId("decision-unassigned")).toContainText("4 von 33 geschlossenen Trades haben keine Herkunft");
     await expect(card.getByTestId("decision-headline")).not.toContainText(/besser als|schlechter als/);
-    await expect(card).toContainText("keine Ursache");
+    await expect(card).toContainText("Eine Ursache ist damit nicht belegt");
     await expectNoHorizontalScroll(page);
     await screenshot(page, info, "herkunft-card");
     expect(errors, errors.join("\n")).toEqual([]);

@@ -51,6 +51,13 @@ export function DemoChart({ bars, lines = [], marks = [], label, height = 230, c
     const prev = placed[placed.length - 1];
     placed.push({ l, ly: prev && base - prev.ly < LABEL_H ? prev.ly + LABEL_H : base });
   }
+  // marks on neighbouring candles would overlap on a phone: a later mark steps down (with a short leader line to its candle)
+  const spread: { m: ChartMark; cy: number }[] = [];
+  for (const m of marks) {
+    let cy = y(m.price);
+    while (spread.some((s) => Math.abs(x(s.m.index) - x(m.index)) < 15 && Math.abs(s.cy - cy) < 15)) cy += 15;
+    spread.push({ m, cy });
+  }
   return (
     <div ref={host} className={cn("w-full min-w-0", className)} data-testid={testId}>
       <svg width={W} height={height} viewBox={`0 0 ${W} ${height}`} role="img" aria-label={label} className="block max-w-full select-none">
@@ -72,10 +79,11 @@ export function DemoChart({ bars, lines = [], marks = [], label, height = 230, c
             </text>
           </g>
         ))}
-        {marks.map((m) => (
+        {spread.map(({ m, cy }) => (
           <g key={m.n} className="text-signal">
-            <circle cx={x(m.index)} cy={y(m.price)} r={7} fill="var(--color-ink-950)" stroke="currentColor" strokeWidth={1.5} />
-            <text x={x(m.index)} y={y(m.price) + 3.5} textAnchor="middle" fontSize={10} fontWeight={600} fill="currentColor" className="font-mono">
+            {cy !== y(m.price) && <line x1={x(m.index)} x2={x(m.index)} y1={y(m.price)} y2={cy} stroke="currentColor" strokeWidth={1} />}
+            <circle cx={x(m.index)} cy={cy} r={7} fill="var(--color-ink-950)" stroke="currentColor" strokeWidth={1.5} />
+            <text x={x(m.index)} y={cy + 3.5} textAnchor="middle" fontSize={10} fontWeight={600} fill="currentColor" className="font-mono">
               {m.n}
             </text>
           </g>

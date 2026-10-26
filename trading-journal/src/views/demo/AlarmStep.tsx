@@ -11,6 +11,7 @@ import { price as fmtPrice } from "@/lib/format";
 import { Badge } from "@/primitives/Badge";
 import { Field } from "@/primitives/Field";
 import { Segmented } from "@/primitives/Segmented";
+import { ChipPick } from "@/views/labor/ui";
 import { DemoCard } from "./DemoCard";
 import { DemoChart, type ChartMark } from "./DemoChart";
 import { patch, useSession } from "./session";
@@ -55,7 +56,7 @@ export function AlarmStep() {
           <Segmented<LevelDirection> size="sm" aria-label={ALARM.direction} value={setup.direction} onChange={(v) => set({ direction: v })} options={[{ v: "above", label: ALARM.above }, { v: "below", label: ALARM.below }]} />
         </Field>
         <Field label={ALARM.rule} className="sm:col-span-2" help={rule.help}>
-          <Segmented<AlarmRule> size="sm" aria-label={ALARM.rule} value={setup.rule} onChange={(v) => set({ rule: v })} options={ALARM_RULES.map((r) => ({ v: r.v, label: r.label }))} className="max-w-full flex-wrap" />
+          <ChipPick<AlarmRule> id="demo-alarm-rule" label={ALARM.rule} value={setup.rule} onChange={(v) => set({ rule: v })} options={ALARM_RULES.map((r) => ({ v: r.v, label: r.label }))} />
         </Field>
         <Field label={ALARM.scrub} htmlFor="demo-alarm-at" className="sm:col-span-2">
           <div className="flex items-center gap-3">

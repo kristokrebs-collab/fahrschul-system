@@ -90,6 +90,7 @@ test.describe("Demo mit Beispieldaten", () => {
     await tid(page, "demo-example-breakout").click();
     await page.getByRole("radio", { name: "Baukasten" }).click();
     await expect(tid(page, "demo-kit")).toBeVisible();
+    await screenshot(page, info, "demo-2-kit");
     await page.getByRole("radio", { name: "In Worten" }).click();
     await expect(tid(page, "demo-idea")).toBeVisible();
     await expectNoHorizontalScroll(page);

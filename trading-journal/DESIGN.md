@@ -729,3 +729,16 @@ Eine Karte, die rechnet (`src/views/timemachine`), im Nothing-Stil: ruhig, Zahle
 - **Mobil (390 px).** Kacheln dreispaltig mit festem Beschriftungsraum (zwei Zeilen), die Vorfälle als dreispaltige Tabelle (Einstieg · Ausgang · Ergebnis mit „Gegenzug“ darunter), der Vergleich als Liste mit drei Werten je Zeile, Bilder messen ihre Breite (`ResizeObserver`) und beschriften an den Rändern nach innen; Knöpfe und Chips ≥ 44 px bei grobem Zeiger.
 - **Formular** im Labor: `FieldRow` / `Input numeric` / `ChipPick` / `Segmented` wie im Versuchsaufbau; Eingabe von Preisen mit Komma oder Punkt; ungültige Pläne stehen als ruhige Zeile mit Grund unter dem Formular, nie als Fehlerdialog. Das Blatt am Trade-Detail ist ein `Sheet` (`size="lg"`) wie „Was wäre wenn“.
 
+## Demo mit Beispieldaten (F58)
+
+Ein Blatt (`Sheet`, `size="lg"`) mit fünf Schritten – **Import · Regeln · Test · Demokonto · Alarm** –, ruhig im Nothing-Stil: Stufenleiste mit Zahl und Wort (nie nur Farbe), ein Fuß mit Zurück · „Schritt n von 5“ · Weiter (am Ende „Demo beenden“), danach eine Schlusskarte mit den echten Wegen (Import, Labor, Handelsplan, Schlüsselmarken).
+
+- **Kennzeichnung.** Jede Karte trägt oben „Beispiel – nicht deine Daten“ (`Badge`, Mono, Kapitälchen, `text-mute`) und unten „Keine professionelle Finanzberatung.“; Karten mit Kerzen nennen deren Quelle („künstlich berechnet, kein Markt“). Die Kennzeichnung ist Text, nicht Farbe.
+- **Zahlen und Bild.** Zahlen in Mono (Doto nur dort, wo die App sie schon so zeigt); das Kerzenbild (`DemoChart`) ist ein statisches SVG, misst seine Breite (`ResizeObserver`), Kerzenfarbe nur als Richtung, jede Linie (Einstieg, Stop, Ziel, Marke) und jede nummerierte Marke steht zusätzlich als Wort in der Legende darunter. Kleinschrift ist `text-mute`, nie `text-faint`.
+- **Auswahl** (Beispiele, Antworten, Baukasten, Alarmregel) über `ChipPick` / umbrechende Chips mit 44 px Tippfläche bei grobem Zeiger und `gap-y-4` (die `touch-hit`-Flächen dürfen sich nicht überlappen); keine umbrechende `Segmented`.
+- **Mobil (390 px).** Eine Spalte, kein horizontaler Scroll: lange Badges brechen um (`whitespace-normal text-left`), Ids und Pfade brechen, Tabellen werden Listen.
+- **Bewegung** nur `src/motion` (`Sheet`, `StaggerItem`; Schrittwechsel `tween.fade` / `spring.enter`); reduzierte Bewegung: sofort. Nichts blinkt, nichts startet von selbst, der Demokonto-Schritt deckt Kerzen nur auf Tipp auf.
+
+## Entscheidung: du, Regelwerk, KI (F24)
+
+Eine Karte in Analyse › Vergleich (`ana-decision`), dieselbe Bauweise wie die Nachbarkarten (`AnaCard`, `InsightCard`): drei Spalten (mobil gestapelt) mit Name der Herkunft in Kapitälchen, Anzahl und Trefferquote in Mono, die Spanne als Zahlenpaar und Ø R mit der Spanne als Linie (`CiWhisker`, Zahlen daneben). Eine Gruppe unter 5 Trades zeigt nur ihre Anzahl und „Zu wenig Daten“ – keine kleinere, schönere Zahl. Das Urteil je Paar steht als Wort (klar / Tendenz / offen) mit Satz; die Überschrift verneint einen Rang, solange nichts „klar“ ist; ein Satz nennt, dass ein Unterschied keine Ursache beweist. „Herkunft nachtragen“ ist eine ruhige Liste (Tipp auf Ich · Regelwerk · KI, 44 px), das KI-Protokoll ein einklappbarer Bereich ohne Gesprächstext. Im Editor ein einziges Feld „Entscheidung“ (Offen · Ich · Regelwerk · KI) im Abschnitt „Ausführung“.

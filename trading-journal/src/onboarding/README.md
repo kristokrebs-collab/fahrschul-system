@@ -54,3 +54,8 @@ starts for a journal WITH trades anyway (it marks the trader `seen`), but an emp
 `tests/unit/onboarding.tour.test.tsx` (auto start, the five steps with real writes, editor round trip, the hold,
 skip / back, no start with trades); e2e `tests/e2e/onboarding.spec.ts` (a real pointer hold) and the tour scans in
 `tests/e2e/a11y.spec.ts` (dark + light).
+
+## Demo mit Beispieldaten (F58)
+
+In der Karte „Einführung & Hilfe“ gibt es neben dem Start der Tour den Knopf „Demo mit Beispieldaten“ (`data-testid="onboarding-demo"`). Er lädt den Demo-Chunk erst beim Klick
+(`import("@/views/demo/demoStore")`) und ändert weder den Stand der Tour noch Einstellungen oder das Journal (`src/views/demo/README.md`).

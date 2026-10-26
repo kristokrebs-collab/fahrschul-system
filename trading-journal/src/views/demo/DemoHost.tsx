@@ -39,7 +39,7 @@ async function openFunction(id: string): Promise<void> {
 function Done() {
   return (
     <DemoCard step="ende" title={DONE.title} lead={DONE.lead}>
-      <ul className="grid gap-2 sm:grid-cols-2" data-testid="demo-done-links">
+      <ul className="grid gap-4 sm:grid-cols-2" data-testid="demo-done-links">
         {DONE.links.map((l) => (
           <li key={l.id}>
             <Button size="sm" className="w-full justify-start whitespace-normal text-left" onClick={() => void openFunction(l.id)} data-testid={`demo-go-${l.id}`}>

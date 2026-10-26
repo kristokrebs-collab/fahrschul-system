@@ -104,3 +104,12 @@ store, `bootMarket` (daily candles for the benchmark), the trade detail, toasts 
 ## Inhalt-Leiste (Auffindbarkeit)
 
 Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Sechs Chips für die Abschnitte (`SectionTitle section="ratios" | "future" | "edge" | "execution" | "patterns" | "compare"` → `data-section`); ohne Trades (Vorschau-Karte) keine Leiste. Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.
+
+## Entscheidung: du, Regelwerk, KI (F24)
+
+`decision/DecisionCard.tsx` (`data-testid="ana-decision"`) steht im Abschnitt „Vergleich“ vor „Eigene Kennzahl“ (`AnalyseView`, Tarif `analyticsPro` wie die ganze Seite).
+Je Herkunft (eigene Entscheidung · Regelwerk · KI) Anzahl, Trefferquote mit 80-%-Wilson-Spanne, Ø R und das Stichprobenwort; unter 5 Trades „Zu wenig
+Daten“ ohne Zahlen; paarweise Differenzen mit über alle Tests korrigiertem Urteil (klar / Tendenz / offen); die Überschrift verneint einen Rang, wo nichts
+belegt ist, und die Karte sagt ausdrücklich, dass ein Unterschied keine Ursache ist. `AssignList.tsx`: „Herkunft nachtragen“ – Trades ohne Herkunft, mit
+Hinweis auf ein zeitlich passendes Signal (nur ein Hinweis; gesetzt wird erst der Tipp, nur für diesen Trade). `AiLogPanel.tsx`: das KI-Protokoll als
+Liste (Helfer, Modell, Zeit, übernommen), mit „Protokoll leeren“. Test `tests/unit/views.analyse.decision.test.tsx`; e2e `tests/e2e/herkunft.spec.ts`.

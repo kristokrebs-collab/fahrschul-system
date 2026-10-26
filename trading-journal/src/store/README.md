@@ -251,3 +251,11 @@ animation-free and testable. Strings in `THEME_STRINGS`.
 without a class rewrite; the ink ramp is inverted (cards brightest, wells one step below). Dark islands keep the ink
 ramp in light mode: the intro stage, the immersive navigation, the overview hero (`:has(> [data-hero-backdrop])`) and
 anything marked `data-theme-scope="dark"`. Light text tokens meet WCAG AA on every plane (`tests/e2e/theme.spec.ts`).
+
+## `aiLog.ts` – KI-Protokoll schreiben (F24)
+
+`recordAi({ helper, model, adopted, ref? })`, `decideAi(id, adopted)`, `clearAiLog()`: schreiben `settings.aiLog` (`{ v: 1, entries }`, Passthrough wie
+`settings.watchlist` / `keyLevels`; Format und Regeln in `src/domain/provenance/README.md`). Sie werfen nie (ein Protokollfehler darf eine Antwort
+nicht verhindern) und tun nichts, solange das Journal nicht geladen ist. Aufrufer: Assistent-Router, Strategie-Übersetzer, Coach-Umformulierung, Optimierer
+(`decideProposal`). Das Feld `Trade.decision` ist Teil des Trades (Backup und Cloud-Merge je Trade, kein eigener Schlüssel). Die Demo (F58) benutzt
+diesen Speicher nicht: ihr Zustand lebt im Speicher von `src/views/demo/session.ts`.
