@@ -15,6 +15,8 @@ import { addGoalFromDraft } from "@/domain/growth/goals";
 import { hasClaudeRuntime } from "@/store/capability";
 import { pushToast } from "@/store/uiStore";
 import {
+  closeCaseApi,
+  deleteCaseApi,
   deleteCommentApi,
   deleteGroupApi,
   deleteInvite,
@@ -29,7 +31,9 @@ import {
   patchGoal,
   patchMemberApi,
   patchReview,
+  postCaseApi,
   postCommentApi,
+  postHypothesisApi,
   postFeedback,
   postGoal,
   postGroup,
@@ -40,6 +44,7 @@ import {
   postShare,
 } from "./api";
 import type {
+  CreateCaseRequest,
   FeedbackRequest,
   FeedResponse,
   GoalInfo,
@@ -48,6 +53,7 @@ import type {
   InviteInfo,
   InvitePreview,
   LeaderboardResponse,
+  HypothesisRequest,
   MentorGoalDraft,
   ShareInfo,
   ShareLevel,
@@ -56,6 +62,7 @@ import type {
   SocialMe,
 } from "./contract";
 import type { OriginFilter, SocialMetric } from "./metrics";
+import { CASES } from "./caseStrings";
 import { S } from "./strings";
 
 export interface UiError {
@@ -75,7 +82,7 @@ const EMPTY_SLOT = { data: null, load: "idle", error: null } as const;
 
 /** The Community page's own sheets (mounted once at the page root – a sheet inside a card would take the card's
  * transform as its containing block). */
-export type CommunitySheet = { kind: "create" } | { kind: "join" } | { kind: "pick" } | { kind: "goal"; groupId: string; studentId: string } | { kind: "proof" };
+export type CommunitySheet = { kind: "create" } | { kind: "join" } | { kind: "pick" } | { kind: "goal"; groupId: string; studentId: string } | { kind: "proof" } | { kind: "case"; groupId: string };
 
 /** What the share sheet shows (`openShare`). */
 export type ShareTarget = { kind: "trade"; tradeId: string } | { kind: "setup"; setupId: string } | { kind: "stats" };
@@ -421,6 +428,32 @@ export async function postComment(groupId: string, reviewId: string, body: strin
 
 export async function deleteComment(groupId: string, reviewId: string, commentId: string): Promise<void> {
   if (await act("commentDelete", () => deleteCommentApi(groupId, reviewId, commentId), S.commentDeleted)) void loadFeed(groupId);
+}
+
+/* ------------------------------------------------------------------ Chartfälle (F47) */
+
+export async function postCase(groupId: string, body: CreateCaseRequest): Promise<boolean> {
+  const r = await act("case", () => postCaseApi(groupId, body), CASES.posted);
+  if (!r) return false;
+  useSocial.setState((s) => ({ pulse: s.pulse + 1 }));
+  void loadFeed(groupId);
+  return true;
+}
+
+/** Writes the hypothesis once; the card then shows the continuation and the result. */
+export async function postHypothesis(groupId: string, caseId: string, body: HypothesisRequest): Promise<boolean> {
+  const r = await act("hypothesis", () => postHypothesisApi(groupId, caseId, body), CASES.committed);
+  if (!r) return false;
+  await loadFeed(groupId);
+  return true;
+}
+
+export async function closeCase(groupId: string, caseId: string): Promise<void> {
+  if (await act("caseClose", () => closeCaseApi(groupId, caseId), CASES.closed)) void loadFeed(groupId);
+}
+
+export async function deleteCase(groupId: string, caseId: string): Promise<void> {
+  if (await act("caseDelete", () => deleteCaseApi(groupId, caseId), CASES.deleted)) void loadFeed(groupId);
 }
 
 /* ------------------------------------------------------------------ mentor goals */

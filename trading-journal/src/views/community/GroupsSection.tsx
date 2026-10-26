@@ -13,6 +13,7 @@ import { Glyph } from "@/social/ui/glyphs";
 import { GroupPanel } from "./GroupPanel";
 import { GroupSwitcher } from "./GroupSwitcher";
 import { GoalList, MentorDesk } from "./MentorDesk";
+import { CaseFeed } from "./cases/CaseFeed";
 import { ReviewFeed } from "./ReviewFeed";
 
 /**
@@ -33,6 +34,7 @@ export function GroupsSection({ className }: { className?: string }) {
   const detail = feed.data?.group.id === active ? feed.data : null;
   const group = detail?.group ?? null;
   const reviews = detail?.reviews ?? [];
+  const cases = detail?.cases ?? [];
   const manager = group && (group.role === "owner" || group.role === "mentor");
   const answer = (id: string) => {
     setFocus(id);
@@ -97,6 +99,7 @@ export function GroupsSection({ className }: { className?: string }) {
                     <div className="grid min-w-0 content-start gap-4">
                       {manager && group.kind === "mentor" && <MentorDesk group={group} reviews={reviews} onAnswer={answer} />}
                       <GoalList goals={goalsHere} />
+                      <CaseFeed group={group} cases={cases} />
                       <ReviewFeed group={group} reviews={reviews} focusId={focus} />
                     </div>
                     <GroupPanel group={group} />

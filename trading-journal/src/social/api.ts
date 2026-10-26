@@ -5,6 +5,9 @@
 import { apiFetch } from "@/cloud/api";
 import type {
   CommentInfo,
+  CreateCaseRequest,
+  HypothesisInfo,
+  HypothesisRequest,
   CreateShareResponse,
   FeedbackRequest,
   FeedResponse,
@@ -42,6 +45,10 @@ export const deleteReviewApi = (id: string, rid: string) => apiFetch<{ ok: true 
 export const postCommentApi = (id: string, rid: string, body: string) => apiFetch<{ comment: CommentInfo }>(`${g(id)}/reviews/${encodeURIComponent(rid)}/comments`, { method: "POST", body: { body } });
 export const deleteCommentApi = (id: string, rid: string, cid: string) =>
   apiFetch<{ ok: true }>(`${g(id)}/reviews/${encodeURIComponent(rid)}/comments/${encodeURIComponent(cid)}`, { method: "DELETE" });
+export const postCaseApi = (id: string, body: CreateCaseRequest) => apiFetch<{ id: string }>(`${g(id)}/cases`, { method: "POST", body });
+export const postHypothesisApi = (id: string, cid: string, body: HypothesisRequest) => apiFetch<{ hypothesis: HypothesisInfo }>(`${g(id)}/cases/${encodeURIComponent(cid)}/hypothesis`, { method: "POST", body });
+export const closeCaseApi = (id: string, cid: string) => apiFetch<{ ok: true }>(`${g(id)}/cases/${encodeURIComponent(cid)}`, { method: "PATCH", body: { close: true } });
+export const deleteCaseApi = (id: string, cid: string) => apiFetch<{ ok: true }>(`${g(id)}/cases/${encodeURIComponent(cid)}`, { method: "DELETE" });
 export const postGoal = (id: string, studentId: string, draft: MentorGoalDraft) => apiFetch<{ id: string }>(`${g(id)}/goals`, { method: "POST", body: { studentId, draft } });
 export const patchGoal = (id: string, gid: string, status: "accepted" | "declined") => apiFetch<{ ok: true }>(`${g(id)}/goals/${encodeURIComponent(gid)}`, { method: "PATCH", body: { status } });
 export const fetchInvite = (code: string) => apiFetch<InvitePreview>(`/social/invite/${encodeURIComponent(code)}`);

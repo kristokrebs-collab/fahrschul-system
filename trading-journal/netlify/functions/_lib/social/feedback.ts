@@ -29,7 +29,7 @@ async function reviewVisible(userId: string, reviewId: string): Promise<boolean>
   }
 }
 
-async function checkTarget(userId: string, t: { type: "comment" | "review" | "share" | "group"; id: string }): Promise<void> {
+async function checkTarget(userId: string, t: { type: "comment" | "review" | "share" | "group" | "case"; id: string }): Promise<void> {
   if (t.type === "review") {
     if (!(await reviewVisible(userId, t.id))) throw NOT_FOUND();
     return;
@@ -40,6 +40,18 @@ async function checkTarget(userId: string, t: { type: "comment" | "review" | "sh
     if (error) dbFail("comments read", error);
     const c = data as { review_id: string } | null;
     if (!c || !(await reviewVisible(userId, c.review_id))) throw NOT_FOUND();
+    return;
+  }
+  if (t.type === "case") {
+    // a case can be reported by the members of its group
+    if (!/^[0-9a-f-]{36}$/i.test(t.id)) throw NOT_FOUND();
+    const { data, error } = await sb().from("group_cases").select("id,group_id").eq("id", t.id).maybeSingle();
+    if (error) dbFail("group_cases read", error);
+    const c = data as { group_id: string } | null;
+    if (!c) throw NOT_FOUND();
+    await requireMember(c.group_id, userId).catch(() => {
+      throw NOT_FOUND();
+    });
     return;
   }
   if (t.type === "group") {

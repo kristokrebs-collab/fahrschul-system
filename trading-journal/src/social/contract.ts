@@ -266,9 +266,55 @@ export type MentorGoalDraft = z.infer<typeof GoalDraftSchema>;
 export const GoalSchema = z.object({ studentId: z.string().uuid(), draft: GoalDraftSchema }).strict();
 export const GoalPatchSchema = z.object({ status: z.enum(["accepted", "declined"]) }).strict();
 
+
+/* ------------------------------------------------------------------ Chartfälle (F47) */
+
+/** Candle sizes of a case (UTC grid of the exchange) and the length of the question in candles. */
+export const CASE_INTERVALS = ["15m", "1h", "4h", "1d"] as const;
+export type CaseInterval = (typeof CASE_INTERVALS)[number];
+export const CASE_INTERVAL_MS: Readonly<Record<CaseInterval, number>> = { "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000 };
+export const CASE_HORIZONS = [6, 12, 24, 48] as const;
+/** How long hypotheses are taken before everyone sees everyone's (hours). */
+export const CASE_OPEN_HOURS = [1, 6, 24, 72] as const;
+export const CASE_DIRECTIONS = ["up", "down", "flat"] as const;
+export type CaseDirection = (typeof CASE_DIRECTIONS)[number];
+export const CASE_CONFIDENCES = [50, 60, 70, 80, 90] as const;
+/** Earliest anchor the database accepts (2020-01-01 UTC) – the exchange's USDⓈ-M history starts later anyway. */
+export const CASE_MIN_ANCHOR = 1_577_836_800_000;
+
+/**
+ * A case: a stretch of PUBLIC market data (symbol, candle size, the last candle everybody sees, how many candles ahead
+ * the question reaches) plus a question – no journal data, no money, no screenshot. The outcome is never stored: every
+ * reader works it out from the public candles on their own device (`cases.ts`), so nobody can set it.
+ */
+export const CreateCaseSchema = z
+  .object({
+    pair: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{4,20}$/),
+    interval: z.enum(CASE_INTERVALS),
+    /** Open time (ms, UTC) of the last candle that is shown: on the candle grid, already closed. */
+    anchorMs: z.number().int().min(CASE_MIN_ANCHOR).max(4_102_444_800_000),
+    horizon: z.union([z.literal(6), z.literal(12), z.literal(24), z.literal(48)]),
+    question: z.string().trim().max(280).default(""),
+    openHours: z.union([z.literal(1), z.literal(6), z.literal(24), z.literal(72)]).default(24),
+  })
+  .strict();
+export type CreateCaseRequest = z.input<typeof CreateCaseSchema>;
+export type CreateCaseBody = z.infer<typeof CreateCaseSchema>;
+
+/** A hypothesis is written ONCE and never changed: direction after `horizon` candles, how sure, and why. */
+export const HypothesisSchema = z
+  .object({
+    direction: z.enum(CASE_DIRECTIONS),
+    confidence: z.union([z.literal(50), z.literal(60), z.literal(70), z.literal(80), z.literal(90)]),
+    reason: z.string().trim().min(10).max(280),
+  })
+  .strict();
+export type HypothesisRequest = z.infer<typeof HypothesisSchema>;
+export const CasePatchSchema = z.object({ close: z.literal(true) }).strict();
+
 export const FEEDBACK_KINDS = ["bug", "idea", "praise", "report", "other"] as const;
 export type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
-export const REPORT_TARGETS = ["comment", "review", "share", "group"] as const;
+export const REPORT_TARGETS = ["comment", "review", "share", "group", "case"] as const;
 export const FeedbackSchema = z
   .object({
     kind: z.enum(FEEDBACK_KINDS),
@@ -434,9 +480,47 @@ export interface GroupsResponse {
   goals: GoalInfo[];
 }
 
+
+export interface HypothesisInfo {
+  author: string;
+  authorId: string;
+  me: boolean;
+  direction: CaseDirection;
+  confidence: number;
+  reason: string;
+  /** When the server stored it – the proof that it was written before the others saw it. */
+  createdAt: string;
+}
+
+export interface CaseInfo {
+  id: string;
+  groupId: string;
+  author: string;
+  authorId: string;
+  me: boolean;
+  pair: string;
+  interval: CaseInterval;
+  anchorMs: number;
+  horizon: number;
+  question: string;
+  /** Hypotheses are taken until then (or until the author closes the case). */
+  closesAt: string;
+  /** Closed: no more hypotheses, everybody sees what everybody wrote. */
+  closed: boolean;
+  createdAt: string;
+  /** How many hypotheses there are (the texts stay hidden until the case is closed). */
+  hypotheses: number;
+  /** My own hypothesis, always visible to me. */
+  mine: HypothesisInfo | null;
+  /** The others' hypotheses – empty until the case is closed; in mentor groups students see only the mentors' and their own. */
+  revealed: HypothesisInfo[];
+}
+
 export interface FeedResponse {
   group: GroupDetail;
   reviews: ReviewInfo[];
+  /** Chartfälle of the group (absent from an older server). */
+  cases?: CaseInfo[];
 }
 
 export interface InvitePreview {

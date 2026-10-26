@@ -3,7 +3,7 @@
  * completeness, origin, costs, the complete list, the continuation check against an earlier version), the builder sheet
  * (preview from the journal, the posted payload) and the ranking's filter row and risk beside every row.
  */
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setCloudEnabledForTests } from "@/cloud/env";
 import { resetCloudSession, useCloudSession } from "@/cloud/session";
@@ -72,7 +72,11 @@ const rows = (metric: string, origin: string): LeaderboardResponse => ({
 
 const calls: { method: string; path: string; search: string; body: unknown }[] = [];
 
-beforeAll(() => installDomPolyfills());
+beforeAll(() => {
+  installDomPolyfills();
+  // lazy chunks and a loaded machine: async queries wait longer than the default second (the end state is what is checked)
+  configure({ asyncUtilTimeout: 15_000 });
+});
 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -117,12 +121,14 @@ afterEach(() => {
 });
 
 const wrap = (ui: React.ReactNode) => render(<MotionRoot>{ui}</MotionRoot>);
+/** The proof page is a lazy chunk: under load its first import takes longer than the default second. */
+const find = (id: string) => screen.findByTestId(id, {}, { timeout: 15_000 });
 const signIn = () => act(() => useCloudSession.setState({ phase: "signedIn", user: USER }));
 
 describe("Beleg-Seite (SharedView)", () => {
   it("zeigt Ergebnis und Risiko nebeneinander, die Art der Ergebnisse als Angabe und den Stand", async () => {
     wrap(<SharedView token={T.proof} />);
-    const page = await screen.findByTestId("proof-page");
+    const page = await find("proof-page");
     expect(screen.getByRole("heading", { level: 1, name: "Ergebnisbeleg" })).toBeInTheDocument();
     expect(within(page).getByTestId("proof-strategy")).toHaveTextContent("Breakout 4h");
     expect(within(page).getByText("Echtgeld")).toBeInTheDocument();
@@ -142,7 +148,7 @@ describe("Beleg-Seite (SharedView)", () => {
 
   it("nennt Vollständigkeit, Herkunft, Kosten und was der Beleg nicht zeigt", async () => {
     wrap(<SharedView token={T.proof} />);
-    const page = await screen.findByTestId("proof-page");
+    const page = await find("proof-page");
     expect(within(page).getByTestId("proof-scope")).toHaveTextContent("Alle 4 geschlossenen Trades des Zeitraums sind in der Liste");
     expect(within(page).getByTestId("proof-complete")).toHaveTextContent("Zum Stand war 1 Position noch offen");
     const origin = within(page).getByTestId("proof-origin");
@@ -163,12 +169,12 @@ describe("Beleg-Seite (SharedView)", () => {
   it("eine Auswahl nennt Auswahl und Rest", async () => {
     payloads[T.proof] = proof({ scope: { only: "Box-Breakout", inPeriod: 11, open: 0 } });
     wrap(<SharedView token={T.proof} />);
-    expect(await screen.findByTestId("proof-scope")).toHaveTextContent("Auswahl: nur die Grundlage „Box-Breakout“ – 4 von 11 geschlossenen Trades des Zeitraums. Die übrigen 7 stehen nicht in dieser Liste.");
+    expect(await find("proof-scope")).toHaveTextContent("Auswahl: nur die Grundlage „Box-Breakout“ – 4 von 11 geschlossenen Trades des Zeitraums. Die übrigen 7 stehen nicht in dieser Liste.");
   });
 
   it("die Liste ist vollständig: alle Einträge in Reihenfolge, Verlust wie Gewinn, kein R und unbekannte Kosten benannt", async () => {
     wrap(<SharedView token={T.proof} />);
-    const history = await screen.findByTestId("proof-history");
+    const history = await find("proof-history");
     const rowsEl = within(history).getAllByTestId("proof-row");
     expect(rowsEl).toHaveLength(4);
     expect(rowsEl[0]).toHaveTextContent("03.09.26");
@@ -182,7 +188,7 @@ describe("Beleg-Seite (SharedView)", () => {
 
   it("eine lange Liste zeigt zuerst 40 Zeilen und auf Wunsch alle", async () => {
     wrap(<SharedView token={T.big} />);
-    const history = await screen.findByTestId("proof-history");
+    const history = await find("proof-history");
     expect(within(history).getAllByTestId("proof-row")).toHaveLength(40);
     fireEvent.click(within(history).getByTestId("proof-all"));
     expect(within(history).getAllByTestId("proof-row")).toHaveLength(120);
@@ -191,21 +197,21 @@ describe("Beleg-Seite (SharedView)", () => {
 
   it("Fortschreibung: alles aus der früheren Fassung ist enthalten", async () => {
     wrap(<SharedView token={T.next} />);
-    const prev = await screen.findByTestId("proof-prev");
+    const prev = await find("proof-prev");
     await waitFor(() => expect(within(prev).getByTestId("proof-prev-result")).toHaveTextContent("Alle 4 Trades der früheren Fassung vom 05.10.2026 sind enthalten; 1 ist neu dazugekommen."));
     expect(calls.map((c) => c.path)).toEqual([`/api/v1/social/shared/${T.next}`, `/api/v1/social/shared/${T.proof}`]);
   });
 
   it("Fortschreibung: ein weggelassener Verlust wird mit Tag und R genannt", async () => {
     wrap(<SharedView token={T.dropped} />);
-    const prev = await screen.findByTestId("proof-prev");
+    const prev = await find("proof-prev");
     await waitFor(() => expect(within(prev).getByTestId("proof-prev-result")).toHaveTextContent("1 Trade der früheren Fassung vom 05.10.2026 fehlt in dieser Fassung."));
     expect(prev).toHaveTextContent("10.09.26 · −1,00R");
   });
 
   it("Fortschreibung: ist die frühere Fassung zurückgezogen, steht das da – kein stilles Bestehen", async () => {
     wrap(<SharedView token={T.gone} />);
-    const prev = await screen.findByTestId("proof-prev");
+    const prev = await find("proof-prev");
     await waitFor(() => expect(prev).toHaveTextContent("nicht mehr abrufbar"));
     expect(prev).toHaveTextContent("lässt sich nicht prüfen");
   });
@@ -231,7 +237,7 @@ describe("Beleg erstellen (ProofSheet)", () => {
     wrap(<CommunityView />);
     signIn();
     fireEvent.click(await screen.findByTestId("share-proof"));
-    return screen.findByTestId("proof-sheet");
+    return find("proof-sheet");
   }
 
   it("zeigt vor dem Link, was auf der Seite steht – aus dem Journal, mit dem Verlust", async () => {
