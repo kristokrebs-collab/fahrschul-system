@@ -5,7 +5,8 @@ Netlify bundles every `*.mts` here with esbuild (`[functions] directory = "netli
 method }` (or `{ schedule }`). Typecheck: `tsc -p tsconfig.functions.json` (part of `npm run typecheck`); lint: `npm run
 lint` covers `netlify/`. Functions import `src/` modules only by RELATIVE path and only alias-free ones
 (`src/billing/types.ts`, `plans.ts`, `contract.ts`, `src/cloud/scrub.ts`, `src/cloud/sync/docs.ts`,
-`src/exchanges/syncFields.ts`). Server env: `.env.example` (Netlify secrets, scope
+`src/exchanges/syncFields.ts`; F21: `src/domain/keylevels/{types,config,evaluate,alerts,timeframes,watch,serverAlerts}.ts`,
+`src/market/keylevels/bars.ts`, `src/market/sources/{binance,http}.ts`, `src/chart/resample.ts` – their `@/` imports are relative on purpose). Server env: `.env.example` (Netlify secrets, scope
 Functions, never `VITE_`).
 
 ## `_lib` (shared, P09)
@@ -76,6 +77,30 @@ payloads), `tests/unit/exchange.cron.test.ts` (cron fairness: lapsed plans, back
 `tests/unit/exchange.functions.test.ts` (P11: connect / sync / dry run / pull / positions / backfill / cron /
 webhook / REST against an admin fake with a JS twin of `upsert_synced_trades` and a fake Bitunix that verifies every
 signature). `functions-disabled/binance.mts` stays out of the build.
+
+## Functions (F21 e-mail alarm with the app closed – optional)
+
+Watches the key-level alerts of accounts that switched „E-Mail-Alarm bei geschlossener App“ on (Markt → Alarme) and mails ONE
+summary when something fired. Same pure watch core as the browser (`src/domain/keylevels/watch.ts`, alias-free, bundled into the
+function; a parity test keeps both equal). Logic in `_lib/alertWatch/`: `run.ts` (the run), `market.ts` (Binance), `mail.ts` (texts +
+Resend), `store.ts` (migration 0008 RPCs + the heartbeat), `recipient.ts`, `clock.ts` (account time zone). **Env** (Netlify, scope
+Functions, see `.env.example` / SETUP.md 6.1): `RESEND_API_KEY` (secret), `ALERT_FROM` (`Name <a@domain>` or `a@domain`, domain
+verified at Resend), `SITE_ORIGIN` (link in the mail, base of the proxy fallback). **Without `RESEND_API_KEY` or `ALERT_FROM` the cron does
+nothing** (no query, no request) and the app shows „Einrichtung nötig“; without migration 0008 it reports `migration`.
+
+| file | route | notes |
+|---|---|---|
+| `alert-watch-cron.mts` | schedule `*/5 * * * *` (in code, published deploys only) | accounts with `settings.serverAlerts.email = true` via `alert_watch_candidates` (≤ 200, order rotates per run; no account → one query, nothing else). Plan gate = feature `boxScanner` (not gated while payments are not set up). ONE request for the prices of all symbols (`/fapi/v1/ticker/price`), one candle request per symbol and source feed (≤ 30 symbols, ≤ 60 requests, ≤ 4 at a time, 24-s budget; ≤ 20 watched levels per account); Binance is tried direct, on 451 / 403 / 429 / a network failure through `SITE_ORIGIN/api/binance` (`netlify.toml`); both blocked → nothing is evaluated, the heartbeat says `binance_451`. A symbol Binance does not know is named (`problems`), never requested. Per account: `stepWatch` → outbox → `planMail`. **Exactly once:** the state (stage memory + outbox) is written FIRST through `set_server_alerts` (only `data.serverAlerts`, guarded by the row's `rev`; a lost race re-reads once and starts over with the same candles, a second loss skips the account until the next run – nothing was mailed or marked), then the mail goes out with an `Idempotency-Key` (hash of the outbox ids), then the mailed items leave the outbox. If that last write is lost, the next run sends the same items again under the same key and Resend answers the first result (`409 invalid_idempotent_request` is read as „was accepted“ – not verified against the live API). One mail per account and run for everything that waits; held back outside the active hours (account time zone, `profiles.tz`), above `maxPerDay` (3 / 6 / 12 / 24, default 6), within 10 minutes of the last mail and in the back-off after a failed send (30 min · 2 h · 6 h); fires older than 24 h are dropped and counted in the next mail. Recipient: the account's own address from Supabase Auth (`auth.admin.getUserById`), confirmed addresses only; never stored, never logged. The log line carries counts and codes only (`accounts`, `watched`, `deferred`, `gated`, `symbols`, `requests`, `fires`, `mails`, `waiting`, `failed`, `code`, `source`). Heartbeat (`app_config` key `alert-watch`: `at`, `ok`, `code`, counts) is written once per run that had accounts |
+| `alert-test.mts` | GET / POST `/api/v1/alerts/test` | GET: `{ configured, entitled, hasEmail, emailConfirmed, lastRun, intervalMin }` (the address itself is never sent). POST: ONE test mail to the account's own confirmed address → `{ sent: true }`; signed in (aal2 if 2FA), plan feature `boxScanner`, 3 / 10 min and 10 / day per account (fail-closed), 503 `alerts_unavailable` without the env, 409 `email_unconfirmed`, 422 `no_email`, 502 `alerts_send_failed` with the reason (`details.reason`: `resend_auth` …) |
+
+**Check the cron:** Netlify → Logs → Functions → `alert-watch-cron` (a line every 5 minutes once an account has the switch on); the
+card in the app shows „zuletzt geprüft“ from the heartbeat; `GET /api/v1/alerts/test` (signed in) answers `lastRun`. Not live-verified here:
+a real Resend key and domain, a real Supabase (the SQL ran on PGlite), the schedule on a published deploy, Binance from the function's
+region.
+
+Tests: `tests/unit/alerts.watch.server.test.ts` (in-memory settings table + the two RPCs with their rev guard, fake Binance, fake Resend:
+silent first look, exactly once, lost races, back-off, hours, limits, caps, plan gate, 451 fallback, no address in logs),
+`alerts.watch.parity.test.ts`, `alerts.watch.mail.test.ts`, `alerts.watch.test-fn.test.ts`, `supabase.alertwatch.test.ts` (PGlite).
 
 ## Functions (P04 coach – optional)
 

@@ -123,7 +123,7 @@ export const PLAN = {
 export const ALERTS = {
   title: "Alarme & Zustellprotokoll",
   note: "Mehrstufige, ruhige Meldungen für deine Schlüsselmarken: Vorbereitung, Bestätigung, Retest, Ungültigkeit.",
-  honest: "Alarme laufen nur, solange diese App in einem Browser-Tab geöffnet ist (der Tab darf im Hintergrund liegen). Ist die App geschlossen, kommt nichts an – es gibt keinen Server, der für dich weiterbeobachtet.",
+  honest: "Diese Alarme laufen im Browser nur, solange diese App in einem Browser-Tab geöffnet ist (der Tab darf im Hintergrund liegen). Ist die App geschlossen, kommt hier nichts an. Mit Konto und Tarif Pro kannst du unten zusätzlich den E-Mail-Alarm einschalten: Ein Server prüft dann alle 5 Minuten weiter und schreibt dir.",
   channels: "Kanäle",
   toast: "Hinweis in der App (Toast)",
   toastHelp: "Die Insel oben, wie bei den Signalen.",

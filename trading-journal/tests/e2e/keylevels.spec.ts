@@ -148,7 +148,8 @@ test.describe("Schlüsselmarken · Tagesplan · Alarme", () => {
     await alerts.scrollIntoViewIfNeeded();
     const note = alerts.getByTestId("alerts-honest");
     await expect(note).toContainText("nur, solange diese App in einem Browser-Tab geöffnet ist");
-    await expect(note).toContainText("es gibt keinen Server");
+    await expect(note).toContainText("kommt hier nichts an");
+    await expect(note).toContainText("E-Mail-Alarm");
     // the log is either empty or lists what was sent so far – the live signal / box alerts of the mock market may have
     // fired already (they are logged too), each line with its outcome
     const rows = alerts.getByTestId("delivery-row");

@@ -290,6 +290,13 @@ export interface Settings {
    */
   keyLevels?: unknown;
   /**
+   * E-Mail-Alarm bei geschlossener App (F21): the switch (`email`, `maxPerDay`, `armedAt` – written by the browser) and the
+   * stage memory / outbox / mail counters of the server's watch (written by `netlify/functions/alert-watch-cron.mts`, only this
+   * key, guarded by the row's `rev`). Versioned passthrough (`{ v: 1, … }`, see `@/domain/keylevels` `serverAlerts.ts`); absent
+   * until the user switches the alarm on. The three-way merge of the cloud sync keeps both writers' keys.
+   */
+  serverAlerts?: unknown;
+  /**
    * Preis- und RSI-Struktur (F05): the timeframes read and the chart switch. Versioned passthrough (`{ v: 1, tfs, chart }`,
    * see `@/domain/trendlines`); absent until the user changes something.
    */

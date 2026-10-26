@@ -29,6 +29,9 @@
 #   exchange-sync-cron   */30 * * * *   Bitunix read-only sync (SYNC_CRON_ENABLED=false switches it off)
 #   backup-nightly       @daily         nightly server backup of the journal docs (P09)
 #   social-aggregate     @daily         leaderboard snapshots + community distribution (k ≥ 10, P12)
+#   alert-watch-cron     */5 * * * *    E-Mail-Alarm bei geschlossener App (F21): needs RESEND_API_KEY + ALERT_FROM and migration 0008,
+#                                       does nothing without them; /api/v1/alerts/test = status + test mail. Binance is read direct, on
+#                                       451 through the /api/binance proxy below (set the functions region to the EU if both are blocked)
 # Background function: exchange-backfill-background (first import of a new exchange connection, up to 15 min).
 [functions]
   directory = "netlify/functions"
@@ -56,6 +59,13 @@
 [[redirects]]
   from = "/api/binance/fapi/v1/klines"
   to = "https://fapi.binance.com/fapi/v1/klines"
+  status = 200
+  force = true
+
+# one request for the prices of ALL symbols (the e-mail alarm's cron, F21 – the app itself reads single tickers)
+[[redirects]]
+  from = "/api/binance/fapi/v1/ticker/price"
+  to = "https://fapi.binance.com/fapi/v1/ticker/price"
   status = 200
   force = true
 

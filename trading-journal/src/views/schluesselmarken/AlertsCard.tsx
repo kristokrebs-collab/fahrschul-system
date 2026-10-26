@@ -2,7 +2,8 @@
  * Karte „Alarme & Zustellprotokoll“ (F22): the channels that exist today (toast, system notification), active hours, the
  * „Vorbereitung“ distance, the cooldown against duplicates – and the visible log of what was sent, what was held back
  * and why (`Zustellprotokoll`, stored in this browser, the last 200). The per-level stages and the one-shot / recurring
- * choice live in the level's editor. The card says plainly that alerts only run while the app is open.
+ * choice live in the level's editor. The card says plainly that these alerts only run while the app is open; the section
+ * „E-Mail-Alarm bei geschlossener App“ (F21, `EmailAlertSection`) is the optional server-side counterpart for accounts.
  */
 import { memo, useState } from "react";
 import { keyLevelsOfSettings, OUTCOME_LABEL, STAGE_LABEL, type AlertSettings, type DeliveryRecord, type DistanceMode } from "@/domain/keylevels";
@@ -10,7 +11,6 @@ import { cn } from "@/lib/cn";
 import { parseNumber, toInputString } from "@/lib/parse";
 import { clearDeliveryLog, useDeliveryLog } from "@/market/keylevels";
 import { MorphSelect } from "@/motion/pulse/MorphSelect";
-import { Switch } from "@/motion/Switch";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
@@ -19,7 +19,9 @@ import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
+import { EmailAlertSection } from "./EmailAlertSection";
 import { BASIS_LABEL, ALERTS as A, OUTCOME_TONE } from "./strings";
+import { SwitchRow } from "./SwitchRow";
 import { saveAlertSettings } from "./writes";
 
 const COOLDOWNS = [0, 10, 30, 60, 120, 240].map((m) => ({ value: String(m), label: A.cooldownOpt(m) }));
@@ -28,22 +30,6 @@ const SHOWN = 40;
 function useAlertSettings(): AlertSettings {
   const raw = useJournal((s) => s.settings.keyLevels);
   return keyLevelsOfSettings({ keyLevels: raw } as { keyLevels?: unknown }).alerts;
-}
-
-function SwitchRow({ id, label, help, checked, onChange, disabled }: { id: string; label: string; help: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return (
-    <div className={cn("flex items-start justify-between gap-4 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5 transition-opacity duration-200", disabled && "opacity-50")}>
-      <span className="grid min-w-0 gap-0.5">
-        <label htmlFor={id} className="cursor-pointer text-[13px] text-fg">
-          {label}
-        </label>
-        <span id={`${id}-help`} className="text-[11px] text-faint">
-          {help}
-        </span>
-      </span>
-      <Switch id={id} checked={checked} onCheckedChange={onChange} aria-describedby={`${id}-help`} disabled={disabled} className="touch-hit mt-0.5 shrink-0" />
-    </div>
-  );
 }
 
 const stamp = (t: number): string => {
@@ -137,6 +123,8 @@ export const AlertsCard = memo(function AlertsCard() {
             </Field>
           </div>
         </div>
+
+        <EmailAlertSection />
 
         <div className="grid gap-2 border-t border-line pt-4">
           <div className="flex flex-wrap items-center justify-between gap-2">

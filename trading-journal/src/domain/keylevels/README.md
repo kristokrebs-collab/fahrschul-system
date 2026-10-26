@@ -96,8 +96,40 @@ midnight) → dedupe (same level + cycle + stage never twice; same level + stage
 (`sent`, `duplicate`, `hours`, `channels`) is a line of the **Zustellprotokoll** (`DeliveryRecord`, capped at 200,
 `appendDelivery`, `parseDeliveryLog`).
 
-**Limit, said in the UI as well:** alerts run only while the app is open in a browser tab (a background tab is fine, a
-closed tab or browser is not). Server-side monitoring (F21) is not part of this and not promised anywhere.
+**Limit, said in the UI as well:** these alerts run only while the app is open in a browser tab (a background tab is fine, a
+closed tab or browser is not). Optionally an account can have a server watch the same levels (F21, below) – by e-mail
+only, in a 5-minute grid, no push.
 
-Tests: `tests/unit/domain.keylevels.{evaluate,config,plan,alerts}.test.ts`, `tests/unit/market.keylevels.test.ts`,
-`tests/unit/views.schluesselmarken*.test.ts(x)`, `tests/e2e/keylevels.spec.ts`.
+## E-Mail-Alarm bei geschlossener App (`watch.ts`, `serverAlerts.ts`, F21)
+
+One decision core, two deliveries. `watch.ts` holds what the browser and the server share: `watchEntry` / `evaluateWatch` (a
+level evaluated on the candles of ITS timeframe), the stage memory (`WatchMems`, `parseWatchMems`, `levelFingerprint`) and
+`stepWatch(prev, entries, now, { live? })` – forgets removed levels, skips fixed / switched-off / unevaluated ones, seeds a
+level silently the first time it is seen or after an edit, and steps `stepStages` for the rest. The browser
+(`src/market/keylevels/alerts.ts`) shows toasts and system notifications; the server (`netlify/functions/_lib/alertWatch/`)
+queues the fires and mails them. `tests/unit/alerts.watch.parity.test.ts` feeds a seeded 4-day price path (every rule, both
+directions, one-shot and recurring) to both and requires the same stage at the same tick. These files are alias-free
+(relative imports only: `lib/format`, `lib/parse`, `market/symbol`, `chart/resample`, `market/keylevels/bars` for the
+30m / 2h / 3h resampling) because the Netlify function bundles them.
+
+`settings.serverAlerts` (`Settings.serverAlerts?: unknown`, versioned passthrough `{ v: 1, … }`, absent until the switch is
+used) has two writers with disjoint keys, so the three-way merge of the cloud sync never has to choose:
+
+| Writer | Keys |
+|---|---|
+| browser | `email` (the switch), `armedAt` (ms of switching on), `maxPerDay` (3 / 6 / 12 / 24; 1 … 24) |
+| server (`set_server_alerts`, only this key, guarded by the row's `rev`) | `mem` (stage memory), `outbox` (fired, not yet mailed – a snapshot of text, rule and prices), `recent` (cooldown), `mails` (`{ day, n }` in the account's time zone), `lastMailAt`, `fail` (`{ at, n, code }`), `notes` (folded in / dropped), `problems` (levels it cannot watch) |
+
+`withServerAlerts(raw, patch)` writes only the patched keys and keeps every other key; `armPatch(now)` is what switching ON
+writes (flag, moment, clean server state; the day's mail count stays). Rules of the watch: only OWN levels with `alerts.on` and
+a stage wanted, ≤ 20 per account (`serverWatchSet`); the five fixed levels never alert; **the first look is silent** – except
+for a level made or edited from 10 minutes before the switch on (`liveSince`, `stepWatch` option `live`): it counts from its
+creation, so a trigger between creation and the server's first look is still announced. Delivery (`queueFires`, `planMail`,
+`afterMail`): a fire goes into the outbox (same id once; the cooldown of the alert settings folds a quick repeat into
+`notes.suppressed`; ≤ 30 entries, ≤ 24 h old); one mail carries everything that waits; it is held back outside the active hours
+(account time zone), above the daily limit, within 10 minutes of the last mail, and during the back-off after a failed send
+(30 min, 2 h, then 6 h). Texts: `stageMessage` (same as the toast) + `ruleText`.
+
+Tests: `tests/unit/domain.keylevels.{evaluate,config,plan,alerts,watch}.test.ts`, `tests/unit/market.keylevels.test.ts`,
+`tests/unit/alerts.watch.{parity,server,mail,test-fn}.test.ts`, `tests/unit/supabase.alertwatch.test.ts`,
+`tests/unit/views.schluesselmarken*.test.ts(x)`, `tests/e2e/keylevels.spec.ts`, `tests/e2e/email-alarm.spec.ts`.

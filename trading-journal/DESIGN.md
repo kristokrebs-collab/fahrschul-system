@@ -674,3 +674,15 @@ Auf ausdrückliche Erlaubnis des Nutzers, ohne das Aussehen zu ändern – Layou
   (`pointer-coarse:before:-inset-3` / `-inset-4`, hinter den Zellen), ein Tipp wählt die nächste Zelle; Raster-Abstand ≥ 24 px, wo die Breite es erlaubt.
 - **Kennzahlenkacheln**: `role="list"` aus sieben Knöpfen (`role="listitem"`), kein `dl` um Knöpfe. **Seitenwechsel**: `overflow-x: clip` um Kopf und Seite – ein ein- oder auslaufendes Blatt macht das
   Dokument nie breiter als den Bildschirm.
+
+### E-Mail-Alarm bei geschlossener App (F21)
+
+Ein Abschnitt der Karte „Alarme & Zustellprotokoll“ (Markt), kein neues Bauteil und keine neue Bewegung: Überschrift im `label`-Stil, ein Satz `text-[12px] text-mute`, die `SwitchRow` (elastischer `Switch`, 44 px
+Trefferfläche über `touch-hit`), darunter **ein Zustandskasten** (`border-line-2 bg-white/[0.03]`): `Badge` mit Punkt in der Tonart des Zustands (`mute` aus / nicht verfügbar, `warn` Einrichtung nötig / Tarif /
+Cloud-Sync aus / Server nicht erreichbar, `win` an), ein Satz, der den Grund nennt, und – nur bei eingeschaltetem Alarm – eine Liste (`dl`: Zuletzt geprüft · Auf dem Server · Überwacht · Mails heute · Zuletzt
+gemailt · Wartet · Versand · Nicht überwacht; ab `sm` zwei Spalten 9,5 rem / Rest, auf dem Handy untereinander, Warnzeilen `text-warn`). Darunter die Tagesgrenze als `Segmented` (3 · 6 · 12 · 24), der Knopf
+„Testmail senden“ mit der Empfänger-Adresse aus der Sitzung, und drei kurze Absätze in `text-[11.5px] text-mute` – „Was er ist – und was nicht“, „Ruhig“ und **„Was an den Server geht“** (immer sichtbar, nie
+eingeklappt). Texte: `src/views/schluesselmarken/emailStrings.ts`. Der Zustand folgt einer festen Reihenfolge (`emailAlertView`): kein Konto → nicht angemeldet → 2FA-Code fehlt → Tarif → Server wird gefragt →
+nicht erreichbar → nicht eingerichtet → keine / unbestätigte Adresse → Cloud-Sync aus → aus → an; **Ausschalten geht in jedem Zustand**. Keine Zahl ohne Quelle: „Zuletzt geprüft“ ist der Herzschlag des
+Zeitplans (`app_config`), fehlt er, steht „Noch keine Prüfung gemeldet“; ist er älter als 20 Minuten oder fehlgeschlagen, steht der Grund in `text-warn`. Mail-Text: Deutsch, knapp, jede Auslösung mit Symbol,
+Regel, Zeit und Kurs beim Auslösen, „Kurs jetzt“ und „Stand: Quelle, Zeit (Zone)“, dazu „Keine professionelle Finanzberatung.“, der Link zur App und der Abmelde-Hinweis (Schalter in der App).

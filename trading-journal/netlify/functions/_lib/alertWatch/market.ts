@@ -4,7 +4,7 @@
  * (`/fapi/v1/ticker/price` without a symbol) and one candle request per symbol and source feed – never per level or
  * per account.
  *
- * Geo-block: Binance answers 451 to some data-centre regions. The first base is `https://fapi.binance.com`; on 451 / a
+ * Geo-block: Binance answers 451 to some data-centre regions. The first base is `https://fapi.binance.com`; on 451 / 403 / 429 / a
  * network failure the run falls back to the app's own same-origin proxy (`SITE_ORIGIN/api/binance`, the rewrites of
  * `netlify.toml`) and keeps using whichever worked. When both fail the run says so (`binance_451` / `binance_down`) and
  * changes nothing – a level without candles is never evaluated, never guessed.
@@ -76,8 +76,9 @@ export function createMarket(opts: MarketOptions): Market {
         return out;
       } catch (e) {
         last = e;
-        // a symbol Binance does not know or a rate limit is no reason to try another door
-        if (e instanceof RestError && (e.kind === "bad_symbol" || e.kind === "bad_period" || e.kind === "rate_limited")) throw e;
+        // a symbol Binance does not know is no reason to try another door; a block (451), a WAF 403, a rate limit of this
+        // egress address or a dead connection is – the proxy leaves from another address
+        if (e instanceof RestError && (e.kind === "bad_symbol" || e.kind === "bad_period")) throw e;
       }
     }
     throw last;

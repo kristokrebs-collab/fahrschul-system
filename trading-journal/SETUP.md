@@ -59,7 +59,7 @@ Prüfbefehle (dieselben wie in der CI): `npm run typecheck && npm run lint && np
    - **Publishable key** (`sb_publishable_…`) → `VITE_SUPABASE_PUBLISHABLE_KEY` (öffentlich, landet im Bundle)
    - **Secret key** (`sb_secret_…`) → `SUPABASE_SECRET_KEY` (**nur** für die Functions, niemals mit `VITE_`-Präfix)
 
-### 2.1 Migrationen 0001 → 0007
+### 2.1 Migrationen 0001 → 0008
 
 Die Dateien liegen in `trading-journal/supabase/migrations/` und werden **genau einmal, in dieser Reihenfolge**
 ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als neue Datei):
@@ -73,9 +73,10 @@ ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als n
 | `0005_mfa_everywhere.sql` | 2FA-Regel überall: mit aktiver 2FA sieht eine Sitzung ohne Code-Eingabe weder Screenshots noch Audit-Log, Abo-, Teilen-, Token- oder Community-Daten |
 | `0006_sync_schedule.sql` | Faire Warteschlange für den automatischen Börsen-Sync (`next_sync_at`, `sync_failures`): fehlschlagende oder nicht mehr berechtigte Verbindungen blockieren zahlende Trader nicht mehr |
 | `0007_seats_screenshots.sql` | Team-Plätze unter Sperre vergeben (gleichzeitige Beitritte überschreiten nie die bezahlte Anzahl); Bucket `screenshots` mit 5 MB / PNG, JPEG, WebP, GIF und Upload nur mit Tarif „Screenshots in der Cloud“, sobald Zahlungen aktiv sind (Lesen und Löschen bleiben nach einem Downgrade erlaubt) |
+| `0008_alert_watch.sql` | E-Mail-Alarm bei geschlossener App (F21): die zwei Funktionen `alert_watch_candidates()` (welche Konten den Schalter an haben – liest nur Regeln und Schalter) und `set_server_alerts()` (schreibt nur `data.serverAlerts` der Einstellungen, abgesichert über `rev`), dazu ein Teilindex auf den Schalter. Nur für den Server (service role), kein Client erreicht sie. Ohne diese Migration tut `alert-watch-cron` nichts und meldet „Migration 0008 fehlt“ |
 
 **Variante A – SQL-Editor (ohne CLI):** Supabase → **SQL Editor → New query** → Inhalt von `0001_core.sql` einfügen →
-**Run** → „Success“ abwarten. Dann `0002` bis `0007` genauso.
+**Run** → „Success“ abwarten. Dann `0002` bis `0008` genauso.
 
 **Variante B – CLI:**
 
@@ -148,6 +149,8 @@ Netlify → **Site configuration → Environment variables → Add a variable**.
 | `EXCHANGE_ENC_KEY_V1` | `openssl rand -base64 32` (Schritt 5) | Functions, secret |
 | `SYNC_CRON_ENABLED` | optional `false` stoppt den 30-Minuten-Sync | Functions |
 | `LOG_SAMPLE_RATE` | optional `0`–`1`, Anteil gespeicherter Fehlerberichte (Standard `1`) | Functions |
+| `RESEND_API_KEY` | optional, E-Mail-Alarm bei geschlossener App (6.1): API-Schlüssel von Resend (`re_…`). Ohne ihn (oder ohne `ALERT_FROM`) tut der Zeitplan nichts und die App sagt „Einrichtung nötig“ | Functions, secret |
+| `ALERT_FROM` | optional, Absender der Alarm-Mails, z. B. `Trading Journal <alarm@deine-domain.de>` – die Domain muss bei Resend verifiziert sein | Functions |
 | `IP_HASH_PEPPER` | empfohlen, `openssl rand -base64 32`: geheimer Schlüssel der IP-Pseudonyme in Audit-Log und Rate-Limits (HMAC). Ohne ihn wird er aus `SUPABASE_SECRET_KEY` abgeleitet; die rohe IP wird nie gespeichert | Functions, secret |
 | `ANTHROPIC_API_KEY` | optional, KI-Formulierung im Coach und **Screenshot-Import** (Premium). Ohne den Schlüssel ist der Screenshot-Import aus: „Aus Screenshot übernehmen“ erscheint nicht, die Einstellungen → Daten nennen den Grund. Ein abgelehnter Schlüssel zeigt sich erst beim Auslesen („Der KI-Schlüssel auf dem Server wurde abgelehnt“). Ohne Schlüssel verkauft die Preisseite keinen „KI-Coach“: Premium-Highlight, Vergleichstabelle und Upgrade-Dialog lassen ihn weg (`billing/status` meldet `coachAi: false`) | Functions, secret |
 | `COACH_MODEL` | optional, Standard `claude-opus-5-5` | Functions |
@@ -359,9 +362,29 @@ Karte Börse) liest die Exporte von Bitunix, Binance, Bybit und weiteren Plattfo
 | `exchange-sync-cron` | alle 30 min | Bitunix-Sync aller Verbindungen mit Auto-Sync (`SYNC_CRON_ENABLED=false` schaltet ab) |
 | `backup-nightly` | täglich | Server-Backup jedes geänderten Journals nach `backups/<user>/<tag>.json`, 14 Tage aufbewahrt |
 | `social-aggregate` | täglich | Bestenlisten-Schnappschüsse und Community-Verteilungen (nur Opt-ins, mindestens 10 Personen) |
+| `alert-watch-cron` | alle 5 min | E-Mail-Alarm bei geschlossener App (F21): prüft die Schlüsselmarken der Konten mit eingeschaltetem Schalter und mailt eine Sammelmail (siehe 6.1). Ohne `RESEND_API_KEY` / `ALERT_FROM` und Migration 0008 passiert nichts |
 
 Netlify → **Functions** listet sie mit „Scheduled“ und dem nächsten Lauf. Zeitpläne stehen im Code der Functions
 (`export const config = { schedule }`), `netlify.toml` dokumentiert sie.
+
+### 6.1 E-Mail-Alarm bei geschlossener App einrichten (optional)
+
+Ohne diese Schritte bleibt der Schalter in der App auf „Einrichtung nötig“; sonst ändert sich nichts.
+
+1. **Resend** (resend.com): Domain hinzufügen und verifizieren (DNS-Einträge), API-Schlüssel anlegen.
+2. Netlify → Environment variables: `RESEND_API_KEY` (Functions, secret) und `ALERT_FROM` (z. B. `Trading Journal <alarm@deine-domain.de>`)
+   setzen; `SITE_ORIGIN` muss gesetzt sein (Link in der Mail, Ausweich-Weg zu Binance). **Neu deployen.**
+3. Migration `0008_alert_watch.sql` ausführen (2.1).
+4. Falls Binance den Server sperrt (im Status der App steht dann „HTTP 451“): Netlify → Site configuration → Functions →
+   **Region** auf einen EU-Standort stellen. Der Zeitplan versucht Binance erst direkt und dann über `/api/binance` der eigenen Site.
+5. In der App (Markt → Alarme & Zustellprotokoll → „E-Mail-Alarm bei geschlossener App“): „Testmail senden“, dann den Schalter einschalten
+   und bei einer Schlüsselmarke den Alarm einschalten. Voraussetzungen: Konto mit bestätigter E-Mail, Cloud-Sync an, Tarif Pro (Gate wie der
+   Box-Scanner; ohne Stripe-Einrichtung nicht geschaltet).
+
+**Kontrolle:** Netlify → **Logs → Functions** → `alert-watch-cron`: alle 5 Minuten eine Zeile `[fn] alert-watch-cron {…}` mit Zählern
+(`accounts`, `watched`, `symbols`, `requests`, `fires`, `mails`, `waiting`, `failed`, `code`) – nie eine Adresse. Gar keine Zeile heißt:
+nicht veröffentlicht (Zeitpläne laufen nur auf veröffentlichten Deploys) oder die Function-Region/Quota. Die App zeigt „zuletzt geprüft“ aus
+`app_config` (`alert-watch`). Der Zeitplan läuft ohne Konto mit Schalter an nur eine Abfrage lang.
 
 ---
 

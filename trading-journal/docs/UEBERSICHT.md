@@ -353,13 +353,14 @@ _Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 5 Funktionen
 
 ### Konto, Einstellungen & Hilfe
 
-_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 17 Funktionen
+_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 18 Funktionen
 
 **Konto & Tarif**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Anmelden, synchronisieren und das Konto verwalten | Konto & Cloud-Sync | Konto | fertig |
+| Per E-Mail Bescheid bekommen, auch wenn die App zu ist | E-Mail-Alarm bei geschlossener App | Markt › Alarme & Zustellprotokoll › E-Mail-Alarm | teilweise |
 | Tarif wählen, Abo verwalten oder kündigen | Abo & Tarife | Preise | fertig |
 | Sehen, welcher Tarif welche Funktion enthält | Tarife im Vergleich | Preise › Alle Funktionen im Vergleich | fertig |
 | Freunde einladen und Gutschrift erhalten | Freunde einladen (Empfehlungscode) | Konto | teilweise |

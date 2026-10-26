@@ -80,7 +80,7 @@ const levels = (): KeyLevel[] => {
     mk("buffer-up", { kind: "buffer", price: 99.8, distance: { mode: "pct", value: 0.3 }, alerts: { ...ALL, recurring: true } }),
     mk("retest-up", { kind: "retest", price: 100, distance: { mode: "pct", value: 0.4 }, alerts: { ...ALL, recurring: true } }),
     mk("atr-down", { kind: "buffer", price: 100.8, direction: "below", distance: { mode: "atr", value: 0.5 }, alerts: { ...ALL, recurring: true } }),
-    mk("off", { kind: "close", price: 100, alerts: { ...ALL, on: false } }),
+    mk("off", { kind: "close", price: 100, alerts: { ...ALL, recurring: false, on: false } }),
   ];
 };
 

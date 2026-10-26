@@ -3,7 +3,7 @@
  * Speichern button; the settings page's own draft does not hold this key, so its save keeps it). Every unknown key of
  * `settings.keyLevels` and every entry this version cannot read survives (`withKeyLevels`).
  */
-import { duplicateKeyLevel, keyLevelsOfSettings, MAX_KEY_LEVELS, withKeyLevels, type AlertSettings, type KeyLevel, type KeyLevelsCfg } from "@/domain/keylevels";
+import { armPatch, duplicateKeyLevel, keyLevelsOfSettings, MAX_KEY_LEVELS, withKeyLevels, withServerAlerts, type AlertSettings, type KeyLevel, type KeyLevelsCfg, type ServerAlertsCfg } from "@/domain/keylevels";
 import { newId } from "@/lib/ids";
 import { useJournal } from "@/store/journalStore";
 import { rearmKeyLevel } from "@/market/keylevels/alerts";
@@ -64,4 +64,32 @@ export async function savePlanToast(planToast: boolean): Promise<WriteResult> {
 export async function saveAlertSettings(patch: Partial<AlertSettings>): Promise<WriteResult> {
   const cfg = current();
   return (await write({ alerts: { ...cfg.alerts, ...patch } })) ? "ok" : "failed";
+}
+
+// ------------------------------------------------------------------------------------------ E-Mail-Alarm (F21)
+
+/** Saves `settings.serverAlerts` (only the patched keys; the server's own keys and any unknown ones stay). */
+async function writeServerAlerts(patch: Partial<Omit<ServerAlertsCfg, "v">>): Promise<boolean> {
+  const { settings, saveSettings } = useJournal.getState();
+  const serverAlerts = withServerAlerts(settings.serverAlerts, patch);
+  if (serverAlerts === settings.serverAlerts) return true;
+  try {
+    await saveSettings({ ...settings, serverAlerts });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The switch „E-Mail-Alarm bei geschlossener App“. ON writes the flag, the moment and a clean slate for the server's old
+ * state (the first look after it is silent again); OFF writes only the flag – the server stops looking at once.
+ */
+export async function setEmailAlarm(on: boolean, now: number = Date.now()): Promise<WriteResult> {
+  return (await writeServerAlerts(on ? armPatch(now) : { email: false })) ? "ok" : "failed";
+}
+
+/** Mails per day at most (1 … 24). */
+export async function setMailsPerDay(maxPerDay: number): Promise<WriteResult> {
+  return (await writeServerAlerts({ maxPerDay })) ? "ok" : "failed";
 }

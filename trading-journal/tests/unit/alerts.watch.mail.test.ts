@@ -190,6 +190,17 @@ describe("market access", () => {
     await expect(noProxy.prices()).rejects.toSatisfy((e) => marketErrorCode(e) === "binance_451");
   });
 
+  it("a 403 or a rate limit of this address also moves on to the proxy", async () => {
+    for (const status of [403, 429]) {
+      const b = binanceFake(NOW);
+      setSeries(b, "BTCUSDT", "4h", [1, 2, 3]);
+      b.block.set("fapi.binance.com", status);
+      const m = createMarket({ fetch: b.fetch, now: () => NOW, proxyBase: "https://journal.example.test/api/binance" });
+      expect((await m.prices()).get("BTCUSDT")).toBe(3);
+      expect(m.source()).toBe("proxy");
+    }
+  });
+
   it("an unknown symbol is no reason to try another door", async () => {
     const b = binanceFake(NOW);
     const m = createMarket({ fetch: b.fetch, now: () => NOW, proxyBase: "https://journal.example.test/api/binance" });

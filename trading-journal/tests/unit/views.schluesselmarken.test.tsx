@@ -206,12 +206,13 @@ describe("PlanCard", () => {
 });
 
 describe("AlertsCard", () => {
-  it("says honestly that alerts only run while the app is open – and promises no server monitoring", () => {
+  it("says honestly that these alerts only run while the app is open – the server side is the optional e-mail section", () => {
     install({ kline_4h: h4(70_000) });
     wrap(<AlertsCard />);
     const note = screen.getByTestId("alerts-honest");
     expect(note).toHaveTextContent("nur, solange diese App in einem Browser-Tab geöffnet ist");
-    expect(note).toHaveTextContent("es gibt keinen Server");
+    expect(note).toHaveTextContent("kommt hier nichts an");
+    expect(note).toHaveTextContent("E-Mail-Alarm");
     expect(screen.queryByText(/rund um die Uhr|24\/7/i)).toBeNull();
   });
 
