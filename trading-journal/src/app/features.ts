@@ -2696,7 +2696,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     group: "daten",
     sub: "Sichern & prüfen",
     page: "settings",
-    anchor: { heading: "Daten" },
+    anchor: { testid: "settings-data", heading: "Daten" },
     place: "Daten",
     keywords: ["Backup", "Sicherung", "Export", "Import", "JSON", "CSV", "Wiederherstellen", "Download", "Quarantäne"],
     intents: ["backup", "sicherung", "daten sichern", "exportieren", "wiederherstellen", "json export", "daten herunterladen", "csv export", "datenverlust verhindern", "gerätewechsel", "trades exportieren"],

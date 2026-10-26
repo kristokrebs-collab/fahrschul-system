@@ -42,7 +42,7 @@ const GOALS: readonly Goal[] = [
   { name: "Vorwärtstest", query: "Vorwärtstest", feature: "forward-test", page: "labor", testid: "forward-section" },
   { name: "Assistent", query: "Assistent", feature: "assistent", dialog: "Assistent" },
   { name: "Trainings-Modus", query: "Trainings-Modus", feature: "ueben", dialog: "Üben" },
-  { name: "Backup", query: "Backup", feature: "backup", page: "settings", heading: "Daten" },
+  { name: "Backup", query: "Backup", feature: "backup", page: "settings", testid: "settings-data" },
 ];
 
 const layer = (page: Page, key: string) => page.locator(`[data-page="${key}"][data-page-role="current"]`);

@@ -108,6 +108,7 @@ export function DataCard({ onImport, className }: DataCardProps) {
   return (
     <Card
       title={DATA_STRINGS.title}
+      data-testid="settings-data"
       action={
         <Badge tone={modeTone} title={modeLabel.text} dot ping={mode === "cloud"}>
           {modeLabel.text}

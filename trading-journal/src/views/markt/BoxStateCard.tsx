@@ -10,7 +10,7 @@
  * celebrates once (`celebrateFrom` kind `record`). Reduced motion: static.
  */
 import { motion, useSpring, useTransform } from "motion/react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState, type CSSProperties } from "react";
 import { BOX_TF_MS, PHASE_LABEL, type BoxPhase, type BoxTf } from "@/domain/boxes";
 import { cn } from "@/lib/cn";
 import { getBoxBars, type BoxesView, type BoxTfView } from "@/market/boxes/store";
@@ -178,6 +178,8 @@ export function waitOf(view: BoxesView, v: BoxTfView): { tone: "warn" | "error" 
 
 /** Height of the loaded body (rail 41 + gap 16 + gauge): the loader keeps it, so nothing below moves when the box arrives. */
 const BODY_PX = 41 + 16 + GAUGE_PX;
+/** On a narrow card the phase labels of the rail wrap to a second line – the loader keeps that too. */
+const RAIL_WRAP_PX = 13;
 
 export function BoxStateCard({ view }: { view: BoxesView }) {
   const [tf, setTf] = useState<BoxTf>("4h");
@@ -210,13 +212,13 @@ export function BoxStateCard({ view }: { view: BoxesView }) {
       className="h-full"
       data-testid="markt-state"
     >
-      <div ref={ref} className="grid gap-4" data-phase={v.analysis?.box.phase ?? "none"} data-tf={tf}>
+      <div ref={ref} className="@container grid gap-4" data-phase={v.analysis?.box.phase ?? "none"} data-tf={tf}>
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill tone={pill.tone} label={pill.label} expanded ring={closesAt ? { endsAt: closesAt, ms: BOX_TF_MS[tf] } : null} layoutKey={`${tf}:${pill.label}`} />
           {closesAt && !wait ? <CloseIn at={closesAt} /> : null}
         </div>
         {wait ? (
-          <div className="pt-1 text-[13px] text-mute" style={{ minHeight: BODY_PX }} data-testid="state-wait" data-loading={wait.loading || undefined}>
+          <div className="min-h-[var(--body-px)] pt-1 text-[13px] text-mute @max-[400px]:min-h-[var(--body-px-narrow)]" style={{ "--body-px": `${BODY_PX}px`, "--body-px-narrow": `${BODY_PX + RAIL_WRAP_PX}px` } as CSSProperties} data-testid="state-wait" data-loading={wait.loading || undefined}>
             <span className="flex items-center gap-3">
               {/* loading: the „Lädt“ pill + the loader say it – the sentence stands once, in Beste Setups (P2-09) */}
               {wait.loading && <DotMatrix preset="loader" size={3} gap={2} />}
