@@ -828,3 +828,41 @@ Keine neue Sprache, sondern eine gemeinsame: dieselben Federn und Dauern aus `sr
 - **Lange Seiten**: Zellen unterhalb des ersten Bildschirms als `Reveal defer` (Stil, Layout und Malen entfallen, solange die Zelle weit weg ist) und die Karten darin als `Later` (eigener kleiner Commit nach dem ersten Bild, nie beim Scrollen, sofort wenn sie näher als 500 px kommen). Der Seitenwechsel ist dann nicht mehr ein einziger langer Task.
 - **Reveal** löst auch bei sehr hohen Karten aus (15 % der Karte ODER ein Fünftel des Bildschirms); vorher blieb eine Karte über ≈ 5 000 px auf dem Handy bei Deckkraft 0 (gemessen: Markt, 390 px).
 - Reduzierte Bewegung: jede Seite zeigt alles sofort, keine Endlos-Animation (e2e `motion-global`).
+
+## Feinschliff Runde 8 – Seiten A (Trades, Grundlagen, Einstellungen, Berichte, Konto, Preise, Wachstum, Community, Funktionen)
+
+Stand: `happy-gates` (Feinschliff 1 und 4 gemergt). Alle neun Seiten dunkel und hell, 390 und 1280 px, mit Beispieldaten und leer durchgesehen
+(Skripte im Scratchpad, ganzseitige Kacheln nach einem Durchlauf, damit Einblendungen gelaufen sind). Die Seiten waren schon aus einem Guss
+(drei frühere Durchgänge) – geändert wurde, was ein kritischer Blick noch fand.
+
+| Seite | Befund | Änderung |
+|---|---|---|
+| Trades | eigene Kopfzeile (28 px, nackte Zahl) neben der gemeinsamen der anderen Seiten; im leeren Journal eine Filterleiste über nichts und zwei Sätze, die dasselbe sagen („Klick auf … um loszulegen“ + „Bereit für den ersten Eintrag.“) | gemeinsame `PageHeader` mit Zahlen-Pille („13 Trades“); ohne Trades keine Filterleiste, ein Satz, CSV-Import / Backup als „Auch hier“; mit Trades Replay · Was wäre wenn · CSV-Import · Berichte |
+| Grundlagen | – | geprüft, unverändert (Zeilen bündig, Texte ohne Befund) |
+| Einstellungen | 9 000 – 16 000 px, 16 lose Karten, 16 Chips in der Leiste; Datenarchiv mit vier Absätzen Kleingedrucktem; Lead nannte nur „Startkapital, Chart-Level“; Karten mit leerer Nachbarhälfte | fünf Gruppen mit Titel + Satz (`SettingsGroup`), fünf Chips; Kleingedrucktes als `MoreInfo` (Archiv −441 px bei 390); Lead neu; Fehler-Tags links hoch, Grundregeln und Limits rechts gestapelt, Daten / Archiv / Speicher in voller Breite; Karten ab Chart-Level mit `Later` + Reserve-Boden, Archiv-Platzhalter in Kartenhöhe |
+| Berichte | leere 5er-Spalte neben dem Wochenreview und ein „Experiment“-Chip, der nach 3 s verschwindet (vergangene Woche); Ziele ohne Weg weiter | `experimentVisible` – Review über die ganze Zeile; „Siehe auch“ Kennzahlen · Aufschlüsselung · Gebühren und Funding; „Plan im Coach“ / „Ziel anlegen“; acht Zellen `defer` + `Later`; Buch-Platzhalter mit Kopfhöhe |
+| Konto | 142 px Sprung beim Laden der Sitzung (390 px: CLS 0,093), lange Seite ohne Leiste, Börsen-Fehler nur „Nicht gefunden.“ | `AuthCard`-Skeleton in der Form der Karte, Reserve-Böden (Sicherheit, Datenschutz, Daten, Tarif, Empfehlung), Leiste (Anmeldung · Sicherheit · Deine Daten · Tarif · Börse · API), „Siehe auch“ Preise, Fehler mit Grund |
+| Preise | Raster `gap-6` statt `gap-5`, Lead „… mehr können soll als du“ | `gap-5`, Lead neu; „Siehe auch“ Konto · Einladen |
+| Wachstum | zwei Karten wiederholen den Satz ihres Abschnitts („Prozessziele zuerst“, „Prozess, nicht Profit“) | Texte gekürzt; elf Zellen `defer` + `Later` |
+| Community | Ergebnisbeleg („Deine Links“) und Chartfälle (in der Gruppe) nur zufällig zu finden; Ladezustand der Rangliste ein Viertel der Endgröße | Leiste (Du · Rangliste · Gruppen · Links und Belege · Feedback) + „Auch hier“ Ergebnisbeleg · Chartfälle · Reviews; Rangliste lädt als Podium + 7 Zeilen, „Wo du stehst“ als Platzhalter |
+| Funktionen | – | geprüft, unverändert |
+| alle | Textlinks in acht Handschriften (Hover ohne Übergang, Fokus uneinheitlich) | `textLink` (`src/lib/textLink.ts`): 200 ms Farbe, Unterstrich, Fokus wie Hover; die kleinen Aktionen (Challenge aufgeben, Gewohnheit archivieren) mit Übergang |
+
+Messwerte (Chromium headless, Seite nach dem Laden, Cloud-Seiten angemeldet über neu geladene Sitzung; **CLS** = Layout-Verschiebung der 5 s nach der
+Überschrift; **Höhen-Drift** = Seitenhöhe nach 5 s minus Seitenhöhe bei der Überschrift, also wie viel die Seite nachwächst):
+
+| Seite | CLS 390 vorher → nachher | CLS 1280 | Drift 390 | Drift 1280 |
+|---|---|---|---|---|
+| Trades | 0 → 0 | 0 → 0 | 0 → 4 | 0 → 0 |
+| Grundlagen | 0 → 0 | 0 → 0 | 0 → 0 | 21 → 0 |
+| Einstellungen | 0 → 0 | 0 → 0 | 2 309 → 0 | 1 135 → 1 |
+| Berichte | 0 → 0 | 0,0005 → 0 | 7 503 → 6 837 (Buchzeilen) | 2 903 → 2 497 |
+| Wachstum | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 |
+| Funktionen | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 |
+| Konto | **0,093 → 0** | 0,007 → 0,004 | 553 → 4 | 357 → −7 |
+| Preise | 0,003 → 0 | 0,004 → 0,001 | 0 → 0 | 0 → 0 |
+| Community | 0,003 → 0,0003 | 0,004 → 0,001 | 981 → 3 049 (*) | 1 085 → 244 |
+
+(*) Community 390: die Überschrift erscheint vor der Sitzung; der Platzhalter („Lade …“, 192 px) wächst, sobald sie da ist – derselbe Code wie vorher, der
+Wert hängt am Zeitpunkt. Das Platzhalter-Layout der Community während der Sitzungsprüfung bleibt eine offene Entscheidung (ein angemeldeter Besucher
+sähe sonst ein Gerüst, ein abgemeldeter ein Gerüst, das zur kurzen Werbeseite schrumpft).

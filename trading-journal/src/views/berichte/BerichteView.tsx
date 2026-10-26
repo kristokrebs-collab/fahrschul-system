@@ -25,7 +25,7 @@ import { Reveal } from "@/motion/Reveal";
 import { Card } from "@/primitives/Card";
 import { FeatureLinks } from "@/app/FeatureLinks";
 import { Later } from "@/primitives/Later";
-import { RESERVE_CLASS_DEFER, type ReserveHeight } from "@/primitives/Reserve";
+import { RESERVE_CLASS, RESERVE_CLASS_DEFER, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
 import { Skeleton } from "@/primitives/Skeleton";
@@ -269,9 +269,13 @@ export function BerichteView({ className }: { className?: string }) {
       <div className="flex min-w-0 flex-col lg:col-span-12 [&>*]:flex-1">
         <Suspense
           fallback={
-            <Card title="Transaktionsbuch" data-testid="ledger-loading">
-              <Skeleton height={160} />
-            </Card>
+            // the head of the book alone (year, zone, summary, reconciliation) is ≈ 640 px at 1280 and ≈ 900 px at 390: the floor of the
+            // placeholder; the rows come below it (50 per page), so the scroll bar of the page does not jump by thousands of px
+            <div className={RESERVE_CLASS} style={reserveStyle({ base: 900, lg: 640 })} data-testid="ledger-loading" aria-busy="true">
+              <Card title="Transaktionsbuch" className="h-full">
+                <Skeleton className="h-[780px] lg:h-[520px]" />
+              </Card>
+            </div>
           }
         >
           <LedgerSection acc={page.acc} />
