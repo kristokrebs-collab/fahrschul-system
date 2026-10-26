@@ -168,7 +168,8 @@ export const SqueezeCard = memo(function SqueezeCard({ view, className }: { view
 
   return (
     <Card title={S.title} note={S.note} className={className} data-testid="markt-squeeze">
-      <div className="grid gap-4">
+      {/* while the archive is read the body already has the height of the finished card (empty or with readings, measured) */}
+      <div className={cn("grid content-start gap-4", load.phase === "loading" && "min-h-[690px] lg:min-h-[385px]")}>
         <p className="text-[12px] leading-relaxed text-mute" data-testid="squeeze-lead">
           {S.lead}
         </p>

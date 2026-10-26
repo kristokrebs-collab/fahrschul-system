@@ -55,7 +55,7 @@ describe("Handelsplan · Plan speichern und verwerfen", () => {
     expect(screen.getByTestId(`hplan-saved-${p.id}`)).toHaveTextContent("Long BTCUSDT");
     expect(screen.getByTestId(`hplan-saved-${p.id}`)).toHaveTextContent("0,037 BTC");
     expect(screen.getByTestId(`hplan-saved-${p.id}`)).toHaveTextContent("Ampel Grün");
-    expect(screen.getByTestId("hplan-saved-note")).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(screen.getByTestId("hplan-saved-note")).toHaveTextContent("Quelle und Stand der Kerzen stehen bei jedem Plan.");
 
     // ein anderes Formular, dann „Öffnen“ holt die Annahmen des Plans zurück
     setForm({ symbol: "ETHUSDT" });

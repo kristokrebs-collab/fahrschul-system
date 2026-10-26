@@ -114,8 +114,9 @@ test.describe("Labor · Zeitmaschine", () => {
     await expect(page.getByTestId("tm-verdict")).toHaveAttribute("data-verdict", /.+/);
     await expect(page.getByTestId("tm-source")).toContainText("Binance");
     await expect(page.getByTestId("tm-plan")).toContainText("Long");
-    const note = card.getByTestId("analysis-note");
-    await expect(note).toContainText("Keine professionelle Finanzberatung.");
+    // inside the Labor page the card says only its own sentence; the one „Keine professionelle Finanzberatung.“ is the page's
+    const note = card.getByTestId("analysis-lead");
+    await expect(note).not.toContainText("Finanzberatung");
     await expect(note).toContainText("keine Zusage");
 
     // the pictures: the fan (bands, stop line dashed, target line solid) and the histogram

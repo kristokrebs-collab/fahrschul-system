@@ -127,7 +127,7 @@ export default function TimeMachineSection() {
       const bars = res.data[form.interval as HistInterval] ?? [];
       const candles: TimeMachineCandle[] = bars.map((b) => ({ time: b.t * 1000, open: b.o, high: b.h, low: b.l, close: b.c, ...(b.v != null ? { volume: b.v } : {}), closed: true }));
       if (candles.length < 200) {
-        setLoad({ status: "error", message: candles.length ? `Nur ${candles.length} Kerzen – für diesen Zeitrahmen und Zeitraum liefert die Börse zu wenig (mindestens 200 sind nötig).` : LABOR.errors.noData });
+        setLoad({ status: "error", message: candles.length ? `Nur ${candles.length} Kerzen – für diesen Zeiteinheit und Zeitraum liefert die Börse zu wenig (mindestens 200 sind nötig).` : LABOR.errors.noData });
         return;
       }
       setLoad({ status: "ok", data: { key, candles, fetchedAt: now, pages: res.pages } });
@@ -186,8 +186,8 @@ export default function TimeMachineSection() {
             ))}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <FieldRow label="Zeitrahmen der Kerzen">
-              <ChipPick id={`tm-iv-${uid}`} label="Zeitrahmen" value={form.interval} options={INTERVALS} onChange={(v) => set("interval", v)} />
+            <FieldRow label="Zeiteinheit der Kerzen">
+              <ChipPick id={`tm-iv-${uid}`} label="Zeiteinheit" value={form.interval} options={INTERVALS} onChange={(v) => set("interval", v)} />
             </FieldRow>
             <FieldRow label={LABOR.period} hint="So viel Verlauf dient als Vorbild und als Suchraum.">
               <ChipPick id={`tm-pd-${uid}`} label={LABOR.period} value={form.period} options={PERIODS} onChange={(v) => set("period", v)} />
@@ -237,7 +237,7 @@ export default function TimeMachineSection() {
       </Card>
       {loaded && !fresh && (
         <p className="rounded-xl border border-warn/30 bg-warn/[0.06] px-3.5 py-2.5 text-[12.5px] text-warn" role="status" data-testid="tm-data-changed">
-          Markt, Zeitrahmen oder Zeitraum haben sich geändert – lade die Kerzen neu, dann rechnet die Zeitmaschine mit ihnen.
+          Markt, Zeiteinheit oder Zeitraum haben sich geändert – lade die Kerzen neu, dann rechnet die Zeitmaschine mit ihnen.
         </p>
       )}
       {loaded && fresh && plan && (
@@ -274,7 +274,7 @@ function MoreOptions({ form, set, uid }: { form: FormState; set: <K extends keyo
   return (
     <div className="grid gap-4 pb-1 pt-1" data-testid="tm-more">
       <div className="grid gap-4 sm:grid-cols-3">
-        {field("horizon", "Zeitstopp (Kerzen)", String(optionsOfForm(form).horizon), "Länge einer Sitzung; leer = Standard des Zeitrahmens.")}
+        {field("horizon", "Zeitstopp (Kerzen)", String(optionsOfForm(form).horizon), "Länge einer Sitzung; leer = Standard des Zeiteinheits.")}
         <FieldRow label="Sitzungen">
           <Segmented<FormState["runs"]> aria-label="Sitzungen" size="sm" options={[{ v: "2000", label: "2 000" }, { v: "10000", label: "10 000" }, { v: "20000", label: "20 000" }]} value={form.runs} onChange={(v) => set("runs", v)} className={SEG_TOUCH} />
         </FieldRow>

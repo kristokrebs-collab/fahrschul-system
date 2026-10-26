@@ -75,7 +75,7 @@ describe("Optimierer · Aufbau", { timeout: 60_000 }, () => {
     expect(screen.getByTestId("evolve-panel")).toHaveAttribute("data-status", "idle");
     // Hauptkarte und Lernkarte tragen den Satz
     for (const card of [screen.getByTestId("evolve-panel").querySelector('[data-testid="evolve-disclaimer"]')!, within(screen.getByTestId("evolve-learned")).getByTestId("evolve-disclaimer")]) {
-      expect(card).toHaveTextContent("Vergangene Ergebnisse sind keine Prognose. Keine professionelle Finanzberatung.");
+      expect(card).toHaveTextContent("Vergangene Ergebnisse sind keine Prognose.");
     }
   });
 
@@ -188,7 +188,7 @@ describe("Optimierer · ein Lauf", { timeout: 90_000 }, () => {
     expect(t).toHaveTextContent("Test-Idee");
     expect(t).toHaveTextContent("Zweite Idee");
     expect(t).toHaveTextContent(/nach allen 50 Varianten dieser Runde aus 2 Strategien/);
-    expect(t).toHaveTextContent("Keine professionelle Finanzberatung");
+    expect(t).not.toHaveTextContent("Finanzberatung");
     expect(within(t).getAllByTestId("evolve-tournament-row").some((r) => r.textContent!.includes("Jetzige Version"))).toBe(true);
   });
 });
@@ -212,7 +212,7 @@ describe("Optimierer · Vorschläge entscheiden", { timeout: 90_000 }, () => {
     expect(within(c).getByTestId("evolve-plateau")).toHaveTextContent(/von \d+ Nachbarwerten sind ähnlich gut/);
     expect(within(c).getByTestId("evolve-better")).toHaveTextContent(/In \d von 4 Testfenstern besser/);
     expect(within(c).getByText("Testfenster")).toBeInTheDocument();
-    expect(within(c).getByTestId("evolve-disclaimer")).toHaveTextContent("Vergangene Ergebnisse sind keine Prognose. Keine professionelle Finanzberatung.");
+    expect(within(c).getByTestId("evolve-disclaimer")).toHaveTextContent("Vergangene Ergebnisse sind keine Prognose.");
     // die drei Entscheidungen sind da
     expect(within(c).getByTestId("evolve-save")).toHaveTextContent("Als neue Version speichern");
     expect(within(c).getByTestId("evolve-challenger")).toHaveTextContent("Als Herausforderer live testen");

@@ -100,7 +100,7 @@ describe("ExecutionCheck (the card)", () => {
     expect(screen.getByTestId("hplan-exec-depth")).toHaveTextContent("der Ausschnitt reicht nicht bis zum Rand"); // 3 levels do not reach ±1 %
     // source, snapshot time, receipt time, the standing sentence
     const stand = screen.getByTestId("hplan-exec-stand");
-    expect(stand).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(stand).not.toHaveTextContent("Finanzberatung");
     expect(stand).toHaveTextContent("Quelle: Binance USDⓈ-M · Orderbuch /fapi/v1/depth (3 Stufen, direkt)");
     expect(stand).toHaveTextContent("Stand 09:44:38 Uhr"); // 1793007878106 = 2026-10-26 09:44:38 UTC; the plan zone is UTC here
     expect(screen.getByTestId("hplan-exec")).toHaveTextContent("Eine Momentaufnahme");

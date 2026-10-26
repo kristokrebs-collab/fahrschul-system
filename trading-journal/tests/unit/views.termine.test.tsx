@@ -173,7 +173,7 @@ describe("Heute wichtig – the Morgenbriefing", () => {
   it("ends with the stand, the zone and the sentence that it is no advice", () => {
     wrap();
     expect(screen.getByTestId("briefing-stand")).toHaveTextContent("Stand 07:30 Uhr (UTC, UTC+0)");
-    expect(screen.getByTestId("briefing-card")).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(screen.getByTestId("briefing-card")).not.toHaveTextContent("Finanzberatung");
   });
 });
 
@@ -188,7 +188,7 @@ describe("Ereignisphasen", () => {
       expect(r.getAttribute("data-verdict")).toMatch(/^(klar|tendenz|offen|wenig)$/);
     }
     expect(within(card).getByTestId("phasen-chance")).toHaveTextContent("Beobachtungen deiner Vergangenheit, keine Ursachen und keine Prognose");
-    expect(card).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(card).not.toHaveTextContent("Finanzberatung");
     expect(within(card).getByTestId("phasen-total")).toHaveTextContent(/^Alle: \d+ Trades/);
   });
 

@@ -182,7 +182,7 @@ describe("Labor · Belastung, Bericht, Filter", () => {
     // die Zeile „Stop unverändert“ hat kein „vor dem Ziel“ (sie ist der Vergleichspunkt), die anderen eine Zahl
     expect(within(rows[0]!).getByTestId("labor-manage-before")).toHaveTextContent("–");
     expect(within(rows[2]!).getByTestId("labor-manage-before").textContent).toMatch(/^(0|\d+ von \d+)$/);
-    expect(within(body).getByTestId("labor-manage-foot")).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(within(body).getByTestId("labor-manage-foot")).not.toHaveTextContent("Finanzberatung");
     expect(useExtras.getState().manage.status).toBe("done");
     // ein neuer Lauf verwirft den Vergleich
     act(() => {

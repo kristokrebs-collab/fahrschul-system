@@ -43,7 +43,7 @@ function Section({ id, title, lines, tz }: { id: string; title: string; lines: r
   const [all, setAll] = useState(false);
   const shown = all ? lines : lines.slice(0, SHOW_LINES);
   return (
-    <section aria-label={title} className="grid gap-2" data-testid={`briefing-${id}`}>
+    <section aria-label={title} className={cn("grid content-start gap-2", id === "markets" && "min-h-[317px] sm:min-h-[232px]")} data-testid={`briefing-${id}`}>
       <h3 className="label">{title}</h3>
       <ul className="grid gap-2.5">
         {shown.map((l, i) => (

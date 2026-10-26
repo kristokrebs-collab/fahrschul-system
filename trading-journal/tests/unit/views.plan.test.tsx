@@ -24,7 +24,7 @@ describe("Handelsplan · der Ablauf", () => {
       const card = screen.getByTestId(`hplan-${id}`);
       expect(card, id).toBeInTheDocument();
       // jede Karte endet mit dem Satz und Quelle + Stand der Kerzen, und sie zeigt, was angenommen wurde
-      expect(within(card).getByTestId(`hplan-${id}-note`)).toHaveTextContent("Keine professionelle Finanzberatung.");
+      expect(within(card).getByTestId(`hplan-${id}-note`)).not.toHaveTextContent("Finanzberatung");
       expect(within(card).getByTestId(`hplan-${id}-note`)).toHaveTextContent("Quelle: Binance USDⓈ-M · Kerzen bis ");
       expect(within(card).getByTestId(`hplan-${id}-assumed`)).toBeInTheDocument();
       expect(within(card).getByTestId(`hplan-${id}-state`)).toHaveAttribute("data-status", "done");

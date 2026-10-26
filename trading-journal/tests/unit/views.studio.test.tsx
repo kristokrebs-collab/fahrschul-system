@@ -191,7 +191,7 @@ describe("Strategie-Studio", () => {
     expect(within(res).getByTestId("studio-stand")).toHaveTextContent("BTCUSDT · 4h · 1 Jahr");
     const card = screen.getByTestId("studio-backtest");
     expect(card).toHaveTextContent("Ein Backtest zeigt die Vergangenheit, keine Prognose.");
-    expect(card).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(card).not.toHaveTextContent("Finanzberatung");
     // the figures are the lab's own: the same engine, so a second run gives the same number of trades
     const first = n;
     await act(async () => {
@@ -294,7 +294,7 @@ describe("Strategie-Studio", () => {
     expect(within(res).getByTestId("studio-cmp-multiple")).toHaveTextContent("Verglichene Strategien: 3");
     expect(within(res).getByTestId("studio-cmp-multiple")).toHaveTextContent(/Bonferroni/);
     expect(within(res).getByTestId("studio-cmp-window")).toHaveTextContent("Train/Test-Schnitt");
-    expect(screen.getByTestId("studio-compare")).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(screen.getByTestId("studio-compare")).not.toHaveTextContent("Finanzberatung");
     // a later run counts what was tried before
     expect(useStudio.getState().tried).toHaveLength(3);
   }, 150_000);

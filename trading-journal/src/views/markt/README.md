@@ -165,3 +165,8 @@ Regeln, aber den nachgeladenen Reihen: frühere Fälle (`squeeze-history-episode
 (`squeeze-history-stand`: „Binance USDⓈ-M, öffentliche Historie (nachgeladen)“, letzter Eintrag, Historie seit, nachgeladen am). Getrennt vom Archiv oben, nie vermischt; hat das Archiv für das Symbol nichts selbst gesammelt, sagt die
 Karte das (`squeeze-history-nocollected`) statt Nullen zu zeigen; ohne nachgeladene Historie führt sie zu Einstellungen › Datenarchiv. Daten: `useSqueezeData.ts` (`loadHistoryData`), Rechenkern `@/domain/squeeze/fromHistory`.
 Tests: `views.markt.squeeze.history.test.tsx`, e2e `backfill.spec.ts`.
+
+## Feinschliff Runde 8 (Seiten B)
+- Fünf Teile mit `SectionTitle` und `SectionNav`: **Jetzt** (Beste Setups, Box-Status, Chart) · **Einordnung** (Squeeze, Struktur, Ähnliche Situationen) · **Marken & Alarme** (Schlüsselmarken, Tagesplan, Alarme) · **Termine** (Heute wichtig, Termine, Ereignisphasen) · **Beobachten** (RSI-Linien, Scanner, Box-Einstellungen). Die Karten behalten ihre `data-testid`.
+- Späte Karten stehen vorher als `PendingCard` in Endgröße (`@/ui/PendingCard`); Termine zeigen sieben Tage, das Briefing vier Zeilen je Abschnitt, bis ein Knopf mehr zeigt.
+- Der Satz „Keine professionelle Finanzberatung.“ steht nur im `AnalysisNote` am Seitenende.

@@ -76,7 +76,7 @@ describe("SignalInboxCard (F28)", () => {
     const card = screen.getByTestId("inbox-card");
     expect(card).toHaveAttribute("data-total", "0");
     expect(card).toHaveTextContent(INBOX_STRINGS.emptyTitle);
-    expect(card).toHaveTextContent("lässt sich nicht nachtragen");
+    expect(card).toHaveTextContent("Hier landet jedes Signal");
     expect(screen.queryByTestId("inbox-row")).toBeNull();
   });
 

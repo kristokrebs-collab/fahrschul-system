@@ -106,7 +106,7 @@ test.describe("Ausführbarkeit jetzt (F44)", () => {
     await expect(tid(page, "hplan-exec-assumption")).toContainText("Annahme im Plan: Slippage am Stop 5,00 bp. Das Orderbuch jetzt: 0,01 bp von der Mitte – die Annahme deckt es.");
     await expect(tid(page, "hplan-exec-turnover")).toContainText("des 24-h-Umsatzes");
     const stand = tid(page, "hplan-exec-stand");
-    await expect(stand).toContainText("Keine professionelle Finanzberatung.");
+    await expect(stand).not.toContainText("Finanzberatung");
     await expect(stand).toContainText("Quelle: Binance USDⓈ-M · Orderbuch /fapi/v1/depth (3 Stufen, direkt) · Stand ");
     await expect(stand).toContainText(" Uhr · abgerufen ");
     await expect(card).toContainText("Eine Momentaufnahme");

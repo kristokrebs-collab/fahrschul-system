@@ -94,7 +94,7 @@ export function bandItems(view: BoxesView, recent: readonly { id: string; title:
 }
 
 /** Band height (border + `py-2` + one 12 px line, rounded up): the loading shell and the running band share it. */
-const BAND = "flex min-h-[38px] flex-col justify-center overflow-hidden rounded-2xl border border-line bg-ink-950/40 py-2";
+const BAND = "flex h-[38px] flex-col justify-center overflow-hidden rounded-2xl border border-line bg-ink-950/40 py-2";
 
 function BandItem({ text, tone }: { text: string; tone: Tone }) {
   return (
@@ -238,7 +238,7 @@ export function MarktView({ className }: { className?: string }) {
             {/* no `Cell` (Reveal) around the section: it is three cards tall (several thousand px on a phone), and a reveal waits for
                 15 % of its element to be in view – an element that tall never gets there and would stay at opacity 0. The cards reveal themselves. */}
             <div className="min-w-0 lg:col-span-12">
-              <Suspense fallback={<PendingCard title="Termine" testId="termine-loading" size="min-h-[5740px] lg:min-h-[2590px]" />}>
+              <Suspense fallback={<PendingCard title="Termine" testId="termine-loading" size="min-h-[5760px] lg:min-h-[2590px]" />}>
                 <TermineSection />
               </Suspense>
             </div>

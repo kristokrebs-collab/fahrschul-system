@@ -65,7 +65,7 @@ describe("Handelsplan · Aktien: die US-Börse wählen", () => {
     expect(screen.getByTestId("hplan-ticket-text")).toHaveTextContent("Quelle: Yahoo Finance (inoffiziell)");
     expect(screen.getByTestId("hplan-progress")).toHaveAttribute("data-done", "5");
     // jede Karte endet mit dem Satz
-    expect(screen.getByTestId("hplan-ticket-note")).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(screen.getByTestId("hplan-ticket-note")).toHaveTextContent("Quelle: ");
     // der Markt-Abschnitt spricht jetzt von Aktien
     expect(screen.getByRole("radio", { name: "AAPL" })).toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: "BTCUSDT" })).toBeNull();

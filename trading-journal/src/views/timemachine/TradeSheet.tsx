@@ -89,7 +89,7 @@ function Loaded({ trade, tp, interval, setInterval, assumed, setAssumed }: { tra
         // only candles that had CLOSED when the trade was entered: the sheet must not know the outcome
         const candles: TimeMachineCandle[] = (res.data[interval as HistInterval] ?? []).filter((b) => b.t * 1000 + ivMs <= entryMs).map((b) => ({ time: b.t * 1000, open: b.o, high: b.h, low: b.l, close: b.c, ...(b.v != null ? { volume: b.v } : {}), closed: true }));
         if (candles.length < MIN_POOL_BARS) {
-          put({ status: "error", message: candles.length ? `Vor diesem Einstieg gibt es auf dem ${interval}-Chart nur ${candles.length} Kerzen – mindestens ${MIN_POOL_BARS} sind nötig. Ein größerer Zeitrahmen hilft.` : `Für ${symbol} liefert die Börse vor diesem Einstieg keine Kerzen.` });
+          put({ status: "error", message: candles.length ? `Vor diesem Einstieg gibt es auf dem ${interval}-Chart nur ${candles.length} Kerzen – mindestens ${MIN_POOL_BARS} sind nötig. Ein größerer Zeiteinheit hilft.` : `Für ${symbol} liefert die Börse vor diesem Einstieg keine Kerzen.` });
           return;
         }
         put({ status: "ok", candles, fetchedAt: now });
@@ -122,8 +122,8 @@ function Loaded({ trade, tp, interval, setInterval, assumed, setAssumed }: { tra
 
       <StaggerItem className="grid gap-3 rounded-2xl border border-line-2 bg-ink-950/40 p-3.5" data-testid="tm-trade-controls">
         <div className="grid gap-1.5">
-          <span className="label">Zeitrahmen der Kerzen</span>
-          <Segmented<FormInterval> aria-label="Zeitrahmen" size="sm" options={FORM_INTERVALS.map((v) => ({ v, label: v === "1d" ? "1T" : v }))} value={interval} onChange={setInterval} className={SEG_TOUCH} />
+          <span className="label">Zeiteinheit der Kerzen</span>
+          <Segmented<FormInterval> aria-label="Zeiteinheit" size="sm" options={FORM_INTERVALS.map((v) => ({ v, label: v === "1d" ? "1T" : v }))} value={interval} onChange={setInterval} className={SEG_TOUCH} />
         </div>
         {tp.targetAssumed && (
           <div className="grid gap-1.5">

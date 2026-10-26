@@ -196,7 +196,7 @@ test.describe("Aktien", () => {
     await expect(ovrs.getByTestId("aktien-why")).toContainText("RSI(14) lag zuvor bei");
     await expect(page.getByTestId("aktien-rank")).toHaveText(["1", "2"]);
     // a result card ends with the sentence
-    await expect(page.getByTestId("aktien-results").getByTestId("aktien-note")).toContainText("Keine professionelle Finanzberatung.");
+    await expect(page.getByTestId("aktien-results").getByTestId("aktien-note")).not.toContainText("Finanzberatung");
     await expectNoHorizontalScroll(page);
     await shot(page, info, "aktien-1-scanner");
 
@@ -325,7 +325,7 @@ test.describe("Aktien", () => {
     await expect(plan.getByTestId("hplan-qty")).toHaveText("20");
     await expect(plan.getByTestId("hplan-maxloss")).toContainText("22,56 USD");
     await expect(plan.getByTestId("hplan-ticket-rows")).toContainText("20 Stück (Positionswert 3.718,00 USD)");
-    await expect(plan.getByTestId("hplan-ticket-note")).toContainText("Keine professionelle Finanzberatung.");
+    await expect(plan.getByTestId("hplan-ticket-note")).toContainText("Quelle: ");
     expect(planCalls.length).toBeGreaterThan(0);
     await expectNoHorizontalScroll(page);
     await shot(page, info, "aktien-5-plan");
@@ -459,7 +459,7 @@ test.describe("Aktien", () => {
     await expect(page.locator('[data-testid="aktien-story"][data-new="1"]')).toHaveCount(3);
     await expect(page.getByTestId("aktien-news-visit")).toContainText("3 Meldungen neu seit dem letzten Besuch");
     await expect(page.getByTestId("aktien-news-stand")).toContainText("Quelle: Yahoo Finance");
-    await expect(page.getByTestId("aktien-news").getByTestId("aktien-note")).toContainText("Keine professionelle Finanzberatung.");
+    await expect(page.getByTestId("aktien-news").getByTestId("aktien-note")).not.toContainText("Finanzberatung");
     await expectNoHorizontalScroll(page);
     await shot(page, info, "aktien-5-news");
     // the filters: only the new ones, only the important ones

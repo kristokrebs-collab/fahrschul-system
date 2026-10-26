@@ -84,7 +84,7 @@ export const STUDIO = {
     questions: { title: "Fragen an dich", note: "Tipp auf eine Antwort, dann ergänzt sie die Regeln.", none: "Keine offenen Fragen.", needed: "Nötig", open: "offen", answered: "beantwortet", provisional: "vorläufig gerechnet", textOnly: "Antworte, indem du es in den Text schreibst." },
     assumptions: { title: "Meine Annahmen", note: "Wo dein Text nichts sagte, habe ich einen Standard genommen. Ändere ihn hier oder schreib den Wert in den Text.", none: "Keine Annahmen nötig." },
     rules: { title: "So rechnet das Labor", note: "Die Regeln als Klartext – genau diese laufen im Backtest und im Papierkonto." },
-    kind: { side: "Richtung", condition: "Bedingung", filter: "Zeitfilter", stop: "Stop", target: "Ziel", breakEven: "Break-even", trailing: "Trailing", partial: "Teilgewinn", timeStop: "Zeit-Stop", opposite: "Gegensignal", risk: "Risiko", market: "Markt", interval: "Zeitrahmen", period: "Zeitraum" } as Record<string, string>,
+    kind: { side: "Richtung", condition: "Bedingung", filter: "Zeitfilter", stop: "Stop", target: "Ziel", breakEven: "Break-even", trailing: "Trailing", partial: "Teilgewinn", timeStop: "Zeit-Stop", opposite: "Gegensignal", risk: "Risiko", market: "Markt", interval: "Zeiteinheit", period: "Zeitraum" } as Record<string, string>,
     yourText: "Dein Text, so gelesen",
     legendOk: "verstanden",
     legendNo: "unklar",
