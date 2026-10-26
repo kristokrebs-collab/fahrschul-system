@@ -153,11 +153,11 @@ describe("Handelsplan · Zeitrahmen, Markt, Fehler", () => {
     expect(screen.getByRole("radio", { name: "15 Min" })).toBeDisabled();
   });
 
-  it("die US-Börse ist gesperrt, solange es keine Aktien-Kerzen gibt – und sagt es", async () => {
+  it("die US-Börse ist wählbar; der Hinweis zur Quelle erscheint erst, wenn sie gewählt ist", async () => {
     renderPlan();
     await screen.findByTestId("hplan-stop");
-    expect(screen.getByRole("radio", { name: "US-Börse (9:30 New York)" })).toBeDisabled();
-    expect(screen.getByTestId("hplan-stocks-note")).toHaveTextContent("Aktien-Kerzen sind noch nicht angebunden");
+    expect(screen.getByRole("radio", { name: "US-Börse (9:30 New York)" })).toBeEnabled();
+    expect(screen.queryByTestId("hplan-stocks-note")).toBeNull();
   });
 
   it("ein anderes Symbol eingeben: gültig wird übernommen und lädt neu, ungültig wird gesagt", async () => {

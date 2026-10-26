@@ -23,6 +23,11 @@ interface PlanFormState {
   /** the saved plan the page works on, `null` = a plan that is not saved */
   planId: string | null;
   set(patch: Partial<PlanForm>): void;
+  /**
+   * Takes values from a link (`#plan?symbol=…&side=…`): on the page at once, written nowhere. The plan that was open is not the
+   * one this form is about any more (`planId` null); the device remembers the form only when the person changes something.
+   */
+  prefill(patch: Partial<PlanForm>): void;
   /** takes a whole form (a saved plan is opened) */
   replace(form: PlanForm, planId?: string | null): void;
   setPlanId(id: string | null): void;
@@ -31,6 +36,8 @@ interface PlanFormState {
 }
 
 const stored = readJson<unknown>(PLAN_FORM_KEY, null);
+/** a link left the open plan behind in memory only: the first real edit writes that down too, so a reload cannot pair the new form with the old plan */
+let openPointerStale = false;
 
 export const usePlanForm = create<PlanFormState>((set, get) => ({
   form: formOf(stored),
@@ -39,7 +46,15 @@ export const usePlanForm = create<PlanFormState>((set, get) => ({
   set: (patch) => {
     const form = formOf({ ...get().form, ...patch });
     writeJson(PLAN_FORM_KEY, form);
+    if (openPointerStale) {
+      openPointerStale = false;
+      writeJson(PLAN_OPEN_KEY, get().planId);
+    }
     set({ form, restored: true });
+  },
+  prefill: (patch) => {
+    if (get().planId != null) openPointerStale = true;
+    set({ form: formOf({ ...get().form, ...patch }), restored: true, planId: null });
   },
   replace: (form, planId = null) => {
     const clean = formOf(form);

@@ -1,9 +1,8 @@
 /**
  * Kerzenquellen des Handelsplans. Der Rechenkern (`src/domain/plan`) nimmt `Symbol + Kerzen`; woher die Kerzen kommen, sagt
- * diese Tabelle. Krypto: Binance USDⓈ-M (`candles.ts`). Aktien: der Platz ist vorbereitet – sobald der Datenvertrag der
- * Aktien-Module eine Quelle mit dieser Form liefert (`load(req) → PlanCandles`, derselbe `Candle`-Typ), wird sie hier
- * eingetragen und die US-Börse-Sitzung wird wählbar. Bis dahin sagt die Seite ehrlich, dass es keine Aktien-Kerzen gibt, und
- * erfindet keine.
+ * diese Tabelle. Krypto: Binance USDⓈ-M (`candles.ts`). Aktien: der Aktien-Datenvertrag (`@/market/stocks`, Yahoo Finance über
+ * die eigenen Server-Funktionen; `stockCandles.ts`), geladen erst, wenn eine US-Börse-Sitzung gewählt ist. Fällt eine Quelle
+ * aus, sagt die Seite den Grund und erfindet keine Kerzen.
  */
 import type { MarketKind } from "@/domain/plan/sessions";
 import { loadPlanCandles, type LoadRequest, type PlanCandles } from "./candles";
@@ -24,9 +23,10 @@ export const PLAN_SOURCES: readonly PlanCandleSource[] = [
   {
     id: "stocks",
     kind: "stocks",
-    label: "Aktien-Kerzen",
-    ready: false,
-    notReady: "Aktien-Kerzen sind noch nicht angebunden – sie kommen mit dem Datenvertrag der Aktien-Module. Der Rechenkern kann sie schon: er nimmt Symbol und Kerzen, die Sitzung der US-Börse mit Feiertagen und Sommerzeit ist eingebaut.",
+    label: "Yahoo Finance (inoffiziell)",
+    ready: true,
+    // its own chunk: the stock client only loads when a US session is chosen
+    load: async (req) => (await import("./stockCandles")).loadStockPlanCandles(req),
   },
 ];
 

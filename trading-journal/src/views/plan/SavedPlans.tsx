@@ -4,7 +4,7 @@
  * created. The section ends with the same line as every step.
  */
 import { useMemo } from "react";
-import { baseOf, clockIn, dateTimeIn, moneyText, planOfSettings, priceText, qtyText, type Light } from "@/domain/plan";
+import { clockIn, dateTimeIn, formMarket, moneyText, planOfSettings, priceText, qtyText, unitOf, type Light } from "@/domain/plan";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { useJournal } from "@/store/journalStore";
@@ -49,11 +49,11 @@ export function SavedPlans({ className }: { className?: string }) {
                   </span>
                 </div>
                 <p className="num text-[12.5px] leading-snug text-fg/90">
-                  Einstieg {P(p.entry)} · Stop {P(p.stop)} · Ziel {p.target != null ? P(p.target) : "–"} · {qtyText(p.qty, p.lot)} {baseOf(p.symbol)} · höchstens {moneyText(p.maxLoss)} {p.currency} Verlust
+                  Einstieg {P(p.entry)} · Stop {P(p.stop)} · Ziel {p.target != null ? P(p.target) : "–"} · {qtyText(p.qty, p.lot)} {unitOf(formMarket(p.form), p.symbol)} · höchstens {moneyText(p.maxLoss)} {p.currency} Verlust
                 </p>
                 <p className="num text-[11.5px] leading-snug text-mute">
                   Gespeichert {dateTimeIn(p.savedAt, p.tz)} Uhr · Quelle: {p.sourceLabel} · Kerzen bis {p.candlesUntil != null ? `${dateTimeIn(p.candlesUntil, p.tz)} Uhr` : "keine Daten"}
-                  {p.alarms ? ` · 3 Alarme${p.alarms.flatBy ? ` (flat by ${clockIn(p.alarms.flatBy.at, p.tz)} Uhr)` : ""}` : ""}
+                  {p.alarms ? (p.alarms.stopId ? ` · 3 Alarme${p.alarms.flatBy ? ` (flat by ${clockIn(p.alarms.flatBy.at, p.tz)} Uhr)` : ""}` : ` · Erinnerung flat by${p.alarms.flatBy ? ` ${clockIn(p.alarms.flatBy.at, p.tz)} Uhr` : ""}`) : ""}
                   {p.journalAt ? " · Journal-Entwurf geöffnet" : ""}
                 </p>
                 <div className="flex flex-wrap gap-2">

@@ -28,7 +28,10 @@ export const DEFAULT_PREFS: Readonly<PlanPrefs> = Object.freeze({ maxPositionPct
 
 export type FlatByState = "pending" | "fired" | "missed";
 
-/** The three alarms of a plan: two key levels of the app (by id) and the clock reminder. */
+/**
+ * The three alarms of a plan: two key levels of the app (by id) and the clock reminder. A stock plan has no key levels – the marks
+ * watch the live crypto market only – so its ids are empty and only the clock reminder exists.
+ */
 export interface PlanAlarms {
   stopId: string;
   targetId: string;
@@ -107,10 +110,10 @@ export function prefsOf(raw: unknown): PlanPrefs {
 
 function alarmsOf(raw: unknown): PlanAlarms | null {
   if (!isObj(raw)) return null;
-  const stopId = str(raw.stopId, 60);
-  const targetId = str(raw.targetId, 60);
+  const stopId = typeof raw.stopId === "string" ? raw.stopId.slice(0, 60) : null;
+  const targetId = typeof raw.targetId === "string" ? raw.targetId.slice(0, 60) : null;
   const createdAt = num(raw.createdAt);
-  if (!stopId || !targetId || createdAt == null) return null;
+  if (stopId == null || targetId == null || createdAt == null) return null;
   let flatBy: PlanAlarms["flatBy"] = null;
   if (isObj(raw.flatBy)) {
     const at = num(raw.flatBy.at);

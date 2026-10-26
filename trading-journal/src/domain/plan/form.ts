@@ -8,7 +8,8 @@ import { parseNumber } from "@/lib/parse";
 import type { AccountId, Side } from "../types";
 import type { EntrySides } from "./entry";
 import type { StopRule, TargetRule } from "./exit";
-import { isSessionId, type SessionId } from "./sessions";
+import { symbolFits } from "./market";
+import { isSessionId, sessionDef, type SessionId } from "./sessions";
 import { MIN, parseDayKey, parseHHMM } from "./time";
 
 export const PLAN_TFS = ["5m", "15m", "30m", "1h"] as const;
@@ -72,6 +73,9 @@ export const DEFAULT_FORM: Readonly<PlanForm> = Object.freeze({
   tick: null,
 });
 
+/** The ticker a stock form starts on when it holds none that fits (an example, like BTCUSDT for crypto). */
+export const DEFAULT_STOCK_SYMBOL = "AAPL";
+
 /** Default quantity step: crypto trades in thousandths, stocks in whole shares. */
 export const DEFAULT_LOT = { crypto: 0.001, stocks: 1 } as const;
 
@@ -134,7 +138,10 @@ export function targetRuleOf(raw: unknown): TargetRule {
 export function formOf(raw: unknown): PlanForm {
   const r: Raw = isObj(raw) ? raw : {};
   const d = DEFAULT_FORM;
-  const symbol = typeof r.symbol === "string" && /^[A-Za-z0-9]{3,20}$/.test(r.symbol.trim()) ? r.symbol.trim().toUpperCase() : d.symbol;
+  const session = isSessionId(r.session) ? r.session : d.session;
+  // the symbol has to fit the market of the session: a crypto pair (3–20 letters / digits) or a US ticker (AAPL, BRK.B)
+  const rawSymbol = typeof r.symbol === "string" ? r.symbol.trim().toUpperCase() : "";
+  const symbol = rawSymbol && symbolFits(rawSymbol, sessionDef(session).market) ? rawSymbol : sessionDef(session).market === "stocks" ? DEFAULT_STOCK_SYMBOL : d.symbol;
   const or = posNum(r.orMinutes, 1, 480);
   const cutoff = posNum(r.cutoffMin, 5, 24 * 60);
   const risk = posNum(r.riskPct, 0.0001, 1);
@@ -146,7 +153,7 @@ export function formOf(raw: unknown): PlanForm {
   return {
     symbol,
     tf: isPlanTf(r.tf) ? r.tf : d.tf,
-    session: isSessionId(r.session) ? r.session : d.session,
+    session,
     day: typeof r.day === "string" && parseDayKey(r.day) ? r.day : null,
     orMinutes: or != null ? Math.round(or) : d.orMinutes,
     sides: r.sides === "long" || r.sides === "short" || r.sides === "both" ? r.sides : d.sides,

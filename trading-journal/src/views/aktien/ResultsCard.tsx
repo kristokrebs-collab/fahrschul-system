@@ -5,6 +5,7 @@
  * sorting, never a quality grade.
  */
 import { useMemo, useState } from "react";
+import { planLinkHash } from "@/domain/plan/link";
 import { rankHits, RANK_NAME, SETUP_SHORT, volumeText, type Hit, type RankBy } from "@/domain/scanner";
 import { watchId, watchlistOfSettings, type WatchKind } from "@/domain/watchlist";
 import { cn } from "@/lib/cn";
@@ -28,7 +29,8 @@ const R = AKTIEN.results;
 /** The plan page is built elsewhere: the link exists only when its page does. */
 export const planPageExists = (pages: readonly string[] = PAGES): boolean => pages.includes("plan");
 
-export const planHash = (symbol: string, side: "long" | "short"): string => `#plan?symbol=${encodeURIComponent(symbol)}&side=${side}`;
+/** `#plan?symbol=AAPL&side=long` – the Handelsplan reads exactly this (`@/domain/plan/link`). */
+export const planHash = (symbol: string, side: "long" | "short"): string => planLinkHash(symbol, side);
 
 function HitRow({ hit, rank, market, onWatch, watched, timeZone, daily, planOk }: { hit: Hit; rank: number; market: WatchKind; onWatch: (h: Hit) => void; watched: boolean; timeZone: string; daily: boolean; planOk: boolean }) {
   const [open, setOpen] = useState(false);

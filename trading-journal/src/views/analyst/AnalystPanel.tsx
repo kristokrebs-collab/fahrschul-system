@@ -69,7 +69,7 @@ function Events({ a }: { a: Analysis }) {
   );
 }
 
-export function AnalystPanel({ ticker: tickerProp = "", autoLoad = false, onLoaded, onUseInDcf, onStartThesis, className, bare, fetchImpl }: AnalystPanelProps) {
+export function AnalystPanel({ ticker: tickerProp = "", autoLoad = false, onLoaded, onUseInDcf, onStartThesis, onCreatePlan, className, bare, fetchImpl }: AnalystPanelProps) {
   const id = useId();
   const [text, setText] = useState(tickerProp);
   const { state, load } = useAnalysis(fetchImpl);
@@ -124,7 +124,7 @@ export function AnalystPanel({ ticker: tickerProp = "", autoLoad = false, onLoad
 
       {state.status === "error" && <SecErrorBox error={state.error} title={AN.errorTitle} />}
 
-      {state.status === "ready" && <Ready a={state.analysis} onUseInDcf={onUseInDcf} onStartThesis={onStartThesis} />}
+      {state.status === "ready" && <Ready a={state.analysis} onUseInDcf={onUseInDcf} onStartThesis={onStartThesis} onCreatePlan={onCreatePlan} />}
 
       <div data-testid="analyst-note">
         <AnalysisNote lead={AN.disclaimer} />
@@ -134,7 +134,7 @@ export function AnalystPanel({ ticker: tickerProp = "", autoLoad = false, onLoad
   return bare ? body : <Card title={AN.title}>{body}</Card>;
 }
 
-function Ready({ a, onUseInDcf, onStartThesis }: { a: Analysis; onUseInDcf: AnalystPanelProps["onUseInDcf"]; onStartThesis: AnalystPanelProps["onStartThesis"] }) {
+function Ready({ a, onUseInDcf, onStartThesis, onCreatePlan }: { a: Analysis; onUseInDcf: AnalystPanelProps["onUseInDcf"]; onStartThesis: AnalystPanelProps["onStartThesis"]; onCreatePlan: AnalystPanelProps["onCreatePlan"] }) {
   const r = a.result;
   const important = r.notes.filter((n) => n.kind === "stale" || n.kind === "lag" || n.kind === "old");
   const rest = r.notes.filter((n) => n.kind !== "stale" && n.kind !== "lag" && n.kind !== "old");
@@ -213,7 +213,7 @@ function Ready({ a, onUseInDcf, onStartThesis }: { a: Analysis; onUseInDcf: Anal
             </ul>
           </Disclosure>
 
-          {(onUseInDcf || onStartThesis) && (
+          {(onUseInDcf || onStartThesis || onCreatePlan) && (
             <div className="flex flex-wrap gap-2">
               {onUseInDcf && (
                 <Button size="sm" onClick={() => onUseInDcf(seedFromAnalyst(r), a.ticker)} data-testid="analyst-use-dcf">
@@ -223,6 +223,11 @@ function Ready({ a, onUseInDcf, onStartThesis }: { a: Analysis; onUseInDcf: Anal
               {onStartThesis && (
                 <Button size="sm" onClick={() => onStartThesis(a.ticker)} data-testid="analyst-start-thesis">
                   {AN.startThesis}
+                </Button>
+              )}
+              {onCreatePlan && (
+                <Button size="sm" onClick={() => onCreatePlan(a.ticker)} data-testid="analyst-create-plan">
+                  {AN.createPlan}
                 </Button>
               )}
             </div>

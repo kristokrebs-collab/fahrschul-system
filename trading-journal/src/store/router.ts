@@ -22,7 +22,7 @@ export interface Route {
 }
 
 /** Pages whose query the router keeps (each validates its own keys; every other page drops the query). */
-export const QUERY_PAGES: ReadonlySet<Page> = new Set<Page>(["analyse", "berichte", "community"]);
+export const QUERY_PAGES: ReadonlySet<Page> = new Set<Page>(["analyse", "berichte", "community", "plan"]);
 
 const RESULTS = new Set<TradeFilter["result"]>(["all", "win", "loss", "open", "be"]);
 const SIDES = new Set<TradeFilter["side"]>(["all", "long", "short"]);
@@ -254,6 +254,8 @@ const SEAM_LOADERS: Partial<Record<Page, () => Promise<QuerySeam>>> = {
       },
       subscribe: (cb) => m.useBerichteUi.subscribe((st, prev) => st.key !== prev.key && cb()),
     })),
+  // `#plan?symbol=AAPL&side=long` (the page Aktien, "Plan erstellen →"): fills market and direction, saves nothing
+  plan: () => import("@/views/plan/linkSeam").then((m) => m.planSeam),
 };
 
 const seams: Partial<Record<Page, QuerySeam>> = {};
