@@ -95,3 +95,10 @@ Tests: `tests/unit/assistant.tools.test.ts` (Routing mit Tippfehlern und Gegenbe
 ## Morgenbriefing (F43)
 
 Werkzeug `briefing` (Auswertungs-Werkzeug in `insights/briefing.ts`): „Morgenbriefing“, „Was ist heute wichtig?“, „Was steht heute an?“, „Termine heute“, „Morning note“. Die Antwort ist das Briefing der Karte „Heute wichtig“ (Markt-Seite) in wenigen Sätzen aus **derselben** Funktion (`buildBriefing` + `briefingParagraph`, `@/domain/events`) und denselben Speichern (`briefingSource` in `insights/sources.ts`: Live-Ticker, bereits geladene Tageskerzen, Schlüsselmarken, Zustellprotokoll, Tagesjournal – der Assistent lädt und startet nichts); jeder Satz mit Quelle und Zeit in eckigen Klammern, Fehlendes „keine Daten“, am Ende „Keine professionelle Finanzberatung.“. Der Knopf „Briefing mit allen Quellen öffnen“ öffnet die Karte (Funktion `morgenbriefing`). Tests: `tests/unit/assistant.briefing.test.ts`, e2e `tests/e2e/termine.spec.ts`.
+
+## Funktionen öffnen und Hilfe (Feinschliff, Runde 8)
+
+„Öffne den Positionsrechner“, „Starte die Demo“, „Zeig mir den Kongress-Tracker“, „Geh zum Datenarchiv“: ein Öffnen-Verb am Anfang und ein Gegenstand, den die Journal-Fragen nicht kennen – das Register findet die Stelle
+(`understand.ts` Schritt 3b → Werkzeug `where` mit dem Gegenstand als Argument, `engine.ts` reicht es durch). Eine ganze Seite („Öffne das Labor“) geht weiter über die Seitenwörter, die Journalfragen („Zeig mir meine
+Verluste im März“) bleiben Journalfragen. Der Seitenname des Assistenten ist derselbe wie im Dock („Entscheidungsgrundlagen“ statt „Setups“; `tests/unit/assistant.navigation.test.ts`). Die Hilfe nennt Handelsplan,
+Aktien-Scanner und Demo – und sagt, dass der Assistent nie eine Order sendet und nie für dich handelt.

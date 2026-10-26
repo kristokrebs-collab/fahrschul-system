@@ -81,3 +81,9 @@ Inhalt-Leisten landet unter der Leiste), `a11y-funktionen.spec.ts` (axe, hell un
 Unter den Kacheln steht eine ruhige, gestrichelte Box (`data-testid="funktionen-demo"`, Knopf `funktionen-demo-open`): „Neu hier? Probier die App mit
 Beispieldaten aus.“ Der Knopf öffnet das Demo-Blatt (`openFeature` → Aktion `demo` → lazy `DemoHost`, siehe `src/views/demo/README.md`); das Register
 führt die Demo als `produktdemo` (Suche, Finder, Assistent finden sie). Nichts startet von selbst.
+
+## Gruppen und Reihenfolge (Runde 8)
+
+Zwölf Kacheln statt zehn: „Aktien beobachten & bewerten“ (Scanner, Watchlist, News, Kongress, Zahlen-Analyst, DCF, Kaufthese) und „Trade planen“ (Handelsplan in fünf Schritten, Verwaltung planen,
+Ausführbarkeit, Zeitmaschine) haben jetzt eine eigene Gruppe, weil beide eine eigene Seite sind und vorher über zwei Gruppen verteilt waren. Die Gruppen stehen in der Reihenfolge des Tages; die beiden
+Alarm-Funktionen (Alarme, E-Mail-Alarm) stehen zusammen unter „Heute vorbereiten“. Die Seite selbst ist unverändert (Logik und Texte kommen aus dem Register, `FUNKTIONEN` in `strings.ts`).

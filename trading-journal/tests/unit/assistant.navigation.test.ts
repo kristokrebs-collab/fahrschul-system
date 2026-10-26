@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PAGE_LABELS } from "@/app/Dock";
 import { respond, type EngineEnv } from "@/assistant/engine";
 import { EMPTY_MEMORY } from "@/assistant/memory";
+import { INTEREST_QUESTION } from "@/assistant/tools";
 import { PAGE_LABEL, understand, type Plan } from "@/assistant/understand";
 import { FALLBACK_PAGE_LABELS } from "@/search/sources";
 import { PAGES } from "@/store/uiStore";
@@ -81,5 +82,15 @@ describe("the help", () => {
     expect(text).toMatch(/Aktien/);
     expect(text).toMatch(/Demo/);
     expect(text).toMatch(/sende nie eine Order/);
+  });
+});
+
+describe("the chips for what is asked more than once", () => {
+  it("every chip leads to the tool whose topic it belongs to (so a counted topic offers a question that really works)", () => {
+    for (const [topic, question] of Object.entries(INTEREST_QUESTION)) {
+      if (!["plan", "stocks", "studio", "where"].includes(topic)) continue;
+      const plan = u(question);
+      expect(plan.kind === "tool" && plan.topic, `${topic}: ${question}`).toBe(topic);
+    }
   });
 });

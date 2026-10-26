@@ -27,7 +27,7 @@ async function readRegister(page: Page): Promise<Row[]> {
   await expect(layer(page, "funktionen").locator("h1").first()).toHaveText("Funktionen", { timeout: 25_000 });
   await expect(page.locator("[data-page-skeleton]")).toHaveCount(0, { timeout: 25_000 });
   const groups = await page.getByTestId("funktionen-tile").evaluateAll((els) => els.map((e) => e.getAttribute("data-group")!));
-  expect(groups).toHaveLength(10);
+  expect(groups).toHaveLength(12);
   const rows: Row[] = [];
   for (const g of groups) {
     await page.locator(`[data-testid="funktionen-tile"][data-group="${g}"]`).click();

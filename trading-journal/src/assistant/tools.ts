@@ -397,6 +397,11 @@ export const INTEREST_QUESTION: Readonly<Record<string, string>> = {
   evolve: "Was hat der Optimierer gefunden?",
   briefing: "Was ist heute wichtig?",
   timemachine: "Wie stehen die Chancen für meinen Plan?",
+  // the pages the assistant only opens
+  plan: "Wie groß soll meine Position sein?",
+  stocks: "Aktien scannen",
+  studio: "Strategie als Text schreiben",
+  where: "Wo finde ich die Zeitmaschine?",
 };
 
 /** Chips for the greeting and help: the most asked topics first, then a few safe defaults. */

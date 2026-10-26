@@ -44,13 +44,52 @@ Gemessen mit `vite preview` + Playwright, mobil 390 × 844 (ein Bildschirm ≈ 8
 
 ## 2. Was jetzt anders ist
 
-- **Seite „Funktionen“**: große Suche „Was willst du tun?“ (versteht Absichten, Tippfehler, Fragesätze), „Zuletzt benutzt“, „Empfohlen / Neu“, **zehn Aufgaben-Kacheln**, Gruppenliste mit
-  Zwischenüberschriften und Details (Fehlt noch, So geht’s, Siehe auch). Mobil 2 865 px (3,4 Bildschirme) statt 23 852 px (28,3); selbst die längste Gruppe („Strategie entwickeln & testen“, 20 Funktionen) hat 4 186 px.
-- **Registry**: 137 Funktionen (vorher 89), jede in genau einer Gruppe, mit Aufgabe in einfachen Worten, Absichten, Abschnitt, „Siehe auch“, Status.
+- **Seite „Funktionen“**: große Suche „Was willst du tun?“ (versteht Absichten, Tippfehler, Fragesätze), „Zuletzt benutzt“, „Empfohlen / Neu“, **zwölf Aufgaben-Kacheln**, Gruppenliste mit
+  Zwischenüberschriften und Details (Fehlt noch, So geht’s, Siehe auch). Mobil 2 865 px (3,4 Bildschirme) statt 23 852 px (28,3) – gemessen mit zehn Kacheln, vor Runde 8; die längste Gruppe („Auswerten & Berichte“) hat jetzt 28 Funktionen in fünf Blöcken zu höchstens sieben.
+- **Registry**: 171 Funktionen (vorher 89), jede in genau einer von zwölf Gruppen, mit Aufgabe in einfachen Worten, Absichten, Abschnitt, „Siehe auch“, Status.
 - **Inhalt-Leiste** (`SectionNav`) auf Markt, Coach, Analyse, Risiko, Labor, Wachstum, Berichte und Einstellungen: ein Chip je Abschnitt, klebt unter dem Header, markiert den Abschnitt in Sicht.
 - **Menü (⌘K / Symbol)**: oben das Feld „Was willst du tun?“ (findet jede Funktion) und der Weg „Alle Funktionen →“; Treffer öffnen die Stelle, scrollen weich dorthin und heben sie kurz hervor.
 - **Globale Suche (`/`)**: derselbe Scorer – „warum verliere ich“ findet *Leaks & Edges*.
 - Unverändert: Dashboard, Dock, Header-Layout.
+
+## 2b. Zusammenhang & Navigation (Feinschliff, Runde 8)
+
+Nach dem Umbau stand fest, **wo** jede Funktion ist. Jetzt geht es darum, dass Zusammengehöriges auch zusammen steht und sich gegenseitig zeigt.
+
+**Karte der Zusammenhänge** (was zusammengehört, wo es steht, was jetzt verbindet):
+
+| Zusammenhang | Wo es steht | Was jetzt verbindet |
+|---|---|---|
+| Handelsplan ↔ Zeitmaschine ↔ Verwaltung ↔ Alarme | Plan (5 Schritte), Labor (Zeitmaschine, Verwaltung testen/vergleichen), Markt (Alarme) | eigene Gruppe „Trade planen“ im Register (8 Funktionen, auch die Zeitmaschine); Siehe-auch im Ausstieg (→ Verwaltung testen / vergleichen), im Labor (Zeitmaschine → Handelsplan, Verwaltung → Verwaltung planen); der Ticket-Schritt hat „Plan → 3 Alarme“ schon selbst |
+| Aktien ↔ Analyst ↔ Kongress ↔ News | alles auf der Seite Aktien | eigene Gruppe „Aktien beobachten & bewerten“ (7), vorher auf zwei Gruppen und drei Zwischenüberschriften verteilt; Siehe-auch Aktien ↔ Handelsplan / Krypto-Scanner |
+| Transaktionsbuch ↔ Berichte ↔ Termine | Buch und Berichte auf einer Seite; Termine auf Markt | Buch steht in der Gruppe „Berichte“; Gebühren & Funding (Analyse) ↔ Transaktionsbuch; Termine gehören zu „Heute wichtig“ und „Ereignisphasen“ (Markt), nicht zu den Berichten |
+| Datenarchiv ↔ Squeeze ↔ Box | Archiv in Einstellungen, Squeeze und Box auf Markt | die Squeeze-Karte führt selbst zum Archiv (Knöpfe, wo es leer ist); die Archiv-Karte führt zurück (Siehe auch) |
+| Playbooks ↔ Labor ↔ Forward-Test | alle im Labor, „Teilen per Link“ in Community | Playbook, Forward-Test und Versionen als Nachbarn im Register; Siehe-auch Community (Teilen) → Playbook |
+| Belege ↔ Community | Ergebnisbeleg in Community, Bericht-Export in Berichte | Siehe-auch im Export → Ergebnisbeleg (nur mit Cloud-Konto) |
+| Tagesplan ↔ Handelsplan | Markt, Plan | Siehe-auch unter dem Tagesplan |
+| Positionsrechner ↔ Handelsplan | Risiko, Plan | Siehe-auch im Rechner |
+
+**Seiten und Tasten.** Reihenfolge überall dieselbe: Übersicht, Trades, Entscheidungsgrundlagen, Markt, Einstellungen (das Dock), dann Handelsplan, Aktien, Risiko · Analyse, Berichte, Coach, Wachstum ·
+Labor, Strategie-Studio · Community, Cockpit, Konto, Preise, Funktionen. In der Befehlsnavigation sind die Zahlen 1–5 genau die Dock-Tabs (vorher stand „Einstellungen“ auf 4 und „Markt“ auf 5);
+6–9 sind Handelsplan, Aktien, Risiko, Analyse. `[` und `]` laufen in derselben Reihenfolge, die Seitenwechsel schieben in dieser Richtung, die Buchstaben nach `g` stehen so im Tastenblatt
+(h Handelsplan, i Aktien, u Strategie-Studio, f Funktionen, …; je Seite ein Buchstabe, geprüft). Die jüngsten Seiten (Handelsplan, Aktien, Strategie-Studio) tragen in der Navigation ein kleines „Neu“, bis sie einmal offen waren.
+
+**Glossar (ein Wort pro Ding).**
+
+| Wort | Bedeutung hier | Nicht zu verwechseln mit |
+|---|---|---|
+| Entscheidungsgrundlage | Regeln und Checkliste, die du bei einem Trade wählst (Seite, Dock, Auswahl im Trade); im Alltag oft „Setup“ | **Setup** in Markt und Aktien: ein vom Scanner gefundener Chart-Aufbau (Box-Setup, Scanner-Treffer) |
+| Box | Preisspanne mit Rand oben und unten (Box-zu-Box-Chart) | – |
+| Schlüsselmarke | eigener Preis mit Regel, Status und Alarm (Markt) | **Chart-Level**: feste Linien aus den Einstellungen (Trigger, Invalidierung) |
+| Tagesplan · Handelsplan · Verbesserungsplan | der ganze Tag in vier Szenarien (Markt) · ein einzelner Trade in fünf Schritten (Seite Handelsplan) · die nächsten Schritte im Coach | – |
+| Ticket | der fertige Plan als Text oder CSV zum Kopieren; die App sendet nie eine Order | Order |
+| Verwaltung | was nach dem Einstieg geschieht (Break-even, Trailing, Teilziel): planen (Handelsplan), testen (Labor), vergleichen (Labor) | – |
+| Backtest · Forward-Test · Zeitmaschine · Replay | Regel auf alter Historie · Regel live auf neuen Kerzen (virtuelles Konto) · ein Plan durch viele neu gemischte und echte frühere Sitzungen (Wahrscheinlichkeit) · einen eigenen Trade Kerze für Kerze nachspielen | Demokonto (nur in der Demo) |
+| Datenarchiv | Marktzahlen, die diese App auf diesem Gerät mitschreibt (aus, bis du es einschaltest) | Börsenhistorie nachladen: einmal die letzten Tage von der Börse holen |
+| Check-in · Bereit-Check · Einstiegs-Check · Risiko-Check | täglicher Zustand · Hinweis, ob du gerade handeln solltest · Regelprüfung eines Einstiegs · Plan gegen deine Limits | – |
+| Serien | Verlustserien (Risiko), Gewinn- und Verlustserien (Analyse), Gewohnheits-Serien (Wachstum) | – |
+| Watchlist | deine Titel (Krypto und Aktien) | früher auch „Beobachtungsliste“ (jetzt nur noch als Suchwort) |
+| Beleg | nachprüfbarer Ergebnislink (Community) | die Belege einer Wochenreview-Aussage (Trades als Beweis) |
 
 ## 3. Die Karte
 
@@ -64,7 +103,7 @@ ein Weg durch die Oberfläche). Der Stand sagt ehrlich, ob die Funktion nur teil
 
 _Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 9 Funktionen
 
-**Markt & Plan**
+**Lage & Plan**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
@@ -106,7 +145,7 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 15 Funktionen
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Die stärksten Setups mit Plan sehen | Beste Setups | Markt › Beste Setups | fertig |
-| Deine Beobachtungsliste nach Setups absuchen | Chancen-Scanner | Markt › Watchlist-Scanner | teilweise |
+| Deine Watchlist nach Setups absuchen | Chancen-Scanner | Markt › Watchlist-Scanner | teilweise |
 | Prüfen, was nach ähnlichen Lagen geschah | Ähnliche Situationen | Markt › Ähnliche Situationen | fertig |
 | Sehen, wie die Top-Trader positioniert sind | Top-Trader-Positionierung | Übersicht › Top Trader · Binance | fertig |
 | Prüfen, ob eine Seite des Marktes überfüllt ist | Squeeze-Beobachtung | Markt › Squeeze-Beobachtung | teilweise |
