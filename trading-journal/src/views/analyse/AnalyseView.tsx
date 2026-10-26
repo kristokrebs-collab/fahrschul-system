@@ -31,6 +31,7 @@ import { BreakdownCard } from "./BreakdownCard";
 import { CompareCard } from "./CompareCard";
 import { CostsCard } from "./CostsCard";
 import { CustomStatCard } from "./CustomStatCard";
+import { DecisionCard } from "./decision/DecisionCard";
 import { DistributionCard } from "./DistributionCard";
 import { ExcursionCard } from "./ExcursionCard";
 import { HeatmapCard } from "./HeatmapCard";
@@ -171,6 +172,9 @@ export function AnalyseView({ className }: { className?: string }) {
             </Cell>
             <Cell index={1} span="lg:col-span-6">
               <CompareCard view={view} settings={settings} cur={cur} />
+            </Cell>
+            <Cell index={0} span="lg:col-span-12">
+              <DecisionCard view={view} cur={cur} />
             </Cell>
             <Cell index={0} span="lg:col-span-12">
               <CustomStatCard view={view} settings={settings} cur={cur} />

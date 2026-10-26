@@ -168,6 +168,7 @@ export const TradeSchema = z
     targets: z.array(z.unknown()).nullable().optional(),
     psych: z.unknown().optional(),
     origin: z.unknown().optional(),
+    decision: z.unknown().optional(),
     boxSnap: z.unknown().optional(),
   })
   .passthrough();

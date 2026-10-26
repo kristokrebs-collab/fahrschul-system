@@ -143,6 +143,8 @@ export interface DraftSource {
   stopLabel: string;
   targetLabel: string;
   sessionLabel: string;
+  /** where the entry came from (`ticketPlan.entrySource`): the Einstiegs-Timer's signal is a rule, the other two are the trader's own plan (F24) */
+  entrySource?: "signal" | "level" | "manual";
 }
 
 /** The journal draft of a plan: an OPEN trade the trader can edit; nothing is saved until the editor's own "Speichern". */
@@ -160,6 +162,7 @@ export function journalDraftOf(p: DraftSource, now: Date = new Date()): TradeDra
     qty: Number(p.qty.toPrecision(8)),
     leverage: p.leverage,
     notes: `Aus dem Handelsplan: ${p.sessionLabel}. Stop: ${p.stopLabel}. Ziel: ${p.targetLabel}. Einstieg und Größe sind geplant, nicht ausgeführt.`,
+    ...(p.entrySource ? { decision: { by: p.entrySource === "signal" ? ("rules" as const) : ("own" as const), via: "plan" as const } } : null),
   };
 }
 

@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useMemo, useState, type ReactNode } from "react";
 import { fillStats, FILL_KIND_LABELS } from "@/domain/fills";
-import type { MarginMode, MarketKind, Side, TradeStatus } from "@/domain/types";
+import type { DecisionBy, MarginMode, MarketKind, Side, TradeStatus } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { price as fmtPrice, signed } from "@/lib/format";
 import { parseNumber } from "@/lib/parse";
@@ -148,6 +148,20 @@ export function ExecutionSection({ j, onChange, side, status, date, entry, stop,
           <Input id="f-exacc" autoComplete="off" value={j.exchangeAccount} onChange={set("exchangeAccount")} placeholder="z. B. Haupt oder Sub-Konto 2" maxLength={40} />
         </Field>
         <OriginField j={j} onChange={onChange} />
+        <Field label="Entscheidung" className="col-span-2 md:col-span-4" help="Wer hat entschieden? Für den Vergleich unter Analyse → Vergleich">
+          <Segmented<"" | DecisionBy>
+            aria-label="Entscheidung von"
+            size="sm"
+            value={j.decision}
+            onChange={(v) => onChange({ decision: v })}
+            options={[
+              { v: "", label: "Offen" },
+              { v: "own", label: "Ich" },
+              { v: "rules", label: "Regelwerk" },
+              { v: "ai", label: "KI" },
+            ]}
+          />
+        </Field>
       </div>
 
       <div className="grid gap-3 rounded-2xl border border-line bg-ink-950/40 p-3 sm:p-3.5">

@@ -79,6 +79,8 @@ function SetupActions({ b, symbol }: { b: BestSetup; symbol: string | null }) {
         entry: s.entry,
         stop: s.stop,
         target: t1,
+        // F24: a Box-zu-Box setup is the app's own rule-based signal
+        decision: { by: "rules", via: "box" },
         ...(symbol ? { boxSnap: toBoxSnapshot(b.analysis, { symbol, tf: b.tf, side: s.side, source: "live" }) } : {}),
       },
     });
