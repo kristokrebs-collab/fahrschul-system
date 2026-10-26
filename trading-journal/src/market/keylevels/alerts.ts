@@ -38,7 +38,7 @@ import {
 import { useJournal } from "@/store/journalStore";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 import { pushToast } from "@/store/uiStore";
-import { recordSignalEvent } from "../signalArchive";
+import { recordKeySignal } from "../signalRecord";
 import { getDeliveryLog, recordDelivery } from "./deliveryLog";
 import { getKeyLevels, retainKeyLevels, subscribeKeyLevels, type KeyLevelsView } from "./store";
 
@@ -102,7 +102,7 @@ function deliver(level: KeyLevel, stage: AlertStage, ev: LevelEvaluation, cycle:
   // F32: a confirmation / retest of an own level is a hit with a time (the stage fired whether or not the message was held back)
   if ((stage === "confirm" || stage === "retest") && decision.outcome !== "duplicate") {
     const side = level.role === "long" || level.role === "short" ? level.role : level.role === "auto" ? (level.direction === "above" ? "long" : "short") : null;
-    recordSignalEvent({ key: `key|${key}`, at: now, source: "key", kind: stage, entry: side != null, symbol: level.symbol, side, tf: level.tf, label: msg.title, detail: msg.detail, strength: null, score: null, ref: level.id, stop: level.invalidation, barClose: ev.basis === "close" && ev.asOf != null ? ev.asOf + KEY_TF_MS[level.tf] : null });
+    recordKeySignal({ key: `key|${key}`, at: now, source: "key", kind: stage, entry: side != null, symbol: level.symbol, side, tf: level.tf, label: msg.title, detail: msg.detail, strength: null, score: null, ref: level.id, stop: level.invalidation, barClose: ev.basis === "close" && ev.asOf != null ? ev.asOf + KEY_TF_MS[level.tf] : null }, level, stage, ev);
   }
 }
 

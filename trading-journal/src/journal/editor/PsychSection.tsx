@@ -6,6 +6,7 @@ import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Field, Input, Textarea } from "@/primitives";
 import { EXIT_REASONS, type JournalForm } from "./form";
+import { VoiceNote } from "./VoiceNote";
 
 export const SCALE_LABELS = {
   stress: ["Entspannt", "Locker", "Angespannt", "Gestresst", "Unter Strom"],
@@ -102,9 +103,11 @@ export function PsychSection({ j, onChange }: PsychSectionProps) {
       <div className="grid gap-3.5 md:grid-cols-2">
         <Field label="Vor dem Trade" htmlFor="f-pre-note">
           <Textarea id="f-pre-note" rows={2} className="leading-relaxed" value={j.preNote} onChange={(e) => onChange({ preNote: e.target.value })} placeholder="Wie ging es dir? Was war der Plan?" />
+          <VoiceNote value={j.preNote} onChange={(preNote) => onChange({ preNote })} label="Vor dem Trade" testId="voice-pre-note" />
         </Field>
         <Field label="Nach dem Trade" htmlFor="f-post-note">
           <Textarea id="f-post-note" rows={2} className="leading-relaxed" value={j.postNote} onChange={(e) => onChange({ postNote: e.target.value })} placeholder="Wie fühlt es sich jetzt an?" />
+          <VoiceNote value={j.postNote} onChange={(postNote) => onChange({ postNote })} label="Nach dem Trade" testId="voice-post-note" />
         </Field>
       </div>
     </div>

@@ -14,6 +14,7 @@ import { cn } from "@/lib/cn";
 import { pct0, r as fmtR } from "@/lib/format";
 import { useSignalArchive } from "@/market/signalArchive";
 import { Badge } from "@/primitives/Badge";
+import { ArchiveBasis } from "./BasisLine";
 import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
 import { Chip, OUTCOME_STRINGS, OutcomeControl, useOutcomes } from "./signalUi";
@@ -148,6 +149,7 @@ export function SignalBalanceCard({ list, now, className }: { list: readonly Enr
             <p>{BALANCE_STRINGS.rate}</p>
             <p>{OUTCOME_STRINGS.rules}</p>
             {bal.context > 0 && <p>{bal.context} weitere Ereignisse (Ausbrüche, Ziele …) sind keine Einstiege und stehen nicht in der Bilanz.</p>}
+            <ArchiveBasis events={events} testId="balance-basis-line" />
           </div>
         </>
       )}

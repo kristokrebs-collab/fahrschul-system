@@ -13,7 +13,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { LIVE_WINDOW_MS, LOADING_TEXT, mtfAutoChecks, OFFLINE_TEXT, RETRO_LOADING, STALE_TEXT, toSignalSnapshot, type MtfItem, type Side, type SignalSnapshot } from "@/domain/signals";
-import { checkTradeAt, getSignalConfig, retroCheck, toTradeSnapshot, useSignalCheck, type LiveSignals, type RetroResult } from "@/market/signals";
+import { entryRulesOf } from "@/market/signalRules";
+import { checkTradeAt, getLageConfig, getSignalConfig, retroCheck, toTradeSnapshot, useSignalCheck, type LiveSignals, type RetroResult } from "@/market/signals";
 import { TextShimmer } from "@/motion/TextShimmer";
 import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -61,7 +62,9 @@ export async function resolveTradeSignal(date: string, side: Side, timeoutMs = S
   });
   try {
     const snap = await Promise.race([checkTradeAt(t, side), timeout]);
-    return snap ?? undefined;
+    if (!snap) return undefined;
+    // the version of the rules this check ran with goes onto the trade with it (F31) – the same reference the screen showed
+    return snap.rules ? snap : { ...snap, rules: entryRulesOf({ cfg: getSignalConfig(), lage: { cfg: getLageConfig() } }) };
   } catch {
     return undefined;
   } finally {
@@ -168,10 +171,15 @@ function StoredView({ stored, side, onCheck, onAuto }: { stored: SignalSnapshot 
   );
 }
 
+/** The snapshot with the version of the rules the check ran with (F31): stored on the trade with the rest. */
+function withRules(snap: SignalSnapshot, live: LiveSignals): SignalSnapshot {
+  return { ...snap, rules: entryRulesOf(live) };
+}
+
 function LiveView({ side, onAuto }: { side: Side; onAuto: (a: MtfAuto | null) => void }) {
   const check = useSignalCheck();
   const live = check.snapshot;
-  const snap = useMemo(() => (live ? toTradeSnapshot(live, side) : null), [live, side]);
+  const snap = useMemo(() => (live ? withRules(toTradeSnapshot(live, side), live) : null), [live, side]);
   useReportAuto(snap, onAuto);
   if (!snap) return <LoadingLine text={check.state === "offline" ? (check.message ?? OFFLINE_TEXT) : (check.message ?? LOADING_TEXT)} busy={check.state === "loading"} />;
   // a provisional live entry counts down to its base candle's close (stored snapshots record only the state)
@@ -203,8 +211,9 @@ function RetroView({ minute, side, onAuto }: { minute: number; side: Side; onAut
   const result = got && got.minute === minute && got.attempt === attempt ? got.result : null;
   const snap = useMemo(() => {
     if (!result?.signals) return null;
-    if (result.status === "live") return toTradeSnapshot(result.signals as LiveSignals, side);
-    return toSignalSnapshot(result.signals, side, getSignalConfig(), { mode: "retro", symbol: result.symbol ?? undefined, source: result.source ?? undefined });
+    if (result.status === "live") return withRules(toTradeSnapshot(result.signals as LiveSignals, side), result.signals as LiveSignals);
+    const cfg = getSignalConfig();
+    return toSignalSnapshot(result.signals, side, cfg, { mode: "retro", symbol: result.symbol ?? undefined, source: result.source ?? undefined, rules: entryRulesOf({ cfg, lage: result.signals.lage }) });
   }, [result, side]);
   useReportAuto(snap, onAuto);
   if (!result) return <LoadingLine text={RETRO_LOADING} busy />;

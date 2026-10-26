@@ -16,11 +16,13 @@ import { r as fmtR } from "@/lib/format";
 import { tradeTime } from "@/lib/dates";
 import { linkTrade, markSeen, skipSignal, useSignalArchive } from "@/market/signalArchive";
 import { Badge, type BadgeTone } from "@/primitives/Badge";
+import { ArchiveBasis } from "./BasisLine";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 import { TestIdeaButton } from "@/views/labor/TestIdeaButton";
+import { SignalDetail } from "./SignalDetail";
 import { useOutcomeState } from "./signalOutcomes";
 import { Chip, ideaInputOf, OutcomeBadge, stamp, useOutcomes } from "./signalUi";
 import { SampleLine } from "./ui";
@@ -65,6 +67,7 @@ function InboxRowView({ row, list, now }: { row: InboxRow; list: readonly Enrich
   };
   const idea = useMemo(() => ideaInputOf(e), [e]);
   const outcome = useOutcomeState().outcomes.get(e.id);
+  const events = useSignalArchive();
   const level = signalLevelLabel(e);
   const canAct = row.entry && row.status !== "gehandelt";
   const candidates = panel === "link" ? linkCandidates(e, list) : [];
@@ -122,6 +125,7 @@ function InboxRowView({ row, list, now }: { row: InboxRow; list: readonly Enrich
             </div>
           )}
           {e.seenAt != null && <p className="text-faint">Zuerst angesehen {stamp(e.seenAt)}</p>}
+          <SignalDetail row={row} events={events} trades={list} outcome={outcome} />
         </div>
       )}
       {panel === "skip" && (
@@ -281,6 +285,7 @@ export function SignalInboxCard({ list, now, className }: { list: readonly Enric
           <div className="grid gap-1.5 border-t border-line pt-3 text-[11.5px] leading-relaxed text-faint">
             <p data-testid="inbox-order">{INBOX_ORDER_NOTE}</p>
             <p>{INBOX_STRINGS.limits}</p>
+            <ArchiveBasis events={events} testId="inbox-basis" />
           </div>
         </div>
       )}

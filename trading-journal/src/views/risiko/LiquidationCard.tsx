@@ -16,7 +16,8 @@ import { Badge } from "@/primitives/Badge";
 import { EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import type { CalcModel } from "./CalculatorCard";
-import type { LiqRow } from "./model";
+import { SourceStand } from "@/ui/SourceStand";
+import type { LiqBasis, LiqRow } from "./model";
 import { RISIKO } from "./strings";
 import { RiskCard, pct, priceText } from "./ui";
 
@@ -82,7 +83,22 @@ export function plannedRow(m: CalcModel, tiers: readonly MaintTier[], atr: numbe
   };
 }
 
-export function LiquidationCard({ rows, planned }: { rows: readonly LiqRow[]; planned: LiqRow | null }) {
+const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+
+/** The source sentence under the card (F27): which positions the rows are from and whether each price was given or calculated. */
+export function liqSourceText(basis: LiqBasis | undefined, planned: boolean): string {
+  const bits: string[] = [];
+  if (basis) {
+    const legs = [basis.journal ? plural(basis.journal, "Journal-Trade", "Journal-Trades") : "", basis.exchange ? plural(basis.exchange, "Börsen-Position", "Börsen-Positionen") : ""].filter(Boolean);
+    if (legs.length) bits.push(legs.join(" und "));
+    const price = [basis.given ? `${basis.given} von Börse oder Trade` : "", basis.approx ? `${basis.approx} gerechnet (Näherung mit deiner Tier-Tabelle)` : ""].filter(Boolean);
+    if (price.length) bits.push(`Liquidationspreis: ${price.join(", ")}`);
+  }
+  if (planned) bits.push("geplante Position: gerechnet aus dem Rechner (Näherung mit deiner Tier-Tabelle)");
+  return bits.join(" · ");
+}
+
+export function LiquidationCard({ rows, planned, basis, exchangeAt }: { rows: readonly LiqRow[]; planned: LiqRow | null; basis?: LiqBasis; exchangeAt?: number | null }) {
   const shown = rows.slice(0, 5);
   const nearest = [planned, ...shown].filter((r): r is LiqRow => r != null && r.distPct != null).sort((a, b) => a.distPct! - b.distPct!)[0] ?? null;
   const empty = !planned && shown.length === 0;
@@ -110,6 +126,7 @@ export function LiquidationCard({ rows, planned }: { rows: readonly LiqRow[]; pl
             <Row key={r.id} r={r} index={i + (planned ? 1 : 0)} />
           ))}
         </ul>
+        <SourceStand source={liqSourceText(basis, !!planned)} parts={basis?.exchange ? [{ label: "Börsen-Abruf", at: exchangeAt ?? null }] : []} className="!text-[11.5px]" testId="liq-source" />
         </div>
       )}
     </RiskCard>

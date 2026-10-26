@@ -96,6 +96,9 @@ describe("CoachView", () => {
     expect(screen.getByTestId("coach-score")).toHaveTextContent("Zu wenig Daten");
     expect(screen.getByTestId("coach-timeline")).toHaveTextContent("Keine Muster");
     expect(screen.getByTestId("coach-chat")).toHaveTextContent("nichts wird geraten");
+    // F27: the source line says there is nothing yet instead of leaving a gap
+    expect(screen.getByTestId("coach-basis")).toHaveTextContent("Quelle: Dein Journal auf diesem Gerät · noch keine Trades");
+    expect(screen.getByTestId("coach-basis")).not.toHaveTextContent("ältester Trade");
     fireEvent.change(screen.getByTestId("coach-input"), { target: { value: "Wie ist meine Win-Rate?" } });
     fireEvent.click(screen.getByTestId("coach-ask"));
     const a = await screen.findByTestId("coach-answer");
@@ -109,6 +112,9 @@ describe("CoachView", () => {
     expect(screen.getByTestId("coach-view")).toHaveAttribute("data-n");
     expect(screen.getByTestId("coach-lesson")).toHaveTextContent(/\w/);
     expect(screen.getByTestId("coach-score")).toHaveTextContent("/ 100");
+    expect(screen.getByTestId("coach-basis")).toHaveTextContent(/Quelle: Dein Journal auf diesem Gerät · \d+ Trades \(\d+ geschlossen\)/);
+    expect(screen.getByTestId("coach-basis")).toHaveTextContent("ältester Trade");
+    expect(screen.getByTestId("coach-basis")).toHaveTextContent("neuester Trade");
 
     fireEvent.change(screen.getByTestId("coach-input"), { target: { value: "Was ist mein bestes Setup?" } });
     fireEvent.click(screen.getByTestId("coach-ask"));

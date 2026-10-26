@@ -222,6 +222,11 @@ export function SignalSummary({ snap, side, closesAt, className }: SignalSummary
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-faint">
         <span>{snapshotSource(snap)}</span>
         {otherSide && <span className="text-mute">· geprüft für {snap.side === "long" ? "Long" : "Short"}</span>}
+        {snap.rules && (
+          <span data-testid="signal-summary-rules" title="Fingerabdruck der Einstellungen, mit denen der Einstiegs-Check gerechnet hat">
+            · Regelstand {snap.rules.n != null ? `${snap.rules.n} (${snap.rules.hash})` : snap.rules.hash}
+          </span>
+        )}
       </div>
     </div>
   );

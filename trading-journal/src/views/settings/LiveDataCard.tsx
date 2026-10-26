@@ -18,6 +18,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Card } from "@/primitives/Card";
 import { Segmented } from "@/primitives/Segmented";
 import { useUi } from "@/store/uiStore";
+import { FeedGaps } from "./FeedGaps";
 import { ActionButton, GlyphLink, GlyphRefresh, GlyphTrash } from "./fx";
 
 export const LIVE_STRINGS = {
@@ -406,6 +407,8 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
       ) : (
         <p className="rounded-xl border border-dashed border-line-2 p-4 text-[12.5px] text-mute">{LIVE_STRINGS.noHealth}</p>
       )}
+
+      {health && <FeedGaps labels={FEED_LABELS} className="mt-4" />}
 
       <div className="mt-4 flex flex-wrap gap-2 pointer-coarse:gap-3.5">
         <ActionButton size="sm" icon={<GlyphRefresh />} spinIcon onRun={onRefresh}>

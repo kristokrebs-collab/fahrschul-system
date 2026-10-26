@@ -4,6 +4,7 @@
  * optional and additive (the other app ignores them).
  */
 import { parseLageSnapshot, toLageSnapshot, type LageSnapshot } from "../lage";
+import type { RuleRef } from "../missed/archive";
 import { STRENGTH_LABEL, whaleCfgOf, type Side, type SignalCfg } from "./config";
 import type { DivKind, DivOsc } from "./divergence";
 import type { KnifeId } from "./knife";
@@ -183,6 +184,11 @@ export interface SignalSnapshot extends SignalSnap {
   knife?: SignalSnapshotKnife;
   /** Lage-Ampel at check time (absent = before the Lage existed / no daily data) */
   lage?: SignalSnapshotLage;
+  /**
+   * The version of the rules the check ran with (F31): a fingerprint of the settings that change the evaluation and the number
+   * the app gave it (`@/domain/missed/rules`). Absent = a snapshot from before versions existed (or from the other journal).
+   */
+  rules?: RuleRef;
 }
 
 const r1 = (x: number): number => Math.round(x * 10) / 10;
@@ -252,6 +258,7 @@ export interface SnapshotMeta {
   mode?: "live" | "retro";
   symbol?: string;
   source?: string;
+  rules?: RuleRef;
 }
 
 /** Snapshot to store on a trade: `snapshot()` plus our additive fields. */
@@ -275,6 +282,7 @@ export function toSignalSnapshot(sig: Signals, side: Side, cfg: Pick<SignalCfg, 
   if (meta.mode) out.mode = meta.mode;
   if (meta.symbol) out.symbol = meta.symbol;
   if (meta.source) out.source = meta.source;
+  if (meta.rules) out.rules = meta.rules;
   if (v.state) out.state = v.state;
   if (v.confTiers !== undefined) out.confTiers = v.confTiers;
   if (v.provStrength !== undefined) out.provStrength = v.provStrength;
@@ -391,6 +399,11 @@ export function parseSignalSnapshot(raw: unknown): SignalSnapshot | null {
     if (typeof raw[k] === "string") out[k] = raw[k] as string;
     else delete out[k];
   }
+  if (raw.rules !== undefined) {
+    const r = parseRules(raw.rules);
+    if (r) out.rules = r;
+    else delete out.rules;
+  }
   if (raw.whale !== undefined) {
     const w = raw.whale === null ? null : parseWhale(raw.whale);
     if (raw.whale === null || w) out.whale = w;
@@ -427,6 +440,14 @@ export function parseSignalSnapshot(raw: unknown): SignalSnapshot | null {
     } else delete out.lage;
   }
   return out;
+}
+
+/** A stored rule reference of a snapshot (kind is always the Einstiegs-Check there). */
+function parseRules(raw: unknown): RuleRef | null {
+  if (!isRec(raw) || raw.kind !== "entry" || typeof raw.hash !== "string" || !/^[0-9a-f]{8}$/.test(raw.hash)) return null;
+  const n = toNum(raw.n);
+  const since = toNum(raw.since);
+  return { kind: "entry", hash: raw.hash, n: Number.isFinite(n) && n >= 1 ? Math.round(n) : null, since: Number.isFinite(since) ? since : null };
 }
 
 const PART_IDS: readonly PartId[] = ["traders", "div", "sr"];

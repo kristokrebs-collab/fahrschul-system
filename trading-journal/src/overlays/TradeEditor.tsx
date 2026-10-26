@@ -27,6 +27,7 @@ import { jsonEqual } from "@/store/merge3";
 import { pushToast, useUi, type AccFilter, type TradeDraft } from "@/store/uiStore";
 import { ExecutionSection } from "@/journal/editor/ExecutionSection";
 import { PsychSection } from "@/journal/editor/PsychSection";
+import { VoiceNote } from "@/journal/editor/VoiceNote";
 import { dropEmptyJournalKeys, fillFix, journalDefaults, journalFromTrade, journalKey, journalRecord, journalReset, openRemainderMessage, statusAfterFills, validateJournal, type JournalForm } from "@/journal/editor/form";
 import { ShotsField } from "@/journal/screenshots/ShotsField";
 import { RatingDots } from "@/journal/ui/RatingDots";
@@ -1055,6 +1056,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           )}
           <Field label="Begründung" htmlFor="f-reason">
             <Textarea id="f-reason" rows={3} className="leading-relaxed" value={d.reason} onChange={setStr("reason")} placeholder={ED.COPY.reasonPlaceholder} />
+            <VoiceNote value={d.reason} onChange={(reason) => setD((x) => ({ ...x, reason }))} label="Begründung" testId="voice-reason" />
           </Field>
         </Section>
 
@@ -1117,6 +1119,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         <Section title="Review">
           <Field label="Learnings & Notizen" htmlFor="f-notes">
             <Textarea id="f-notes" rows={3} className="leading-relaxed" value={d.notes} onChange={setStr("notes")} placeholder="Was lief gut, was mache ich nächstes Mal anders?" />
+            <VoiceNote value={d.notes} onChange={(notes) => setD((x) => ({ ...x, notes }))} label="Learnings und Notizen" testId="voice-notes" />
           </Field>
           <Field label="Chart-Link (TradingView)" htmlFor="f-chart">
             <Input id="f-chart" type="url" value={d.chart} onChange={setStr("chart")} placeholder="https://www.tradingview.com/x/…" autoComplete="off" {...fieldInvalid("chart")} />

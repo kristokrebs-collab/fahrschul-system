@@ -9,7 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { accountView } from "@/domain/account";
 import { detectBehaviors } from "@/domain/coach/events";
 import { buildReport, periodOf } from "@/domain/reports";
-import { __resetDeliveryLog, DELIVERY_LOG_KEY, recordDelivery } from "@/market/keylevels/deliveryLog";
+import { __resetDeliveryLog, DELIVERY_LOG_KEY, logExternalDelivery, recordDelivery } from "@/market/keylevels/deliveryLog";
 import { PRESENCE_KEY } from "@/market/presence";
 import { __resetSignalArchive, recordSignalEvent, SIGNAL_ARCHIVE_KEY } from "@/market/signalArchive";
 import { MotionRoot } from "@/motion/MotionRoot";
@@ -91,6 +91,11 @@ describe("SignalInboxCard (F28)", () => {
     expect(within(rows[0]!).getByText("Signal fresh")).toBeInTheDocument(); // my market beats the stronger signal on a market I do not trade
     expect(rows[3]).toHaveTextContent("Gehandelt:");
     expect(screen.getByTestId("inbox-order")).toHaveTextContent("Reihenfolge");
+    // the source line: where the list comes from, how many, from which to which time (F27)
+    const basis = screen.getByTestId("inbox-basis");
+    expect(basis).toHaveTextContent("Quelle: Signalarchiv dieses Geräts (nur bei offener App gesammelt) · 4 Ereignisse");
+    expect(basis).toHaveTextContent("ältestes Signal");
+    expect(basis).toHaveTextContent("neuestes Signal");
 
     fireEvent.click(screen.getByTestId("inbox-filter-gehandelt"));
     expect(screen.getAllByTestId("inbox-row")).toHaveLength(1);
@@ -226,6 +231,7 @@ describe("SignalBalanceCard (F25)", () => {
     expect(loadLabData).not.toHaveBeenCalled(); // nothing is fetched while rendering
     const total = screen.getAllByTestId("balance-row").find((r) => r.getAttribute("data-key") === "alle")!;
     expect(total).toHaveAttribute("data-n", "4");
+    expect(screen.getByTestId("balance-basis-line")).toHaveTextContent("Quelle: Signalarchiv dieses Geräts (nur bei offener App gesammelt) · 4 Ereignisse");
     expect(total).toHaveTextContent("Ausgang noch nicht ausgewertet");
     expect(screen.getByTestId("outcome-auto")).toHaveTextContent("Wird automatisch ausgewertet.");
     expect(screen.getByTestId("outcome-stand")).toHaveTextContent("Noch nicht berechnet.");
@@ -340,6 +346,20 @@ describe("DataQualityCard (F27)", () => {
     expect(d).toHaveAttribute("data-sent", "1");
     expect(d).toHaveAttribute("data-duplicate", "1");
     expect(d).toHaveAttribute("data-hours", "1");
+  });
+
+  it("the sent lines say which alarm they came from – the entry check and the box evaluation are in the log as sent lines", () => {
+    recordDelivery({ source: "key", levelId: "l", title: "A", detail: "", stage: "confirm", basis: "close", channels: ["toast"], outcome: "sent", dedupeKey: "k1", at: NOW - H });
+    logExternalDelivery("signal", "Einstiegs-Check BTCUSDT", "Long, 4 von 5 Bedingungen");
+    logExternalDelivery("signal", "Einstiegs-Check ETHUSDT", "Short");
+    logExternalDelivery("box", "Box 4h BTCUSDT", "Ausbruch");
+    render(wrap(<DataQualityCard now={NOW} />));
+    expect(screen.getByTestId("quality-delivery")).toHaveAttribute("data-sent", "4");
+    const s = screen.getByTestId("quality-delivery-sources");
+    expect(s).toHaveAttribute("data-key", "1");
+    expect(s).toHaveAttribute("data-signal", "2");
+    expect(s).toHaveAttribute("data-box", "1");
+    expect(s).toHaveTextContent("davon Schlüsselmarken 1 · Einstiegs-Check 2 · Box-zu-Box 1");
   });
 
   it("checks the candles only on request and lists the holes", async () => {

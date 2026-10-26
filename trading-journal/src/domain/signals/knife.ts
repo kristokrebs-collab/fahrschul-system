@@ -83,6 +83,9 @@ const LABEL: Readonly<Record<KnifeId, Readonly<Record<Side, string>>>> = {
 /** The whale point in the Lage layout. */
 export const KNIFE_WHALE_INFO_LABEL = "Top-Trader-Delta (Info)";
 
+/** The German row label of a filter point for a side (what a stored snapshot's `knife.items` stand for). */
+export const knifeItemLabel = (id: KnifeId, side: Side): string => LABEL[id][side];
+
 const fmt0 = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
 const price = (x: number): string => (Number.isFinite(x) ? fmt0.format(x) : "–");
 const ago = (bars: number): string => (bars <= 0 ? "jetzt" : bars === 1 ? "vor 1 Kerze" : `vor ${bars} Kerzen`);

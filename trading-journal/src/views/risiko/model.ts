@@ -20,6 +20,29 @@ export interface LiqRow {
   leverage: number | null;
 }
 
+/** Where the shown liquidation rows come from (F27): how many legs are journal trades / venue positions, and how many prices are given vs. calculated. */
+export interface LiqBasis {
+  journal: number;
+  exchange: number;
+  /** the venue / the trade gave the liquidation price */
+  given: number;
+  /** calculated from the tier table (an approximation) */
+  approx: number;
+}
+
+/** Counts the legs that have a row (a leg without liquidation data has none and is not counted). */
+export function liqBasis(legs: readonly ExposureLeg[], rows: readonly LiqRow[]): LiqBasis {
+  const byId = new Map(legs.map((l) => [l.id, l] as const));
+  const b: LiqBasis = { journal: 0, exchange: 0, given: 0, approx: 0 };
+  for (const r of rows) {
+    const leg = byId.get(r.id);
+    if (leg) b[leg.source] += 1;
+    if (r.given) b.given += 1;
+    else if (r.liq != null) b.approx += 1;
+  }
+  return b;
+}
+
 /**
  * Liquidation of every open leg that carries one: the venue's / trade's own price when it has one, else the
  * approximation (isolated margin from the leverage / margin; cross from the wallet). Closest first.

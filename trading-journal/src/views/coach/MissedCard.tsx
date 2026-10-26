@@ -20,6 +20,7 @@ import { cn } from "@/lib/cn";
 import { pct0 } from "@/lib/format";
 import { setSignalWatched, useSignalArchive } from "@/market/signalArchive";
 import { Badge } from "@/primitives/Badge";
+import { ArchiveBasis } from "./BasisLine";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
@@ -189,6 +190,7 @@ export function MissedCard({ list, now, className }: { list: readonly EnrichedTr
           {rep.missed.length > 0 ? ` Stichprobe: ${rep.missed.length} verpasste, ${rep.traded.length} gehandelte Signale.` : ""}
         </p>
         {rep.rows.length > 0 && <p>{OUTCOME_STRINGS.rules}</p>}
+        <ArchiveBasis events={events} testId="missed-basis" />
       </div>
     </Card>
   );

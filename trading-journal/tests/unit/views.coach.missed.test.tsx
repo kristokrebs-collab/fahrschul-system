@@ -97,6 +97,7 @@ describe("MissedCard", () => {
     expect(rows[0]).toHaveTextContent("ETHUSDT · 4h");
     expect(screen.getByTestId("missed-counter")).toHaveTextContent("Stichprobe: 2 verpasste, 1 gehandelte Signale.");
     expect(screen.getByTestId("missed-limits")).toHaveTextContent("bewusst ausgelassen oder übersehen");
+    expect(screen.getByTestId("missed-basis")).toHaveTextContent("Quelle: Signalarchiv dieses Geräts (nur bei offener App gesammelt) · 5 Ereignisse");
 
     // Beobachten marks and persists the mark; „Testen“ goes to the Labor
     await act(async () => {

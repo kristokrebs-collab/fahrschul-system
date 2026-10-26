@@ -30,6 +30,7 @@ import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import { useUi } from "@/store/uiStore";
 import type { RiskBase } from "./hooks";
+import { LivePriceStand } from "./LivePriceStand";
 import { parseInput, toInput, useRiskUi, type CalcInputs } from "./riskStore";
 import { RISIKO } from "./strings";
 import { Metric, RiskCard, SEG_TOUCH, money, pct, priceText, qtyText } from "./ui";
@@ -216,6 +217,7 @@ export function CalculatorCard({ base }: { base: RiskBase }) {
             </span>
           )}
         </div>
+        {isLive && <LivePriceStand className="!text-[11.5px]" />}
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Field label={S.pair} htmlFor={fieldIds.pair}>

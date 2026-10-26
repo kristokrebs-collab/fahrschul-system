@@ -17,9 +17,10 @@ import type { EnrichedTrade } from "../types";
 import { SOURCE_LABEL, type SignalEvent } from "./archive";
 import { buildInbox, type InboxRow } from "./inbox";
 import { isDecided, type OutcomeBasis, type OutcomeMap } from "./outcome";
+import { ruleLabel } from "./rules";
 
-export type BalanceGroup = "type" | "setup" | "tf";
-export const BALANCE_GROUP_LABEL: Readonly<Record<BalanceGroup, string>> = { type: "Signalart", setup: "Setup", tf: "Zeiteinheit" };
+export type BalanceGroup = "type" | "setup" | "tf" | "rules";
+export const BALANCE_GROUP_LABEL: Readonly<Record<BalanceGroup, string>> = { type: "Signalart", setup: "Setup", tf: "Zeiteinheit", rules: "Regelstand" };
 export type BasisFilter = "all" | OutcomeBasis;
 export const BASIS_FILTER_LABEL: Readonly<Record<BasisFilter, string>> = { all: "Beides", own: "Marken des Signals", standard: "Standardmaß" };
 
@@ -84,6 +85,8 @@ const SETUP_NONE = "Ohne Setup-Namen";
 
 /** Group key and label of one event. */
 function groupOf(e: SignalEvent, by: BalanceGroup): { key: string; label: string } {
+  // the version of the rules the signal came from: the same settings are one group, a changed setting starts the next
+  if (by === "rules") return e.rules ? { key: `${e.rules.kind}|${e.rules.hash}`, label: ruleLabel(e.rules) } : { key: "ohne", label: "Ohne Regelstand (vor der Aufzeichnung der Versionen)" };
   if (by === "tf") return { key: e.tf ?? "–", label: e.tf ?? "Ohne Zeiteinheit" };
   const type = e.source === "box" ? (e.kind === "scan" ? "Box-Scanner" : "Box-Setup") : e.source === "key" ? `Schlüsselmarke (${e.kind === "retest" ? "Retest" : "Bestätigung"})` : SOURCE_LABEL.entry;
   if (by === "type") return { key: type, label: type };
