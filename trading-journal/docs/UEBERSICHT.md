@@ -44,13 +44,52 @@ Gemessen mit `vite preview` + Playwright, mobil 390 × 844 (ein Bildschirm ≈ 8
 
 ## 2. Was jetzt anders ist
 
-- **Seite „Funktionen“**: große Suche „Was willst du tun?“ (versteht Absichten, Tippfehler, Fragesätze), „Zuletzt benutzt“, „Empfohlen / Neu“, **zehn Aufgaben-Kacheln**, Gruppenliste mit
-  Zwischenüberschriften und Details (Fehlt noch, So geht’s, Siehe auch). Mobil 2 865 px (3,4 Bildschirme) statt 23 852 px (28,3); selbst die längste Gruppe („Strategie entwickeln & testen“, 20 Funktionen) hat 4 186 px.
-- **Registry**: 137 Funktionen (vorher 89), jede in genau einer Gruppe, mit Aufgabe in einfachen Worten, Absichten, Abschnitt, „Siehe auch“, Status.
+- **Seite „Funktionen“**: große Suche „Was willst du tun?“ (versteht Absichten, Tippfehler, Fragesätze), „Zuletzt benutzt“, „Empfohlen / Neu“, **zwölf Aufgaben-Kacheln**, Gruppenliste mit
+  Zwischenüberschriften und Details (Fehlt noch, So geht’s, Siehe auch). Mobil 2 865 px (3,4 Bildschirme) statt 23 852 px (28,3) – gemessen mit zehn Kacheln, vor Runde 8; die längste Gruppe („Auswerten & Berichte“) hat jetzt 28 Funktionen in fünf Blöcken zu höchstens sieben.
+- **Registry**: 171 Funktionen (vorher 89), jede in genau einer von zwölf Gruppen, mit Aufgabe in einfachen Worten, Absichten, Abschnitt, „Siehe auch“, Status.
 - **Inhalt-Leiste** (`SectionNav`) auf Markt, Coach, Analyse, Risiko, Labor, Wachstum, Berichte und Einstellungen: ein Chip je Abschnitt, klebt unter dem Header, markiert den Abschnitt in Sicht.
 - **Menü (⌘K / Symbol)**: oben das Feld „Was willst du tun?“ (findet jede Funktion) und der Weg „Alle Funktionen →“; Treffer öffnen die Stelle, scrollen weich dorthin und heben sie kurz hervor.
 - **Globale Suche (`/`)**: derselbe Scorer – „warum verliere ich“ findet *Leaks & Edges*.
 - Unverändert: Dashboard, Dock, Header-Layout.
+
+## 2b. Zusammenhang & Navigation (Feinschliff, Runde 8)
+
+Nach dem Umbau stand fest, **wo** jede Funktion ist. Jetzt geht es darum, dass Zusammengehöriges auch zusammen steht und sich gegenseitig zeigt.
+
+**Karte der Zusammenhänge** (was zusammengehört, wo es steht, was jetzt verbindet):
+
+| Zusammenhang | Wo es steht | Was jetzt verbindet |
+|---|---|---|
+| Handelsplan ↔ Zeitmaschine ↔ Verwaltung ↔ Alarme | Plan (5 Schritte), Labor (Zeitmaschine, Verwaltung testen/vergleichen), Markt (Alarme) | eigene Gruppe „Trade planen“ im Register (8 Funktionen, auch die Zeitmaschine); Siehe-auch im Ausstieg (→ Verwaltung testen / vergleichen), im Labor (Zeitmaschine → Handelsplan, Verwaltung → Verwaltung planen); der Ticket-Schritt hat „Plan → 3 Alarme“ schon selbst |
+| Aktien ↔ Analyst ↔ Kongress ↔ News | alles auf der Seite Aktien | eigene Gruppe „Aktien beobachten & bewerten“ (7), vorher auf zwei Gruppen und drei Zwischenüberschriften verteilt; Siehe-auch Aktien ↔ Handelsplan / Krypto-Scanner |
+| Transaktionsbuch ↔ Berichte ↔ Termine | Buch und Berichte auf einer Seite; Termine auf Markt | Buch steht in der Gruppe „Berichte“; Gebühren & Funding (Analyse) ↔ Transaktionsbuch; Termine gehören zu „Heute wichtig“ und „Ereignisphasen“ (Markt), nicht zu den Berichten |
+| Datenarchiv ↔ Squeeze ↔ Box | Archiv in Einstellungen, Squeeze und Box auf Markt | die Squeeze-Karte führt selbst zum Archiv (Knöpfe, wo es leer ist); die Archiv-Karte führt zurück (Siehe auch) |
+| Playbooks ↔ Labor ↔ Forward-Test | alle im Labor, „Teilen per Link“ in Community | Playbook, Forward-Test und Versionen als Nachbarn im Register; Siehe-auch Community (Teilen) → Playbook |
+| Belege ↔ Community | Ergebnisbeleg in Community, Bericht-Export in Berichte | Siehe-auch im Export → Ergebnisbeleg (nur mit Cloud-Konto) |
+| Tagesplan ↔ Handelsplan | Markt, Plan | Siehe-auch unter dem Tagesplan |
+| Positionsrechner ↔ Handelsplan | Risiko, Plan | Siehe-auch im Rechner |
+
+**Seiten und Tasten.** Reihenfolge überall dieselbe: Übersicht, Trades, Entscheidungsgrundlagen, Markt, Einstellungen (das Dock), dann Handelsplan, Aktien, Risiko · Analyse, Berichte, Coach, Wachstum ·
+Labor, Strategie-Studio · Community, Cockpit, Konto, Preise, Funktionen. In der Befehlsnavigation sind die Zahlen 1–5 genau die Dock-Tabs (vorher stand „Einstellungen“ auf 4 und „Markt“ auf 5);
+6–9 sind Handelsplan, Aktien, Risiko, Analyse. `[` und `]` laufen in derselben Reihenfolge, die Seitenwechsel schieben in dieser Richtung, die Buchstaben nach `g` stehen so im Tastenblatt
+(h Handelsplan, i Aktien, u Strategie-Studio, f Funktionen, …; je Seite ein Buchstabe, geprüft). Die jüngsten Seiten (Handelsplan, Aktien, Strategie-Studio) tragen in der Navigation ein kleines „Neu“, bis sie einmal offen waren.
+
+**Glossar (ein Wort pro Ding).**
+
+| Wort | Bedeutung hier | Nicht zu verwechseln mit |
+|---|---|---|
+| Entscheidungsgrundlage | Regeln und Checkliste, die du bei einem Trade wählst (Seite, Dock, Auswahl im Trade); im Alltag oft „Setup“ | **Setup** in Markt und Aktien: ein vom Scanner gefundener Chart-Aufbau (Box-Setup, Scanner-Treffer) |
+| Box | Preisspanne mit Rand oben und unten (Box-zu-Box-Chart) | – |
+| Schlüsselmarke | eigener Preis mit Regel, Status und Alarm (Markt) | **Chart-Level**: feste Linien aus den Einstellungen (Trigger, Invalidierung) |
+| Tagesplan · Handelsplan · Verbesserungsplan | der ganze Tag in vier Szenarien (Markt) · ein einzelner Trade in fünf Schritten (Seite Handelsplan) · die nächsten Schritte im Coach | – |
+| Ticket | der fertige Plan als Text oder CSV zum Kopieren; die App sendet nie eine Order | Order |
+| Verwaltung | was nach dem Einstieg geschieht (Break-even, Trailing, Teilziel): planen (Handelsplan), testen (Labor), vergleichen (Labor) | – |
+| Backtest · Forward-Test · Zeitmaschine · Replay | Regel auf alter Historie · Regel live auf neuen Kerzen (virtuelles Konto) · ein Plan durch viele neu gemischte und echte frühere Sitzungen (Wahrscheinlichkeit) · einen eigenen Trade Kerze für Kerze nachspielen | Demokonto (nur in der Demo) |
+| Datenarchiv | Marktzahlen, die diese App auf diesem Gerät mitschreibt (aus, bis du es einschaltest) | Börsenhistorie nachladen: einmal die letzten Tage von der Börse holen |
+| Check-in · Bereit-Check · Einstiegs-Check · Risiko-Check | täglicher Zustand · Hinweis, ob du gerade handeln solltest · Regelprüfung eines Einstiegs · Plan gegen deine Limits | – |
+| Serien | Verlustserien (Risiko), Gewinn- und Verlustserien (Analyse), Gewohnheits-Serien (Wachstum) | – |
+| Watchlist | deine Titel (Krypto und Aktien) | früher auch „Beobachtungsliste“ (jetzt nur noch als Suchwort) |
+| Beleg | nachprüfbarer Ergebnislink (Community) | die Belege einer Wochenreview-Aussage (Trades als Beweis) |
 
 ## 3. Die Karte
 
@@ -62,22 +101,35 @@ ein Weg durch die Oberfläche). Der Stand sagt ehrlich, ob die Funktion nur teil
 
 ### Heute vorbereiten
 
-_Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 8 Funktionen
+_Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 9 Funktionen
+
+**Lage & Plan**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Sehen, ob der Markt heute Vorsicht verlangt | Lage-Ampel | Übersicht › Lage-Ampel | teilweise |
+| Den Tag mit Terminen, Märkten und Marken überblicken | Morgenbriefing „Heute wichtig“ | Markt › Heute wichtig | teilweise |
 | Den Tag in vier Szenarien durchdenken | Tagesplan | Markt › Tagesplan | fertig |
 | Preislevel festlegen, die du beobachten willst | Schlüsselmarken | Markt › Schlüsselmarken | fertig |
+
+**Alarme**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
+| Dich benachrichtigen lassen, wenn eine Marke erreicht wird | Alarme & Zustellprotokoll | Markt › Alarme & Zustellprotokoll | teilweise |
+| Per E-Mail Bescheid bekommen, auch wenn die App zu ist | E-Mail-Alarm bei geschlossener App | Markt › Alarme & Zustellprotokoll › E-Mail-Alarm | teilweise |
+
+**Dein Zustand**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
 | Kurz festhalten, wie fit du heute bist | Täglicher Check-in | Wachstum › Check-in | fertig |
 | Prüfen, ob du gerade handeln solltest | Bereit-Check vor dem Trade | Wachstum › Bereit für den nächsten Trade? | fertig |
-| Dich benachrichtigen lassen, wenn eine Marke erreicht wird | Alarme & Zustellprotokoll | Markt › Alarme & Zustellprotokoll | teilweise |
 | Sehen, was heute in deinen Trades auffällt | Heute im Coach | Coach › Heute | fertig |
-| Den Tag mit Terminen, Märkten und Marken überblicken | Morgenbriefing „Heute wichtig“ | Markt › Heute wichtig | teilweise |
 
 ### Trade prüfen & Chart
 
-_Einstieg prüfen, Chancen finden, den Chart lesen._ · 26 Funktionen
+_Einstieg prüfen, Chancen finden, den Chart lesen._ · 15 Funktionen
 
 **Einstieg prüfen**
 
@@ -85,50 +137,72 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 26 Funktionen
 |---|---|---|---|
 | Prüfen, ob ein Einstieg gerade gültig ist | Einstiegs-Check | Übersicht › Einstiegs-Check | fertig |
 | Verstehen, warum der Check handeln oder auslassen sagt | Warum handeln oder auslassen? | Übersicht › Warum handeln oder auslassen? | fertig |
-| Positionsgröße aus Risiko und Stop berechnen | Positionsrechner | Risiko › Rechner | fertig |
 | Den Chart spiegeln und die These neu prüfen | Chart spiegeln / Bias prüfen | Markt › Bias-Test | fertig |
+| Positionsgröße aus Risiko und Stop berechnen | Positionsrechner | Risiko › Rechner | fertig |
 
 **Chancen finden**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Die stärksten Setups mit Plan sehen | Beste Setups | Markt › Beste Setups | fertig |
-| Deine Beobachtungsliste nach Setups absuchen | Chancen-Scanner | Markt › Watchlist-Scanner | teilweise |
-| Aktien und Krypto nach Chart-Setups absuchen | Aktien-Scanner | Aktien › Scanner | teilweise |
+| Deine Watchlist nach Setups absuchen | Chancen-Scanner | Markt › Watchlist-Scanner | teilweise |
 | Prüfen, was nach ähnlichen Lagen geschah | Ähnliche Situationen | Markt › Ähnliche Situationen | fertig |
 | Sehen, wie die Top-Trader positioniert sind | Top-Trader-Positionierung | Übersicht › Top Trader · Binance | fertig |
 | Prüfen, ob eine Seite des Marktes überfüllt ist | Squeeze-Beobachtung | Markt › Squeeze-Beobachtung | teilweise |
 | Termine sehen, die für den Handel zählen | Ereigniskalender | Markt › Termine | teilweise |
 
-**Aktien beobachten**
+**Chart lesen**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
-| Titel merken und ihren Kurs im Blick behalten | Watchlist (Aktien und Krypto) | Aktien › Watchlist | fertig |
-| Schlagzeilen zu deiner Watchlist lesen | News-Monitor (Watchlist) | Aktien › News | teilweise |
-| Sehen, welche Aktiengeschäfte Kongressmitglieder gemeldet haben | Kongress-Tracker | Aktien › Kongress | teilweise |
-
-**Chart & Einstellungen**
-
-| Aufgabe | Funktion | Seite › Abschnitt | Stand |
-|---|---|---|---|
-| Den Live-Chart mit Boxen und Zielen ansehen | Box-zu-Box-Chart | Markt › Box-Chart | fertig |
+| Den Live-Chart mit Boxen (Preisspannen) und Zielen ansehen | Box-zu-Box-Chart | Markt › Box-Chart | fertig |
 | Sehen, in welcher Phase die Box gerade ist | Box-Status | Markt › Box-Status | teilweise |
 | Trendlinien auf Preis und RSI prüfen | Preis- & RSI-Struktur | Markt › Preis- & RSI-Struktur | fertig |
 | Linien und Pfeile in den Chart eines Trades zeichnen | Zeichnungen im Trade-Chart | Trades – Trades → Trade öffnen → Chart → Zeichnen | teilweise |
 | Scanner, Mindestnote und Box-Alarme einstellen | Box-Einstellungen & Box-Alarme | Markt › Box-Einstellungen | fertig |
 
-**Handelsplan**
+### Aktien beobachten & bewerten
+
+_Scannen, beobachten, lesen und bewerten – Aktien und Krypto._ · 7 Funktionen
+
+**Finden & beobachten**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
-| Den Moment finden, in dem die Range bricht | Einstiegs-Timer (Handelsplan) | Handelsplan › Einstieg | teilweise |
-| Stop und Ziel festlegen, bevor man einsteigt | Ausstiegsplan: Stop und Ziel (Handelsplan) | Handelsplan › Ausstieg | fertig |
-| Ganze Einheiten innerhalb deiner vier Grenzen wählen | Positionsgröße im Handelsplan | Handelsplan › Größe | teilweise |
-| Prüfen, ob der Plan deine Grenzen einhält | Risiko-Check des Handelsplans | Handelsplan › Risiko-Check | fertig |
-| Den fertigen Plan als Text oder CSV mitnehmen | Ticket zum Kopieren (Handelsplan) | Handelsplan › Ticket | fertig |
-| Prüfen, ob sich meine Größe gerade sauber handeln lässt | Ausführbarkeit jetzt (Spread und Tiefe) | Handelsplan › Ticket › Ausführbarkeit jetzt | teilweise |
-| Vor dem Einstieg festlegen, wann der Stop nachgezogen wird | Verwaltung planen (Handelsplan & Positionsrechner) | Handelsplan › Ausstieg · Verwaltung nach dem Einstieg | fertig |
+| Aktien und Krypto nach Chart-Setups absuchen | Aktien-Scanner | Aktien › Scanner | teilweise |
+| Titel merken und ihren Kurs im Blick behalten | Watchlist (Aktien und Krypto) | Aktien › Watchlist | fertig |
+| Schlagzeilen zu deiner Watchlist lesen | News-Monitor (Watchlist) | Aktien › News | teilweise |
+| Sehen, welche Aktiengeschäfte Mitglieder des US-Kongresses gemeldet haben | Kongress-Tracker | Aktien › Kongress | teilweise |
+
+**Zahlen & Bewertung**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
+| Sehen, was eine Firma zuletzt gemeldet hat | Zahlen-Analyst | Aktien › Analyse · Zahlen | teilweise |
+| Den fairen Wert einer Aktie aus künftigen Gewinnen als Spanne rechnen | DCF-Rechner | Aktien › Analyse · Bewertung | fertig |
+| Eine Kaufthese festhalten und gegen neue Zahlen prüfen | Kaufthese | Aktien › Analyse · These | teilweise |
+
+### Trade planen
+
+_Vom Einstieg über Stop und Größe bis zum Ticket – und durchgespielt._ · 8 Funktionen
+
+**Plan bauen**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
+| Den Moment finden, in dem der Kurs aus seiner Spanne ausbricht | Handelsplan: Einstieg | Handelsplan › Einstieg | teilweise |
+| Stop und Ziel festlegen, bevor du einsteigst | Handelsplan: Ausstieg (Stop und Ziel) | Handelsplan › Ausstieg | fertig |
+| Vor dem Einstieg festlegen, wann der Stop nachgezogen wird | Handelsplan: Verwaltung planen | Handelsplan › Ausstieg · Verwaltung nach dem Einstieg | fertig |
+| Eine Größe wählen, die deine Limits einhält | Handelsplan: Größe | Handelsplan › Größe | teilweise |
+
+**Plan prüfen & mitnehmen**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
+| Prüfen, ob der Plan deine Grenzen einhält | Handelsplan: Risiko-Check | Handelsplan › Risiko-Check | fertig |
+| Prüfen, ob sich deine Größe gerade sauber handeln lässt | Handelsplan: Ausführbarkeit jetzt (Spread und Tiefe) | Handelsplan › Ticket › Ausführbarkeit jetzt | teilweise |
+| Einen Handelsplan durchspielen, bevor Geld im Spiel ist | Zeitmaschine (Plan durchspielen) | Labor › Zeitmaschine | fertig |
+| Den fertigen Plan als Text oder CSV mitnehmen | Handelsplan: Ticket zum Kopieren | Handelsplan › Ticket | fertig |
 
 ### Risiko & Disziplin
 
@@ -163,7 +237,7 @@ _Limits, Exposure und Regeln, bevor es teuer wird._ · 12 Funktionen
 
 ### Strategie entwickeln & testen
 
-_Eine Idee bauen und gegen echte Historie prüfen._ · 25 Funktionen
+_Eine Idee bauen und gegen echte Historie prüfen._ · 23 Funktionen
 
 **Idee bauen**
 
@@ -173,9 +247,8 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 25 Funktionen
 | Eigene Handelsregeln aus Bausteinen bauen | Eigene Idee (Regelbaukasten) | Labor › Strategie & Kosten | teilweise |
 | Weitere Indikatoren in deinen Regeln nutzen | Indikator-Bausteine (Donchian bis Funding) | Labor › Strategie & Kosten · Eigene Idee | teilweise |
 | Mit einer bekannten Strategie als Vorlage starten | Strategie-Bibliothek (32 Vorlagen) | Labor › Strategie & Kosten · Eigene Idee | teilweise |
-| Break-even, Trailing und Teilziel testen | Break-even, Trailing & Teilziel | Labor › Strategie & Kosten | teilweise |
+| Break-even, Trailing und Teilziel testen | Verwaltung testen: Break-even, Trailing & Teilziel | Labor › Strategie & Kosten | teilweise |
 | Ein Setup oder Signal als Idee ins Labor übernehmen | Diese Idee testen | Markt › Beste Setups | fertig |
-| Deine Setups durchsuchen und vergleichen | Setup-Bibliothek (Journal) | Entscheidungsgrundlagen › Entscheidungsgrundlagen | teilweise |
 | Frühere Fassungen deines Entwurfs ansehen | Versionen der Entwürfe | Labor › Versionen deiner Entwürfe | fertig |
 
 **Test & Ergebnis**
@@ -193,12 +266,11 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 25 Funktionen
 |---|---|---|---|
 | Prüfen, ob die Strategie höhere Kosten übersteht | Kosten- und Belastungstest | Labor › Kosten- und Belastungstest | fertig |
 | Den Test auf Ausreißer und Datenlücken prüfen | Strategie-Prüfbericht | Labor › Strategie-Prüfbericht | fertig |
-| Prüfen, ob das Ergebnis nur Overfitting ist | Robustheit: Overfitting, Walk-forward, Heatmap | Labor › Overfitting-Check | fertig |
-| Sehen, was jeder Filter wirklich bringt | Varianten- und Filtervergleich | Labor › Varianten- und Filtervergleich | teilweise |
+| Prüfen, ob die Strategie nur zur Vergangenheit passt (Overfitting) | Robustheit: Overfitting, Walk-forward, Heatmap | Labor › Overfitting-Check | fertig |
 | Prüfen, wie empfindlich die Idee auf Zahlen reagiert | Parameter-Raster | Labor › Parameter-Raster | fertig |
-| Eine Strategie schrittweise verbessern lassen, ohne dich zu überanpassen | Hintergrund-Optimierer | Labor › Optimierer | teilweise |
-| Einen Handelsplan durchspielen, bevor Geld im Spiel ist | Zeitmaschine (Plan durchspielen) | Labor › Zeitmaschine | fertig |
+| Sehen, was jeder Filter wirklich bringt | Varianten- und Filtervergleich | Labor › Varianten- und Filtervergleich | teilweise |
 | Sehen, ob Break-even oder Trailing dem Ergebnis hilft oder schadet | Verwaltung vergleichen | Labor › Verwaltung vergleichen | fertig |
+| Eine Strategie schrittweise verbessern lassen, ohne dich zu überanpassen | Hintergrund-Optimierer | Labor › Optimierer | teilweise |
 
 **Live prüfen & teilen**
 
@@ -218,11 +290,11 @@ _Warum du verlierst, was du verpasst, was du ändern kannst._ · 17 Funktionen
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
-| Herausfinden, was deine Gewinner und Verlierer gemeinsam haben | Muster-Entdecker | Labor › Muster-Entdecker | fertig |
 | Sehen, wo du Geld verlierst und wo dein Vorteil liegt | Leaks & Edges | Coach › Leaks & Edges | fertig |
 | Muster wie Revenge-Trading und Overtrading erkennen | Verhaltensmuster & Timeline | Coach › Timeline | fertig |
 | Sehen, was dich deine Fehler gekostet haben | Fehler-Kosten | Übersicht › Fehler-Kosten | fertig |
 | Eigene Fehler-Stichworte für Trades festlegen | Fehler-Tags festlegen | Einstellungen › Fehler-Tags | fertig |
+| Herausfinden, was deine Gewinner und Verlierer gemeinsam haben | Muster-Entdecker | Labor › Muster-Entdecker | fertig |
 
 **Coach**
 
@@ -253,7 +325,7 @@ _Warum du verlierst, was du verpasst, was du ändern kannst._ · 17 Funktionen
 
 ### Auswerten & Berichte
 
-_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 31 Funktionen
+_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 28 Funktionen
 
 **Berichte**
 
@@ -262,23 +334,28 @@ _Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 31 Funktionen
 | Einen Bericht für Woche, Monat oder Jahr lesen | Wochen- & Monatsberichte | Berichte | fertig |
 | Die Woche mit Befunden und Belegen durchgehen | Wochenreview | Berichte › Wochenreview | fertig |
 | Sehen, was dir das Journal im Monat gebracht hat | Persönlicher Monatsnutzen | Berichte › Persönlicher Monatsnutzen | fertig |
-| Berichte als PDF, CSV oder Markdown speichern | Berichte exportieren | Berichte › Export | fertig |
 | Einen kurzen Rückblick auf Woche oder Monat lesen | Rückblick | Übersicht › Rückblick | fertig |
 | Käufe, Verkäufe, Gebühren und Funding als Buch prüfen | Transaktionsbuch | Berichte › Transaktionsbuch | teilweise |
+| Berichte als PDF, CSV oder Markdown speichern | Berichte exportieren | Berichte › Export | fertig |
 
-**Kennzahlen & Vergleiche**
+**Kennzahlen**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Die wichtigsten Kennzahlen deines Tradings mit Unsicherheit sehen | Kennzahlen (Sharpe, SQN, Kelly) | Analyse › Kennzahlen | fertig |
-| Sehen, was Gebühren und Funding dich kosten | Gebühren & Funding | Analyse › Kosten | fertig |
-| Das Ergebnis nach Setup, Session oder Wochentag aufteilen | Aufschlüsselung nach Setup, Session, Wochentag … | Analyse › Breakdown | fertig |
 | Einen Überblick über deinen Vorteil bekommen | Edge-Score | Übersicht › Edge-Score | fertig |
 | Die auffälligsten Befunde aus deinen Trades lesen | Erkenntnisse | Übersicht › Erkenntnisse | fertig |
+| Das Ergebnis nach Setup, Session oder Wochentag aufteilen | Aufschlüsselung nach Setup, Session, Wochentag … | Analyse › Breakdown | fertig |
+| Sehen, was Gebühren und Funding dich kosten | Gebühren & Funding | Analyse › Kosten | fertig |
+| Eine eigene Kennzahl berechnen lassen | Eigene Kennzahl | Analyse › Eigene Kennzahl | fertig |
+
+**Vergleiche**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
 | Dich mit dem Markt vergleichen | Benchmark: Konto gegen Markt | Analyse › Benchmark | fertig |
 | Zwei Zeiträume, Konten oder Setups vergleichen | Zeiträume und Konten vergleichen | Analyse › Vergleich | fertig |
 | Vergleichen, wie eigene, Regelwerk- und KI-Trades abschneiden | Mensch, Regelwerk oder KI – wer entscheidet besser? | Analyse › Vergleich · Entscheidung | teilweise |
-| Eine eigene Kennzahl berechnen lassen | Eigene Kennzahl | Analyse › Eigene Kennzahl | fertig |
 
 **Wann und wo**
 
@@ -303,14 +380,6 @@ _Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 31 Funktionen
 | Prüfen, ob deine Serien normal sind | Gewinn- und Verlustserien | Analyse › Serien | fertig |
 | Prüfen, wie weit Trades gegen oder für dich liefen | MAE / MFE | Analyse › MAE / MFE | fertig |
 
-**Aktien: Zahlen & Bewertung**
-
-| Aufgabe | Funktion | Seite › Abschnitt | Stand |
-|---|---|---|---|
-| Sehen, was eine Firma zuletzt gemeldet hat | Zahlen-Analyst | Aktien › Analyse · Zahlen | teilweise |
-| Den Wert einer Aktie als Spanne durchrechnen | DCF-Rechner | Aktien › Analyse · Bewertung | fertig |
-| Eine Kaufthese festhalten und gegen neue Zahlen prüfen | Kaufthese | Aktien › Analyse · These | teilweise |
-
 ### Üben & Wachsen
 
 _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
@@ -329,7 +398,7 @@ _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
 | Prozessziele setzen und verfolgen | Ziele, Challenges & Gewohnheiten | Wachstum › Aktive Ziele | fertig |
 | Eine Challenge starten | Challenges | Wachstum › Challenges | fertig |
 | Tägliche Gewohnheiten abhaken | Gewohnheiten | Wachstum › Gewohnheiten | fertig |
-| Sehen, wie lange du dranbleibst | Laufende Serien | Wachstum › Laufende Serien | fertig |
+| Sehen, wie lange du bei deinen Gewohnheiten dranbleibst | Gewohnheits-Serien | Wachstum › Laufende Serien | fertig |
 
 **Psyche**
 
@@ -350,7 +419,7 @@ _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
 
 ### Trades eintragen & Daten
 
-_Trades hineinbekommen, ordnen, sichern und prüfen._ · 13 Funktionen
+_Trades hineinbekommen, ordnen, sichern und prüfen._ · 14 Funktionen
 
 **Eintragen & importieren**
 
@@ -369,6 +438,7 @@ _Trades hineinbekommen, ordnen, sichern und prüfen._ · 13 Funktionen
 |---|---|---|---|
 | Deine Trades filtern, sortieren und Ansichten speichern | Trades filtern & Ansichten speichern | Trades | fertig |
 | Trades automatisch einem Setup zuordnen | Trades automatisch zuordnen | Entscheidungsgrundlagen › Automatisch zuordnen | fertig |
+| Deine Setups durchsuchen und vergleichen | Entscheidungsgrundlagen (deine Setups) | Entscheidungsgrundlagen › Entscheidungsgrundlagen | teilweise |
 
 **Sichern & prüfen**
 
@@ -376,7 +446,7 @@ _Trades hineinbekommen, ordnen, sichern und prüfen._ · 13 Funktionen
 |---|---|---|---|
 | Das Journal sichern oder wiederherstellen | Backup & Wiederherstellung | Einstellungen › Daten | fertig |
 | Prüfen, ob die Marktdaten aktuell sind | Datenstatus | Einstellungen › Live-Daten | teilweise |
-| Marktzahlen und Analysezustände auf diesem Gerät mitschreiben | Datenarchiv | Einstellungen › Datenarchiv | teilweise |
+| Marktzahlen und Analyse-Stände auf diesem Gerät aufzeichnen | Datenarchiv | Einstellungen › Datenarchiv | teilweise |
 | Die letzten Tage Marktzahlen von Binance einmal nachholen | Börsenhistorie nachladen | Einstellungen › Datenarchiv › Börsenhistorie nachladen | teilweise |
 | Prüfen, ob Alarme und Kerzen zuverlässig angekommen sind | Daten- und Alarmqualität | Coach › Daten- und Alarmqualität | teilweise |
 
@@ -387,23 +457,22 @@ _Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 7 Funktionen
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Einer Gruppe beitreten oder eine anlegen | Gruppen & Einladungen | Community | teilweise |
-| Dich freiwillig mit anderen vergleichen | Rangliste (freiwillig) | Community | teilweise |
 | Mit einem Mentor oder Schüler zusammenarbeiten | Mentor-Modus | Community | fertig |
-| Einen Trade oder ein Setup per Link teilen | Teilen per Link | Community | teilweise |
 | Trades in der Gruppe besprechen | Reviews & Kommentare | Community | fertig |
 | Eine Kursstrecke in der Gruppe vorab einschätzen und später prüfen | Chartfälle mit Hypothese vorab | Community › Gruppe › Chartfälle | fertig |
-| Meine Ergebnisse als nachprüfbaren Beleg teilen | Ergebnisbeleg | Community › Teilen › Ergebnisbeleg | fertig |
+| Einen Trade oder ein Setup per Link teilen | Teilen per Link | Community | teilweise |
+| Deine Ergebnisse als nachprüfbaren Beleg teilen | Ergebnisbeleg | Community › Teilen › Ergebnisbeleg | fertig |
+| Dich freiwillig mit anderen vergleichen | Rangliste (freiwillig) | Community | teilweise |
 
 ### Konto, Einstellungen & Hilfe
 
-_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 19 Funktionen
+_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 18 Funktionen
 
 **Konto & Tarif**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Anmelden, synchronisieren und das Konto verwalten | Konto & Cloud-Sync | Konto | fertig |
-| Per E-Mail Bescheid bekommen, auch wenn die App zu ist | E-Mail-Alarm bei geschlossener App | Markt › Alarme & Zustellprotokoll › E-Mail-Alarm | teilweise |
 | Tarif wählen, Abo verwalten oder kündigen | Abo & Tarife | Preise | fertig |
 | Sehen, welcher Tarif welche Funktion enthält | Tarife im Vergleich | Preise › Alle Funktionen im Vergleich | fertig |
 | Freunde einladen und Gutschrift erhalten | Freunde einladen (Empfehlungscode) | Konto | teilweise |
@@ -415,7 +484,7 @@ _Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 19 Funktionen
 | Startkapital, Währung und Konten festlegen | Konten und Startkapital | Einstellungen › Konten | fertig |
 | Zeiteinheiten, Gewichte und Schwellen des Einstiegs-Checks anpassen | Einstiegs-Check einstellen | Einstellungen › Einstiegs-Check | fertig |
 | Die Lage-Ampel ein- oder ausschalten und anpassen | Lage-Ampel einstellen | Einstellungen › Lage-Ampel | fertig |
-| Feste Preislevel für den Chart eintragen | Chart-Level manuell | Einstellungen › Chart-Level · manuell | fertig |
+| Feste Preislevel für den Chart eintragen | Chart-Level (feste Linien) | Einstellungen › Chart-Level · manuell | fertig |
 | Deine Backtest-Zahlen als Vergleichswert hinterlegen | Backtest-Referenz | Einstellungen › Backtest-Referenz | fertig |
 | Hyblock-Daten anbinden | Hyblock-Connector | Einstellungen › Hyblock-Connector | fertig |
 | App installieren, Speicher und Version ansehen | Version & Speicher | Einstellungen › Version & Speicher | fertig |

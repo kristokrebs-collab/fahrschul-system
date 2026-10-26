@@ -43,7 +43,7 @@ export const ASSISTANT_STRINGS = {
   placeholder: "Frag mich etwas – oder tippe aufs Mikrofon",
   listening: "Ich höre zu …",
   micNote: "Die Sprache erkennt der Dienst deines Browsers; nichts wird von der App aufgenommen oder gespeichert.",
-  empty: "Ich antworte aus deinen Trades, prüfe den Einstieg, erkläre Laborläufe, öffne Seiten und merke mir, was dir wichtig ist.",
+  empty: "Ich antworte aus deinen Trades, prüfe den Einstieg, erkläre Laborläufe, zeige dir, wo etwas steht („Wo finde ich den Handelsplan?“), öffne Seiten und merke mir, was dir wichtig ist.",
   noTrades: "Noch keine abgeschlossenen Trades – Fragen zu deinen Zahlen beantworte ich, sobald welche da sind. Alles andere geht schon jetzt.",
 } as const;
 

@@ -91,6 +91,8 @@ describe("function register", () => {
     expect(FEATURE_GROUPS.map((g) => g.name)).toEqual([
       "Heute vorbereiten",
       "Trade prüfen & Chart",
+      "Aktien beobachten & bewerten",
+      "Trade planen",
       "Risiko & Disziplin",
       "Strategie entwickeln & testen",
       "Aus Fehlern lernen",
@@ -112,7 +114,56 @@ describe("function register", () => {
         for (const f of members) subs.set(f.sub!, (subs.get(f.sub!) ?? 0) + 1);
         for (const [sub, n] of subs) expect(n, `${g.id} › ${sub}`).toBeGreaterThanOrEqual(2);
       }
+      // no block of the page is a wall: the group view is cut by sub headings of at most 8 functions (a group at most 30)
+      expect(members.length, `${g.id} is too long for one tile`).toBeLessThanOrEqual(30);
+      const bySub = new Map<string, number>();
+      for (const f of members) bySub.set(f.sub ?? "", (bySub.get(f.sub ?? "") ?? 0) + 1);
+      for (const [sub, n] of bySub) expect(n, `${g.id} › ${sub || "(no sub heading)"} holds ${n} functions`).toBeLessThanOrEqual(8);
     }
+  });
+
+  it("keeps a group together by the page it belongs to: Handelsplan and Aktien each have their own group, in the order of a trader's day", () => {
+    const of = (id: string) => featureById(id)!.group;
+    for (const id of ["handelsplan-einstieg", "handelsplan-ausstieg", "handelsplan-groesse", "handelsplan-risiko", "handelsplan-ticket", "ausfuehrbarkeit-live", "verwaltung-planen", "zeitmaschine"]) expect(of(id), id).toBe("planen");
+    for (const id of ["aktien-scanner", "aktien-watchlist", "aktien-news", "aktien-kongress", "zahlen-analyst", "dcf-rechner", "kaufthese"]) expect(of(id), id).toBe("aktien");
+    // the two alarms sit side by side
+    expect(of("alarme")).toBe(of("email-alarm"));
+    // the groups come in the order of the day: prepare → check → stocks → plan → risk → build → learn → evaluate → grow → data → community → account
+    expect(FEATURE_GROUPS.map((g) => g.id)).toEqual(["heute", "pruefen", "aktien", "planen", "risiko", "testen", "lernen", "auswerten", "wachsen", "daten", "community", "konto"]);
+    // the group list of the register follows the group order, and a sub heading stays in one run
+    const order = FEATURE_GROUPS.map((g) => g.id);
+    let last = -1;
+    const closed = new Set<string>();
+    let run = "";
+    for (const f of FEATURE_REGISTRY) {
+      const gi = order.indexOf(f.group);
+      expect(gi, `${f.id} is out of group order`).toBeGreaterThanOrEqual(last);
+      last = gi;
+      const key = `${f.group}/${f.sub ?? ""}`;
+      if (key !== run) {
+        expect(closed.has(key), `${f.id}: the sub heading ${key} is split into two runs`).toBe(false);
+        if (run) closed.add(run);
+        run = key;
+      }
+    }
+  });
+
+  it("writes the tasks in the second person and the names with one word per thing", () => {
+    for (const f of FEATURE_REGISTRY) {
+      // Du-Form: a task never talks about "ich", "mein …", "wir" or "man"
+      expect(f.task, `${f.id}: ${f.task}`).not.toMatch(/\b(ich|mir|mich|mein\w*|wir|uns|unser\w*|man)\b/i);
+      expect(f.task![0], `${f.id}: a task starts with a capital`).toBe(f.task![0]!.toUpperCase());
+      expect(f.name, f.id).not.toMatch(/\s{2,}|\s$|^\s/);
+      expect((f.see ?? []).length, `${f.id}: at most four 'Siehe auch'`).toBeLessThanOrEqual(4);
+    }
+    // the five steps of the Handelsplan and the three kinds of Verwaltung read as a family
+    for (const f of FEATURE_REGISTRY.filter((x) => x.page === "plan")) expect(f.name.startsWith("Handelsplan"), f.id).toBe(true);
+    expect(featureById("verwaltung-planen")!.name).toMatch(/^Handelsplan: Verwaltung planen/);
+    expect(featureById("positionsverwaltung")!.name).toMatch(/^Verwaltung testen/);
+    expect(featureById("verwaltung-vergleich")!.name).toMatch(/^Verwaltung vergleichen/);
+    // a name is used once
+    const names = FEATURE_REGISTRY.map((f) => f.name.toLowerCase());
+    expect(new Set(names).size).toBe(names.length);
   });
 
   it("gives every function its task in plain words and the intents someone searches with", () => {

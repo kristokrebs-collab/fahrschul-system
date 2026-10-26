@@ -812,3 +812,19 @@ Keine neue Sprache und keine neue Bewegung: vorhandene Bausteine (`Segmented`, `
 - **Signalprotokoll** (aufgeklappter Posteingang-Eintrag): drei Blöcke mit Kapitälchen-Überschrift (`text-mute`, 10 px) – Voraussetzungen (Zeile = Wort + ✓ / ✗ / ?, Beschriftung des Zustands zuerst, `whitespace-nowrap`), Regelstand (Mono, mit `text-warn`-Zeile, wenn sich die Einstellungen seitdem geändert haben) und Verlauf (`ol`, Zeit in Mono `text-faint`, Zeilen aus Journal / Kerzen / Uhr tragen „aus Journal, Kerzen oder Uhr“, die Zeilen derselben Marke „dieselbe Marke / Box“ sind `text-mute`). Fehlt ein Block, sagt er in einem Satz, warum (älteres Signal, Quelle nennt keine).
 - **Quellen- und Lückenzeilen**: `SourceStand` (`num text-[12px] text-mute`, auf der Coach-Seite 11,5 px am Ende der Karte), „Quelle: … · Abruf …“, fehlende Zeit = „keine Daten“; die Lückenanzeige unter den Live-Daten ist eine Liste (`text-[11.5px] text-faint`, bei einer Lücke `text-warn` mit dem Wort „Lücke“ und der Zahl der fehlenden Einträge), jede Zeile eine Reihe.
 - **Spracheingabe**: ein Pillen-Knopf „Diktieren“ unter dem Textfeld (`aria-pressed`, 32 px, bei grobem Zeiger 44 px), beim Zuhören „Beenden“ mit Stopp-Zeichen und einer `role="status"`-Zeile („Hört zu … „…““); Probleme (kein Mikrofon, kein Netz, nichts gehört) stehen als `text-warn`-Zeile, nicht als Dialog; der Datenschutzsatz („Die Sprache erkennt der Dienst deines Browsers … Die App nimmt nichts auf“) steht dauerhaft darunter in 11 px `text-faint`.
+
+
+## Zusammenhang & Navigation (Feinschliff, Runde 8)
+
+Keine neue Sprache, nur ruhigere Wege. **Befehlsnavigation:** die fünf Dock-Seiten groß (wie bisher die ersten vier), darunter die übrigen Seiten in vier kleinen Gruppen (Kapitälchen-Überschrift `font-mono text-[10.5px] text-faint`,
+dasselbe Raster mit Symbol, Name, Zähler und Ziffer); die jüngsten Seiten tragen eine Pille „Neu“ (`rounded-full border-line-2`, `text-mute`, 9,5 px Mono), bis sie einmal offen waren – kein Farbakzent, keine Bewegung.
+**„Siehe auch“** (`FeatureLinks`): eine Zeile aus Kapitälchen-Anker und unterstrichenen Textlinks mit Pfeil (`text-[12.5px] text-mute`), in Karten durch eine Haarlinie abgesetzt; Touch ≥ 44 px bei grobem Zeiger;
+höchstens drei Links, nie auf der Startseite. **Einführung, Schritt „Mehr“:** eine Liste aus vier schlichten Kästen (Name, ein Satz) und ein einziger Knopf („Demo mit Beispieldaten“); nichts startet von selbst.
+## Bewegung & Leistung global (Feinschliff)
+
+Keine neue Sprache, sondern eine gemeinsame: dieselben Federn und Dauern aus `src/motion/tokens.ts` bei jedem Baustein, dazu Bausteine für lange Seiten. Details: `src/motion/README.md`, `src/primitives/README.md`.
+- **Press-Skalierung nach Zielgröße** (`pressScale`): 24-px-Schalter .88, Icon-Knöpfe (Kopfzeile, Dock) .92, Buttons .96, Label im Segmented und Toast .97, Karten .985. Gleiche Art Element = gleiches Drücken (Feder `spring.press`).
+- **Platz für spät ladende Karten** (`Reserve`, `ReserveFallback`, `ReserveSuspense`, `CardSkeleton`): die Endgröße der Karte steht ab dem ersten Bild (Mindesthöhe je Breakpoint, Platzhalter in Kartenform), nichts darunter rutscht. Die Höhen sind gemessene Pixel; ungefähr reicht.
+- **Lange Seiten**: Zellen unterhalb des ersten Bildschirms als `Reveal defer` (Stil, Layout und Malen entfallen, solange die Zelle weit weg ist) und die Karten darin als `Later` (eigener kleiner Commit nach dem ersten Bild, nie beim Scrollen, sofort wenn sie näher als 500 px kommen). Der Seitenwechsel ist dann nicht mehr ein einziger langer Task.
+- **Reveal** löst auch bei sehr hohen Karten aus (15 % der Karte ODER ein Fünftel des Bildschirms); vorher blieb eine Karte über ≈ 5 000 px auf dem Handy bei Deckkraft 0 (gemessen: Markt, 390 px).
+- Reduzierte Bewegung: jede Seite zeigt alles sofort, keine Endlos-Animation (e2e `motion-global`).

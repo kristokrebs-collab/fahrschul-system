@@ -52,6 +52,10 @@ test.describe("Einführung", () => {
 
     await next(page, "boerse");
     await expect(page.getByTestId("tour-exchange-off")).toContainText("Du trägst Trades selbst ein");
+    // the late areas, and the way to the demo (a real click on it is tested in the unit test; here it only has to be there)
+    await next(page, "mehr");
+    await expect(page.getByTestId("tour-more")).toContainText("Handelsplan");
+    await expect(page.getByTestId("tour-demo")).toBeVisible();
     await next(page, "ziel");
     await page.getByRole("radio", { name: /Höchstens 3 Trades am Tag/ }).click();
 

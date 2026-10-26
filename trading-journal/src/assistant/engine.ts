@@ -65,7 +65,8 @@ export function execute(plan: Plan, question: string, env: EngineEnv): Turn {
           .then((reply): Reply[] => [{ kind: "tool", tool, reply }]);
         return { replies: [], via: plan.via, topic: plan.topic, needsServer: false, later };
       }
-      const reply = runTool(tool, tool === "navigate" ? plan.arg : question, env);
+      // navigate and where carry their own argument (the page, the thing to open after "Öffne …"); the other tools read the whole question
+      const reply = runTool(tool, tool === "navigate" ? plan.arg : tool === "where" ? plan.arg || question : question, env);
       return { replies: [{ kind: "tool", tool, reply }], via: plan.via, topic: plan.topic, needsServer: false };
     }
     case "clarify":

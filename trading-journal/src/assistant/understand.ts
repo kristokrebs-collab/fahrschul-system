@@ -194,7 +194,7 @@ const PAGE_WORDS: ReadonlyArray<[RegExp, Page]> = [
 export const PAGE_LABEL: Readonly<Record<Page, string>> = {
   overview: "Übersicht",
   trades: "Trades",
-  setups: "Setups",
+  setups: "Entscheidungsgrundlagen",
   settings: "Einstellungen",
   markt: "Markt",
   analyse: "Analyse",
@@ -335,7 +335,10 @@ export function closestQuestions(text: string, k = 3): string[] {
   return scored.sort((a, b) => b.s - a.s || a.i - b.i).slice(0, k).map((e) => e.q);
 }
 
-export const CLARIFY_TEXT = "Das habe ich noch nicht sicher verstanden. Ich beantworte Fragen zu deinen Trades (Kennzahlen, Zeiträume, Setups, Sessions, Wochentage), zu Verhalten wie Revenge oder FOMO, zu deinem Einstiegs-Check und zum Labor – oder ich öffne eine Seite für dich.";
+export const CLARIFY_TEXT = "Das habe ich noch nicht sicher verstanden. Ich beantworte Fragen zu deinen Trades (Kennzahlen, Zeiträume, Setups, Sessions, Wochentage), zu Verhalten wie Revenge oder FOMO, zu deinem Einstiegs-Check und zum Labor – ich zeige dir, wo eine Funktion steht („Wo finde ich den Handelsplan?“), oder öffne eine Seite für dich.";
+
+/** "Öffne den Belastungstest", "Starte die Demo", "Zeig mir den Kongress-Tracker": a verb of opening at the start – the function register finds the place. */
+const OPEN_VERB = /^\s*(?:öffne\w*|oeffne\w*|zeig\w*|starte\w*|geh\w*|bring\w*|spring\w*|navigiere)(?:\s+(?:mich|mir|uns))?(?:\s+(?:zu|zum|zur|nach|auf))?\s+/i;
 
 /**
  * What to do with `text`. Order: tools whose phrasing is unmistakable → journal parser (exact) → typo repair →
@@ -365,6 +368,13 @@ export function understand(text: string, ctx: UnderstandCtx): Plan {
     const page = pageOf(norm0);
     const short = norm0.trim().split(" ").length <= 5;
     if (page && !intent.metricExplicit && !intent.behavior && !intent.period && !intent.filters.length && (!intent.groupBy || short)) return { kind: "tool", tool: "navigate", arg: page, via: [`Seite: ${PAGE_LABEL[page]}`], topic: `page:${page}` };
+  }
+
+  // 3b) "Öffne den Belastungstest", "Starte die Demo": an opening verb and something the journal does not ask about – the function
+  //     register finds the place (`whereTool`: a clear hit opens, close ones are offered, no hit says so)
+  if (!ownSubject(intent) && !intent.filters.length && OPEN_VERB.test(raw)) {
+    const thing = raw.replace(OPEN_VERB, "").trim();
+    if (thing && thing.split(/\s+/).length <= 5) return { kind: "tool", tool: "where", arg: thing, via: ["Funktion öffnen"], topic: "where" };
   }
 
   // 4) typo repair

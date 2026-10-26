@@ -3,12 +3,12 @@ import { useEffect, useRef, useState, type ElementType, type KeyboardEvent, type
 import { cn } from "@/lib/cn";
 import { useMorphSource } from "@/motion/MorphDialog";
 import { contextSpringAt } from "@/motion/physics";
-import { radius, spring, tween } from "@/motion/tokens";
+import { pressScale, radius, spring, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { useReducedFx } from "@/motion/useReducedFx";
 
 /** Press feedback of a morph source: subtle enough not to read as a separate "click" before the morph takes over. */
-const PRESS_SCALE = 0.985;
+const PRESS_SCALE = pressScale.surface;
 /** A `borderRadius` at or above this is a pill source (`radius.pill`): it morphs through a separate surface span. */
 const PILL_RADIUS = 999;
 /** Source content fade (OV-04/05): out the moment its dialog opens, back in once the reverse morph has landed. */

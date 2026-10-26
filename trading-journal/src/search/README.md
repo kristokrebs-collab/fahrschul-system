@@ -56,3 +56,11 @@ Funktion. Die Gruppe steht hinter den Seiten (`KIND_BIAS`), so liefert „Labor�
 `openFeature` (Seite + Scrollen zur Karte, oder das Sheet); der Overlay-Chunk merkt ihn in der „Zuletzt geöffnet“-Liste (`feature:<id>`), die auch „Zuletzt
 benutzt“ der Seite „Funktionen“ speist. Ohne `features` im Input gibt es keine Funktionstreffer (das Register ist ein Lazy-Chunk). Tests:
 `tests/unit/search.features.test.ts`, `features.intents.test.ts` (46 Absichten: die richtige Funktion unter den ersten drei Funktionstreffern).
+
+## Finder und Rauschen (Feinschliff, Runde 8)
+
+Der Zähler (`src/app/featureQuery.ts`) gilt für die Seite „Funktionen“, die Navigation, diese Suche und den Assistenten. Damit ein Wort ohne Sinn keine sichere Antwort bekommt:
+ein längeres Wort zählt für ein kürzeres nur mit kurzer Endung oder langem Stamm („Positionsrechner“ → „Position“, aber „bestellen“ nicht → „beste“); Tippfehler gelten nur, wenn der erste Buchstabe stimmt
+(„Positonsrechner“ ja, „bestellen“ → „einstellen“ nein) und ein angefangenes Wort mit einem Fehler erst ab sechs Buchstaben („Danke“ ist nicht „Dunkel“); „App“ ist ein Füllwort („Was kann die App“ findet
+nicht jede Funktion mit „App“ im Namen). `tests/unit/features.finder.test.ts` hält 80 Fragen an die später gekommenen Bereiche (Handelsplan, Zeitmaschine, Aktien, Kongress, Archiv, Demo, Belege …, mit Tippfehlern)
+und die Gegenprobe (Unsinn findet nichts Sicheres; „Order senden“ führt zum Ticket, das nie sendet). Die Seiten haben in `PAGE_WORDS` ihre eigenen Suchwörter (nur das, was auf der Seite selbst steht).

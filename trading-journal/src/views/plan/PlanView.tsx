@@ -11,6 +11,7 @@
  *   Gespeichert     the saved plans (`settings.plan`)
  */
 import { Suspense, useEffect, type ReactNode } from "react";
+import { SeeAlso } from "@/app/FeatureLinks";
 import { clockIn, dateTimeIn } from "@/domain/plan";
 import { cn } from "@/lib/cn";
 import { tvSymbolToBinance } from "@/market/symbol";
@@ -191,6 +192,7 @@ export function PlanView({ className }: { className?: string }) {
       <LinkLine />
       <Progress steps={vm.model.steps} progress={vm.model.progress} />
       <SectionNav items={NAV} />
+      <SeeAlso at="plan.page" />
       <div className="grid min-w-0 gap-5 lg:grid-cols-12 lg:items-start">
         <aside className="min-w-0 lg:sticky lg:top-[132px] lg:order-2 lg:col-span-5" aria-label="Bild zum Plan">
           <ChartCard vm={vm} />

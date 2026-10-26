@@ -3,7 +3,7 @@ import { useId, useRef, useState, type KeyboardEvent, type MouseEvent, type Poin
 import { cn } from "@/lib/cn";
 import { useTouchMoveGuard } from "@/motion/a11y";
 import { contextSpring, contextSpringAt, haptic, physics, pointerSpeed, pointerTempo, snapIndex, tempoOf, useAxisDrag, type AxisDragMove, type AxisDragRelease } from "@/motion/physics";
-import { radius, spring, tween } from "@/motion/tokens";
+import { pressScale, radius, spring, tween } from "@/motion/tokens";
 import { useCanHover } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -26,7 +26,7 @@ export interface SegmentedProps<T extends string> {
 }
 
 /** The label (not the item, so the shared thumb is never measured mid-press) dips to .97 while pressed. */
-const LABEL_PRESS = { pressed: { scale: 0.97 } };
+const LABEL_PRESS = { pressed: { scale: pressScale.label } };
 
 /**
  * Coarse pointers: every segment is at least 44 px wide (layout) and its tap area 44 px tall (an invisible ::after

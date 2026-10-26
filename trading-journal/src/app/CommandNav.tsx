@@ -8,7 +8,7 @@
  *
  * Dialog behaviour: role=dialog, aria-modal, aria-label "Navigation", focus trap, Escape, scroll lock, inert page
  * (applied after the open wipe, released after the close wipe – never in the first frames of either), focus return.
- * Focus starts on the close button; arrow keys / Home / End move between the entries, 1–4 jump to a page. Unmounted while closed, so none of its
+ * Focus starts on the close button; arrow keys / Home / End move between the entries, 1–9 jump to a page (1–5 are the dock tabs in the dock's order, then Handelsplan, Aktien, Risiko, Analyse). Unmounted while closed, so none of its
  * texts exist in the page otherwise.
  */
 import { AnimatePresence, motion, type Transition } from "motion/react";
@@ -39,7 +39,8 @@ import { exportCsv, exportJson } from "@/store/backup";
 import { canDownload } from "@/store/download";
 import { navigate } from "@/store/router";
 import { toggleTheme, useTheme } from "@/store/themeStore";
-import { PAGES, pushToast, useUi, type Page } from "@/store/uiStore";
+import { readJson, storageKey, writeJson } from "@/store/storage";
+import { DOCK_PAGES, PAGES, pushToast, useUi, type Page } from "@/store/uiStore";
 import { useViews } from "@/store/viewsStore";
 import { create } from "zustand";
 
@@ -81,7 +82,8 @@ export const COMMAND_NAV_STRINGS = {
   syncFailed: "Synchronisieren fehlgeschlagen",
   csv: "CSV-Export",
   backup: "Backup herunterladen",
-  more: "Werkzeuge & Konto",
+  groups: { handeln: "Planen & Handeln", lernen: "Auswerten & Lernen", strategien: "Strategien", mehr: "Mehr" },
+  isNew: "Neu",
   views: "Gespeicherte Ansichten",
   recentFeatures: "Zuletzt benutzte Funktionen",
   hints: "↑↓ wählen · ↵ öffnen · 1–9 Seite · Esc schließt",
@@ -173,10 +175,37 @@ function useRecentFeatures(): FeatureChip[] {
 }
 
 const PAGE_HASH = Object.fromEntries(PAGES.map((p) => [p, `#${p}`])) as Record<Page, string>;
-/** The pack's big links: the four original pages (digits 1–4); the feature pages follow in a compact grid. */
-const PRIMARY = PAGES.slice(0, 4);
-const SECONDARY = PAGES.slice(4);
-/** Two-digit index of a page (`01` … `15`) – the digit shortcut of the first nine. */
+/** The big links: the five dock tabs, in the dock's order (digits 1–5); every other page follows in a compact grid by task. */
+const PRIMARY = PAGES.slice(0, DOCK_PAGES.length);
+/**
+ * The pages below the dock five, grouped by what you are doing. Their order is `PAGES` order (the digit order), and together
+ * they hold every page that is not a dock tab exactly once (`tests/unit/app.navOrder.test.ts`).
+ */
+export const NAV_GROUPS: readonly { id: keyof typeof COMMAND_NAV_STRINGS.groups; pages: readonly Page[] }[] = [
+  { id: "handeln", pages: ["plan", "aktien", "risiko"] },
+  { id: "lernen", pages: ["analyse", "berichte", "coach", "wachstum"] },
+  { id: "strategien", pages: ["labor", "studio"] },
+  { id: "mehr", pages: ["community", "cockpit", "konto", "preise", "funktionen"] },
+];
+/** Pages that came with the last release: a small "Neu" next to the name until the page has been opened once (this browser only). */
+export const NEW_PAGES: readonly Page[] = ["plan", "aktien", "studio"];
+const VISITED_KEY = storageKey("visited-pages");
+
+/** The pages of `NEW_PAGES` opened so far (blocked or damaged storage reads as "none": the tags then stay). */
+export function readVisitedPages(): Page[] {
+  const v = readJson<unknown>(VISITED_KEY, []);
+  return Array.isArray(v) ? v.filter((p): p is Page => typeof p === "string" && (NEW_PAGES as readonly string[]).includes(p)) : [];
+}
+
+/** Remembers that `page` was opened; only the pages of `NEW_PAGES` are kept. Returns true when something was written. */
+export function markPageVisited(page: Page): boolean {
+  if (!(NEW_PAGES as readonly string[]).includes(page)) return false;
+  const seen = readVisitedPages();
+  if (seen.includes(page)) return false;
+  return writeJson(VISITED_KEY, [...seen, page]);
+}
+
+/** Two-digit index of a page (`01` … `19`) – the digit shortcut of the first nine. */
 const pageNo = (i: number): string => String(i + 1).padStart(2, "0");
 
 function Panel({ reduced }: { reduced: boolean }) {
@@ -190,6 +219,8 @@ function Panel({ reduced }: { reduced: boolean }) {
   const theme = useTheme((s) => s.resolved);
   const views = useViews((s) => s.views);
   const recentFeatures = useRecentFeatures();
+  // read when the panel opens: a page opened meanwhile loses its "Neu" the next time
+  const [visited] = useState(readVisitedPages);
   const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const syncOn = useSyncStatus((s) => s.phase !== "off");
   const ref = useRef<HTMLDivElement>(null);
@@ -386,50 +417,62 @@ function Panel({ reduced }: { reduced: boolean }) {
                     </li>
                   ))}
                 </ul>
-                {/* the feature pages: a compact grid (icon, name, live count, digit) – preloading their chunk on intent */}
-                <div className="grid gap-2.5">
-                  <Item delay={CONFIG.delays.links[PRIMARY.length] ?? 960} reduced={reduced}>
-                    <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">{COMMAND_NAV_STRINGS.more}</p>
-                  </Item>
-                  <ul className="cmdnav-links grid grid-cols-[repeat(auto-fill,minmax(min(100%,168px),1fr))] gap-2">
-                    {SECONDARY.map((p, k) => {
-                      const i = PRIMARY.length + k;
-                      return (
-                        <li key={p} className="min-w-0">
-                          <Item delay={CONFIG.delays.links[i] ?? 1560} reduced={reduced} className="h-full">
-                            <a
-                              href={PAGE_HASH[p]}
-                              data-cmd-item=""
-                              aria-current={page === p ? "page" : undefined}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                go(p);
-                              }}
-                              onPointerEnter={() => preloadPage(p)}
-                              onFocus={() => preloadPage(p)}
-                              onPointerDown={() => preloadPage(p)}
-                              className="cmdnav-link group/link relative flex h-full min-h-12 items-center gap-3 rounded-xl border border-line-2 bg-ink-900 px-3 py-2.5 text-fg outline-none transition-[opacity,border-color] duration-[250ms] hover:border-white/30 focus-visible:border-white/60"
-                            >
-                              <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg border border-line-2 text-mute group-hover/link:text-fg [&>svg]:size-4">
-                                <Icon name={PAGE_ICON[p]} />
-                              </span>
-                              <span className="grid min-w-0 flex-1">
-                                <span className="truncate text-[15px] font-medium leading-tight">{PAGE_LABELS[p]}</span>
-                                <span className={cn("dot-num truncate text-[11.5px]", counts[p].tone ?? "text-mute")}>
-                                  <DotFigure text={counts[p].text} />
+                {/* the other pages by task: a compact grid per group (icon, name, live count, digit) – preloading their chunk on intent */}
+                {NAV_GROUPS.map((g) => (
+                  <div key={g.id} role="group" aria-label={COMMAND_NAV_STRINGS.groups[g.id]} className="grid gap-2.5" data-testid="cmd-group" data-group={g.id}>
+                    <Item delay={CONFIG.delays.links[PAGES.indexOf(g.pages[0]!)] ?? 960} reduced={reduced}>
+                      <p aria-hidden="true" className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">
+                        {COMMAND_NAV_STRINGS.groups[g.id]}
+                      </p>
+                    </Item>
+                    <ul className="cmdnav-links grid grid-cols-[repeat(auto-fill,minmax(min(100%,168px),1fr))] gap-2">
+                      {g.pages.map((p) => {
+                        const i = PAGES.indexOf(p);
+                        const fresh = NEW_PAGES.includes(p) && !visited.includes(p);
+                        return (
+                          <li key={p} className="min-w-0">
+                            <Item delay={CONFIG.delays.links[i] ?? 1560} reduced={reduced} className="h-full">
+                              <a
+                                href={PAGE_HASH[p]}
+                                data-cmd-item=""
+                                aria-current={page === p ? "page" : undefined}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  go(p);
+                                }}
+                                onPointerEnter={() => preloadPage(p)}
+                                onFocus={() => preloadPage(p)}
+                                onPointerDown={() => preloadPage(p)}
+                                className="cmdnav-link group/link relative flex h-full min-h-12 items-center gap-3 rounded-xl border border-line-2 bg-ink-900 px-3 py-2.5 text-fg outline-none transition-[opacity,border-color] duration-[250ms] hover:border-white/30 focus-visible:border-white/60"
+                              >
+                                <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg border border-line-2 text-mute group-hover/link:text-fg [&>svg]:size-4">
+                                  <Icon name={PAGE_ICON[p]} />
                                 </span>
-                              </span>
-                              <span aria-hidden="true" className="shrink-0 self-start font-mono text-[10px] text-faint">
-                                {pageNo(i)}
-                              </span>
-                              {page === p && <span aria-hidden="true" className="absolute right-2 bottom-2 size-1.5 rounded-full bg-signal" />}
-                            </a>
-                          </Item>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
+                                <span className="grid min-w-0 flex-1">
+                                  <span className="flex min-w-0 items-center gap-1.5">
+                                    <span className="truncate text-[15px] font-medium leading-tight">{PAGE_LABELS[p]}</span>
+                                    {fresh && (
+                                      <span data-testid="cmd-new" className="shrink-0 rounded-full border border-line-2 px-1.5 font-mono text-[9.5px] uppercase leading-[14px] tracking-[0.1em] text-mute">
+                                        {COMMAND_NAV_STRINGS.isNew}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className={cn("dot-num truncate text-[11.5px]", counts[p].tone ?? "text-mute")}>
+                                    <DotFigure text={counts[p].text} />
+                                  </span>
+                                </span>
+                                <span aria-hidden="true" className="shrink-0 self-start font-mono text-[10px] text-faint">
+                                  {pageNo(i)}
+                                </span>
+                                {page === p && <span aria-hidden="true" className="absolute right-2 bottom-2 size-1.5 rounded-full bg-signal" />}
+                              </a>
+                            </Item>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
               </nav>
             </div>
 
@@ -579,6 +622,12 @@ function GlyphArrowDown() {
 export function CommandNav() {
   const open = useNav((s) => s.open);
   const reduced = useReducedFx();
+  const current = useUi((s) => s.page);
+
+  // a page of the last release loses its "Neu" tag once it has been opened (by any way: dock, search, link, assistant)
+  useEffect(() => {
+    markPageVisited(current);
+  }, [current]);
 
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {

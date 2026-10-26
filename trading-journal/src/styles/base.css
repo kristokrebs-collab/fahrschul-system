@@ -35,6 +35,15 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* The height of the section strip (`SectionNav`), read only by `html`'s scroll-padding below. Registered as a length that does
+   NOT inherit: writing a plain custom property on <html> restyles the whole document (every element inherits it) – on a long
+   page that was a full style pass inside the commit that mounts it; registered like this the write touches <html> alone. */
+@property --section-nav-h {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
 /* The dialog scroll lock (body overflow:hidden) must not make the scrollbar vanish and reflow the page
    under a running morph: keep its gutter reserved. */
 html {

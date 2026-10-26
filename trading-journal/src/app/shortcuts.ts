@@ -2,9 +2,11 @@
  * Keyboard shortcuts (P13): one registry, a pure matcher and the guard rules – the host (`ShortcutHost.tsx`) only wires
  * them to `keydown`.
  *
- *   g + Buchstabe   page (`PAGE_KEYS`: o Übersicht, t Trades, s Setups, e Einstellungen, m Markt, a Analyse, r Risiko,
- *                   c Coach, b Berichte, l Labor, w Wachstum, g Community, d Cockpit, k Konto, p Preise)
+ *   g + Buchstabe   page (`PAGE_KEYS`: o Übersicht, t Trades, s Entscheidungsgrundlagen, e Einstellungen, m Markt, h Handelsplan,
+ *                   i Aktien, r Risiko, a Analyse, b Berichte, c Coach, w Wachstum, l Labor, u Strategie-Studio, g Community,
+ *                   d Cockpit, k Konto, p Preise, f Funktionen – one letter each, the sheet lists them in the order of `PAGES`)
  *   n               new trade                     /  or ⌘⇧F / Ctrl+⇧F   global search
+ *   a               assistant
  *   ?               this sheet                    [  ]                  previous / next page
  *   t               light / dark                  ⌘K / Ctrl+K           navigation (CommandNav, unchanged)
  *

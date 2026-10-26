@@ -1,11 +1,11 @@
 /**
- * First-run tour (P13) end to end in jsdom: auto start on an empty journal, the five steps with real writes (capital
+ * First-run tour (P13) end to end in jsdom: auto start on an empty journal, the six steps with real writes (capital
  * and currency into the settings, a process goal through P08's `addGoalFromDraft`), the honest exchange hint without
  * the cloud, stepping aside for the setup editor and coming back, the final hold, and no auto start for a journal
  * that already has trades.
  */
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { OnboardingHost } from "@/onboarding/OnboardingHost";
 import { ONBOARDING_KEY, readOnboarding, useOnboarding } from "@/onboarding/onboardingStore";
@@ -64,7 +64,7 @@ describe("Onboarding tour", () => {
     expect(screen.queryByRole("dialog", { name: "Einführung" })).toBeNull();
   });
 
-  it("empty journal: starts by itself, walks the five steps with real writes and ends with the hold", async () => {
+  it("empty journal: starts by itself, walks the six steps with real writes and ends with the hold", async () => {
     await act(async () => {
       useJournal.setState({ trades: [] });
     });
@@ -72,7 +72,7 @@ describe("Onboarding tour", () => {
     const dialog = await screen.findByRole("dialog", { name: "Einführung" });
     expect(step()).toBe("start");
     expect(within(dialog).getByRole("list", { name: "Fortschritt der Einführung" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("img", { name: "Schritt 1 von 5" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("img", { name: "Schritt 1 von 6" })).toBeInTheDocument();
 
     // 2 Konten: invalid input blocks, a valid one is saved
     await next();
@@ -107,7 +107,17 @@ describe("Onboarding tour", () => {
     expect(step()).toBe("boerse");
     expect(await screen.findByTestId("tour-exchange-off")).toHaveTextContent("Du trägst Trades selbst ein");
 
-    // 5 Ziel: pick the trade limit, hold to start (assistive-tech path: arm, confirm)
+    // 5 Mehr: the late areas, said honestly, and the way to the demo (nothing starts by itself)
+    await next();
+    expect(step()).toBe("mehr");
+    const more = await screen.findByTestId("tour-more");
+    for (const word of ["Handelsplan", "Aktien", "Labor", "Datenarchiv"]) expect(more).toHaveTextContent(word);
+    expect(more).toHaveTextContent("Die App sendet nie eine Order");
+    expect(more).toHaveTextContent("nur, wenn du es unter Einstellungen einschaltest");
+    expect(screen.getByTestId("tour-demo")).toHaveTextContent("Demo mit Beispieldaten");
+    expect(useOnboarding.getState().open).toBe(true);
+
+    // 6 Ziel: pick the trade limit, hold to start (assistive-tech path: arm, confirm)
     await next();
     expect(step()).toBe("ziel");
     fireEvent.click(await screen.findByRole("radio", { name: /Höchstens 3 Trades am Tag/ }));
@@ -124,6 +134,28 @@ describe("Onboarding tour", () => {
       expect(goals.some((g) => g.metric === "tradesPerDay" && g.source.kind === "onboarding")).toBe(true);
     });
     expect(useUi.getState().toasts.some((t) => t.title === "Startklar")).toBe(true);
+  });
+
+  it("the demo button on step 5 closes the tour as skipped (not done) and opens the demo", async () => {
+    const openDemo = vi.fn();
+    vi.doMock("@/views/demo/demoStore", () => ({ openDemo }));
+    await act(async () => {
+      useJournal.setState({ trades: [] });
+    });
+    mount();
+    await screen.findByRole("dialog", { name: "Einführung" });
+    await act(async () => {
+      useOnboarding.setState({ step: 4 });
+    });
+    await waitFor(() => expect(step()).toBe("mehr"));
+    const demo = await screen.findByTestId("tour-demo", {}, { timeout: 5000 });
+    await act(async () => {
+      fireEvent.click(demo);
+    });
+    await waitFor(() => expect(openDemo).toHaveBeenCalledTimes(1));
+    expect(readOnboarding()?.status).toBe("skipped");
+    expect(useOnboarding.getState().open).toBe(false);
+    vi.doUnmock("@/views/demo/demoStore");
   });
 
   it("skip closes and remembers; Zurück goes back a step", async () => {
