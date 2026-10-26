@@ -1,3 +1,4 @@
+import { SeeAlso } from "@/app/FeatureLinks";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
@@ -106,6 +107,7 @@ export function SharesCard({ className }: { className?: string }) {
             </AnimatePresence>
           </ul>
         )}
+        <SeeAlso at="community.shares" inCard className="mt-auto" />
       </div>
     </Card>
   );

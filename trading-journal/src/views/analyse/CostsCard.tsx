@@ -4,6 +4,7 @@
  * staggered, transform only; reduced motion: at rest), the figures count up (`CountValue`). Fees are what the P&L
  * actually carries (`effectiveFees`: the trade's fees or the Σ of its fill fees). Pure read of `aggregate()`.
  */
+import { SeeAlso } from "@/app/FeatureLinks";
 import { motion } from "motion/react";
 import { memo, useRef } from "react";
 import { aggregate } from "@/domain/agg";
@@ -101,6 +102,7 @@ export const CostsCard = memo(function CostsCard({ closed, cur }: { closed: read
         <p className="text-[12px] text-mute" data-testid="ana-costs-share">
           {g.fees === 0 && g.funding === 0 ? COSTS_STRINGS.none : share ? COSTS_STRINGS.share(share) : `${COSTS_STRINGS.fees} ${n0(g.fees)} ${cur} · ${COSTS_STRINGS.funding} ${n0(g.funding)} ${cur}`}
         </p>
+        <SeeAlso at="analyse.costs" inCard />
       </div>
     </Card>
   );

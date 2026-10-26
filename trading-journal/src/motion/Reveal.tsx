@@ -1,15 +1,18 @@
-import { motion, useInView, type HTMLMotionProps, type Transition, type Variants } from "motion/react";
+import { motion, type HTMLMotionProps, type Transition, type Variants } from "motion/react";
 import { createContext, useContext, useRef, type ReactNode } from "react";
 import { useIntroGate } from "@/intro/introStore";
-import { canObserveInView } from "@/motion/inView";
+import { canObserveInView, useRevealSeen } from "@/motion/inView";
 import { isSafeFx } from "@/motion/safeFx";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { cn } from "@/lib/cn";
+import { INTRINSIC_CLASS, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 
 /**
  * Blur-fade entrance (21st.dev / magicui "Blur Fade"): `{opacity 0, y 14, blur 6px}` (Samsung-Internet-safe effects:
- * no blur) → rest once the element is
- * 15 % in view (viewport shrunk by 50 px). `y` rides `spring.enter`, opacity/filter `tween.reveal`; delay =
+ * no blur) → rest once the element has reached the reveal point (`revealReached`, `@/motion/inView`: 15 % of it in view,
+ * viewport shrunk by 50 px – or a fifth of that viewport for an element too tall for 15 % ever to fit, so no tall card
+ * stays at opacity 0). `y` rides `spring.enter`, opacity/filter `tween.reveal`; delay =
  * `min(index, stagger.max) · stagger.reveal`.
  *
  * Contract (see README / e2e):
@@ -28,7 +31,6 @@ const REVEAL_TO = { opacity: 1, y: 0, filter: "blur(0px)", transitionEnd: { filt
 /** Samsung-Internet-safe effects (`data-safe-fx`, `@/motion/safeFx`): the same fade-up without the blur. */
 export const REVEAL_FROM_SAFE = { opacity: 0, y: 14 } as const;
 const REVEAL_TO_SAFE = { opacity: 1, y: 0 } as const;
-const REVEAL_VIEWPORT = { once: true, amount: 0.15, margin: "-50px" } as const;
 /** Rest pose for `settled`: identity, applied instantly (motion drops the identity transform → `transform: none`). */
 const REVEAL_REST = { opacity: 1, y: 0, filter: "none" } as const;
 const INSTANT: Transition = { duration: 0 };
@@ -59,16 +61,27 @@ export interface RevealProps extends Omit<HTMLMotionProps<"div">, RevealOwned> {
   as?: RevealTag;
   /** Skip the entrance and rest at the final pose (e.g. the intro already carried this element into place). */
   settled?: boolean;
+  /**
+   * Below-the-fold cell of a long page: it skips style, layout and paint while far off screen (`content-visibility: auto`,
+   * the pattern of the Übersicht) and assumes this end size (px per breakpoint, `ReserveHeight`) until it was rendered once.
+   * Paint containment clips at the cell box, so the cell gets 12 px of room above and below (padding offset by an equal
+   * negative margin: layout is unchanged) for the card's hover lift. Marks the cell `data-defer` for `useIdlePrerender`.
+   */
+  defer?: ReserveHeight;
   children?: ReactNode;
 }
 
+/** The cell classes of a deferred reveal: skip while far away, room for the hover lift (layout-neutral). */
+export const DEFER_CLASS = "[content-visibility:auto] -my-3 py-3";
+
 /** One element that blur-fades in when it scrolls into view (once). */
-export function Reveal({ index = 0, delay = 0, as = "div", settled = false, children, ...rest }: RevealProps) {
+export function Reveal({ index = 0, delay = 0, as = "div", settled = false, defer, children, ...inherited }: RevealProps) {
+  const rest = defer == null ? inherited : { ...inherited, className: cn(DEFER_CLASS, INTRINSIC_CLASS, inherited.className), style: { ...reserveStyle(defer), ...inherited.style }, "data-defer": "" };
   const enabled = useRevealEnabled();
   const gate = useIntroGate();
   const ref = useRef<HTMLDivElement>(null);
   // the observer runs independently of the gate, so an element already in view reveals the moment the gate opens
-  const inView = useInView(ref, { ...REVEAL_VIEWPORT, initial: !enabled });
+  const inView = useRevealSeen(ref, enabled);
   // motion.li / motion.section share the div prop surface for everything Reveal passes through
   const Tag = motion[as] as typeof motion.div;
   if (!enabled) {
@@ -121,7 +134,7 @@ export function RevealGroup({ delay = 0, as = "div", children, ...rest }: Reveal
   const enabled = useRevealEnabled();
   const gate = useIntroGate();
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { ...REVEAL_VIEWPORT, initial: !enabled }) && gate;
+  const inView = useRevealSeen(ref, enabled) && gate;
   const Tag = motion[as] as typeof motion.div;
   const variants: Variants = { hidden: {}, shown: { transition: { delayChildren: (i: number) => revealDelay(i, delay) } } };
   return (

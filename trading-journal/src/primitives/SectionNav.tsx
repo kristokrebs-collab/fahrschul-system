@@ -43,6 +43,30 @@ export function findSection(root: ParentNode, id: string, heading?: string): HTM
   return h ? (h.closest<HTMLElement>(".rounded-2xl") ?? h) : null;
 }
 
+/**
+ * `findSection` for many ids against one DOM state: the `data-section` markers (the usual case) are read in ONE pass and the
+ * heading list at most once, instead of three selector scans (and a heading scan) per id on every look – on a long page that
+ * was the single most expensive thing the strip did while the page was being mounted (Feinschliff 2026-10).
+ */
+export function sectionFinder(root: ParentNode): (id: string, heading?: string) => HTMLElement | null {
+  let marked: Map<string, HTMLElement> | undefined;
+  let headings: HTMLElement[] | undefined;
+  return (id, heading) => {
+    if (!marked) {
+      marked = new Map();
+      for (const el of Array.from(root.querySelectorAll<HTMLElement>("[data-section]"))) {
+        const key = el.getAttribute("data-section");
+        if (key && !marked.has(key)) marked.set(key, el);
+      }
+    }
+    const direct = marked.get(id) ?? root.querySelector<HTMLElement>(`[data-testid="${esc(id)}"]`) ?? root.querySelector<HTMLElement>(`[id="${esc(id)}"]`);
+    if (direct || !heading) return direct;
+    headings ??= Array.from(root.querySelectorAll<HTMLElement>("h2, h3"));
+    const h = headings.find((x) => (x.textContent ?? "").replace(/\s+/g, " ").trim().startsWith(heading));
+    return h ? (h.closest<HTMLElement>(".rounded-2xl") ?? h) : null;
+  };
+}
+
 const NONE: ReadonlySet<string> = new Set();
 
 /** The strip that currently tells the document its height (see the effect in `SectionNav`). */
@@ -87,14 +111,19 @@ function useActiveSection(items: readonly SectionNavItem[], nav: RefObject<HTMLE
     const io = canObserveInView() ? new IntersectionObserver(onEntries, { rootMargin: `-${line}px 0px -55% 0px`, threshold: 0 }) : null;
     const seen = new Set<Element>();
     const lost = new Set<string>();
+    const found = new Set<string>();
     const attach = (): boolean => {
       lost.clear();
+      // sections already attached are not looked for again; one finder (one DOM pass) per look
+      const find = sectionFinder(root);
       for (const id of ids) {
-        const el = findSection(root, id, headingOf.get(id));
+        if (found.has(id)) continue;
+        const el = find(id, headingOf.get(id));
         if (!el) {
           lost.add(id);
           continue;
         }
+        found.add(id);
         if (seen.has(el)) continue;
         seen.add(el);
         idOf.set(el, id);
@@ -142,9 +171,12 @@ export function SectionNav({ items, label = "Inhalt", className }: { items: read
     const set = (): void => {
       if (heightOwner === token) document.documentElement.style.setProperty("--section-nav-h", `${el.offsetHeight}px`);
     };
-    set();
+    // With a ResizeObserver the first value arrives with its first report (after the page's first layout, before paint):
+    // reading `offsetHeight` here would force that layout inside the commit and, with the write that follows, lay the whole
+    // page out a second time for the layout effects of the cards after the strip. Without one (jsdom) read at once.
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(set) : null;
-    ro?.observe(el);
+    if (ro) ro.observe(el);
+    else set();
     return () => {
       ro?.disconnect();
       if (heightOwner === token) {

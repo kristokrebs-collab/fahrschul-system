@@ -11,6 +11,7 @@
  *   Gespeichert     the saved plans (`settings.plan`)
  */
 import { Suspense, useEffect, type ReactNode } from "react";
+import { SeeAlso } from "@/app/FeatureLinks";
 import { clockIn, dateTimeIn } from "@/domain/plan";
 import { cn } from "@/lib/cn";
 import { tvSymbolToBinance } from "@/market/symbol";
@@ -182,7 +183,8 @@ export function PlanView({ className }: { className?: string }) {
       <PageHeader title="Handelsplan" lead="Vom Einstiegssignal bis zum Ticket – in fünf Schritten, mit deinen Limits. Die App rechnet und kopiert; sie sendet nie eine Order." leadFill={PLAN_LEAD_FILL} />
       <LinkLine />
       <Progress steps={vm.model.steps} progress={vm.model.progress} />
-            <div className="grid min-w-0 gap-5 lg:grid-cols-12 lg:items-start">
+      <SeeAlso at="plan.page" />
+      <div className="grid min-w-0 gap-5 lg:grid-cols-12 lg:items-start">
         <aside className="min-w-0 lg:sticky lg:top-[168px] lg:order-2 lg:col-span-5" aria-label="Bild zum Plan">
           <ChartCard vm={vm} />
         </aside>

@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { spring, tween } from "@/motion/tokens";
+import { pressScale, spring, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -16,7 +16,7 @@ export interface ExpanderProps {
 }
 
 /** A 24 px target needs a firmer squeeze than a card to read as a press. */
-const PRESS_SCALE = 0.88;
+const PRESS_SCALE = pressScale.small;
 
 /**
  * Bundle `_g`: round `+` toggle. Open = a pre-rendered white disc that pops in (`spring.pop`, scale + opacity)

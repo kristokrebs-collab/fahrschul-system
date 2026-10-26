@@ -4,6 +4,7 @@
  * border, not colour alone); a scenario that rests on a vorläufig level reads „vorläufig“, one that lost to the
  * precedence rule reads „überstimmt“. The switch decides whether a change of the plan is announced (toast island).
  */
+import { SeeAlso } from "@/app/FeatureLinks";
 import { memo } from "react";
 import { keyLevelsOfSettings, planToastOn, PRECEDENCE_LABEL, type PlanScenario, type PlanState } from "@/domain/keylevels";
 import { cn } from "@/lib/cn";
@@ -96,6 +97,7 @@ export const PlanCard = memo(function PlanCard() {
           </span>
           <Switch id="plan-toast" checked={toastOn} onCheckedChange={(v) => void onToast(v)} aria-describedby="plan-toast-help" className="touch-hit mt-0.5 shrink-0" />
         </div>
+        <SeeAlso at="markt.plan" inCard />
       </div>
     </Card>
   );

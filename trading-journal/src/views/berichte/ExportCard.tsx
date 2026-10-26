@@ -4,6 +4,7 @@
  * light). The focus of the page limits the sections. PDF is a plan feature (`reportsPdf`): without it the button says
  * so and opens the upgrade sheet – never a dead button. An empty period has nothing to export and says that.
  */
+import { SeeAlso } from "@/app/FeatureLinks";
 import { useState } from "react";
 import { useEntitlement } from "@/billing/entitlements";
 import { openUpgrade } from "@/billing/store";
@@ -47,6 +48,7 @@ export function ExportCard({ report, focus, className }: { report: Report; focus
       </div>
       {pdf && !empty && <p className="mt-2 text-[11px] leading-snug text-faint">PDF: im Druckdialog „Als PDF sichern“ wählen.</p>}
       {printing && <ReportPrint report={report} focus={focus} onDone={() => setPrinting(false)} />}
+      <SeeAlso at="berichte.export" inCard className="mt-3" />
     </Card>
   );
 }

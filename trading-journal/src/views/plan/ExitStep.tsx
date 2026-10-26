@@ -3,6 +3,7 @@
  * The rules are the ones of the skill trader-exit; a refused plan says why and how to fix it, nothing is bent to make it pass.
  */
 import { useMemo, useState } from "react";
+import { SeeAlso } from "@/app/FeatureLinks";
 import { allKeyLevels } from "@/domain/keylevels";
 import { clockIn, num, parseHHMM, pctText, priceText, rText, toStep, type StopRule, type TargetRule } from "@/domain/plan";
 import { Input } from "@/primitives/Input";
@@ -219,13 +220,16 @@ export function ExitStep({ vm }: { vm: PlanVm }) {
         </div>
       )}
       {exit?.ok && (
-        <ManageCard
-          spec={form.manage}
-          onChange={(manage) => set({ manage })}
-          result={model.manage}
-          waiting={model.size == null ? "Die Preise und Beispielrechnungen erscheinen, sobald Schritt 3 die Größe berechnet hat." : "Schritt 3 hat keine Größe berechnet – ohne Menge gibt es keine Beispielrechnung."}
-          testPrefix="hplan"
-        />
+        <>
+          <ManageCard
+            spec={form.manage}
+            onChange={(manage) => set({ manage })}
+            result={model.manage}
+            waiting={model.size == null ? "Die Preise und Beispielrechnungen erscheinen, sobald Schritt 3 die Größe berechnet hat." : "Schritt 3 hat keine Größe berechnet – ohne Menge gibt es keine Beispielrechnung."}
+            testPrefix="hplan"
+          />
+          <SeeAlso at="plan.exit" />
+        </>
       )}
       {exit && !exit.ok && (
         <p className="rounded-xl border border-loss/30 bg-loss/[0.06] px-3 py-2 text-[12.5px] leading-snug text-fg/90" role="status" data-testid="hplan-exit-refused" data-code={exit.code}>

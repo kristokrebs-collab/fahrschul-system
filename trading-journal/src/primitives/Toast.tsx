@@ -4,7 +4,7 @@ import { cn } from "@/lib/cn";
 import { flingExit, useSwipeDismiss, type SwipeDismissInfo } from "@/motion/physics";
 import { useTouchMoveGuard } from "@/motion/a11y";
 import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
-import { gesture, radius, spring, tween } from "@/motion/tokens";
+import { gesture, pressScale, radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { DotFigure, DotUnit } from "@/primitives/DotUnit";
 import { GlyphCheck, GlyphCross, GlyphInfo } from "@/primitives/icons";
@@ -289,7 +289,7 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
         type="button"
         // a click that ends a drag is swallowed by the swipe handle (capture phase) before it gets here
         onClick={() => onDismiss(null)}
-        whileTap={reduced ? undefined : { scale: 0.97, transition: spring.press }}
+        whileTap={reduced ? undefined : { scale: pressScale.label, transition: spring.press }}
         layoutRoot
         className="relative flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-800 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/calc(0.35*var(--shade,1)))]"
         style={{ maxWidth: "calc(100vw - 32px)" }}

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { canObserveInView, observeInView, resetInViewObserverForTests } from "@/motion/inView";
+import { canObserveInView, observeInView, observeReveal, resetInViewObserverForTests, REVEAL_AMOUNT, REVEAL_SCREEN_SHARE, revealReached } from "@/motion/inView";
 
 type Entry = { target: Element; isIntersecting: boolean };
 
@@ -70,5 +70,99 @@ describe("observeInView (shared IntersectionObserver)", () => {
     expect(canObserveInView()).toBe(false);
     const off = observeInView(document.createElement("div"), () => {});
     expect(() => off()).not.toThrow();
+  });
+});
+
+describe("reveal trigger (revealReached / observeReveal)", () => {
+  const ROOT = 744; // a 390 × 844 phone, viewport shrunk by 2 × 50 px
+
+  it("fires at 15 % of an element that fits the screen, not before", () => {
+    expect(revealReached(0.1, 80, ROOT)).toBe(false);
+    expect(revealReached(REVEAL_AMOUNT, 120, ROOT)).toBe(true);
+  });
+
+  it("fires for an element too tall for 15 % ever to be on screen (a fifth of the screen is enough)", () => {
+    // 6 000 px card: at most 744 px = 12.4 % can be visible – the old rule never revealed it
+    expect(revealReached(0.12, 744, ROOT)).toBe(true);
+    expect(revealReached(0.02, 120, ROOT)).toBe(false);
+    expect(revealReached(0.03, ROOT * REVEAL_SCREEN_SHARE, ROOT)).toBe(true);
+  });
+
+  it("never fires without a viewport height and no ratio", () => {
+    expect(revealReached(0.01, 500, 0)).toBe(false);
+  });
+
+  describe("observer", () => {
+    interface RevealEntry {
+      target: Element;
+      isIntersecting: boolean;
+      intersectionRatio: number;
+      intersectionRect: { height: number };
+      rootBounds: { height: number } | null;
+    }
+    class RevealIO {
+      static last: RevealIO | null = null;
+      observed = new Set<Element>();
+      constructor(
+        public cb: (entries: RevealEntry[]) => void,
+        public init: IntersectionObserverInit,
+      ) {
+        RevealIO.last = this;
+      }
+      observe(el: Element) {
+        this.observed.add(el);
+      }
+      unobserve(el: Element) {
+        this.observed.delete(el);
+      }
+      disconnect() {
+        this.observed.clear();
+      }
+    }
+    beforeEach(() => {
+      RevealIO.last = null;
+      vi.stubGlobal("IntersectionObserver", RevealIO);
+      resetInViewObserverForTests();
+    });
+    afterEach(() => {
+      resetInViewObserverForTests();
+      vi.unstubAllGlobals();
+    });
+    const entry = (target: Element, ratio: number, h: number): RevealEntry => ({ target, isIntersecting: true, intersectionRatio: ratio, intersectionRect: { height: h }, rootBounds: { height: ROOT } });
+
+    it("watches with the 50 px margin, fires once and lets go of the element", () => {
+      const el = document.createElement("div");
+      const onReach = vi.fn();
+      observeReveal(el, onReach);
+      const io = RevealIO.last as RevealIO;
+      expect(io.init.rootMargin).toBe("-50px");
+      expect(io.observed.has(el)).toBe(true);
+      io.cb([entry(el, 0.05, 40)]);
+      expect(onReach).not.toHaveBeenCalled();
+      io.cb([entry(el, 0.2, 200)]);
+      expect(onReach).toHaveBeenCalledTimes(1);
+      expect(io.observed.has(el)).toBe(false);
+      io.cb([entry(el, 0.3, 300)]);
+      expect(onReach).toHaveBeenCalledTimes(1);
+    });
+
+    it("reveals a tall element by the screen share", () => {
+      const el = document.createElement("div");
+      const onReach = vi.fn();
+      observeReveal(el, onReach);
+      (RevealIO.last as RevealIO).cb([entry(el, 0.05, 300)]);
+      expect(onReach).toHaveBeenCalledTimes(1);
+    });
+
+    it("the cancel stops watching", () => {
+      const el = document.createElement("div");
+      const onReach = vi.fn();
+      const off = observeReveal(el, onReach);
+      const io = RevealIO.last as RevealIO;
+      off();
+      expect(io.observed.has(el)).toBe(false);
+      io.cb([entry(el, 1, 500)]);
+      expect(onReach).not.toHaveBeenCalled();
+    });
   });
 });

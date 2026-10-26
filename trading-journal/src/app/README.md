@@ -355,3 +355,18 @@ findet jede Funktion, nicht nur Seiten (das Register lädt mit dem ersten Buchst
 Feld sind Ziffern und Pos1/Ende Text, das erste Esc leert; `FeatureLinks.tsx` = „Auch hier: …“-Zeile für Seiten, deren Nachbarfunktionen sonst zufällig gefunden würden (Coach). Das Register
 ist nur im Lazy-Chunk der Seite / Suche / des Assistenten – die Erstladung importiert es nicht (`shellStats` zeigt für die Seite den festen Text „Index“).
 Dokumente zum Register: `docs/COVERAGE.md` (eine Zeile je F01–F74; Test `tests/unit/features.registry.test.ts`) und `docs/UEBERSICHT.md` (Karte Aufgabe → Seite → Abschnitt).
+
+## Zusammenhang & Navigation (Feinschliff, Runde 8)
+
+- **Reihenfolge der Seiten** steht an einer Stelle: `PAGES` in `src/store/uiStore.ts` – die fünf Dock-Tabs in Dock-Reihenfolge (Übersicht, Trades, Entscheidungsgrundlagen, Markt, Einstellungen), dann
+  Handelsplan, Aktien, Risiko · Analyse, Berichte, Coach, Wachstum · Labor, Strategie-Studio · Community, Cockpit, Konto, Preise, Funktionen. Dieselbe Reihenfolge ist die Zahlenfolge der Befehlsnavigation (1–5 = Dock),
+  die Folge von `[` / `]` und der Schieberichtung (`NAV_ORDER`), die Gleichstand-Reihenfolge der Suche und die Folge der `g`-Kürzel im Tastenblatt. Das Dock selbst bleibt unverändert.
+- **Befehlsnavigation** (`CommandNav.tsx`): oben das Feld „Was willst du tun?“, dann die fünf Dock-Seiten groß, darunter die übrigen Seiten in vier Gruppen nach Aufgabe (`NAV_GROUPS`: Planen & Handeln · Auswerten & Lernen ·
+  Strategien · Mehr). Die jüngsten Seiten (`NEW_PAGES`: Handelsplan, Aktien, Strategie-Studio) tragen ein kleines „Neu“, bis sie einmal geöffnet waren (nur dieser Browser, `visited-pages`, ein beschädigter Speicher
+  heißt „noch nichts geöffnet“). `tests/unit/app.navOrder.test.ts` hält Reihenfolge, Gruppen, Buchstaben (je Seite einer, eindeutig) und die Marke fest.
+- **„Siehe auch“** zwischen Seiten: Tabelle `seeAlso.ts` (Daten, kein Register-Import), Baustein `<SeeAlso at="plan.exit" />` in `FeatureLinks.tsx`; höchstens drei Links je Zeile, höchstens drei Zeilen je Seite,
+  nur auf eine andere Seite, nur zu Funktionen, die das Register selbst als verwandt nennt (`tests/unit/seeAlso.test.tsx`). Neue Zeile: Eintrag in der Tabelle, die Zeile an der Karte, der Test sagt, wenn eines fehlt.
+- **Register** (`features.ts`): zwölf Gruppen in der Reihenfolge des Tages (Heute vorbereiten · Trade prüfen & Chart · Aktien beobachten & bewerten · Trade planen · Risiko & Disziplin · Strategie entwickeln & testen ·
+  Aus Fehlern lernen · Auswerten & Berichte · Üben & Wachsen · Trades eintragen & Daten · Community & Teilen · Konto, Einstellungen & Hilfe); ein Block (Zwischenüberschrift) hat höchstens acht Einträge, höchstens
+  acht Sterne insgesamt, Aufgaben in der Du-Form, die Handelsplan-Schritte heißen alle „Handelsplan: …“. `tests/unit/features.anchors.test.ts` prüft für jeden Eintrag, dass sein Anker in einem Modul steht, das SEINE Seite erreicht;
+  `tests/e2e/funktionen-anker.spec.ts` findet ihn im DOM.

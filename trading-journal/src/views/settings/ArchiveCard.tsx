@@ -10,6 +10,7 @@
  */
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useMemo, useState } from "react";
+import { SeeAlso } from "@/app/FeatureLinks";
 import { ARCHIVE_MAX_SYMBOLS, EVERY_MIN_CHOICES, FAIL_LABEL, MAX_MB_CHOICES, effectiveSymbols, gapText, isBackfillSeries, observedSymbols, seriesDef, type Gap } from "@/domain/archive";
 import { boxesCfgOf } from "@/domain/boxes";
 import { cn } from "@/lib/cn";
@@ -224,6 +225,7 @@ export const ArchiveCard = memo(function ArchiveCard({ className }: { className?
           <p data-testid="archive-local">{S.local}</p>
           <p data-testid="archive-limit">{S.limit}</p>
         </div>
+        <SeeAlso at="settings.archive" />
 
         <SwitchRow id="archive-on" label={S.switch} help={cfg.on ? S.switchOn(cfg.everyMin) : S.switchOff} checked={cfg.on} onChange={(on) => setArchiveCfg({ on })} disabled={unavailable && !cfg.on} />
         <p className="num -mt-2 text-[12px] text-mute" role="status" data-testid="archive-status" data-state={cfg.on ? status.state : "off"}>

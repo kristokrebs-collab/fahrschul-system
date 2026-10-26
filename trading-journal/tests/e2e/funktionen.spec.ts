@@ -27,12 +27,12 @@ test.describe("Funktionen", () => {
     test.skip(!PROJECTS.includes(info.project.name), "runs on mobile + desktop");
   });
 
-  test("opens by hash with the search and ten task tiles, one column on a phone, no sideways scroll", async ({ page }, info) => {
+  test("opens by hash with the search and twelve task tiles, one column on a phone, no sideways scroll", async ({ page }, info) => {
     const errors = collectErrors(page);
     await openFunktionen(page);
     const tiles = layer(page, "funktionen").getByTestId("funktionen-tile");
-    await expect(tiles).toHaveCount(10);
-    for (const name of ["Heute vorbereiten", "Trade prüfen & Chart", "Risiko & Disziplin", "Strategie entwickeln & testen", "Aus Fehlern lernen", "Auswerten & Berichte", "Üben & Wachsen", "Trades eintragen & Daten", "Community & Teilen", "Konto, Einstellungen & Hilfe"]) {
+    await expect(tiles).toHaveCount(12);
+    for (const name of ["Heute vorbereiten", "Trade prüfen & Chart", "Aktien beobachten & bewerten", "Trade planen", "Risiko & Disziplin", "Strategie entwickeln & testen", "Aus Fehlern lernen", "Auswerten & Berichte", "Üben & Wachsen", "Trades eintragen & Daten", "Community & Teilen", "Konto, Einstellungen & Hilfe"]) {
       await expect(layer(page, "funktionen").getByRole("button", { name: `${name}: Funktionen anzeigen` })).toHaveCount(1);
     }
     await expect(layer(page, "funktionen").getByRole("searchbox", { name: "Was willst du tun?" })).toBeVisible();

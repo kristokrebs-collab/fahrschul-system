@@ -37,7 +37,7 @@ export function placeText(f: FeatureEntry): string {
 const FILLER = new Set(
   ("wo wie wann was welche welcher welches finde finden find findet ich du mir mich wir man kann kannst koennte könnte muss soll sehe sehen seh steht stehen ist sind gibt gibts es gibt da dort hier " +
     "der die das den dem des ein eine einen einem einer eines zu zum zur im in am an auf von mit fuer für bei oeffne öffne zeig zeige zeigt mal bitte noch eigentlich genau " +
-    "komme komm komme gehe geh gehen suche suchen suche funktion funktionen seite stelle bereich")
+    "komme komm komme gehe geh gehen suche suchen suche funktion funktionen seite stelle bereich app")
     .split(" ")
     .map(normalize),
 );
@@ -112,15 +112,19 @@ const commonPrefix = (a: string, b: string): number => {
 function wordScore(t: string, w: string): number {
   if (t === w) return 1;
   if (t.length >= 2 && w.startsWith(t)) return 0.88 + 0.07 * (t.length / w.length);
-  if (w.length >= 4 && t.startsWith(w)) return 0.8;
+  // the typed word continues the text word ("Positionsrechner" → "Position", "Verlusten" → "Verlust"): a short ending or a long stem – not "bestellen" → "beste"
+  if (w.length >= 4 && t.startsWith(w) && (t.length - w.length <= 3 || w.length >= 6)) return 0.8;
   if (t.length >= 4 && w.includes(t)) return 0.62;
   const n = Math.min(t.length, w.length);
   const cp = commonPrefix(t, w);
-  if (n >= 5 && cp >= Math.max(5, Math.ceil(0.75 * n))) return 0.72;
-  if (t.length >= 5 && Math.abs(t.length - w.length) <= 2) {
+  // a shared stem with different endings ("Verlustserie" ~ "Verlustserien"); a whole shorter word at the start is the prefix rule above
+  if (n >= 5 && cp < n && cp >= Math.max(5, Math.ceil(0.75 * Math.max(t.length, w.length)))) return 0.72;
+  // a slip inside the word, not in its first letter ("Positonsrechner"; "bestellen" is not "einstellen")
+  if (t.length >= 5 && t[0] === w[0] && Math.abs(t.length - w.length) <= 2) {
     const tol = t.length >= 9 ? 2 : 1;
     if (editDistance(t, w, tol) <= tol) return 0.66;
-    if (w.length > t.length && editDistance(t, w.slice(0, t.length), 1) <= 1) return 0.58;
+    // a typed beginning with one slip ("Wochenbrich" → "Wochenbericht"); from six letters on, so "danke" is not "dunkel"
+    if (t.length >= 6 && w.length > t.length && editDistance(t, w.slice(0, t.length), 1) <= 1) return 0.58;
   }
   return 0;
 }
