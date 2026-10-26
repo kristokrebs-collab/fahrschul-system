@@ -423,3 +423,20 @@ export async function openTradeEditor(page: Page): Promise<Locator> {
   await editor.locator("#f-entry").click();
   return editor;
 }
+
+/**
+ * Waits until the page has stopped growing: lazy cards above the target load one after another and move everything below them,
+ * so a click on a popup trigger that is still travelling closes its panel (an "outside scroll"). Two equal heights 700 ms apart.
+ */
+export async function waitForStableLayout(page: Page, timeout = 30_000): Promise<void> {
+  const height = () => page.evaluate(() => document.documentElement.scrollHeight);
+  const until = Date.now() + timeout;
+  let last = await height();
+  for (;;) {
+    await page.waitForTimeout(700);
+    const now = await height();
+    if (now === last) return;
+    if (Date.now() > until) throw new Error(`the page kept changing its height (${last} → ${now})`);
+    last = now;
+  }
+}

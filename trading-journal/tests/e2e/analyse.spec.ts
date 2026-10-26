@@ -14,7 +14,7 @@
  * `/dev/analyse.html` under `npm run dev`). `P03_SHOTS` writes review screenshots into that directory.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, openRoute, seed } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, openRoute, seed, waitForStableLayout } from "./helpers";
 
 const ANALYSE_URL = process.env.PW_ANALYSE_URL ?? "/#analyse";
 const SHOTS = process.env.P03_SHOTS;
@@ -236,6 +236,7 @@ test.describe("Analyse", () => {
   test("a custom stat is saved into the settings and removed again", async ({ page }) => {
     await seed(page, { extra: { "tj2-trades": analyseTrades() } });
     await openAnalyse(page);
+    await waitForStableLayout(page);
     const card = page.getByTestId("ana-custom");
     await card.scrollIntoViewIfNeeded();
     await card.getByTestId("custom-metric").click();
