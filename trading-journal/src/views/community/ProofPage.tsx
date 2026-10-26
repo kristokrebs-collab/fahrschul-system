@@ -27,7 +27,7 @@ const matrix = (s: string) => s.replace("−", "-");
 function Fact({ label, value, sub, valueClass, testId }: { label: string; value: ReactNode; sub?: ReactNode; valueClass?: string; testId?: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-line bg-ink-950/50 px-3 py-2" data-testid={testId}>
-      <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{label}</div>
+      <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-mute">{label}</div>
       <div className={cn("num mt-0.5 truncate text-[14px] font-medium", valueClass)}>{value}</div>
       {sub && <div className="mt-0.5 text-[11px] leading-snug text-mute">{sub}</div>}
     </div>
@@ -37,7 +37,7 @@ function Fact({ label, value, sub, valueClass, testId }: { label: string; value:
 function Block({ title, children, testId, className }: { title: string; children: ReactNode; testId?: string; className?: string }) {
   return (
     <section className={cn("grid gap-3 rounded-2xl border border-line-2 bg-ink-900 p-4 sm:p-5", className)} data-testid={testId}>
-      <h3 className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">{title}</h3>
+      <h3 className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-mute">{title}</h3>
       {children}
     </section>
   );
@@ -76,7 +76,7 @@ export function RCurve({ f, className }: { f: ProofFigures; className?: string }
         <path d={line} fill="none" className={cn("stroke-current", toneClass(f.sumR))} strokeWidth="1.75" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         {dd && <path d={dd} fill="none" className="stroke-loss" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
       </svg>
-      <figcaption className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10.5px] uppercase tracking-[0.1em] text-faint">
+      <figcaption className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10.5px] uppercase tracking-[0.1em] text-mute">
         <span>Start 0R</span>
         <span>
           Höchster Stand {fmtR(hi)}
@@ -165,7 +165,7 @@ export function ProofPage({ proof, createdAt, className }: ProofPageProps) {
       <Reveal index={0}>
         <article className="grid gap-4 rounded-2xl border border-line-2 bg-[radial-gradient(120%_70%_at_0%_0%,var(--color-ink-750)_0%,var(--color-ink-850)_55%)] p-4 sm:p-6">
           <header className="grid gap-2">
-            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-faint">
+            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-mute">
               {T.title} · {T.kicker}
             </span>
             <h2 className="text-[21px] font-semibold tracking-tight [overflow-wrap:anywhere] sm:text-[24px]" data-testid="proof-strategy">
@@ -178,20 +178,20 @@ export function ProofPage({ proof, createdAt, className }: ProofPageProps) {
               <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-mute" data-testid="proof-period">
                 {T.period(dayLabel(proof.from), dayLabel(proof.to))}
               </span>
-              <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-faint">{T.stand(stamp(createdAt))}</span>
+              <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-mute">{T.stand(stamp(createdAt))}</span>
             </div>
             <p className="max-w-[62ch] text-[12.5px] leading-relaxed text-mute">{BASIS_HINT[proof.basis]}</p>
           </header>
           <div className="grid grid-cols-2 gap-4">
             <div className="grid min-w-0 gap-1.5" data-testid="proof-sum">
               <DotMatrixText text={f.scored ? matrix(fmtR(f.sumR)) : "--"} tone={tone(f.scored ? f.sumR : null)} size={4} gap={1.5} label={`${T.sum} ${fmtR(f.sumR)}`} className="max-w-full" />
-              <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-mute">
                 {T.sum} · {f.scored} {f.scored === 1 ? "Trade" : "Trades"}
               </span>
             </div>
             <div className="grid min-w-0 gap-1.5" data-testid="proof-drawdown">
               <DotMatrixText text={f.scored ? matrix(fmtDd(f.maxDrawdownR)) : "--"} tone={f.maxDrawdownR > 0 ? "loss" : "fg"} size={4} gap={1.5} label={`${T.drawdown} ${fmtDd(f.maxDrawdownR)}`} className="max-w-full" />
-              <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-mute">
                 {T.drawdown} · {T.drawdownSub}
               </span>
             </div>
@@ -271,7 +271,7 @@ export function ProofPage({ proof, createdAt, className }: ProofPageProps) {
           <p className="text-[12.5px] text-mute">{T.historyHint}</p>
           <div className="max-h-[460px] overflow-auto rounded-xl border border-line" role="region" aria-label={T.historyLabel} tabIndex={0}>
             <table className="w-full border-collapse text-left text-[12.5px]">
-              <thead className="sticky top-0 bg-ink-900 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+              <thead className="sticky top-0 bg-ink-900 font-mono text-[10px] uppercase tracking-[0.12em] text-mute">
                 <tr>
                   <th scope="col" className="px-3 py-2 font-medium">{T.col.n}</th>
                   <th scope="col" className="px-3 py-2 font-medium">{T.col.day}</th>
@@ -283,9 +283,9 @@ export function ProofPage({ proof, createdAt, className }: ProofPageProps) {
               <tbody>
                 {rows.map((t, i) => (
                   <tr key={i} className="border-t border-line" data-testid="proof-row">
-                    <td className="num px-3 py-1.5 text-faint">{i + 1}</td>
+                    <td className="num px-3 py-1.5 text-mute">{i + 1}</td>
                     <td className="num px-3 py-1.5">{shortDay(t[0])}</td>
-                    <td className={cn("num px-3 py-1.5 text-right font-medium", t[1] == null ? "text-faint" : toneClass(t[1]))}>{t[1] == null ? T.noR : fmtR(t[1])}</td>
+                    <td className={cn("num px-3 py-1.5 text-right font-medium", t[1] == null ? "text-mute" : toneClass(t[1]))}>{t[1] == null ? T.noR : fmtR(t[1])}</td>
                     <td className="num px-3 py-1.5 text-right text-mute">{t[2] == null ? T.unknown : fmtR(t[2], 3)}</td>
                     <td className="px-3 py-1.5 text-mute">{ORIGIN_SHORT[t[3]]}</td>
                   </tr>

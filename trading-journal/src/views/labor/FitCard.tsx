@@ -10,18 +10,31 @@
  */
 import { memo, useMemo } from "react";
 import { compareFit, journalProfile, strategyFacts, type FitItem, type FitReport } from "@/domain/fit";
+import { exitsText, activeLeaves } from "@/domain/lab/rules/tree";
 import { cn } from "@/lib/cn";
 import { date as fmtDate } from "@/lib/format";
 import { Badge } from "@/primitives/Badge";
 import { Card } from "@/primitives/Card";
 import { useEnriched, useJournal } from "@/store/journalStore";
 import { eventsOf } from "@/views/coach/hooks";
-import { useLabor } from "./laborStore";
+import { useLabor, type LabConfig } from "./laborStore";
 import { LABOR } from "./strings";
 
 const F = LABOR.fit;
 
 const NAMES: Readonly<Record<string, string>> = { custom: "Eigene Idee", box: "Box-zu-Box", mcb: "MCB-Leiter", rules: "Regel-Baukasten" };
+
+/**
+ * The rule parts the idea is made of, for the statement „Regelumfang“: „Eigene Idee“ = the active conditions and the exit
+ * rules (target, break-even, trailing, partial, time stop, opposite signal); „Regel-Baukasten“ = its conditions and the
+ * fixed stop and target (no further exit rules); the templates Box and MCB have a fixed logic and are not counted.
+ */
+export function ruleParts(strategy: string, cfg: LabConfig | null): { conds: number; exits: number } | null {
+  if (!cfg) return null;
+  if (strategy === "custom" && cfg.custom?.sides) return { conds: activeLeaves(cfg.custom).length, exits: exitsText(cfg.custom).length };
+  if (strategy === "rules" && Array.isArray(cfg.rules?.conds)) return { conds: cfg.rules.conds.length, exits: 0 };
+  return null;
+}
 
 /** The comparison for the shown run (null before a result). Exported for tests. */
 export function useFit(): FitReport | null {
@@ -39,8 +52,10 @@ export function useFit(): FitReport | null {
       riskPct: runCfg?.riskPct ?? null,
       maxDD: result.stats.maxDD,
       trades: result.trades,
+      interval: result.interval,
+      rules: ruleParts(result.strategy, runCfg),
     });
-    return compareFit(strategy, journalProfile(enriched, settings, eventsOf(enriched, settings, days)));
+    return compareFit(strategy, journalProfile(enriched, settings, eventsOf(enriched, settings, days), days));
   }, [result, runCfg, enriched, settings, days]);
 }
 
