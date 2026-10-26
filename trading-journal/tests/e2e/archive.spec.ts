@@ -228,7 +228,8 @@ test.describe("Datenarchiv (F26)", () => {
 
   for (const theme of ["dark", "light"] as const) {
     test(`barrierefrei und mit großen Tippflächen (${theme})`, async ({ page }, info) => {
-      await seed(page, { extra: { "tj2-theme": JSON.stringify({ pref: theme, accent: "signal" }), [CFG_KEY]: JSON.stringify({ v: 1, on: true, everyMin: 10, picked: ["BTCUSDT"], states: false, maxMb: 25 }) } });
+      // switched off while the rows are scanned (a running collector would add points and change the gap), then on for the choices
+      await seed(page, { extra: { "tj2-theme": JSON.stringify({ pref: theme, accent: "signal" }), [CFG_KEY]: JSON.stringify({ v: 1, on: false, everyMin: 10, picked: ["BTCUSDT"], states: false, maxMb: 25 }) } });
       await seededRoute(page, () => seedView(page), "#settings", "Einstellungen");
       await themeSettled(page);
       const card = page.getByTestId("settings-archive-card");
@@ -237,6 +238,9 @@ test.describe("Datenarchiv (F26)", () => {
       await expect(card.locator('[data-testid="archive-row"][data-series="premium"]').getByTestId("archive-gap-summary")).toContainText("1 Lücke", { timeout: 20_000 });
       await card.locator('[data-testid="archive-row"][data-series="premium"]').getByRole("button", { name: "Lücken anzeigen" }).click();
       await expectAccessible(page, '[data-testid="settings-archive-card"]', `Datenarchiv (${theme})`);
+      await card.getByRole("switch", { name: "Archiv sammeln" }).click();
+      await expect(card.getByTestId("archive-options")).toBeVisible();
+      await expectAccessible(page, '[data-testid="settings-archive-card"]', `Datenarchiv mit Auswahl (${theme})`);
       if (hasTouch(info)) {
         const misses = await page.evaluate(auditHitBoxes, { selector: HIT_SELECTOR, root: '[data-testid="settings-archive-card"]' });
         expect(misses, misses.map((m) => `${m.name} ${m.w}×${m.h} (${m.where})`).join("\n")).toEqual([]);
