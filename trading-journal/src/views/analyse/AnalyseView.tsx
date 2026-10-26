@@ -19,6 +19,7 @@ import { cn } from "@/lib/cn";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
 import { Card } from "@/primitives/Card";
+import { RESERVE_CLASS, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 import { EmptyState } from "@/primitives/EmptyState";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
@@ -46,13 +47,22 @@ import { SEG_TOUCH, SectionTitle } from "./ui";
 export const ANALYSE_LEAD_FILL = { storageKey: storageKey("fill-analyse"), highlight: ANALYSE_HIGHLIGHT } as const;
 const ACC_OPTIONS = (["all", "makro", "scalp"] as const).map((v) => ({ v, label: ACCOUNT_LABELS[v] }));
 
-function Cell({ index, span, children }: { index: number; span: string; children: ReactNode }) {
+/**
+ * `reserve`: the END size of a card whose content arrives after the first paint (the Monte Carlo run, the daily candles of
+ * the benchmark) – a floor from the first frame (`Reserve`, `@/primitives/Reserve`), so the cards below never slide down
+ * when it lands (measured on the finished page: Monte Carlo 944 / 744 px, Benchmark 604 / 529 px at 390 / ≥ 640 px).
+ */
+function Cell({ index, span, reserve, children }: { index: number; span: string; reserve?: ReserveHeight; children: ReactNode }) {
   return (
-    <Reveal index={index} className={cn("flex min-w-0 flex-col [&>*]:flex-1", span)}>
+    <Reveal index={index} className={cn("flex min-w-0 flex-col [&>*]:flex-1", reserve && RESERVE_CLASS, span)} style={reserve ? reserveStyle(reserve) : undefined}>
       {children}
     </Reveal>
   );
 }
+
+/** End sizes of the late cards (px at 390 / 640 / 1024 and up). */
+const RESERVE_MONTE_CARLO: ReserveHeight = { base: 944, sm: 744 };
+const RESERVE_BENCHMARK: ReserveHeight = { base: 604, sm: 529 };
 
 /** The sections of the page, for its "Inhalt" strip (`data-section` on each `SectionTitle`). */
 const NAV: readonly SectionNavItem[] = [
@@ -130,7 +140,7 @@ export function AnalyseView({ className }: { className?: string }) {
                 </Cell>
               }
             >
-              <Cell index={0} span="lg:col-span-8">
+              <Cell index={0} span="lg:col-span-8" reserve={RESERVE_MONTE_CARLO}>
                 <MonteCarloCard view={view} cur={cur} />
               </Cell>
               <Cell index={1} span="lg:col-span-4">
@@ -167,7 +177,7 @@ export function AnalyseView({ className }: { className?: string }) {
           </section>
           <section aria-labelledby={ids.compare} className="contents">
             <SectionTitle id={ids.compare} section="compare" title={SECTIONS.compare} className="lg:col-span-12" />
-            <Cell index={0} span="lg:col-span-6">
+            <Cell index={0} span="lg:col-span-6" reserve={RESERVE_BENCHMARK}>
               <BenchmarkCard view={view} />
             </Cell>
             <Cell index={1} span="lg:col-span-6">

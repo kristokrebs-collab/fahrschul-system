@@ -167,7 +167,7 @@ runs: tests `waitFor` before `toBeVisible`.
 
 ### `Reveal` · `RevealGroup` / `RevealItem`
 Blur-fade entrance `{opacity 0, y 14, blur 6px}` (`REVEAL_FROM`; under `html[data-safe-fx]` `REVEAL_FROM_SAFE` without the blur –
-a blur over a card revealed while the page scrolls is the tablet compositor's heaviest work) → rest, once, when 15 % is in view (margin −50px); stagger
+a blur over a card revealed while the page scrolls is the tablet compositor's heaviest work) → rest, once, at the reveal point (`revealReached`, `inView.ts`: 15 % of the element in view with the viewport shrunk by 50 px – OR a fifth of that viewport for an element too tall for 15 % ever to fit, ≥ ≈ 5 000 px on a phone; before, such a card stayed at opacity 0 for ever); one shared observer for all reveals (`useRevealSeen` / `observeReveal`); stagger
 `min(i, stagger.max)·stagger.reveal`; ends at `transform:none` / `filter:none` (transitionEnd), no x offset. Reduced motion or no
 `IntersectionObserver`: `initial={false}`, static. The group is driven by `animate`, so items mounted later also enter.
 
