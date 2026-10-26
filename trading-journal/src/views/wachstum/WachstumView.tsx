@@ -18,6 +18,7 @@ import { cn } from "@/lib/cn";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { useMediaQuery } from "@/motion/useMediaQuery";
 import { Button } from "@/primitives/Button";
+import type { ReserveHeight } from "@/primitives/Reserve";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { storageKey } from "@/store/storage";
 import { AnalysisNote } from "@/ui/AnalysisNote";
@@ -53,6 +54,21 @@ const NAV: readonly SectionNavItem[] = [
   { id: "psyche", label: WACHSTUM.sections.psyche.title },
   { id: "progress", label: WACHSTUM.sections.progress.title },
 ];
+
+/** End sizes (px at 390 / 640 / 1024+) of the cells below the first screenful – measured on the finished page. */
+const SIZE = {
+  streaks: { base: 415, sm: 407, lg: 260 },
+  goals: { base: 316, sm: 274, lg: 274 },
+  challenge: { base: 406, sm: 372, lg: 372 },
+  habits: { base: 316, sm: 274, lg: 372 },
+  trackers: { base: 554, sm: 355, lg: 355 },
+  mood: { base: 281, sm: 281, lg: 355 },
+  insights: { base: 394, sm: 354, lg: 336 },
+  diary: { base: 254, sm: 254, lg: 254 },
+  skills: { base: 664, sm: 626, lg: 626 },
+  bests: { base: 649, sm: 494, lg: 626 },
+  progress: { base: 757, sm: 419, lg: 251 },
+} as const satisfies Record<string, ReserveHeight>;
 
 export const WACHSTUM_LEAD_FILL = { storageKey: storageKey("fill-wachstum"), highlight: WACHSTUM.highlight } as const;
 
@@ -104,45 +120,45 @@ export function WachstumView({ className }: { className?: string }) {
         </Cell>
       </Section>
       <Section id={ids.streaks} section="streaks" title={S.streaks.title} sub={S.streaks.sub}>
-        <Cell index={0} span="lg:col-span-12">
+        <Cell index={0} span="lg:col-span-12" size={SIZE.streaks}>
           <StreakBoard streaks={streaks} />
         </Cell>
       </Section>
       <Section id={ids.goals} section="goals" title={S.goals.title} sub={S.goals.sub}>
-        <Cell index={0} span="lg:col-span-12">
+        <Cell index={0} span="lg:col-span-12" size={SIZE.goals}>
           <GoalsCard goals={goals.active} week={goals.week} />
         </Cell>
       </Section>
       <Section id={ids.routines} section="routines" title={S.routines.title} sub={S.routines.sub}>
-        <Cell index={0} span="lg:col-span-5">
+        <Cell index={0} span="lg:col-span-5" size={SIZE.challenge}>
           <ChallengeCard running={challenges} suggestions={deck} todayKey={today.key} done={doneChallenges} />
         </Cell>
-        <Cell index={1} span="lg:col-span-7">
+        <Cell index={1} span="lg:col-span-7" size={SIZE.habits}>
           <HabitGrid rows={habits.rows} columns={habits.columns} todayKey={today.key} existing={existingHabits} />
         </Cell>
       </Section>
       <Section id={ids.psyche} section="psyche" title={S.psyche.title} sub={S.psyche.sub}>
-        <Cell index={0} span="lg:col-span-7">
+        <Cell index={0} span="lg:col-span-7" size={SIZE.trackers}>
           <TrackersCard trackers={trackers} />
         </Cell>
-        <Cell index={1} span="lg:col-span-5">
+        <Cell index={1} span="lg:col-span-5" size={SIZE.mood}>
           <MoodCard factors={factors} cur={b.settings.currency} />
         </Cell>
-        <Cell index={0} span="lg:col-span-12">
+        <Cell index={0} span="lg:col-span-12" size={SIZE.insights}>
           <CheckInInsights days={b.days} trades={b.enriched} settings={b.settings} />
         </Cell>
-        <Cell index={0} span="lg:col-span-12">
+        <Cell index={0} span="lg:col-span-12" size={SIZE.diary}>
           <DiaryCard days={diary} />
         </Cell>
       </Section>
       <Section id={ids.progress} section="progress" title={S.progress.title} sub={S.progress.sub}>
-        <Cell index={0} span="lg:col-span-5">
+        <Cell index={0} span="lg:col-span-5" size={SIZE.skills}>
           <SkillRadar now={skills.now} before={skills.before} />
         </Cell>
-        <Cell index={1} span="lg:col-span-7">
+        <Cell index={1} span="lg:col-span-7" size={SIZE.bests}>
           <BestsCard bests={bests.bests} next={bests.next} />
         </Cell>
-        <Cell index={0} span="lg:col-span-12">
+        <Cell index={0} span="lg:col-span-12" size={SIZE.progress}>
           <ProgressCard points={series} />
         </Cell>
       </Section>

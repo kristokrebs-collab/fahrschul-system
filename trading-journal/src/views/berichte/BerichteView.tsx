@@ -24,6 +24,8 @@ import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
 import { Card } from "@/primitives/Card";
 import { FeatureLinks } from "@/app/FeatureLinks";
+import { Later } from "@/primitives/Later";
+import { RESERVE_CLASS_DEFER, type ReserveHeight } from "@/primitives/Reserve";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
 import { Skeleton } from "@/primitives/Skeleton";
@@ -52,13 +54,30 @@ export const SEEN_AFTER_MS = 1500;
 const ACC_OPTIONS = (["all", "makro", "scalp"] as const).map((v) => ({ v, label: ACCOUNT_LABELS[v] }));
 const KIND_OPTIONS = REPORT_KINDS.map((v) => ({ v, label: KIND_LABEL[v] }));
 
-function Cell({ index, span, children }: { index: number; span: string; children: ReactNode }) {
+/**
+ * `size` = the END size of the card in this cell (px at 390 / 640 / 1024+, measured on the finished page with all cards shown): a cell
+ * below the first screenful skips style, layout and paint while far away (`Reveal defer`), holds that size and mounts its card after
+ * the page has painted (`Later`), one per idle slice. Only for the full report (focus „Alles“) – a single card at full width is
+ * shorter, there the cell simply follows its content.
+ */
+function Cell({ index, span, size, children }: { index: number; span: string; size?: ReserveHeight; children: ReactNode }) {
   return (
-    <Reveal index={index} className={cn("flex min-w-0 flex-col [&>*]:flex-1", span)}>
-      {children}
+    <Reveal index={index} defer={size} className={cn("flex min-w-0 flex-col [&>*]:flex-1", size && RESERVE_CLASS_DEFER, span)}>
+      {size ? <Later>{children}</Later> : children}
     </Reveal>
   );
 }
+
+const SIZE = {
+  performance: { base: 376, sm: 282, lg: 333 },
+  compare: { base: 333, sm: 333, lg: 333 },
+  strategy: { base: 373, sm: 277, lg: 410 },
+  risk: { base: 410, sm: 410, lg: 410 },
+  psych: { base: 338, sm: 276, lg: 276 },
+  mistakes: { base: 185, sm: 169, lg: 276 },
+  goals: { base: 410, sm: 237, lg: 237 },
+  review: { base: 907, sm: 774, lg: 754 },
+} as const satisfies Record<string, ReserveHeight>;
 
 function Arrow({ dir, onClick, disabled, label }: { dir: "prev" | "next"; onClick: () => void; disabled?: boolean; label: string }) {
   return (
@@ -192,42 +211,42 @@ export function BerichteView({ className }: { className?: string }) {
         <>
           {focus === "all" && (
             <>
-              <Cell index={0} span="lg:col-span-7">
+              <Cell index={0} span="lg:col-span-7" size={SIZE.performance}>
                 <PerformanceCard report={report} bars={page.bars} />
               </Cell>
-              <Cell index={1} span="lg:col-span-5">
+              <Cell index={1} span="lg:col-span-5" size={SIZE.compare}>
                 <CompareCard report={report} />
               </Cell>
             </>
           )}
           {show("strategy") && (
-            <Cell index={0} span={focus === "all" ? "lg:col-span-7" : "lg:col-span-12"}>
+            <Cell index={0} span={focus === "all" ? "lg:col-span-7" : "lg:col-span-12"} size={focus === "all" ? SIZE.strategy : undefined}>
               <StrategyCard report={report} />
             </Cell>
           )}
           {show("risk") && (
-            <Cell index={1} span={focus === "all" ? "lg:col-span-5" : "lg:col-span-12"}>
+            <Cell index={1} span={focus === "all" ? "lg:col-span-5" : "lg:col-span-12"} size={focus === "all" ? SIZE.risk : undefined}>
               <ReportRiskCard report={report} />
             </Cell>
           )}
           {show("psychology") && (
             // 7 / 5 like the rows above – the column gutter runs through (P2-14)
-            <Cell index={0} span={focus === "all" ? "lg:col-span-7" : "lg:col-span-12"}>
+            <Cell index={0} span={focus === "all" ? "lg:col-span-7" : "lg:col-span-12"} size={focus === "all" ? SIZE.psych : undefined}>
               <PsychCard report={report} />
             </Cell>
           )}
           {show("mistakes") && (
-            <Cell index={1} span={focus === "all" ? "lg:col-span-5" : "lg:col-span-12"}>
+            <Cell index={1} span={focus === "all" ? "lg:col-span-5" : "lg:col-span-12"} size={focus === "all" ? SIZE.mistakes : undefined}>
               <MistakesCard report={report} />
             </Cell>
           )}
           {focus === "all" && (
-            <Cell index={0} span="lg:col-span-12">
+            <Cell index={0} span="lg:col-span-12" size={SIZE.goals}>
               <GoalsCard report={report} />
             </Cell>
           )}
           {focus === "all" && kind === "week" && (
-            <Cell index={0} span={showExperiment ? "lg:col-span-7" : "lg:col-span-12"}>
+            <Cell index={0} span={showExperiment ? "lg:col-span-7" : "lg:col-span-12"} size={SIZE.review}>
               <WeekReviewCard page={page} />
             </Cell>
           )}

@@ -14,6 +14,7 @@ import { ExchangeSection } from "@/exchanges/ExchangeSection";
 import { exchangeEnabled } from "@/exchanges/store";
 import { cn } from "@/lib/cn";
 import { Reveal } from "@/motion/Reveal";
+import { RESERVE_CLASS, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { hasClaudeRuntime } from "@/store/capability";
 import { navigate } from "@/store/router";
@@ -22,9 +23,9 @@ import { useCockpit } from "@/views/cockpit/cockpitStore";
 import { LegalLinks } from "@/legal/LegalLinks";
 import { KontoView } from "./KontoView";
 
-function Cell({ index, span, section, children }: { index: number; span: string; section?: string; children: ReactNode }) {
+function Cell({ index, span, section, size, children }: { index: number; span: string; section?: string; size?: ReserveHeight; children: ReactNode }) {
   return (
-    <Reveal index={index} className={cn("min-w-0", span)} data-section={section}>
+    <Reveal index={index} className={cn("min-w-0", size && RESERVE_CLASS, span)} style={size ? reserveStyle(size) : undefined} data-section={section}>
       {children}
     </Reveal>
   );
@@ -44,7 +45,7 @@ function KontoExtras() {
   const cells: ReactNode[] = [];
   if (billing) {
     cells.push(
-      <Cell key="plan" index={index++} span={account ? "lg:col-span-7" : "lg:col-span-12"} section="konto-tarif">
+      <Cell key="plan" index={index++} span={account ? "lg:col-span-7" : "lg:col-span-12"} section="konto-tarif" size={account ? { base: 354, lg: 316 } : undefined}>
         <PlanCard onNavigate={(p) => navigate(p)} usage={{ savedViews, dashboards }} />
       </Cell>,
     );
@@ -54,7 +55,7 @@ function KontoExtras() {
       <Cell key="billing" index={index++} span="lg:col-span-5">
         <BillingCard />
       </Cell>,
-      <Cell key="referral" index={index++} span="lg:col-span-12">
+      <Cell key="referral" index={index++} span="lg:col-span-12" size={{ base: 362, lg: 320 }}>
         <ReferralCard />
       </Cell>,
     );

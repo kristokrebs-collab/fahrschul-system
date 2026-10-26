@@ -10,9 +10,17 @@ import { SecurityCard } from "@/cloud/ui/SecurityCard";
 import { KONTO } from "@/cloud/ui/strings";
 import { SyncStatusCard } from "@/cloud/ui/SyncStatusCard";
 import { Reveal } from "@/motion/Reveal";
+import { RESERVE_CLASS, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 import { hasClaudeRuntime } from "@/store/capability";
 import { storageKey } from "@/store/storage";
 import { PageHeader } from "@/views/setups/PageHeader";
+
+/** End sizes (px at 390 / 640 / 1024+) of the signed-in cards that fill late – measured on the finished page. */
+const SIZE = {
+  security: { base: 721, lg: 656 },
+  privacy: { base: 470, lg: 656 },
+  data: { base: 718, lg: 364 },
+} as const satisfies Record<string, ReserveHeight>;
 
 export const KONTO_LEAD_FILL = { storageKey: storageKey("fill-konto"), highlight: KONTO.leadHighlight } as const;
 
@@ -24,10 +32,14 @@ export interface KontoViewProps {
   className?: string;
 }
 
-/** One grid cell with the reveal cascade; the span sits on the cell, never on the card surface. */
-function Cell({ index, span, section, children }: { index: number; span: string; section?: string; children: ReactNode }) {
+/**
+ * One grid cell with the reveal cascade; the span sits on the cell, never on the card surface. `size`: the END size of a card whose
+ * content arrives after the first paint (the device list, the backups) – the cell holds it as a floor from the first frame
+ * (`reserveStyle`, `@/primitives/Reserve`), so the cards below never slide down when the data lands.
+ */
+function Cell({ index, span, section, size, children }: { index: number; span: string; section?: string; size?: ReserveHeight; children: ReactNode }) {
   return (
-    <Reveal index={index} className={cn("min-w-0", span)} data-section={section}>
+    <Reveal index={index} className={cn("min-w-0", size && RESERVE_CLASS, span)} style={size ? reserveStyle(size) : undefined} data-section={section}>
       {children}
     </Reveal>
   );
@@ -61,13 +73,13 @@ export function KontoView({ extraCards, nav, className }: KontoViewProps) {
           <Cell index={1} span="lg:col-span-7">
             <SyncStatusCard className="h-full" />
           </Cell>
-          <Cell index={2} span="lg:col-span-7" section="konto-sicherheit">
+          <Cell index={2} span="lg:col-span-7" section="konto-sicherheit" size={SIZE.security}>
             <SecurityCard className="h-full" />
           </Cell>
-          <Cell index={3} span="lg:col-span-5">
+          <Cell index={3} span="lg:col-span-5" size={SIZE.privacy}>
             <PrivacyCard className="h-full" />
           </Cell>
-          <Cell index={4} span="lg:col-span-12" section="konto-daten">
+          <Cell index={4} span="lg:col-span-12" section="konto-daten" size={SIZE.data}>
             <AccountDataCard />
           </Cell>
         </>

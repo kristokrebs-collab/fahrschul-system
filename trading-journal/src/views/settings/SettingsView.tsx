@@ -1,5 +1,5 @@
 import { animate, motion, useMotionValue, useTransform } from "motion/react";
-import { lazy, memo, Suspense, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ED } from "@/domain/edition";
 import type { Rule } from "@/domain/types";
 import type { FeedId, ProviderHealth, StatusLabel } from "@/market/types";
@@ -15,6 +15,8 @@ import { revealInvalid } from "@/primitives/fieldFx";
 import { Card } from "@/primitives/Card";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
+import { Later } from "@/primitives/Later";
+import { RESERVE_CLASS, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 import { Skeleton } from "@/primitives/Skeleton";
 import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
@@ -98,6 +100,36 @@ export const SETTINGS_STRINGS = {
 } as const;
 
 /** Subtitle recipe: pixel fill once per session, then the marker on the key word. */
+/**
+ * End sizes (px at 390 / 640 / 1024+) of the cards below the first screenful, measured on the finished page. Each card mounts
+ * after the page has painted (`Later`, one per idle slice – the switch to the page is no longer one 700 ms task) and the box
+ * holds its size until then (`Reserve` floor + `CardSkeleton`), so nothing moves when it lands. The 16 cards of this page
+ * used to mount in ONE commit.
+ */
+const SIZE = {
+  trigger: { base: 867, sm: 500, lg: 434 },
+  live: { base: 2671, sm: 1713, lg: 1182 },
+  signal: { base: 4408, sm: 3455, lg: 2363 },
+  lage: { base: 409, sm: 341, lg: 233 },
+  hyblock: { base: 666, sm: 570, lg: 399 },
+  mistakes: { base: 560, sm: 512, lg: 654 },
+  rules: { base: 404, sm: 368, lg: 368 },
+  limits: { base: 309, sm: 250, lg: 266 },
+  data: { base: 904, sm: 665, lg: 647 },
+  storage: { base: 466, sm: 369, lg: 336 },
+  theme: { base: 393, sm: 433, lg: 443 },
+  tour: { base: 529, sm: 415, lg: 443 },
+  more: { base: 361, sm: 266, lg: 266 },
+} as const satisfies Record<string, ReserveHeight>;
+
+function LateCard({ size, className, children }: { size: ReserveHeight; className?: string; children: ReactNode }) {
+  return (
+    <div className={cn("flex min-w-0 flex-col [&>*]:flex-1", RESERVE_CLASS, className)} style={reserveStyle(size)}>
+      <Later>{children}</Later>
+    </div>
+  );
+}
+
 /** The five groups of the page (titles never start with a card heading – the strip and the register find cards by it). */
 const G = {
   basics: { title: "Grundlagen", sub: "Konten und die Referenzwerte, mit denen deine Trades verglichen werden." },
@@ -266,47 +298,47 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
         {/* Chart-Level and Live-Daten span the page (design pass v3): side by side the 9-field level card stood ~1000 px
             empty next to the feed table; the table runs in two columns from xl */}
         <SettingsGroup section="s-maerkte" title={G.markets.title} sub={G.markets.sub}>
-          <div className="min-w-0 lg:col-span-2">
+          {/* `Card` puts `className` on its inner surface, so a full-width card needs a spanning grid item around it (`LateCard`) */}
+          <LateCard size={SIZE.trigger} className="lg:col-span-2">
             <TriggerCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
-          </div>
+          </LateCard>
 
-          <div className="min-w-0 lg:col-span-2">
+          <LateCard size={SIZE.live} className="lg:col-span-2">
             <LiveDataCard health={health} statusLabels={statusLabels} onRefresh={onRefresh} onReconnect={onReconnect} onClearCache={onClearCache} />
-          </div>
+          </LateCard>
 
-          {/* `Card` puts `className` on its inner surface, so a full-width card needs a spanning grid item around it */}
-          <div className="min-w-0 lg:col-span-2">
+          <LateCard size={SIZE.signal} className="lg:col-span-2">
             <SignalCheckCard draft={draft} onChange={set} onPatch={patch} changed={changed} invalid={invalidField} />
-          </div>
+          </LateCard>
 
           {/* Lage-Ampel (decision 23): applied at once, `settings.signals.lage` */}
-          <div className="min-w-0 lg:col-span-2">
+          <LateCard size={SIZE.lage} className="lg:col-span-2">
             <LageCard />
-          </div>
+          </LateCard>
 
-          <div className="min-w-0 lg:col-span-2">
+          <LateCard size={SIZE.hyblock} className="lg:col-span-2">
             <HyblockCard draft={draft} onChange={set} onTest={onTestHyblock} />
-          </div>
+          </LateCard>
         </SettingsGroup>
 
         {/* the tags stand tall on the left, the rules and the limits are stacked on the right: no card is half empty next to a gap */}
         <SettingsGroup section="s-regeln-gruppe" title={G.rules.title} sub={G.rules.sub}>
-          <div className="flex min-w-0 flex-col lg:row-span-2 [&>*]:flex-1">
+          <LateCard size={SIZE.mistakes} className="lg:row-span-2">
             <MistakesCard rows={draft.mistakes} onChange={setMistakes} trades={trades} changed={changed.has("mistakes")} />
-          </div>
-          <div className="flex min-w-0 flex-col [&>*]:flex-1">
+          </LateCard>
+          <LateCard size={SIZE.rules}>
             <RulesCardMemo rules={draft.rules} onChange={setRules} trades={trades} changed={changed.has("rules")} />
-          </div>
-          <div className="flex min-w-0 flex-col [&>*]:flex-1">
+          </LateCard>
+          <LateCard size={SIZE.limits}>
             <LimitsCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
-          </div>
+          </LateCard>
         </SettingsGroup>
 
         {/* what lives on this device: the backup, the local archive and the storage – three full rows, none of them half empty next to a gap */}
         <SettingsGroup section="s-sichern" title={G.keep.title} sub={G.keep.sub}>
-          <div className="min-w-0 lg:col-span-2">
+          <LateCard size={SIZE.data} className="lg:col-span-2">
             <DataCardMemo onImport={openImport} />
-          </div>
+          </LateCard>
 
           {/* F26: the local data archive – a setting about this device's storage (on / off, size, deletion), so it lives here */}
           <div className="min-w-0 lg:col-span-2">
@@ -323,20 +355,24 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
             </Suspense>
           </div>
 
-          <div className="min-w-0 lg:col-span-2">
+          <LateCard size={SIZE.storage} className="lg:col-span-2">
             <StorageCard />
-          </div>
+          </LateCard>
         </SettingsGroup>
 
         {/* P13: theme (Hell / Dunkel / System, accents) and the guided tour – a pair of similar height */}
         <SettingsGroup section="s-aussehen" title={G.look.title} sub={G.look.sub}>
-          <ThemeCard />
-          <OnboardingCard />
+          <LateCard size={SIZE.theme}>
+            <ThemeCard />
+          </LateCard>
+          <LateCard size={SIZE.tour}>
+            <OnboardingCard />
+          </LateCard>
 
           {/* P14: the settings that live on their pages (Konto, Preise, Box-, Risiko-Einstellungen) */}
-          <div className="min-w-0 lg:col-span-2">
+          <LateCard size={SIZE.more} className="lg:col-span-2">
             <MoreSettingsCard />
-          </div>
+          </LateCard>
         </SettingsGroup>
 
         <div className="flex justify-end lg:col-span-2">

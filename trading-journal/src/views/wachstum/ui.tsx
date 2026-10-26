@@ -7,17 +7,24 @@ import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type PointerEve
 import { cn } from "@/lib/cn";
 import { DotMatrix } from "@/motion/DotMatrix";
 import { Reveal } from "@/motion/Reveal";
+import { Later } from "@/primitives/Later";
+import { RESERVE_CLASS_DEFER, type ReserveHeight } from "@/primitives/Reserve";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { SectionTitle } from "@/views/analyse/ui";
 
 export { SEG_TOUCH } from "@/views/insights/ui";
 
-/** Grid cell that reveals once (ends at `transform: none`) and lets its card fill the row height. */
-export function Cell({ index, span, children, className }: { index: number; span: string; children: ReactNode; className?: string }) {
+/**
+ * Grid cell that reveals once (ends at `transform: none`) and lets its card fill the row height. With `size` (the card's END size,
+ * px at 390 / 640 / 1024+, measured on the finished page) the cell is a below-the-fold cell of the long page: it skips style, layout
+ * and paint while far away (`Reveal defer`), holds that size from the first frame and mounts its card after the page has painted,
+ * one per idle slice (`Later`) – the switch to the page is no longer one long task and nothing slides when a card lands.
+ */
+export function Cell({ index, span, children, className, size }: { index: number; span: string; children: ReactNode; className?: string; size?: ReserveHeight }) {
   return (
-    <Reveal index={index} className={cn("flex min-w-0 flex-col [&>*]:flex-1", span, className)}>
-      {children}
+    <Reveal index={index} defer={size} className={cn("flex min-w-0 flex-col [&>*]:flex-1", size && RESERVE_CLASS_DEFER, span, className)}>
+      {size ? <Later>{children}</Later> : children}
     </Reveal>
   );
 }
