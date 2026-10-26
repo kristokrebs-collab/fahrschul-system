@@ -4,6 +4,7 @@
  */
 import type { CsvTrade, ParseResult } from "./model";
 import { cell, normalizePair, parseNum, parseSide, parseTime, type CsvTable } from "./parse";
+import { isInverseContract, noRejections, reject, rejectionWarnings } from "./scope";
 
 export const MAP_FIELDS = ["date", "exitDate", "pair", "side", "entry", "exit", "qty", "size", "fees", "pnl", "stop", "target", "leverage", "bot"] as const;
 export type MapField = (typeof MAP_FIELDS)[number];
@@ -76,8 +77,11 @@ export interface GenericOptions {
 export function parseWithMapping(t: CsvTable, m: ColumnMapping, opts: GenericOptions): ParseResult {
   const decimalComma = t.delimiter === ";";
   const out: CsvTrade[] = [];
+  const rej = noRejections();
   let skipped = 0;
   t.rows.forEach((r) => {
+    // F42: a pair that is spelled like a Coin-M contract (BTCUSD_PERP, BTC-USD-SWAP) is not read as a linear one
+    if (isInverseContract("any", cell(r, m.pair))) return reject(rej, "inverse", cell(r, m.pair));
     const side = parseSide(cell(r, m.side));
     const entry = parseNum(cell(r, m.entry), decimalComma);
     const openedAt = parseTime(cell(r, m.date), { assume: opts.assume });
@@ -110,5 +114,5 @@ export function parseWithMapping(t: CsvTable, m: ColumnMapping, opts: GenericOpt
       ...(cell(r, m.bot ?? -1) ? { bot: cell(r, m.bot ?? -1).slice(0, 40) } : null),
     });
   });
-  return { trades: out, skipped, warnings: [] };
+  return { trades: out, skipped, warnings: rejectionWarnings(rej) };
 }

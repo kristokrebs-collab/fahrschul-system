@@ -45,6 +45,9 @@ const TrendStructureCard = lazy(() => import("./TrendStructureCard").then((m) =>
 // F19: „Ähnliche Situationen“ – own chunk too (domain search, market hook, texts), the hit sheet is a third one
 const SimilarCard = lazy(() => import("./SimilarCard").then((m) => ({ default: m.SimilarCard })));
 
+// F07: „Squeeze-Beobachtung“ (reads the data archive) – own chunk, loaded with the page
+const SqueezeCard = lazy(() => import("./SqueezeCard"));
+
 // F43: „Heute wichtig“ (Morgenbriefing), „Termine“ (Kalender) and „Ereignisphasen“ – own chunk, loaded with the page
 const TermineSection = lazy(() => import("@/views/termine/TermineSection"));
 
@@ -53,6 +56,7 @@ const NAV: readonly SectionNavItem[] = [
   { id: "markt-best", label: "Beste Setups" },
   { id: "markt-state", label: "Box-Status" },
   { id: "markt-chart", label: "Chart" },
+  { id: "markt-squeeze", label: "Squeeze" },
   { id: "markt-trend", label: "Struktur" },
   { id: "markt-similar", label: "Ähnliche Situationen" },
   { id: "keylevels-card", label: "Marken" },
@@ -202,6 +206,17 @@ export function MarktView({ className }: { className?: string }) {
       </Cell>
       {!focus && (
         <>
+          <Cell index={3} span="lg:col-span-12">
+            <Suspense
+              fallback={
+                <Card title="Squeeze-Beobachtung" data-testid="markt-squeeze-loading">
+                  <Skeleton height={160} />
+                </Card>
+              }
+            >
+              <SqueezeCard view={view} />
+            </Suspense>
+          </Cell>
           <Cell index={3} span="lg:col-span-12">
             <Suspense
               fallback={

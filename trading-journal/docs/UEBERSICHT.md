@@ -77,7 +77,7 @@ _Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 8 Funktionen
 
 ### Trade prüfen & Chart
 
-_Einstieg prüfen, Chancen finden, den Chart lesen._ · 22 Funktionen
+_Einstieg prüfen, Chancen finden, den Chart lesen._ · 23 Funktionen
 
 **Einstieg prüfen**
 
@@ -97,6 +97,7 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 22 Funktionen
 | Aktien und Krypto nach Chart-Setups absuchen | Aktien-Scanner | Aktien › Scanner | teilweise |
 | Prüfen, was nach ähnlichen Lagen geschah | Ähnliche Situationen | Markt › Ähnliche Situationen | fertig |
 | Sehen, wie die Top-Trader positioniert sind | Top-Trader-Positionierung | Übersicht › Top Trader · Binance | fertig |
+| Prüfen, ob eine Seite des Marktes überfüllt ist | Squeeze-Beobachtung | Markt › Squeeze-Beobachtung | teilweise |
 | Termine sehen, die für den Handel zählen | Ereigniskalender | Markt › Termine | teilweise |
 
 **Aktien beobachten**
@@ -342,7 +343,7 @@ _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
 
 ### Trades eintragen & Daten
 
-_Trades hineinbekommen, ordnen, sichern und prüfen._ · 11 Funktionen
+_Trades hineinbekommen, ordnen, sichern und prüfen._ · 12 Funktionen
 
 **Eintragen & importieren**
 
@@ -368,6 +369,7 @@ _Trades hineinbekommen, ordnen, sichern und prüfen._ · 11 Funktionen
 |---|---|---|---|
 | Das Journal sichern oder wiederherstellen | Backup & Wiederherstellung | Einstellungen › Daten | fertig |
 | Prüfen, ob die Marktdaten aktuell sind | Datenstatus | Einstellungen › Live-Daten | teilweise |
+| Marktzahlen und Analysezustände auf diesem Gerät mitschreiben | Datenarchiv | Einstellungen › Datenarchiv | teilweise |
 | Prüfen, ob Alarme und Kerzen zuverlässig angekommen sind | Daten- und Alarmqualität | Coach › Daten- und Alarmqualität | teilweise |
 
 ### Community & Teilen

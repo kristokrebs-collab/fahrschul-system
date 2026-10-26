@@ -27,6 +27,8 @@
  * | `TrainingMount` | F38 | the training sheet (Lernmodus: situations without the future, decision, reveal, reflection) – its own chunk, fetched the first time it is opened |
  * | `SignalOutcomeHost` | F32 | once after the start: the automatic outcomes of archived signals (idle, a few at a time; own chunk, fetched only when entry signals are stored; gate `coach`) |
  * | `ForwardMount` | F23 | the forward test's catch-up of the virtual accounts – its own chunk, fetched only while an account is running / paused / being wound up, only while the app is open |
+ * | `ArchiveMount` | F26 | the data archive's collector (public Binance numbers + analysis states into this browser's IndexedDB) – its own chunk, fetched only while the user has switched the archive on (default off), only while the app is open |
+ * | `SqueezeMount` | F07 | the squeeze observation's alert (toast, only after the explicit switch `settings.squeeze.alerts`) – its own chunk, fetched only then |
  */
 import { lazy, Suspense, type ReactNode } from "react";
 import { installE2eHooks } from "@/app/e2eHooks";
@@ -39,6 +41,8 @@ import { ExchangeHost } from "@/exchanges/ExchangeHost";
 import { ExcursionBackfillHost } from "@/journal/ExcursionBackfillHost";
 import { ShotImportHost } from "@/journal/extract/ShotImportHost";
 import { BoxAlertHost } from "@/market/boxes/alerts";
+import { squeezeOfSettings } from "@/domain/squeeze/config";
+import { useArchiveOn } from "@/market/archive/store";
 import { BoxSnapBackfillHost } from "@/market/boxes/BoxSnapBackfillHost";
 import { KeyLevelHost } from "@/market/keylevels/alerts";
 import { PlanClockHost } from "@/market/plan/clock";
@@ -63,6 +67,8 @@ const WhatIfHost = lazy(() => import("@/views/trades/whatif/WhatIfHost"));
 const TimeMachineHost = lazy(() => import("@/views/timemachine/TradeSheet"));
 const TrainingHost = lazy(() => import("@/views/ueben/TrainingHost"));
 const ForwardHost = lazy(() => import("@/views/labor/forward/ForwardHost"));
+const ArchiveHost = lazy(() => import("@/market/archive/host"));
+const SqueezeHost = lazy(() => import("@/market/squeeze/host"));
 
 /** The assistant sheet: its chunk is fetched the first time it is opened and then stays mounted (close animation). */
 function AssistantMount() {
@@ -110,6 +116,27 @@ function ForwardMount() {
   return active ? (
     <Suspense fallback={null}>
       <ForwardHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Data archive (F26): the collector's chunk is fetched only while the switch (default off) is on; the switch is read from this browser's storage. */
+function ArchiveMount() {
+  const on = useArchiveOn();
+  return on ? (
+    <Suspense fallback={null}>
+      <ArchiveHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Squeeze observation (F07): the alert's chunk is fetched only after the explicit switch (default off) and while the archive it reads runs. */
+function SqueezeMount() {
+  const alerts = useJournal((s) => squeezeOfSettings(s.settings).alerts);
+  const archiveOn = useArchiveOn();
+  return alerts && archiveOn ? (
+    <Suspense fallback={null}>
+      <SqueezeHost />
     </Suspense>
   ) : null;
 }
@@ -205,6 +232,12 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Forward-Test">
         <ForwardMount />
+      </HostSlot>
+      <HostSlot name="Datenarchiv">
+        <ArchiveMount />
+      </HostSlot>
+      <HostSlot name="Squeeze-Beobachtung">
+        <SqueezeMount />
       </HostSlot>
     </>
   );

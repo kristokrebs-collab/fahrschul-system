@@ -58,6 +58,8 @@ growth/       Wachstum (P08): goals (one rule for negative targets: only R metri
 psych/        Psyche (P08): states and patterns from the coach's events and P05's limits (no diagnoses) – src/domain/psych/README.md
 scanner/      Aktien-Scanner (F67): market-neutral kernel – opening-range breakout, bull flag, oversold-RSI recovery on candles, pre-filter, time-sliced run with progress / cancel and honest counts – src/domain/scanner/README.md
 watchlist/    Watchlist (F67): `settings.watchlist = { v: 1, items }` (stocks + crypto pairs, ≤ 50), add / remove / merge-safe, unknown keys and entries kept – index.ts
+archive/      Datenarchiv (F26): Reihen-Tabelle, Gerätekonfiguration (Standard aus), Lücken mit Grund, CSV/JSON-Export – nichts geschätzt, nichts aufgefüllt – src/domain/archive/README.md
+squeeze/      Squeeze-Beobachtung (F07): Funding, Open-Interest-Anstieg, Konten-Positionierung gegen einstellbare Schwellen, Box-Kontext, frühere Fälle mit Stichprobenwort, `settings.squeeze` – eine Beobachtung, kein Signal – src/domain/squeeze/README.md
 newsmonitor/  News-Monitor (F68): headline rules (keyword importance as a hint, words shown), merge of duplicates, "neu seit dem letzten Besuch" – rules.ts, merge.ts
 ```
 

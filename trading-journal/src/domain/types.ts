@@ -345,6 +345,13 @@ export interface Settings {
    * id list, so the cloud / two-tab merge works per entry; entries a newer version wrote survive untouched.
    */
   watchlist?: unknown;
+  /**
+   * Squeeze-Beobachtung (F07): the thresholds (funding, open-interest rise and window, long share, how many readings must hold)
+   * and the explicit switch of its alert (default off). Versioned passthrough (`{ v: 1, fundingPct, oiRisePct, oiHours, longPct,
+   * minMet, alerts }`, see `@/domain/squeeze`); absent until the user changes something. The data archive itself is NOT a setting:
+   * it lives in this browser's IndexedDB and in a device-local switch, outside backup and cloud sync.
+   */
+  squeeze?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */
