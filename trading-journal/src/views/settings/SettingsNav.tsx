@@ -23,6 +23,7 @@ const NAV: readonly SectionNavItem[] = [
   { id: "s-grenzen", label: "Grenzen", heading: "Disziplin-Grenzen" },
   { id: "s-darstellung", label: "Darstellung", heading: "Darstellung" },
   { id: "s-hilfe", label: "Einführung", heading: "Einführung & Hilfe" },
+  { id: "s-archiv", label: "Archiv", heading: "Datenarchiv" },
   { id: "s-mehr", label: "Mehr", heading: "Weitere Einstellungen" },
   { id: "s-version", label: "Version", heading: "Version & Speicher" },
 ];

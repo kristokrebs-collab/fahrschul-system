@@ -1,5 +1,5 @@
 import { animate, motion, useMotionValue, useTransform } from "motion/react";
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ED } from "@/domain/edition";
 import type { Rule } from "@/domain/types";
 import type { FeedId, ProviderHealth, StatusLabel } from "@/market/types";
@@ -36,6 +36,9 @@ import { SignalCheckCard } from "./SignalCheckCard";
 import { StorageCard } from "./StorageCard";
 import { SettingsNav } from "./SettingsNav";
 import { SymbolField } from "./SymbolField";
+
+// F26: the archive card (its store view, export and texts) is its own chunk – fetched when the settings page renders it
+const ArchiveCard = lazy(() => import("./ArchiveCard"));
 
 export const SETTINGS_STRINGS = {
   title: "Einstellungen",
@@ -281,6 +284,19 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
         {/* P13: theme (Hell / Dunkel / System, accents) and the guided tour – a pair of similar height */}
         <ThemeCard />
         <OnboardingCard />
+
+        {/* F26: the local data archive – a setting about this device's storage (on / off, size, deletion), so it lives here */}
+        <div className="min-w-0 lg:col-span-2">
+          <Suspense
+            fallback={
+              <Card title="Datenarchiv" data-testid="settings-archive-loading">
+                <p className="text-[12px] text-mute">Lade …</p>
+              </Card>
+            }
+          >
+            <ArchiveCard />
+          </Suspense>
+        </div>
 
         {/* P14: the settings that live on their pages (Konto, Preise, Box-, Risiko-Einstellungen) */}
         <div className="min-w-0 lg:col-span-2">

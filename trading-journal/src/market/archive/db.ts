@@ -71,6 +71,8 @@ export interface ArchiveDb {
   range(series: SeriesId, symbol: string, from: number, to: number, limit?: number): Promise<ArchivePoint[]>;
   /** the newest `n` points of one row, oldest first */
   latest(series: SeriesId, symbol: string, n: number): Promise<ArchivePoint[]>;
+  /** the times of one row (keys only – cheap), oldest first */
+  times(series: SeriesId, symbol: string): Promise<number[]>;
   ticks(from?: number, to?: number): Promise<TickRecord[]>;
   /** every series × symbol that exists, with count and first / last time; sorted by series, symbol */
   overview(): Promise<SeriesInfo[]>;
@@ -186,6 +188,11 @@ function build(db: IDBDatabase): ArchiveDb {
         };
       });
       return out.reverse();
+    },
+    async times(series, symbol) {
+      const store = db.transaction(POINTS, "readonly").objectStore(POINTS);
+      const keys = (await req(store.getAllKeys(rowRange(series, symbol)))) as Key[];
+      return keys.map((k) => k[2]);
     },
     async ticks(from = -Infinity, to = Infinity) {
       const store = db.transaction(TICKS, "readonly").objectStore(TICKS);
