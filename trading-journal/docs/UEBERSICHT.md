@@ -77,7 +77,7 @@ _Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 8 Funktionen
 
 ### Trade prüfen & Chart
 
-_Einstieg prüfen, Chancen finden, den Chart lesen._ · 14 Funktionen
+_Einstieg prüfen, Chancen finden, den Chart lesen._ · 19 Funktionen
 
 **Einstieg prüfen**
 
@@ -107,6 +107,16 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 14 Funktionen
 | Trendlinien auf Preis und RSI prüfen | Preis- & RSI-Struktur | Markt › Preis- & RSI-Struktur | fertig |
 | Linien und Pfeile in den Chart eines Trades zeichnen | Zeichnungen im Trade-Chart | Trades – Trades → Trade öffnen → Chart → Zeichnen | teilweise |
 | Scanner, Mindestnote und Box-Alarme einstellen | Box-Einstellungen & Box-Alarme | Markt › Box-Einstellungen | fertig |
+
+**Handelsplan**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
+| Den Moment finden, in dem die Range bricht | Einstiegs-Timer (Handelsplan) | Handelsplan › Einstieg | teilweise |
+| Stop und Ziel festlegen, bevor man einsteigt | Ausstiegsplan: Stop und Ziel (Handelsplan) | Handelsplan › Ausstieg | fertig |
+| Ganze Einheiten innerhalb deiner vier Grenzen wählen | Positionsgröße im Handelsplan | Handelsplan › Größe | teilweise |
+| Prüfen, ob der Plan deine Grenzen einhält | Risiko-Check des Handelsplans | Handelsplan › Risiko-Check | fertig |
+| Den fertigen Plan als Text oder CSV mitnehmen | Ticket zum Kopieren (Handelsplan) | Handelsplan › Ticket | fertig |
 
 ### Risiko & Disziplin
 

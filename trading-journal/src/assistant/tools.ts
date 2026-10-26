@@ -141,6 +141,7 @@ const TOPIC_LABEL: Readonly<Record<string, string>> = {
   experiment: "Wochenexperiment",
   lab: "Labor",
   studio: "Strategie-Studio",
+  plan: "Handelsplan",
   memory: "Gedächtnis",
   compare: "Vergleiche",
   list: "Trade-Listen",
@@ -427,6 +428,13 @@ export function runTool(tool: ToolId, arg: string, env: ToolEnv): ToolReply {
         return reply({
           title: "Strategie-Studio geöffnet",
           text: "Dort schreibst du deine Strategie in normalen Worten. Das Studio macht daraus die Regeln des Labors, zeigt Unklares und fragt nach, statt zu raten. Ich öffne nur – gerechnet wird erst, wenn du dort den Backtest startest; ein Backtest zeigt die Vergangenheit, keine Prognose. Keine professionelle Finanzberatung.",
+          close: true,
+        });
+      case "plan":
+        env.go("plan");
+        return reply({
+          title: "Handelsplan geöffnet",
+          text: "Der Handelsplan führt in fünf Schritten vom Einstiegssignal zum Ticket: Einstieg, Ausstieg (Stop und Ziel), Größe innerhalb deiner Grenzen, Risiko-Check und Ticket zum Kopieren. Ich öffne nur – gerechnet wird aus den Kerzen und deinen Limits, und die App sendet nie eine Order. Keine professionelle Finanzberatung.",
           close: true,
         });
       case "explain":

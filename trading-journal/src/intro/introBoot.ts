@@ -14,7 +14,7 @@ export interface IntroEnv {
 }
 
 /** Every page but the overview (`PAGES` of `@/store/uiStore`, spelled out: this module loads before the stores). */
-const OTHER_PAGES = new Set(["trades", "setups", "settings", "markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise", "funktionen", "studio"]);
+const OTHER_PAGES = new Set(["trades", "setups", "settings", "markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise", "funktionen", "studio", "plan"]);
 
 /**
  * Page of a start hash: a known page, `share` for a public share link (`#share/<token>` – a visitor's first look is

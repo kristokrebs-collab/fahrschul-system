@@ -332,6 +332,13 @@ export interface Settings {
    * An id list, so the cloud / two-tab merge works per appointment.
    */
   events?: unknown;
+  /**
+   * Handelsplan: the trader's plan rules (position cap, cash buffer, smallest reward : risk, smallest order) and the saved
+   * plans (entry, stop, target, size, risk light, the form behind them and the alarms created from them). Versioned
+   * passthrough (`{ v: 1, prefs, plans }`, see `@/domain/plan`); absent until the first plan is saved. Plans are an id list,
+   * so the cloud / two-tab merge works per plan; entries a newer version wrote survive untouched.
+   */
+  plan?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */

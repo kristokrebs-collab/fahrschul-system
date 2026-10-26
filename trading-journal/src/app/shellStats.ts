@@ -112,6 +112,7 @@ export function pageCounts(s: ShellStats, env: PageCountEnv): Record<Page, PageC
     // the register itself (`features.ts`) is a lazy chunk – the navigation does not load it for a number
     funktionen: { text: "Index" },
     studio: { text: "Text" },
+    plan: { text: "5 Schritte" },
   };
 }
 

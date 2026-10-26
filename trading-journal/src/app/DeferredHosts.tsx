@@ -20,6 +20,7 @@
  * | `ShotImportHost` | F29 | the lazy preview sheet of „Aus Screenshot übernehmen“ + the pill for queued drafts |
  * | `BoxSnapBackfillHost` | P02 | idle Box-zu-Box context at entry for synced / imported trades and other pairs (F02) |
  * | `KeyLevelHost` | F22 / F08 | stage alerts of the user's own key levels + day-plan change toast, only while the app is open (no plan gate) |
+ * | `PlanClockHost` | F44 / F22 | the „flat by close“ reminder of a saved Handelsplan (a clock time, not a price), only while the app is open |
  * | `PresenceHost` | F27 | the beat that records when the app was open (alerts run only then) – this device only |
  * | `WhatIfMount` | F33 | the „Was wäre wenn“ sheet of a trade – its own chunk, fetched the first time it is opened |
  * | `TrainingMount` | F38 | the training sheet (Lernmodus: situations without the future, decision, reveal, reflection) – its own chunk, fetched the first time it is opened |
@@ -39,6 +40,7 @@ import { ShotImportHost } from "@/journal/extract/ShotImportHost";
 import { BoxAlertHost } from "@/market/boxes/alerts";
 import { BoxSnapBackfillHost } from "@/market/boxes/BoxSnapBackfillHost";
 import { KeyLevelHost } from "@/market/keylevels/alerts";
+import { PlanClockHost } from "@/market/plan/clock";
 import { PresenceHost } from "@/market/presence";
 import { SocialHost } from "@/social/ui/SocialHost";
 import { hasActiveForward } from "@/domain/forward/active";
@@ -173,6 +175,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Schlüsselmarken-Alarme">
         <KeyLevelHost />
+      </HostSlot>
+      <HostSlot name="Handelsplan-Erinnerung">
+        <PlanClockHost />
       </HostSlot>
       <HostSlot name="Anwesenheit">
         <PresenceHost />

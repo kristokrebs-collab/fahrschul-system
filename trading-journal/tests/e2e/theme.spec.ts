@@ -16,7 +16,7 @@ import { collectErrors, expectNoHorizontalScroll, stored } from "./helpers";
 import { openUx, themeSettled, UX_PROJECTS } from "./uxHarness";
 
 /** Every page of the app (`PAGES` in `src/store/uiStore.ts` – the store module itself cannot be imported here). */
-const PAGES = ["overview", "trades", "setups", "settings", "markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise", "funktionen", "studio"] as const;
+const PAGES = ["overview", "trades", "setups", "settings", "markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise", "funktionen", "studio", "plan"] as const;
 
 const css = (page: Page, name: string, sel = ":root") => page.evaluate(([n, s]) => getComputedStyle(document.querySelector(s!)!).getPropertyValue(n!).trim(), [name, sel] as const);
 

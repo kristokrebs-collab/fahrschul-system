@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import type { Page, Route } from "@playwright/test";
 import { SYNTH_LIVE_PRICE, synthKlines, synthRatios, type RatioKind, type RatioScript, type SynthShape } from "./synth";
 import { boxFixture } from "./boxFixture";
+import { planKlineRows } from "./planCandles";
 
 export type MarketScenario = "live" | "stale" | "blocked_451" | "offline" | "reconnect";
 
@@ -256,6 +257,14 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
     if (u.pathname === "/fapi/v1/klines") {
       const iv = u.searchParams.get("interval") ?? "1h";
       const limit = Number(u.searchParams.get("limit") ?? 500);
+      // the Handelsplan reads 5-minute candles (no fixture file): the fixed series of `planCandles.ts`, the same numbers for any window
+      if (iv === "5m") {
+        const from = q.startTime ?? Date.now() - limit * 300_000;
+        const to = q.endTime ?? Date.now();
+        return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(planKlineRows(from, to, limit)) });
+      }
+      // an interval without a fixture is answered like the exchange answers an unknown one (not by a crash of the mock)
+      if (!INTERVAL_MS[iv]) return route.fulfill({ status: 400, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ code: -1120, msg: "Invalid interval." }) });
       // daily bars keep the exchange's 00:00 UTC grid: the fixture's day of `baseTime` (its forming bar) becomes the
       // mocked "today" – a bar off the grid reads to the Lage as a missing daily close (1ba7f81)
       const D = INTERVAL_MS["1d"];
