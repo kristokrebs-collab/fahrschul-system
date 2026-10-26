@@ -26,7 +26,7 @@ export function readLiveStates(symbol: string | null): StateRead[] {
       const a = boxes.tfs[tf].analysis;
       const b = a?.box.box;
       if (!a || !b) continue;
-      out.push({ series: BOX_SERIES[tf], symbol, d: { phase: a.box.phase, dir: a.box.dir, top: num(b.top), bottom: num(b.bottom), grade: b.grade, pos: num(a.box.pos), price: num(a.box.price) } });
+      out.push({ series: BOX_SERIES[tf], symbol, d: { phase: a.box.phase, dir: a.box.dir, brk: b.brk, top: num(b.top), bottom: num(b.bottom), grade: b.grade, pos: num(a.box.pos), price: num(a.box.price) } });
     }
   }
   return out;

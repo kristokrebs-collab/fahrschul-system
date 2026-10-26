@@ -38,7 +38,8 @@ const RATIO_FIELDS: readonly FieldDef[] = [
 ];
 const BOX_FIELDS: readonly FieldDef[] = [
   { key: "phase", label: "Phase", unit: "wort" },
-  { key: "dir", label: "Richtung (1 hoch, −1 runter, 0 keine)", unit: "zahl" },
+  { key: "dir", label: "Richtung des laufenden Ausbruchs (1 hoch, −1 runter, 0 keiner)", unit: "zahl" },
+  { key: "brk", label: "Richtung, in die die Box verlassen wurde (1 hoch, −1 runter, 0 noch nicht)", unit: "zahl" },
   { key: "top", label: "Obere Kante", unit: "preis" },
   { key: "bottom", label: "Untere Kante", unit: "preis" },
   { key: "grade", label: "Boxnote", unit: "wort" },
