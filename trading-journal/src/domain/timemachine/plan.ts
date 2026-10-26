@@ -126,7 +126,7 @@ export const isRefusal = (x: unknown): x is TmRefusal => typeof x === "object" &
 
 /** Short German name of the trigger ("gleiche Abstände zum Schlusskurs"). */
 export function triggerText(t: TmTrigger, kind?: OrderKind): string {
-  if (t.kind === "close") return "gleiche Abstände (in ATR) zum Schlusskurs jeder Kerze, eine Position nach der anderen";
+  if (t.kind === "close") return "gleiche Abstände (in ATR) zum Schlusskurs jeder Kerze – ohne eigene Einstiegsbedingung ist jeder Schluss ein möglicher Einstieg, eine Position nach der anderen";
   if (t.kind === "range") return kind === "market" ? `der Schlusskurs kommt in dieselbe Zone der Spanne der letzten ${t.lookback} Kerzen (± ${Math.round(RANGE_TOL * 100)} % der Höhe)` : `Einstieg an derselben Stelle der Spanne der letzten ${t.lookback} Kerzen`;
   return "dieses Preisniveau (jedes Mal, wenn der Kurs es von derselben Seite erreichte)";
 }

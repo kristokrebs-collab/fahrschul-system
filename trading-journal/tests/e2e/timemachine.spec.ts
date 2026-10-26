@@ -7,7 +7,7 @@
  *
  * Runs on the routed page `/#labor` of the production build (`PW_LABOR_URL` overrides it).
  */
-import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, screenshot, seed } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { synthPrice } from "./mocks/synth";
@@ -30,6 +30,60 @@ async function fillPlan(page: Page, plan = PLAN): Promise<void> {
   await page.getByTestId("tm-entry").fill(plan.entry);
   await page.getByTestId("tm-stop").fill(plan.stop);
   await page.getByTestId("tm-target").fill(plan.target);
+}
+
+/**
+ * Everything in `scope` that reaches past the scope's content box on the left or right (a figure or word that spills out of its
+ * card, e.g. into the padding): the boxes of the elements and the extent of every piece of text, unless a clipping or scrolling
+ * ancestor inside the scope holds it. Decorative layers (absolutely positioned) and SVG parts (judged through their <svg>) are
+ * left out; boxes under 3 px (screen-reader text) never count.
+ */
+async function spill(scope: Locator): Promise<string[]> {
+  return scope.evaluate((root) => {
+    const outer = root.getBoundingClientRect();
+    const cs = getComputedStyle(root);
+    // the content box: what lies inside the card's padding (a word in the padding is a word cut by the card's edge)
+    const left = outer.left + parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth);
+    const right = outer.right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth);
+    const out: string[] = [];
+    const held = (el: Element | null): boolean => {
+      for (let p = el; p && p !== root; p = p.parentElement) {
+        const st = getComputedStyle(p);
+        if (st.overflowX !== "visible" || st.position === "absolute" || st.position === "fixed") return true;
+      }
+      return false;
+    };
+    const report = (what: string, r: { left: number; right: number }) => {
+      if (r.right > right + 1 || r.left < left - 1) out.push(`${what} ragt ${Math.round(Math.max(r.right - right, left - r.left))} px hinaus`);
+    };
+    for (const el of Array.from(root.querySelectorAll<HTMLElement>("*"))) {
+      if (el.closest("svg") && el.tagName.toLowerCase() !== "svg") continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 3 || r.height < 3 || held(el)) continue;
+      report(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 50)}`, r);
+    }
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const text = (n.textContent ?? "").trim();
+      const host = n.parentElement;
+      if (!text || !host || host.closest("svg") || held(host)) continue;
+      // the text must stay inside the content box of the box it sits in (the nearest ancestor that is not a plain inline)
+      let boxEl: Element = host;
+      while (boxEl !== root && getComputedStyle(boxEl).display === "inline" && boxEl.parentElement) boxEl = boxEl.parentElement;
+      const bs = getComputedStyle(boxEl);
+      const br = boxEl.getBoundingClientRect();
+      const bl = br.left + parseFloat(bs.paddingLeft) + parseFloat(bs.borderLeftWidth);
+      const bR = br.right - parseFloat(bs.paddingRight) - parseFloat(bs.borderRightWidth);
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      for (const r of Array.from(range.getClientRects())) {
+        if (r.width < 3 || r.height < 3) continue;
+        report(`Text "${text.slice(0, 30)}"`, r);
+        if (r.right > bR + 1 || r.left < bl - 1) out.push(`Text "${text.slice(0, 30)}" ragt ${Math.round(Math.max(r.right - bR, bl - r.left))} px aus seinem Kasten`);
+      }
+    }
+    return out;
+  });
 }
 
 const pct = async (page: Page, id: string): Promise<number> => {
@@ -88,6 +142,9 @@ test.describe("Labor · Zeitmaschine", () => {
     await expect(page.getByTestId("tm-assumptions")).toContainText("Seed 19");
     await page.getByTestId("tm-assumptions").scrollIntoViewIfNeeded();
     await screenshot(page, info, "tm-result-bottom");
+    await page.getByTestId("tm-events-toggle").click();
+    expect(await spill(card), "nothing in the card reaches past its box").toEqual([]);
+    expect(await spill(page.getByTestId("tm-section")), "nothing in the section (form and card) reaches past its box").toEqual([]);
     await expectNoHorizontalScroll(page);
     expect(errors).toEqual([]);
   });
@@ -218,6 +275,7 @@ test.describe("Trade-Detail · Zeitmaschine", () => {
     await expect(page.getByTestId("tm-stale").or(page.getByTestId("tm-busy")).first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId("tm-result")).toHaveAttribute("data-stale", "false", { timeout: 90_000 });
     expect(await page.getByTestId("tm-p-target").innerText()).not.toBe(first);
+    expect(await spill(sheet), "nothing in the sheet reaches past its box").toEqual([]);
     await expectNoHorizontalScroll(page);
     await screenshot(page, info, "tm-trade-sheet");
     // the idle MAE / MFE backfill may add its own measurements: only what the trader entered must be untouched

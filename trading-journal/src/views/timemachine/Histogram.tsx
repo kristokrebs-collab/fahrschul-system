@@ -94,7 +94,7 @@ export function Histogram({ result }: { result: TmResult }) {
           )}
           {geo.bars.map((b, i) =>
             labelled.has(i) ? (
-              <text key={`t${i}`} x={anchor(b.x + b.w / 2) === "end" ? b.x + b.w : b.x + b.w / 2} y={Math.max(box.t + 9, b.y - 4)} textAnchor={anchor(b.x + b.w / 2)} fontSize={10.5} fill={ink} className="num font-mono" paintOrder="stroke" stroke={themePaint("#0a0a0a")} strokeWidth={3} strokeLinejoin="round">
+              <text key={`t${i}`} x={anchor(b.x + b.w / 2) === "end" ? b.x + b.w : b.x + b.w / 2} y={Math.max(box.t + 9, b.y - 4)} textAnchor={anchor(b.x + b.w / 2)} fontSize={10.5} fill={ink} className="num font-mono" paintOrder="stroke" stroke="var(--color-ink-950, #0a0a0a)" strokeWidth={3} strokeLinejoin="round">
                 {pc(b.share)}
               </text>
             ) : null,

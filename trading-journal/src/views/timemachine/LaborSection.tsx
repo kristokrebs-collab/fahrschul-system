@@ -7,6 +7,7 @@
  */
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
 import { normalizeWatchSymbol } from "@/domain/boxes";
+import { estimatePages } from "@/domain/backtest/history";
 import { HIST_MS, type HistInterval } from "@/domain/backtest/types";
 import { checkPlan, costText, TM_INTERVAL_TEXT, type TmPlan } from "@/domain/timemachine";
 import { Autocomplete } from "@/motion/pulse/Autocomplete";
@@ -89,6 +90,8 @@ export default function TimeMachineSection() {
   const costs = useMemo(() => costsOfLab(labCfg), [labCfg]);
   const options = useMemo(() => optionsOfForm(form), [form]);
   const key = dataKey(form);
+  // the page count of a load (the loader asks the exchange for what the cache lacks: at most this many calls)
+  const pages = useMemo(() => estimatePages(form.interval as HistInterval, 0, FORM_PERIODS[form.period] * 86_400_000), [form.interval, form.period]);
   const loaded = load.status === "ok" ? load.data : null;
   const fresh = loaded?.key === key;
   const busy = load.status === "loading";
@@ -199,6 +202,9 @@ export default function TimeMachineSection() {
           </Collapse>
           <p className="text-[11.5px] leading-snug text-mute" data-testid="tm-costs">
             Kosten wie im Versuchsaufbau (Strategie &amp; Kosten): {costText(costs)}
+          </p>
+          <p className="text-[11.5px] text-faint" data-testid="tm-estimate">
+            {form.symbol} · {LABOR.estimate(pages, true)}
           </p>
           {shownProblem && (
             <p className="rounded-xl border border-warn/30 bg-warn/[0.06] px-3.5 py-2.5 text-[12.5px] text-warn" role="status" data-testid="tm-form-problem">

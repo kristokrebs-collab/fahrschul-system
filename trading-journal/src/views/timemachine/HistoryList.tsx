@@ -24,9 +24,9 @@ export function HistoryList({ events, interval }: { events: readonly TmEvent[]; 
         <caption className="sr-only">Frühere Vorfälle, neueste zuerst</caption>
         <thead>
           <tr className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
-            <th scope="col" className="w-[30%] py-1 pr-2 font-semibold">{TM.history.colWhen}</th>
-            <th scope="col" className="w-[38%] py-1 pr-2 font-semibold">{TM.history.colEnd}</th>
-            <th scope="col" className="w-[32%] py-1 text-right font-semibold">{TM.history.colR}</th>
+            <th scope="col" className="w-[24%] py-1 pr-2 font-semibold">{TM.history.colWhen}</th>
+            <th scope="col" className="w-[34%] py-1 pr-2 font-semibold">{TM.history.colEnd}</th>
+            <th scope="col" className="w-[42%] py-1 text-right font-semibold">{TM.history.colR}</th>
           </tr>
         </thead>
         <tbody>

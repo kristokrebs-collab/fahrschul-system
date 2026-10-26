@@ -121,7 +121,7 @@ export function FanChart({ result }: { result: TmResult }) {
           <line x1={box.l} x2={box.l + innerW} y1={geo.zeroY} y2={geo.zeroY} stroke={mute} strokeWidth={1} strokeDasharray="1 4" strokeLinecap="round" />
           <line x1={box.l} x2={box.l + innerW} y1={geo.stopY} y2={geo.stopY} stroke={ink} strokeOpacity={0.75} strokeWidth={1.2} strokeDasharray="6 4" data-line="stop" />
           <line x1={box.l} x2={box.l + innerW} y1={geo.targetY} y2={geo.targetY} stroke={ink} strokeOpacity={0.9} strokeWidth={1.4} data-line="target" />
-          <g fontSize={10.5} className="font-mono" fill={ink} paintOrder="stroke" stroke={themePaint("#0a0a0a")} strokeWidth={3} strokeLinejoin="round">
+          <g fontSize={10.5} className="font-mono" fill={ink} paintOrder="stroke" stroke="var(--color-ink-950, #0a0a0a)" strokeWidth={3} strokeLinejoin="round">
             <text x={box.l + innerW - 4} y={geo.targetY - 5} textAnchor="end">
               {TM.fan.targetLine} {rr(result.targetR).replace(/^\+/, "+")}
             </text>
