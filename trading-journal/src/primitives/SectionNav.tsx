@@ -94,6 +94,12 @@ function useActiveSection(items: readonly SectionNavItem[], nav: RefObject<HTMLE
     const passed = new Map<string, boolean>();
     const idOf = new Map<Element, string>();
     const compute = (): void => {
+      // the observer reports only crossings of the band: a jump over it (back to the top, down to the end) leaves sections marked as
+      // passed that are not. Where the page has a layout (a zero-height box means none), read the truth from the boxes.
+      for (const [el, id] of idOf) {
+        const r = el.getBoundingClientRect();
+        if (r.height > 0) passed.set(id, r.top < window.innerHeight * 0.45);
+      }
       let last: string | undefined;
       for (const id of ids) if (passed.get(id)) last = id;
       setSeen(last ?? ids[0]);

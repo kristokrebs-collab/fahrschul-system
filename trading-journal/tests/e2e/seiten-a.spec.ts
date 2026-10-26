@@ -256,3 +256,18 @@ test.describe("Seiten A: Feinschliff", () => {
     await expect(links.getByRole("button", { name: /Konto und Abo verwalten/ })).toBeVisible();
   });
 });
+
+test.describe("Abschnittsleiste nach Sprüngen", () => {
+  test("nach dem Sprung ans Seitenende und zurück nach oben ist wieder der erste Abschnitt markiert", async ({ page }) => {
+    await seed(page);
+    await page.goto("/#wachstum");
+    const nav = page.getByRole("navigation", { name: "Inhalt dieser Seite" });
+    await expect(nav.getByRole("button").first()).toBeVisible({ timeout: 30_000 });
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight), { timeout: 20_000, intervals: [700] }).toBeGreaterThan(1500);
+    const first = (await nav.getByRole("button").first().innerText()).trim();
+    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+    await page.waitForTimeout(500);
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await expect(nav.locator('[aria-current="location"]')).toHaveText(first, { timeout: 5_000 });
+  });
+});
