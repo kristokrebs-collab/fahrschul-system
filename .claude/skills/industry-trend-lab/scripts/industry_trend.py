@@ -78,7 +78,7 @@ def backtest(names, dates, R, RF, a):
     T, N = len(dates), len(names)
     ind = [indicators([R[t][i] for t in range(T)], a.up, a.down, a.kelt) for i in range(N)]
     exposure, stop = [0] * N, [float("nan")] * N
-    weights_prev = [0.0] * N; out, trades, turnover_total = [], 0, 0.0
+    weights_prev = [0.0] * N; out, trades, turnover_total, turns = [], 0, 0.0, []
     for t in range(T):
         # Rendite von Tag t mit den am Vortag gesetzten Gewichten
         r = sum(w * (0.0 if math.isnan(R[t][i]) else R[t][i]) for i, w in enumerate(weights_prev) if w) + (1 - sum(weights_prev)) * RF[t]
@@ -96,9 +96,9 @@ def backtest(names, dates, R, RF, a):
         s = sum(w_new)
         if s > a.max_lev: w_new = [w * a.max_lev / s for w in w_new]
         turn = sum(abs(w_new[i] - weights_prev[i]) for i in range(N)); turnover_total += turn
-        out.append(r - turn * a.cost_bps / 10000 if t else r)
+        out.append(r - turn * a.cost_bps / 10000 if t else r); turns.append(turn if t else 0.0)
         weights_prev = w_new
-    return out, trades, turnover_total
+    return out, trades, turnover_total, turns
 
 def stats(rets, rf, label):
     n = len(rets); years = n / 252
@@ -127,7 +127,7 @@ def main():
     names, dates, R, RF, MK = load(a.industry, a.factors)
     sel = [i for i, d in enumerate(dates) if a.start <= int(d[:4]) <= a.end]
     names_n = len(names); dates, R, RF, MK = [dates[i] for i in sel], [R[i] for i in sel], [RF[i] for i in sel], [MK[i] for i in sel]
-    out, trades, turn = backtest(names, dates, R, RF, a)
+    out, trades, turn, _ = backtest(names, dates, R, RF, a)
     print(f"Daten: {names_n} Branchen, {dates[0]} bis {dates[-1]}, {len(dates)} Handelstage. Einstiege: {trades}, Umschlag/Jahr: {turn / (len(dates) / 252):.1f}x, Kosten: {a.cost_bps} bp/Seite")
     print(stats(out, RF, "Trendstrategie")); print(stats(MK, RF, "Buy & Hold (Markt)"))
     print("\nTeilzeiträume (Robustheit; Stärke kann sich ändern):")

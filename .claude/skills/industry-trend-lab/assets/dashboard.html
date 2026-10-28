@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prüfstand Branchen-Trend</title>
+<style>
+/* Design-These: ein Prüfstand, kein Verkaufs-Dashboard. Ruhige Leitstand-Optik, Zahlen in Monospace, eine Signaturgeste:
+   das TOR, durch das jede Idee muss. Prüfungen fallen nacheinander ein, am Ende steht der Stempel (ÜBERNOMMEN / VERWORFEN). */
+:root { --bg:#0a0b0d; --panel:#111317; --panel2:#0d0f12; --line:#23262d; --ink:#e8eaee; --muted:#8a8f9a; --ok:#35d07f; --no:#ff5a5f; --warn:#f5b84a; --blue:#6ea8ff; --grey:#7b8190;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace; --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg:#f2f3f6; --panel:#ffffff; --panel2:#f7f8fa; --line:#dcdfe6; --ink:#16181d; --muted:#626874; --ok:#13a35b; --no:#d93a40; --warn:#b97700; --blue:#2563d6; --grey:#8a91a0; } }
+:root[data-theme="light"] { --bg:#f2f3f6; --panel:#ffffff; --panel2:#f7f8fa; --line:#dcdfe6; --ink:#16181d; --muted:#626874; --ok:#13a35b; --no:#d93a40; --warn:#b97700; --blue:#2563d6; --grey:#8a91a0; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 var(--sans); }
+.wrap { max-width:1100px; margin:0 auto; padding:20px 16px 56px; display:grid; gap:16px; }
+header { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; justify-content:space-between; }
+h1 { margin:0; font-size:20px; letter-spacing:-.01em; }
+.badges { display:flex; flex-wrap:wrap; gap:8px; }
+.badge { font:600 11px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase; padding:6px 9px; border:1px solid var(--line); border-radius:999px; color:var(--muted); }
+.badge.sim { color:var(--warn); border-color:color-mix(in srgb,var(--warn) 50%,var(--line)); }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; min-width:0; }
+.panel > h2 { margin:0 0 12px; font:600 11px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+.num { font-family:var(--mono); font-variant-numeric:tabular-nums; }
+.grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; } .grid2 { display:grid; grid-template-columns:1.4fr 1fr; gap:16px; }
+@media (max-width:820px) { .grid3, .grid2 { grid-template-columns:1fr; } }
+
+/* TOR (Signatur) */
+.gate { display:grid; grid-template-columns:1fr minmax(200px,260px); gap:20px; align-items:stretch; }
+@media (max-width:820px) { .gate { grid-template-columns:1fr; } }
+.checks { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.check { display:grid; grid-template-columns:26px 1fr auto; gap:10px; align-items:center; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--panel2); opacity:0; transform:translate3d(-14px,0,0); }
+.check.in { opacity:1; transform:none; transition:opacity .35s ease, transform .45s cubic-bezier(.16,1,.3,1); }
+.dot { width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font:700 12px/1 var(--mono); color:#06100a; }
+.check.ok .dot { background:var(--ok); } .check.no .dot { background:var(--no); color:#190506; }
+.check .val { font:12px var(--mono); color:var(--muted); text-align:right; }
+.check.no { border-color:color-mix(in srgb,var(--no) 40%,var(--line)); }
+.stamp { display:grid; place-items:center; text-align:center; border:2px solid var(--line); border-radius:12px; padding:18px; min-height:150px; }
+.stamp .word { font:800 clamp(22px,4vw,30px)/1.05 var(--mono); letter-spacing:.04em; opacity:0; transform:scale(1.5) rotate(-6deg); }
+.stamp.show .word { opacity:1; transform:scale(1) rotate(-3deg); transition:transform .5s cubic-bezier(.2,1.4,.4,1), opacity .2s ease; }
+.stamp.no { border-color:var(--no); color:var(--no); } .stamp.ok { border-color:var(--ok); color:var(--ok); }
+.stamp small { display:block; margin-top:10px; font:12px/1.4 var(--sans); color:var(--muted); opacity:0; transition:opacity .4s .5s ease; } .stamp.show small { opacity:1; }
+
+/* Karten */
+.seg h3 { margin:0 0 2px; font-size:15px; } .seg .range { font:11px var(--mono); color:var(--muted); margin-bottom:10px; }
+.row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; align-items:baseline; font:12.5px var(--mono); padding:3px 0; border-top:1px dashed var(--line); }
+.row.head { color:var(--muted); font-size:11px; border-top:0; } .row b { font-weight:600; }
+.win { color:var(--ok); } .lose { color:var(--no); }
+svg text { fill:var(--muted); font-family:var(--mono); font-size:10px; }
+svg[style*="font-size:6px"] text { font-size:6px; }
+.legend { display:flex; gap:14px; font:11px var(--mono); color:var(--muted); margin-top:6px; flex-wrap:wrap; } .legend i { display:inline-block; width:14px; height:3px; margin-right:6px; vertical-align:middle; }
+.curve path { fill:none; stroke-width:1.8; stroke-linejoin:round; }
+.draw { stroke-dasharray:1; stroke-dashoffset:1; animation:draw 1.6s .2s ease-out forwards; } @keyframes draw { to { stroke-dashoffset:0; } }
+.heat { display:grid; grid-template-columns:auto repeat(3,1fr); gap:3px; font:11px var(--mono); align-items:stretch; }
+.heat .c { padding:9px 4px; text-align:center; border-radius:6px; position:relative; } .heat .lab { color:var(--muted); padding:9px 4px; text-align:center; }
+.heat .c.base { outline:2px solid var(--blue); outline-offset:-2px; } .heat .c.cand { outline:2px dashed var(--warn); outline-offset:-2px; }
+.heatwrap { display:grid; gap:14px; grid-template-columns:repeat(3,1fr); } @media (max-width:820px){ .heatwrap { grid-template-columns:1fr; } }
+.heatwrap h4 { margin:0 0 6px; font:600 11px var(--mono); color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+table { width:100%; border-collapse:collapse; font:12.5px var(--mono); } th { text-align:left; color:var(--muted); font-weight:500; font-size:11px; padding:6px 8px; border-bottom:1px solid var(--line); } td { padding:7px 8px; border-bottom:1px dashed var(--line); }
+.empty { text-align:center; padding:40px 16px; color:var(--muted); } .empty button, .tbtn { background:var(--panel2); color:var(--ink); border:1px solid var(--line); border-radius:999px; padding:7px 14px; cursor:pointer; font:inherit; }
+footer { color:var(--muted); font-size:12px; }
+@media (prefers-reduced-motion: reduce) { .check, .check.in, .stamp .word, .stamp small { transition:none !important; opacity:1; transform:none; } .draw { animation:none; stroke-dashoffset:0; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script id="results" type="application/json">null</script>
+<script>
+(function () {
+  var app = document.getElementById('app'), raw = document.getElementById('results').textContent, DATA = null;
+  try { DATA = JSON.parse(raw); } catch (e) {}
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function pct(x, d) { return x == null ? 'n. b.' : (x * 100).toFixed(d == null ? 1 : d) + ' %'; }
+  function f2(x) { return x == null ? 'n. b.' : x.toFixed(2); }
+  function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+  function sharpeColor(s) { var t = Math.max(-.2, Math.min(1.3, s)); if (t < 0) return 'color-mix(in srgb,var(--no) ' + Math.round(Math.min(1, -t / .2) * 55 + 10) + '%, var(--panel2))'; return 'color-mix(in srgb,var(--ok) ' + Math.round(t / 1.3 * 70 + 6) + '%, var(--panel2))'; }
+
+  function empty() {
+    app.innerHTML = '<div class="panel empty"><h1>Prüfstand Branchen-Trend</h1><p>Noch keine Ergebnisse geladen.</p><p>Erzeugen mit <span class="num">validate.py</span>, dann <span class="num">results.json</span> hier laden:</p><p><button id="pick" type="button">results.json wählen</button></p><input id="file" type="file" accept="application/json" hidden></div>';
+    document.getElementById('pick').onclick = function () { document.getElementById('file').click(); };
+    document.getElementById('file').onchange = function (e) { var r = new FileReader(); r.onload = function () { try { DATA = JSON.parse(r.result); render(); } catch (x) { alert('Datei nicht lesbar'); } }; r.readAsText(e.target.files[0]); };
+  }
+
+  function curveSvg(d) {
+    var W = 640, H = 260, P = { l: 44, r: 8, t: 10, b: 20 }, s = d.kurve.strategie, m = d.kurve.markt, n = s.length;
+    var all = s.concat(m), lo = Math.log10(Math.min.apply(null, all)), hi = Math.log10(Math.max.apply(null, all));
+    function X(i) { return P.l + i / (n - 1) * (W - P.l - P.r); } function Y(v) { return P.t + (1 - (Math.log10(v) - lo) / (hi - lo)) * (H - P.t - P.b); }
+    function path(a) { return a.map(function (v, i) { return (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1); }).join(''); }
+    var g = '', k;
+    for (k = Math.ceil(lo); k <= Math.floor(hi); k++) g += '<line x1="' + P.l + '" x2="' + (W - P.r) + '" y1="' + Y(Math.pow(10, k)) + '" y2="' + Y(Math.pow(10, k)) + '" stroke="var(--line)"/><text x="' + (P.l - 6) + '" y="' + (Y(Math.pow(10, k)) + 3) + '" text-anchor="end">' + (k === 0 ? '1' : '10^' + k) + '</text>';
+    var b1 = X(d.kurve.i1), b2 = X(d.kurve.i2);
+    g += '<rect x="' + P.l + '" y="' + P.t + '" width="' + (b1 - P.l) + '" height="' + (H - P.t - P.b) + '" fill="var(--blue)" opacity=".06"/><rect x="' + b1 + '" y="' + P.t + '" width="' + (b2 - b1) + '" height="' + (H - P.t - P.b) + '" fill="var(--warn)" opacity=".07"/><rect x="' + b2 + '" y="' + P.t + '" width="' + (W - P.r - b2) + '" height="' + (H - P.t - P.b) + '" fill="var(--ok)" opacity=".06"/>';
+    g += '<text x="' + (P.l + 4) + '" y="' + (H - 6) + '">Entwicklung ' + d.split.Entwicklung.von.slice(0, 4) + '</text><text x="' + (b1 + 4) + '" y="' + (H - 6) + '">Validierung ' + d.split.Validierung.von.slice(0, 4) + '</text><text x="' + (b2 + 4) + '" y="' + (H - 6) + '">Endtest ' + d.split.Endtest.von.slice(0, 4) + '</text>';
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Vermögenskurve Strategie gegen Markt, logarithmisch">' + g + '<g class="curve"><path d="' + path(m) + '" stroke="var(--grey)" pathLength="1" class="draw"/><path d="' + path(s) + '" stroke="var(--blue)" pathLength="1" class="draw"/></g></svg>';
+  }
+  function dt(x) { x = String(x); return x.slice(6, 8) + '.' + x.slice(4, 6) + '.' + x.slice(0, 4); }
+  function histSvg(h) {
+    var W = 320, H = 130, mx = Math.max.apply(null, h), bw = (W - 8) / h.length, out = '';
+    h.forEach(function (v, i) { var bh = mx ? v / mx * (H - 22) : 0; out += '<rect x="' + (4 + i * bw + 1) + '" y="' + (H - 16 - bh) + '" width="' + (bw - 2) + '" height="' + bh + '" rx="2" fill="' + (i >= h.length / 2 ? 'var(--ok)' : 'var(--no)') + '" opacity=".75"/>'; });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Verteilung der Monatsrenditen" style="font-size:6px"><text x="4" y="' + (H - 3) + '">-20 %</text><text x="' + (W / 2) + '" y="' + (H - 3) + '" text-anchor="middle">0</text><text x="' + (W - 4) + '" y="' + (H - 3) + '" text-anchor="end">+20 %</text>' + out + '</svg>';
+  }
+  function heat(d, key) {
+    var rows = ['20', '40', '80'], cols = ['10', '20', '40'], h = '<div class="heat"><div></div>' + cols.map(function (c) { return '<div class="lab">Hoch ' + c + '</div>'; }).join('');
+    rows.forEach(function (r) { h += '<div class="lab">Tief ' + r + '</div>'; cols.forEach(function (c) { var k = c + '/' + r, v = d.raster[k][key], cls = (k === d.basis ? ' base' : '') + (k === d.kandidat ? ' cand' : ''); h += '<div class="c' + cls + '" style="background:' + sharpeColor(v) + '" title="Hoch ' + c + ' Tage / Tief ' + r + ' Tage: Sharpe ' + f2(v) + '">' + f2(v) + '</div>'; }); });
+    return h + '</div>';
+  }
+  function seg(name, s) {
+    var d = s.strategie, m = s.markt, wc = (d.cagr || 0) >= (m.cagr || 0) ? 'win' : 'lose', ws = d.sharpe >= m.sharpe ? 'win' : 'lose';
+    return '<div class="panel seg"><h3>' + name + '</h3><div class="range">' + dt(s.von) + ' bis ' + dt(s.bis) + '</div><div class="row head"><span></span><span>Strategie</span><span>Markt</span></div>' +
+      '<div class="row"><span>Rendite p. a.</span><b class="' + wc + '">' + pct(d.cagr) + '</b><span>' + pct(m.cagr) + '</span></div>' +
+      '<div class="row"><span>Sharpe</span><b class="' + ws + '">' + f2(d.sharpe) + '</b><span>' + f2(m.sharpe) + '</span></div>' +
+      '<div class="row"><span>max. Verlust</span><b>' + pct(d.maxdd, 0) + '</b><span>' + pct(m.maxdd, 0) + '</span></div></div>';
+  }
+
+  function render() {
+    var d = DATA; if (!d) return empty();
+    var verdictOk = d.entscheidung === 'UEBERNOMMEN';
+    app.innerHTML = '';
+    var hd = el('header', '', '<div><h1>Prüfstand Branchen-Trend</h1><div style="color:var(--muted);font-size:12px">Kontrollierte Verbesserungsschleife: nur übernehmen, was alle Prüfungen besteht</div></div>');
+    var bd = el('div', 'badges', '<span class="badge sim">Simulation / Backtest</span><span class="badge">Daten ' + d.daten_von.slice(0, 4) + ' bis ' + d.daten_bis.slice(0, 4) + '</span><span class="badge">' + d.branchen + ' Branchen</span><span class="badge">Kosten ' + d.kosten_bp + ' bp</span><button class="tbtn" id="theme" type="button">Hell / Dunkel</button>');
+    hd.appendChild(bd); app.appendChild(hd);
+
+    var gate = el('section', 'panel', '<h2>Das Tor: Basis ' + d.basis + ' gegen Kandidat ' + d.kandidat + ' (Tage Hoch / Tief)</h2>');
+    var gw = el('div', 'gate'), ul = el('ul', 'checks');
+    d.checks.forEach(function (c) { ul.appendChild(el('li', 'check ' + (c.ok ? 'ok' : 'no'), '<span class="dot">' + (c.ok ? '✓' : '✕') + '</span><span>' + c.name + '</span><span class="val">' + c.wert + '</span>')); });
+    var st = el('div', 'stamp ' + (verdictOk ? 'ok' : 'no'), '<div><div class="word">' + (verdictOk ? 'ÜBERNOMMEN' : 'VERWORFEN') + '</div><small>' + (verdictOk ? 'Alle Prüfungen bestanden. Weiter mit Paper-Test, nie direkt echtes Geld.' : 'Mindestens eine Prüfung nicht bestanden: Basis ' + d.basis + ' bleibt.') + '</small></div>');
+    gw.appendChild(ul); gw.appendChild(st); gate.appendChild(gw); app.appendChild(gate);
+    var items = ul.children, i = 0;
+    function next() { if (i < items.length) { items[i++].classList.add('in'); setTimeout(next, reduce ? 0 : 260); } else { setTimeout(function () { st.classList.add('show'); }, reduce ? 0 : 200); } }
+    reduce ? (Array.prototype.forEach.call(items, function (x) { x.classList.add('in'); }), st.classList.add('show')) : setTimeout(next, 250);
+
+    var g3 = el('div', 'grid3'); ['Entwicklung', 'Validierung', 'Endtest'].forEach(function (n) { g3.insertAdjacentHTML('beforeend', seg(n, d.split[n])); }); app.appendChild(g3);
+
+    var g2 = el('div', 'grid2');
+    g2.appendChild(el('section', 'panel', '<h2>Vermögenskurve nach Kosten (logarithmisch, Start = 1)</h2>' + curveSvg(d) + '<div class="legend"><span><i style="background:var(--blue)"></i>Strategie ' + d.basis + '</span><span><i style="background:var(--grey)"></i>Markt (Buy &amp; Hold)</span></div>'));
+    var wf = d.walkforward;
+    g2.appendChild(el('section', 'panel', '<h2>Walk-forward (10 J. wählen, 5 J. anwenden)</h2><div class="row head"><span></span><span>Rendite</span><span>Sharpe</span></div>' +
+      '<div class="row"><span>Auswahl</span><b>' + pct(wf.walkforward.cagr) + '</b><b>' + f2(wf.walkforward.sharpe) + '</b></div><div class="row"><span>fest ' + d.basis + '</span><span>' + pct(wf.fest.cagr) + '</span><span>' + f2(wf.fest.sharpe) + '</span></div><div class="row"><span>Markt</span><span>' + pct(wf.markt.cagr) + '</span><span>' + f2(wf.markt.sharpe) + '</span></div>' +
+      '<div style="margin-top:10px;font:11px var(--mono);color:var(--muted)">Gewählt: ' + wf.auswahl.map(function (p) { return p.von.slice(0, 4) + ': ' + p.gewaehlt; }).join(' · ') + '</div>'));
+    app.appendChild(g2);
+
+    var hw = el('section', 'panel', '<h2>Robustheit: Sharpe je Parameter-Paar (blau = Basis, gestrichelt = Kandidat)</h2><div class="heatwrap"><div><h4>Entwicklung</h4>' + heat(d, 'entwicklung') + '</div><div><h4>Validierung</h4>' + heat(d, 'validierung') + '</div><div><h4>Endtest</h4>' + heat(d, 'endtest') + '</div></div><div style="margin-top:8px;font-size:12px;color:var(--muted)">Eine gute Einstellung sollte von guten Nachbarn umgeben sein (Plateau), nicht allein stehen.</div>');
+    app.appendChild(hw);
+
+    var v = d.verteilung, g4 = el('div', 'grid2');
+    g4.appendChild(el('section', 'panel', '<h2>Verteilung der Monatsrenditen (Basis ' + d.basis + ')</h2>' + histSvg(v.hist) + '<div class="row head"><span>Ø Monat</span><span>Streuung</span><span>Schiefe / Wölbung</span></div><div class="row"><b>' + pct(v.mean, 2) + '</b><span>' + pct(v.std, 1) + '</span><span>' + f2(v.skew) + ' / ' + f2(v.kurt) + '</span></div><div style="font-size:12px;color:var(--muted);margin-top:6px">' + v.monate + ' Monate, ' + pct(v.anteil_positiv, 0) + ' davon positiv</div>'));
+    var ct = '<table><tr><th>Kosten je Seite</th><th>Rendite p. a.</th><th>Sharpe</th><th>max. Verlust</th></tr>';
+    d.kosten.forEach(function (c) { ct += '<tr><td>' + c.bp + ' bp</td><td>' + pct(c.cagr) + '</td><td>' + f2(c.sharpe) + '</td><td>' + pct(c.maxdd, 0) + '</td></tr>'; });
+    g4.appendChild(el('section', 'panel', '<h2>Kosten-Szenarien</h2>' + ct + '</table><div style="font-size:12px;color:var(--muted);margin-top:8px">Umschlag ca. ' + d.umschlag_pro_jahr.toFixed(0) + '× pro Jahr. Steuern und Hebel-Finanzierung sind nicht enthalten.</div>'));
+    app.appendChild(g4);
+
+    var lt = '<table><tr><th>Nr.</th><th>Datum</th><th>Änderung</th><th>Entw.</th><th>Valid.</th><th>Endtest</th><th>Entscheidung</th></tr>';
+    d.experimente.slice().reverse().forEach(function (e) { lt += '<tr><td>' + e.id + '</td><td>' + e.datum + '</td><td>' + e.aenderung + '</td><td>' + f2(e.entwicklung) + '</td><td>' + f2(e.validierung) + '</td><td>' + f2(e.endtest) + '</td><td class="' + (e.entscheidung === 'UEBERNOMMEN' ? 'win' : 'lose') + '">' + e.entscheidung + '</td></tr>'; });
+    app.appendChild(el('section', 'panel', '<h2>Experiment-Log (Sharpe je Abschnitt, nach Kosten)</h2><div style="overflow-x:auto">' + lt + '</table></div>'));
+
+    app.appendChild(el('footer', '', 'Simulation, Rückblick, keine Prognose, keine Anlageberatung. Daten: Kenneth French Data Library (' + d.branchen + ' US-Branchen, Stand ' + dt(d.daten_bis) + '). Erzeugt am ' + d.erstellt + '. Es werden keine Orders erzeugt.'));
+    document.getElementById('theme').onclick = function () { var r = document.documentElement; r.dataset.theme = (r.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')) === 'dark' ? 'light' : 'dark'; };
+  }
+  render();
+})();
+</script>
+</body>
+</html>
