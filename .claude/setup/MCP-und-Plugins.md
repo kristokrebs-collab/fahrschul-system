@@ -30,12 +30,8 @@ Playwright (`@playwright/mcp`), Exa-Suche (braucht `EXA_API_KEY` als Umgebungsva
 3. In Claude Code `/mcp` öffnen und prüfen, welche Server verbunden sind. Nicht Gebrauchte entfernen.
 Superpowers und Archify sind **nicht** installiert, bevor Du die Plugin-Befehle oben selbst ausführst.
 
-### Flowstep (Design-Canvas, MCP) – nur auf Deinem Rechner einrichten
-Quelle: https://docs.flowstep.ai/mcp/quickstart (gelesen 2026-10-25). Server-Adresse `https://api.flowstep.ai/mcp`, Anmeldung per OAuth im Browser (kein Schlüssel zum Einfügen). Voraussetzung: ein Flowstep-Konto (app.flowstep.ai).
-- **Claude Code:** `claude mcp add --transport http flowstep https://api.flowstep.ai/mcp`, dann in Claude Code `/mcp` öffnen und bei der ersten Nutzung im Browser **Allow** klicken. Ein Eintrag steht auch in `mcp.example.json`.
-- **claude.ai / Claude Desktop:** Flowstep ist laut Doku ein Eintrag im Konnektor-Verzeichnis (claude.ai/directory/flowstep), per Klick hinzufügbar.
-- **Kosten:** Free-Plan begrenzt; Starter 15 $/Monat mit 80 Nachrichten (laut Preisseite). Nur die drei KI-Design-Werkzeuge (`ai-design-screens`, `ai-generate-screen-variant`, `ai-edit-screen-variant`) zählen gegen das Kontingent; Lesen, Rendern und JSX-Bearbeiten sind laut Doku frei.
-- **Hinweis:** Ich verbinde das nicht selbst. Die Anmeldung und das Allow klickst Du.
+### Flowstep: nicht verwendet
+Auf Wunsch (2026-10-28) gestrichen: keine Einrichtung, kein Eintrag in `mcp.example.json`.
 
 ### TradingView-MCP (atilaahmettaner/tradingview-mcp), optional, nicht eingerichtet
 Gelesen 2026-10-28 (nur Quelltext, nichts ausgeführt): MIT-Lizenz, 149 Dateien, rund 50 Werkzeuge (Screener, Mehrzeitrahmen-Analyse, Backtests, Stimmung für Krypto/Aktien/Forex/Futures). Im Quelltext fand ich **keine Order-Funktionen** (kein Broker). Einrichtung laut README: `pip install tradingview-mcp-server` oder `uvx tradingview-mcp-server` (PyPI-Version 0.8.1, das Repo nennt schon 0.9.x als unterstützt: Version vorher prüfen). Es gibt auch eine **gehostete Variante „TradingMCP“** (tradingmcp.ai, Anmeldung): das wäre ein Fremddienst mit Deinen Daten, nur mit Deiner ausdrücklichen Zustimmung. Du hast schon einen TradingView-Konnektor in Claude; den Mehrwert dieses Servers erst prüfen. Eine neue Verbindung richte ich nicht selbst ein.

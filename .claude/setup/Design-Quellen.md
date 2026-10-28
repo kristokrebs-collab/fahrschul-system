@@ -12,7 +12,7 @@ Gelesen wurden die öffentlichen Startseiten. Inhalte hinter Login (Galerien, Ch
 | v0 (Vercel) | Chat → Full-Stack-App („Use your ChatGPT plan in v0“), Registrierung nötig | Dienst, kein Quellcode zum Ziehen. Ablauf: dort prompten, Code exportieren, in Claude Code verfeinern |
 | Bolt | KI-Builder für Websites/Apps, Anmeldung nötig | wie v0 |
 | Lovable | Schutzseite („Just a moment…“), Seite nicht lesbar | nicht gelesen. Dienst, wie v0 |
-| Flowstep | „Design-Canvas für Agenten“: mehrere Screens per Prompt, Export als Code oder Figma, **MCP-Verbindung zu Claude Code, Cursor, Codex, Windsurf**; Free-Plan begrenzt, Starter 15 $/Monat | Dienst. Einrichtung auf Deinem Rechner in `MCP-und-Plugins.md` (Eintrag auch in `mcp.example.json`) |
+| Flowstep | „Design-Canvas für Agenten“: mehrere Screens per Prompt, Export als Code oder Figma, **MCP-Verbindung zu Claude Code, Cursor, Codex, Windsurf**; Free-Plan begrenzt, Starter 15 $/Monat | Dienst. **Nicht verwendet** (gestrichen am 2026-10-28) |
 
 ## Aceternity: was wir schon haben (Zuordnung, ohne deren Code)
 | Aceternity-Komponente (Name) | Vorhanden bei uns |
