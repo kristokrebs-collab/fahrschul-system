@@ -50,3 +50,6 @@ Vorher gelesen: kein `curl | sh`, keine versteckten Netzwerkaufrufe, keine Hooks
 
 Eigene Arbeiten ohne Fremdcode: `trading-lab`, `social-drafts` (Recherche mit verlinkten Quellen in den Referenzdateien).
 Nicht übernommen: Aceternity UI (AGB: alle Rechte vorbehalten, Lizenz der kostenlosen Komponenten nicht angegeben), Refero und Godly (fremde Designs), v0, Bolt, Lovable, Flowstep (Dienste). Befund siehe `.claude/setup/Design-Quellen.md`.
+
+## Trend-/Edge-Labor (2026-10-28)
+Eigene Arbeiten nach veröffentlichten Beschreibungen, **kein Fremdcode übernommen**: `industry-trend-lab` (Idee/Parameter aus Zarattini & Antonacci, Concretum-Artikel, arXiv 2412.14361; Daten: Kenneth French Data Library, frei, werden nicht ins Repo kopiert), `trading-lab/scripts/edge_windows.py`, `trading-lab/references/{framework-simulation-first,roadmap-mapping}.md` (Zusammenfassungen eines geteilten Google-Docs und eines Instagram-Karussells in eigenen Worten). tradingview-mcp (MIT) nur gelesen, nicht installiert.

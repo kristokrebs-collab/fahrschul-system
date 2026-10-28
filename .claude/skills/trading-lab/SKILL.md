@@ -22,6 +22,12 @@ Gilt zusammen mit `trading-desk` (keine Order ohne manuelles „Ja“, Paper Tra
 - Fehler-Zuordnung ist unsicher: Ein Verlust kann Pech statt Fehler sein.
 - Daten nur aus freien/offiziellen Quellen (siehe `trader-timemachine`, Yahoo, EDGAR) und mit Quelle/Zeitraum nennen.
 
+## Weitere Hilfen (Stand 2026-10-28)
+- `scripts/edge_windows.py`: Zeitfenster-Analyse mit Permutationstest („beste Stunde“ ist bei 24 Fenstern oft Zufall).
+- `references/framework-simulation-first.md`: Ablauf SCAN → SCORE → SIZE → LOG (aus einem geteilten Leitfaden, in eigenen Worten).
+- `references/roadmap-mapping.md`: Zuordnung einer „Self-Improving-Bot“-Roadmap zu unseren Skills; Live-Ausführung bewusst ausgelassen.
+- Strategie-Beispiel: Skill `industry-trend-lab`.
+
 ## Dateien
 `scripts/journal.py` (Trades, Statistik, Fehlerkosten, Regelentwurf) · `scripts/dsr.py` (Deflated Sharpe) · `references/backtest-hygiene.md` · `references/learning-loop.md` · `references/automation-ideas.md` (Ideen für Hintergrund-Automationen mit Risiken).
 Journal liegt in `trader/journal.json` (nicht committen).

@@ -24,6 +24,7 @@ description: >-
 | `/trader-scanner` → `/trader-news` → `/trader-entry` → `/trader-exit` → `/trader-timemachine` → `/trader-budget` → `/trader-risk` → `/trader-broker` | Tagesablauf Daytrading, links nach rechts | day-trader-skill (MIT) |
 | `/trader-alerts`, `/trader-analyst`, `/trader-pelosi` | Preisalarme, Quartalszahlen (SEC), Kongress-Trades | day-trader-skill |
 | Strategien testen, Journal, aus Fehlern lernen | Backtest-Hygiene, Deflated Sharpe, Trade-Journal, Regelvorschläge | Skill `trading-lab` |
+| Branchen-Trendstrategie über 100 Jahre | Backtest mit freien French-Daten, ehrliche Abweichung vom Paper | Skill `industry-trend-lab` |
 | Social-Posts zu Trading | nur Entwürfe, Prüfskript, manuelle Freigabe und manuelles Posten | Skill `social-drafts` |
 | Kronos-Prognose | lokales Zeitreihenmodell für Kerzen | `references/kronos.md`, läuft nur auf Deinem Rechner |
 
