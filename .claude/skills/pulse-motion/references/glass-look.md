@@ -9,6 +9,12 @@
 ## Quelle und Ehrlichkeit
 Look nach einem Reel-Screenshot ("Glassy Dashboard V2", Code: `motion.div whileHover={{y:-5}}`, `glass-card p-6 rounded-2xl`). Werte sind eigene, plausible Werte, nicht gemessen.
 
+## Design-These und Signatur
+- **These:** Glas ist ein Instrument, keine Dekoration: Es zeigt, was dahinter liegt (Farbszene), und trennt Ebenen durch Licht statt durch Linien. Ruhige Typografie (ein Schnitt, grosse Zahlen), Farbe kommt nur aus der Szene, nie aus den Flaechen.
+- **Signatur-Element:** die Glanzkante oben (1-px-Innenlicht) zusammen mit der langsam treibenden Dreifarb-Szene; beides zusammen macht den Look wiedererkennbar.
+- **Bewegung:** Eintritt ease-out mit 60 ms Stagger, Hover-Anhub per Feder, Szene 38 s, nie linear.
+- **Pruefung:** zwei Durchgaenge mit Screenshots (dunkel/hell, dann Handybreite); der zweite fand und behob einen Knopf, der die Kopfzeile ueberdeckte.
+
 ## So geht es
 1. `assets/glass.css` einbinden, `assets/glass-look.js` einbinden (`<script src>`), Knopf "Glas" erscheint unten links; oder `?look=glass`; oder `document.documentElement.dataset.look='glass'`.
 2. `glass-look.js` erkennt Flaechen selbst: deckende/Verlaufs-Hintergruende mit Radius >= 6 px werden `.gl`, vollflaechige Buehnen werden `.gl-stage` (durchsichtig, damit die Szene scheint). In eigenen Projekten `.gl` direkt vergeben.
