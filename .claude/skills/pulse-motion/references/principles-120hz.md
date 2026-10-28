@@ -10,6 +10,19 @@ Ziel: Jede Animation läuft auf 60/120/144/240-Hz-Displays gleich schnell und ru
 5. **Nichts pro Frame messen/bauen:** kein `getBoundingClientRect`/`offsetWidth`/`getComputedStyle` im Frame, kein `innerHTML`; einmal messen, cachen (ResizeObserver). Spans/Elemente einmal erzeugen.
 6. **Leerlauf = 0 Arbeit:** rAF-Schleife nur laufen lassen, solange etwas animiert; `will-change` nur während der Animation; `backdrop-filter`/große Blur-Flächen sparsam (kleine Flächen).
 
+## Easing- und Bewegungs-Regeln (gelten IMMER, bei jeder Animation)
+1. **Eintritt = ease-out** (`cubic-bezier(.16,1,.3,1)`): schneller Start, weiches Ankommen. Alles, was erscheint, einblendet, aufklappt.
+2. **Austritt = ease-in** (`cubic-bezier(.55,.08,.4,.95)`): langsamer Start, beschleunigt weg. Alles, was verschwindet. **Austritt kürzer als Eintritt** (ca. 60 %).
+3. **Interface-Elemente (Knöpfe, Menüs, Karten): Feder mit leichtem Overshoot** (`cubic-bezier(.34,1.56,.64,1)` oder `springAt`, ζ ≈ 0,6–0,8); Overshoot klein (≤ 8 %), bei Daten/Tabellen/Fehlern keinen.
+4. **Nichts linear.** `linear` nur für Dauerläufe (Spinner, Marquee, Fortschritt, der echte Zeit abbildet).
+5. **Dauern:** Mikro-Feedback (Hover/Press) 120–200 ms, Ein-/Ausblenden 180–300 ms, Panels/Overlays 300–500 ms, Hero-/Szenenwechsel bis 800 ms; > 1 s nur mit Grund.
+6. **Stagger:** 30–60 ms je Element, Gesamt-Staffel ≤ 400 ms; beim Austritt nicht staffeln.
+7. **Unterbrechbar:** Zustand per Transition auf Ziel-Wert, nicht per Keyframe-Skript; erneutes Klicken mitten in der Animation darf nicht springen.
+8. **Ursprung beachten:** `transform-origin` dort, wo das Element herkommt (Menü am Knopf, Dropdown an der Oberkante, Flutkreis am Druckpunkt).
+9. **Tokens statt Zahlen im Code:** `--ease-out`, `--ease-in`, `--spring`, `--dur-*` im `:root` definieren und überall nutzen.
+10. **Bewegungsarm:** `prefers-reduced-motion` → Blende statt Flug/Dreh/Parallax; Fokusring nur bei Tastatur (`:focus-visible`).
+Gegenprobe vor Abgabe: `grep -n "linear\|ease;\|ease " <datei>` — jede Fundstelle begründen oder ersetzen.
+
 ## Bausteine (getestet)
 
 ### Exakte gedämpfte Feder (Position 0→1, bildratenunabhängig)

@@ -70,3 +70,5 @@ Der Nutzer pastet weitere „Style Reference“-Blöcke (Name, Farben, Typo, Kom
 2. **Tippfehler der Quelle korrigieren** (z. B. fünfstellige Hexwerte wie `#15846` → `#15846e`).
 3. `assets/styles/<slug>.css` nach dem Muster (Marken-Variablen mit Slug-Prefix + Semantik-Schicht `--s-*`, Scope `[data-style="<slug>"]`).
 4. `_preview.html` um den Style erweitern, `python3 scripts/build_index.py`, `scripts/package.sh`.
+
+> Easing-Regeln (Eintritt ease-out, Austritt ease-in, Feder, nichts linear): siehe `references/principles-120hz.md` und SKILL.md, gelten für jeden Style.
