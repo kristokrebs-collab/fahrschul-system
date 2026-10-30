@@ -31,6 +31,7 @@ canvas{display:block;width:100%;height:100%}
 /* Gradient -> flow */
 .flow{position:absolute;inset:-30%;background:conic-gradient(from 0deg,#ff7a45,#ffd23f,#ff4fa3,#6a5cff,#ff7a45);filter:blur(34px);animation:spin 14s var(--ease-in) infinite alternate;will-change:transform}
 @keyframes spin{from{transform:rotate(0) scale(1)}to{transform:rotate(140deg) scale(1.25)}}
+.flow.is-off{animation-play-state:paused}
 .flow-label{position:relative;font:600 13px var(--mono);color:#fff;letter-spacing:.06em;mix-blend-mode:overlay}
 /* Number -> roll */
 .odo{display:flex;font:700 30px/1 var(--mono);letter-spacing:-.02em;height:1em;overflow:hidden;font-variant-numeric:tabular-nums}
@@ -105,12 +106,14 @@ canvas{display:block;width:100%;height:100%}
     pRaf = requestAnimationFrame(function step(t) {
       if (!pT0) pT0 = t; var dt = Math.min(t - (pLast || t), 50) / 1000; pLast = t; var e = (t - pT0) / 1000, k = css('--form-k', 5.5);
       P.forEach(function (p) { if (e > p.d) { var a = 1 - Math.exp(-k * 0.5 * dt * (1 + e * .3)); p.x += (p.tx - p.x) * a; p.y += (p.ty - p.y) * a; } });
-      drawP(s, e); pRaf = requestAnimationFrame(step);
+      var far = 0; P.forEach(function (p) { if (Math.abs(p.tx - p.x) + Math.abs(p.ty - p.y) > 0.3) far++; });
+      drawP(s, 99);
+      if (far || e < 0.8) pRaf = requestAnimationFrame(step);   // angekommen: Schleife endet, Leerlauf = keine Arbeit
     });
   }
   function drawP(s, e) {
     var x = s.x; x.clearRect(0, 0, s.w, s.h);
-    P.forEach(function (p) { var br = e > 99 ? 0 : Math.sin(e * 1.6 + p.h * 9) * 0.6; x.fillStyle = 'hsl(' + (20 + p.h * 260) + ' 95% 66%)'; x.beginPath(); x.arc(p.x, p.y, 2 + br * .5, 0, 6.3); x.fill(); });
+    P.forEach(function (p) { var br = 0; x.fillStyle = 'hsl(' + (20 + p.h * 260) + ' 95% 66%)'; x.beginPath(); x.arc(p.x, p.y, 2 + br * .5, 0, 6.3); x.fill(); });
   }
   jobs.particles = initParticles;
 
@@ -191,6 +194,7 @@ canvas{display:block;width:100%;height:100%}
   }
   jobs.words = runWords;
 
+  (function () { var f = document.querySelector('.flow'); if (f && window.IntersectionObserver) new IntersectionObserver(function (es) { f.classList.toggle('is-off', !es[0].isIntersecting); }).observe(f); })();
   document.querySelectorAll('[data-replay]').forEach(function (b) { b.addEventListener('click', function () { jobs[b.dataset.replay](); }); });
   document.getElementById('theme').addEventListener('click', function () { var r = document.documentElement; r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark'; });
   var start = function () { initParticles(); runLine(); runRoll(); runWords(); };

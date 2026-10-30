@@ -30,7 +30,7 @@ Ideenliste aus einem Instagram-Karussell („Claude Motion Graphics, 16 premium 
 - Canvas/SVG tragen `aria-label`; Zahl als Text im `aria-label`
 
 ## 120-Hz-Technik
-rAF mit Zeitstempel und dt, Leerlauf = keine Arbeit (Konfetti, Orbit pausiert außerhalb des Sichtfelds). Nur `transform`/`opacity`/Canvas; der Pay-Button animiert `clip-path` auf 46 px Fläche. Test: `check120.cjs`.
+rAF mit Zeitstempel und dt, Leerlauf = keine Arbeit (Konfetti, Orbit pausiert außerhalb des Sichtfelds). Nur `transform`/`opacity`/Canvas; der Pay-Button animiert `clip-path` auf 46 px Fläche. **Gemessen (check120, Headless, alle 8 Bausteine plus wiederholtes Auslösen gleichzeitig):** normale CPU p95 3,7 ms, 0,1 % der Frames über 8,33 ms; mit 4-facher CPU-Drosselung p95 13,9 ms und 16 % über Budget (Urteil des Tools: „zu langsam“ im Stresstest). Teuerste Teile: rotierendes Blur-Gradient (Gradient → Flow) und die Orbit-Schleife. Darum: **Bausteine einzeln oder zu wenigen verwenden**, nicht alle acht auf einem Bildschirm. Gradient pausiert außerhalb des Sichtfelds, Partikel stoppen, sobald sie angekommen sind. Echtgerät-Test bei 120 Hz steht aus.
 
 ## Einbindung
 Block `COMPONENT:START/END` + CSS kopieren; jeder Baustein hat seinen Abschnitt im Skript (Kommentare `---- 01 … ----`). Nur den gewünschten Baustein mitnehmen.

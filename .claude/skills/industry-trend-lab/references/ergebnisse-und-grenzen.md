@@ -21,3 +21,11 @@ Teilzeiträume (Standardlauf ohne Kosten, Daten bis 2026-09): 1950 bis 1999 star
 
 ## Offene Fragen vor jeder Nutzung
 Steuern, Handelbarkeit (Branchenportfolios sind keine Fonds; ETF-Ersatz hat andere Renditen), Hebelfinanzierung, Umschlag, Kapitalgröße. Keine Anlageberatung.
+
+## Mega-Test (2026-10-30)
+12.096 Varianten (up 10 bis 65, down 20 bis 130, Keltner 1,0 bis 4,0, Ziel-Vola 1 bis 3 %, Hebel 1 bis 2), je über 26.338 Handelstage, 5 bp Kosten je Seite. Auswahl nur auf den ersten 80 %, Endtest die letzten 20 % (ab 20.10.2005).
+- Beste der Auswahl (65/20, K1,0, V1 %, H2): Sharpe 1,26 in Auswahl, 0,39 im Endtest; Basis (20/40): 0,83 und 0,54.
+- 64 % aller Varianten sind im Endtest besser als die Basis, aber die in der Auswahl besten sind es nicht: Rang-Korrelation -0,00.
+- Monte-Carlo (10.000 Block-Bootstrap-Pfade, 5 Jahre, aus den letzten 40 % der Daten): Median 1,81x, P05 1,04x, P95 3,17x, Verlustchance 3,9 %.
+- Entscheidung: VERWORFEN, Vault leer. Lehre: Aus Tausenden Varianten das Beste zu wählen bringt keinen Vorsprung außerhalb der Auswahl; der Deflated Sharpe allein schützt bei langer Tageshistorie kaum, der unberührte Endtest und die Kosten sind die wirksamen Prüfungen.
+- Grenzen: Monte-Carlo-Pfade stammen aus derselben Historie (keine Zukunft), Kosten nur linear, Steuern/Finanzierung fehlen, Signale sind vom letzten Datenstand (30.09.2026), nicht live.
