@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tactile Highlight</title>
+<style>
+/* ===== CONFIG (hier hochdrehen) ===== */
+:root{
+  /* Look */
+  --stage-bg:#131313;            /* Buehnenfarbe (gemessen 131313) */
+  --text-color:#f2f2f2;          /* normaler Text (gemessen ~F2F2F2) */
+  --text-hl-color:#ffffff;       /* Text auf dem Marker: reines Weiss */
+  --marker-bg:#030205;           /* Marker-Balken, fast schwarz (gemessen 020104) */
+  --marker-radius:5px;           /* Eckenradius des Markers */
+  --marker-pad-x:0.16em;         /* Innenabstand links/rechts (ca. 10px @64px) */
+  --marker-glow:0 8px 20px rgba(255,255,255,.07); /* feiner heller Schein UNTER dem Marker */
+  --selection-bg:#3872ac;        /* Textauswahl-Blau (gemessen 3872AC) */
+  --font:Roboto,Inter,Geist,Arial,"Liberation Sans",ui-sans-serif,system-ui,sans-serif;
+  --font-size:clamp(30px,5.186vw,76px); /* Referenz 64px @1234 Buehne */
+  --font-weight:700;
+  --letter-spacing:-0.05em;      /* enge Laufweite (Roboto; Fallback Liberation Sans ist ~14% breiter) */
+  --line-height:1.15;            /* Zeilenabstand = 74px @64px */
+  --cursor:pointer;              /* Hand-Zeiger wie im Video */
+  /* Motion (ms) */
+  --enter-fade-ms:120;           /* Text blendet kurz ein */
+  --lead-delay-ms:0;             /* Verzoegerung bis zum "Tab" (Vorlauf des Markers) */
+  --tab-pop-ms:15;               /* Tab links vom Marker springt auf (Breite 0.72 -> 1) */
+  --tab-hold-ms:30;              /* Tab bleibt kurz stehen */
+  --tab-retract-ms:42;           /* Tab zieht sich nach rechts zurueck (ease-in) */
+  --wipe-delay-ms:90;            /* Marker beginnt nach dem Tab-Rueckzug zu wachsen */
+  --wipe-tau-ms:150;             /* Marker-Wisch: p = 1 - exp(-t/tau) (ease-out, Zeitkonstante) */
+  --tab-width-em:1.38;           /* Breite des Tabs in em (88px @64px) */
+}
+</style>
+<style>
+/* COMPONENT CSS */
+html,body{margin:0;height:100%}
+body{background:var(--stage-bg);display:grid;place-items:center;overflow:hidden;font-family:var(--font)}
+.th{position:relative;margin:0;text-align:center;contain:layout paint;cursor:var(--cursor);
+  font:var(--font-weight) var(--font-size)/var(--line-height) var(--font);letter-spacing:var(--letter-spacing);
+  color:var(--text-color);font-kerning:normal;-webkit-user-select:text;user-select:text;
+  -webkit-tap-highlight-color:transparent;padding:0.3em 0.4em}
+.th__l{display:block;white-space:nowrap}
+.th__l--hl{display:flex;justify-content:center}
+.th__hl{position:relative;display:inline-block;padding:0 var(--marker-pad-x);white-space:nowrap;border-radius:var(--marker-radius)}
+.th__bg,.th__tab{position:absolute;top:0;bottom:0;background:var(--marker-bg);border-radius:var(--marker-radius);
+  pointer-events:none;transform:scale3d(1,1,1)}
+.th__bg{left:0;right:0;transform-origin:0 50%;box-shadow:var(--marker-glow)}
+.th__tab{right:100%;width:calc(var(--tab-width-em)*1em);transform-origin:100% 50%;opacity:0}
+.th__txt{position:relative}
+.th__c{display:inline}
+.th__c.is-on{color:var(--text-hl-color)}
+.th ::selection,.th::selection{background:var(--selection-bg);color:#fff}
+.th.is-running .th__bg,.th.is-running .th__tab{will-change:transform}
+.th__sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){.th__tab{display:none}}
+</style>
+</head>
+<body>
+<!-- COMPONENT:START -->
+<h1 class="th" id="th" aria-label="Our mission is to build Better Interfaces.">
+  <span class="th__l" aria-hidden="true">Our mission is to build</span>
+  <span class="th__l th__l--hl" aria-hidden="true"><span class="th__hl"><i class="th__tab"></i><i class="th__bg"></i><span class="th__txt">Better Interfaces.</span></span></span>
+</h1>
+<!-- COMPONENT:END -->
+<script>
+/* Init: initTactileHighlight(rootEl, {trigger:'mount'|'inview', replayOnView:false, wipeTauMs, wipeDelayMs, tabHoldMs, ...})
+   root._th.replay() startet den Marker-Wisch neu. Alles zeitbasiert (rAF-Zeitstempel). */
+function initTactileHighlight(root, opts){
+  opts = opts || {};
+  var cs = getComputedStyle(root);
+  var num = function(n, d){ var v = parseFloat(cs.getPropertyValue(n)); return isNaN(v) ? d : v; };
+  var C = {
+    fade: opts.enterFadeMs != null ? opts.enterFadeMs : num('--enter-fade-ms', 120),
+    lead: opts.leadDelayMs != null ? opts.leadDelayMs : num('--lead-delay-ms', 0),
+    pop: opts.tabPopMs != null ? opts.tabPopMs : num('--tab-pop-ms', 15),
+    hold: opts.tabHoldMs != null ? opts.tabHoldMs : num('--tab-hold-ms', 30),
+    retract: opts.tabRetractMs != null ? opts.tabRetractMs : num('--tab-retract-ms', 42),
+    wipeDelay: opts.wipeDelayMs != null ? opts.wipeDelayMs : num('--wipe-delay-ms', 90),
+    tau: opts.wipeTauMs != null ? opts.wipeTauMs : num('--wipe-tau-ms', 150)
+  };
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var bg = root.querySelector('.th__bg'), tab = root.querySelector('.th__tab'), txt = root.querySelector('.th__txt');
+  var label = txt.textContent;
+  // Zeichen einmal in Spans zerlegen (kein DOM-Umbau pro Frame)
+  txt.textContent = '';
+  var chars = [];
+  for (var i = 0; i < label.length; i++){
+    var s = document.createElement('span'); s.className = 'th__c'; s.textContent = label[i];
+    txt.appendChild(s); chars.push(s);
+  }
+  var rights = [], boxW = 1, lit = 0;      // gecachte Zeichen-Rechtskanten (px ab Marker-Links)
+  function measure(){                       // einmal messen (nicht pro Frame)
+    var hl = bg.parentNode, hr = hl.getBoundingClientRect(), left = hr.left;
+    boxW = hr.width || 1; rights = [];
+    for (var j = 0; j < chars.length; j++) rights.push(chars[j].getBoundingClientRect().right - left);
+  }
+  function setLit(n){                       // DOM nur aendern, wenn sich der Wert aendert
+    if (n === lit) return;
+    var a = Math.min(n, lit), b = Math.max(n, lit);
+    for (var j = a; j < b; j++) chars[j].classList.toggle('is-on', n > lit);
+    lit = n;
+  }
+  function paintFinal(){
+    bg.style.transform = 'scale3d(1,1,1)'; tab.style.opacity = '0'; root.style.opacity = '1'; setLit(chars.length);
+  }
+  function paintInitial(){
+    bg.style.transform = 'scale3d(0,1,1)'; tab.style.opacity = '0'; root.style.opacity = '0'; setLit(0);
+  }
+  var raf = 0, t0 = 0, running = false;
+  function frame(t){
+    if (!t0) t0 = t;
+    var e = t - t0 - C.lead;                 // ms seit Start (nur Zeitstempel, kein Frame-Zaehler)
+    if (e < 0){ raf = requestAnimationFrame(frame); return; }
+    root.style.opacity = C.fade > 0 ? Math.min(1, e / C.fade) : 1;
+    // Tab: pop (0.72 -> 1), halten, dann nach rechts einziehen (ease-in)
+    var tabS = 0, tabO = 0;
+    if (e < C.pop){ tabS = 0.72 + 0.28 * (e / C.pop); tabO = 1; }
+    else if (e < C.pop + C.hold){ tabS = 1; tabO = 1; }
+    else if (e < C.pop + C.hold + C.retract){
+      var k = (e - C.pop - C.hold) / C.retract; tabS = 1 - k * k; tabO = 1;   // ease-in
+    }
+    tab.style.opacity = tabO ? '1' : '0';
+    if (tabO) tab.style.transform = 'scale3d(' + tabS.toFixed(4) + ',1,1)';
+    // Marker-Wisch: exponentielles Annaehern (analytisch, bildratenunabhaengig)
+    var we = e - C.wipeDelay, p = 0;
+    if (we > 0) p = 1 - Math.exp(-we / C.tau);
+    var done = p > 0.9995; if (done) p = 1;
+    bg.style.transform = 'scale3d(' + p.toFixed(4) + ',1,1)';
+    var edge = p * boxW, n = 0;
+    while (n < rights.length && rights[n] <= edge + 0.5) n++;
+    setLit(n);
+    if (done){ running = false; root.classList.remove('is-running'); paintFinal(); return; }
+    raf = requestAnimationFrame(frame);
+  }
+  function replay(){
+    cancelAnimationFrame(raf);
+    if (reduce){ paintFinal(); return; }
+    measure(); paintInitial();
+    root.classList.add('is-running'); running = true; t0 = 0;
+    raf = requestAnimationFrame(frame);
+  }
+  var ro = window.ResizeObserver ? new ResizeObserver(function(){ if (!running){ measure(); } }) : null;
+  if (ro) ro.observe(root);
+  function start(){
+    measure();
+    if (opts.trigger === 'inview' && window.IntersectionObserver){
+      paintInitial();
+      var io = new IntersectionObserver(function(es){
+        es.forEach(function(en){
+          if (en.isIntersecting){ replay(); if (!opts.replayOnView) io.disconnect(); }
+        });
+      }, {threshold:0.4});
+      io.observe(root);
+    } else replay();
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(start); else start();
+  root._th = { replay: replay };
+  return root._th;
+}
+</script>
+<!-- Demo: exakt der Video-Inhalt -->
+<script>
+initTactileHighlight(document.getElementById('th'), {});
+</script>
+</body>
+</html>

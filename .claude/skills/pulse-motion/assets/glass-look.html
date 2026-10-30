@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="de" data-look="glass">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Glass Look</title>
+<link rel="stylesheet" href="glass.css">
+<style>
+/* ===== CONFIG (hier hochdrehen) ===== */
+:root{
+  --gl-blur:24px;                /* Staerke der Unschaerfe hinter dem Glas */
+  --lift:-5px;                   /* Hover-Anhub der Karten (wie whileHover y:-5) */
+  --font:Inter,Geist,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --hover-ms:260; --enter-ms:520; --stagger-ms:60;
+}
+</style>
+<style>
+/* COMPONENT CSS */
+html,body{margin:0;min-height:100%}
+body{font-family:var(--font);padding:clamp(16px,4vw,48px);box-sizing:border-box}
+.gd{max-width:980px;margin:0 auto;display:grid;gap:16px}
+.gd__bar{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:10px 12px 10px 18px;border-radius:999px}
+.gd__bar b{font-weight:600;font-size:14px} .gd__bar small{color:var(--gl-fg-dim);font-size:12px}
+.gd__stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px}
+.gd__card{padding:20px;border-radius:22px;transition:transform calc(var(--hover-ms)*1ms) var(--spring),box-shadow calc(var(--hover-ms)*1ms) var(--ease-out);cursor:default}
+.gd__card:hover{transform:translate3d(0,var(--lift),0)}
+.gd__card p{margin:0;font-size:13px;color:var(--gl-fg-dim)}
+.gd__card h2{margin:6px 0 8px;font-size:28px;font-weight:700;letter-spacing:-.02em}
+.gd__card span{font-size:12px;font-weight:600;color:#3be0a8}
+.gd__wide{padding:22px;border-radius:26px}
+.gd__wide h3{margin:0 0 12px;font-size:15px;font-weight:600}
+.gd__pills{display:flex;flex-wrap:wrap;gap:8px}
+.gd__pill{border:0;padding:9px 16px;border-radius:999px;font:500 13px var(--font);color:inherit;cursor:pointer;
+  transition:transform .2s var(--spring),filter .2s var(--ease-out)}
+.gd__pill:hover{transform:translate3d(0,-2px,0)} .gd__pill:active{transform:scale(.95)}
+.gd__pill:focus-visible{outline:2px solid var(--gl-fg);outline-offset:2px}
+.gd__pill[aria-pressed=true]{filter:brightness(1.35);font-weight:700}
+[data-theme=light] .gd__pill[aria-pressed=true]{filter:brightness(.9)}
+/* Eintritt: ease-out, gestaffelt, nur transform/opacity */
+.gd [data-in]{opacity:0;transform:translate3d(0,14px,0);animation:gd-in calc(var(--enter-ms)*1ms) var(--ease-out) forwards;animation-delay:calc(var(--n,0) * var(--stagger-ms) * 1ms)}
+@keyframes gd-in{to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.gd [data-in]{animation:none;opacity:1;transform:none}.gd__card,.gd__pill{transition:none}}
+@media (max-width:640px){body{padding-top:56px}}
+.theme{position:fixed;top:12px;right:12px;z-index:5;font:500 12px var(--font);color:var(--gl-fg);background:rgba(255,255,255,.1);border:1px solid var(--gl-edge-soft);border-radius:999px;padding:6px 12px;cursor:pointer}
+</style>
+</head>
+<body>
+<button class="theme" id="theme" type="button">Hell / Dunkel</button>
+<!-- COMPONENT:START -->
+<main class="gd">
+  <header class="gd__bar gl" data-in style="--n:0"><b>Glass-Dashboard</b><small>Beispielwerte, keine echten Daten</small></header>
+  <section class="gd__stats" aria-label="Kennzahlen">
+    <article class="gd__card gl" data-in style="--n:1"><p>Einnahmen</p><h2>425k</h2><span>+8 % zum Vorzeitraum</span></article>
+    <article class="gd__card gl" data-in style="--n:2"><p>Ausgaben</p><h2>314k</h2><span>+3 % zum Vorzeitraum</span></article>
+    <article class="gd__card gl" data-in style="--n:3"><p>Gewinn</p><h2>111k</h2><span>+14 % zum Vorzeitraum</span></article>
+    <article class="gd__card gl" data-in style="--n:4"><p>Sparquote</p><h2>26,1 %</h2><span>vom Einkommen</span></article>
+  </section>
+  <section class="gd__wide gl" data-in style="--n:5">
+    <h3>Zeitraum</h3>
+    <div class="gd__pills" role="group" aria-label="Zeitraum">
+      <button class="gd__pill gl" type="button" aria-pressed="false">Diese Woche</button>
+      <button class="gd__pill gl" type="button" aria-pressed="true">Dieser Monat</button>
+      <button class="gd__pill gl" type="button" aria-pressed="false">Dieses Jahr</button>
+    </div>
+  </section>
+</main>
+<!-- COMPONENT:END -->
+<script>
+/* Glas-Look-Demo: .gl-Klassen sind hier von Hand gesetzt (siehe glass-look.js fuer automatische Erkennung in bestehenden Komponenten). */
+document.querySelectorAll('.gd__pill').forEach(function(b){
+  b.addEventListener('click', function(){ document.querySelectorAll('.gd__pill').forEach(function(o){ o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); }); });
+});
+document.getElementById('theme').addEventListener('click', function(){
+  var r = document.documentElement; r.dataset.theme = r.dataset.theme === 'light' ? 'dark' : 'light';
+});
+</script>
+</body>
+</html>

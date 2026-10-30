@@ -1,0 +1,21 @@
+/* ORYZO AI — „Dunkelkammer-Produkteditorial“ (dark, warm). Einsatz: <section data-style="oryzo-ai"> (+ _base.css) */
+[data-style="oryzo-ai"] {
+  /* Marke */
+  --ory-cream: #ffedd7; --ory-walnut: #100904; --ory-bark: #382416; --ory-cork: #40372e; --ory-driftwood: #6c5f51; --ory-ember: #dc5000; --ory-black: #000000; /* nur SVG-Füllungen */
+  --ory-muted: #b8a995;   /* abgeleitet: Creme ~70 % für Sekundärtext (Driftwood #6c5f51 bleibt Linien-/Strukturfarbe, als Text zu blass) */
+  /* Semantik-Schicht */
+  --s-bg: var(--ory-walnut); --s-surface: var(--ory-bark); --s-fg: var(--ory-cream); --s-fg-muted: var(--ory-muted); --s-card-muted: var(--ory-muted);
+  --s-border: var(--ory-cork); --s-border-strong: var(--ory-cream); --s-accent: var(--ory-ember); --s-link: var(--ory-cream);
+  --s-action-bg: var(--ory-bark); --s-action-fg: var(--ory-cream);
+  --s-radius-card: 12px; --s-radius-btn: 36px; --s-card-pad: 24px;
+  --s-btn-pad: 14px 24px; --s-btn-weight: 500; --s-btn-case: uppercase;
+  --s-font-ui: 'Halyard Display', 'Inter', 'Söhne', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-display: var(--s-font-ui); --s-font-mono: var(--s-font-ui);
+  --s-display-weight: 500; --s-display-leading: 0.9; --s-display-tracking: normal; --s-display-case: uppercase; --s-body-weight: 500;
+  --s-ease: ease; --s-dur: .2s;
+  /* Extras: ALLES uppercase/500, nur der 29px-Beschreibungstext ist 400 + gemischte Schreibung */
+  --ory-body-voice-size: 29px; --ory-body-voice-leading: 1.26; --ory-divider: 1px dashed var(--ory-cork);
+  --ory-ember-use: "nur Credit-Zeilen / Studio-Link, nie Buttons";
+  font-feature-settings: "ss01" on;
+}
+[data-style="oryzo-ai"] .s-voice { font-weight: 400; text-transform: none; font-size: var(--ory-body-voice-size); line-height: var(--ory-body-voice-leading); }

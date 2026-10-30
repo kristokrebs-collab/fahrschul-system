@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dancing Letters</title>
+<style>
+/* ===== CONFIG (hier hochdrehen) ===== */
+:root{
+  --stage-bg:#131313;          /* Buehnenfarbe (gemessen 131313) */
+  --text-color:#ededed;        /* Buchstabenfarbe (gemessen EDEDED) */
+  --font:Inter,Geist,Roboto,ui-sans-serif,system-ui,"Helvetica Neue",Arial,sans-serif;
+  --font-size:clamp(48px,7.8vw,96px); /* Referenz: 96px @ 1234x673 (Versalhoehe 70px) */
+  --font-weight:800;
+  --letter-spacing:-0.02em;
+  /* Motion: per JS-Optionen (opts) oder hier als Zahlen ueberschreibbar */
+  --radius:95;                 /* px: Zeiger-Naehe, ab der ein Buchstabe "weggestossen" wird */
+  --hold-ms:1400;              /* ms: so lange bleibt der Buchstabe verrutscht, nachdem der Zeiger weg ist */
+  --cooldown-ms:420;           /* ms: Mindestabstand zwischen zwei neuen Zufallswuerfen desselben Buchstabens */
+  --kick-k:520;                /* Feder "wegspringen": Steifigkeit (hoeher = schneller) */
+  --kick-c:20;                 /* Feder "wegspringen": Daempfung (niedriger = mehr Wackeln/Overshoot) */
+  --back-k:26;                 /* Feder "zurueck": weich und langsam (~1 s) */
+  --back-c:8;                  /* Feder "zurueck": Daempfung (~0.8 = leichtes Nachschwingen) */
+  --scale-min:0.5;             /* Zufalls-Skalierung min */
+  --scale-max:1.12;            /* Zufalls-Skalierung max */
+  --y-max:0.34;                /* Zufalls-Versatz vertikal, Anteil der Schriftgroesse (+/-) */
+  --rot-max:34;                /* Zufalls-Rotation (Grad, +/-) */
+}
+</style>
+<style>
+/* COMPONENT CSS */
+html,body{margin:0;height:100%}
+body{background:var(--stage-bg);display:grid;place-items:center;overflow:hidden;font-family:var(--font)}
+.dl{position:relative;display:inline-block;contain:layout paint;padding:.5em .6em;margin:-.5em -.6em;
+  font:var(--font-weight) var(--font-size)/1 var(--font);letter-spacing:var(--letter-spacing);
+  color:var(--text-color);white-space:nowrap;cursor:default;
+  -webkit-user-select:none;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent}
+.dl__c{display:inline-block;transform:translate3d(0,0,0);transform-origin:50% 50%}
+.dl.is-active .dl__c{will-change:transform}
+.dl__sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<!-- COMPONENT:START -->
+<div class="dl" id="dl" role="img" aria-label="ANIMATE">ANIMATE</div>
+<!-- COMPONENT:END -->
+<script>
+/* Init: initDancingLetters(rootEl, {text, radius, holdMs, cooldownMs, kick:{k,c}, back:{k,c}, scale:[min,max], yMax, rotMax})
+   Gibt {destroy, poke(i)} zurueck. Funktioniert ohne Demo-Code (liest Text aus rootEl). */
+function initDancingLetters(root, opts){
+  opts = opts || {};
+  var cs = getComputedStyle(root);
+  var num = function(n, d){ var v = parseFloat(cs.getPropertyValue(n)); return isNaN(v) ? d : v; };
+  var text = opts.text || root.textContent.trim();
+  var radius = opts.radius != null ? opts.radius : num('--radius', 95);
+  var holdMs = opts.holdMs != null ? opts.holdMs : num('--hold-ms', 1400);
+  var coolMs = opts.cooldownMs != null ? opts.cooldownMs : num('--cooldown-ms', 420);
+  var kick = opts.kick || {k:num('--kick-k',520), c:num('--kick-c',20)};
+  var back = opts.back || {k:num('--back-k',26), c:num('--back-c',8)};
+  var sc = opts.scale || [num('--scale-min',0.5), num('--scale-max',1.12)];
+  var yMax = opts.yMax != null ? opts.yMax : num('--y-max',0.34);
+  var rotMax = opts.rotMax != null ? opts.rotMax : num('--rot-max',34);
+  var fontPx = parseFloat(cs.fontSize) || 96;
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var STEP = 1/240; // fester Substep (s) -> bildratenunabhaengig
+
+  root.setAttribute('role','img'); root.setAttribute('aria-label', text);
+  root.textContent = '';
+  var L = []; // je Buchstabe: Zustand [y,rot,scale], Geschwindigkeit, Ziel, Mitte
+  for (var i = 0; i < text.length; i++){
+    var ch = text.charAt(i);
+    var el = document.createElement('span');
+    el.className = 'dl__c'; el.setAttribute('aria-hidden','true');
+    el.textContent = ch === ' ' ? ' ' : ch;
+    root.appendChild(el);
+    L.push({el:el, ch:ch, p:[0,0,1], v:[0,0,0], tg:[0,0,1], cx:0, cy:0, hit:-1e9, contact:-1e9, away:false, key:''});
+  }
+  var ptr = null, ptrNew = false, raf = 0, lastT = null, acc = 0, now = 0, active = false;
+
+  function measure(){ // einmal messen und cachen (nie pro Frame)
+    var r = root.getBoundingClientRect();
+    for (var i = 0; i < L.length; i++){
+      var b = L[i].el.getBoundingClientRect();
+      L[i].cx = b.left + b.width/2; L[i].cy = b.top + b.height/2;
+    }
+  }
+  function rnd(a, b){ return a + Math.random()*(b-a); }
+  function newTarget(l){
+    l.tg[0] = rnd(-yMax*0.7, yMax) * fontPx;
+    l.tg[1] = rnd(-rotMax, rotMax) * (Math.random() < .2 ? 1 : 0.1);
+    l.tg[2] = rnd(sc[0], sc[1]);
+    l.away = true;
+  }
+  function poke(i){ var l = L[i]; if (!l) return; newTarget(l); l.hit = l.contact = now; start(); }
+  function applyPointer(){
+    if (!ptr || !ptrNew) return; ptrNew = false;
+    var r2 = radius*radius;
+    for (var i = 0; i < L.length; i++){
+      var l = L[i]; if (l.ch === ' ') continue;
+      var dx = ptr.x - l.cx, dy = ptr.y - l.cy;
+      if (dx*dx + dy*dy < r2){
+        l.contact = now;
+        if (now - l.hit > coolMs){ newTarget(l); l.hit = now; }
+      }
+    }
+  }
+  function integrate(l, dt){ // semi-impliziter Euler, Federkonstanten je nach Phase
+    var s = l.away ? kick : back;
+    for (var j = 0; j < 3; j++){
+      var rest = j === 2 ? 1 : 0, tg = l.away ? l.tg[j] : rest;
+      var a = s.k * (tg - l.p[j]) - s.c * l.v[j];
+      l.v[j] += a * dt; l.p[j] += l.v[j] * dt;
+    }
+  }
+  function paint(l){
+    var key = l.p[0].toFixed(2) + '|' + l.p[1].toFixed(2) + '|' + l.p[2].toFixed(3);
+    if (key === l.key) return; l.key = key;
+    l.el.style.transform = 'translate3d(0,' + l.p[0].toFixed(2) + 'px,0) rotate(' + l.p[1].toFixed(2) + 'deg) scale(' + l.p[2].toFixed(3) + ')';
+  }
+  function frame(t){
+    var dt = lastT == null ? 0 : Math.min(t - lastT, 50); lastT = t; now = t;
+    applyPointer();
+    acc += dt/1000;
+    var busy = false;
+    while (acc >= STEP){
+      for (var i = 0; i < L.length; i++){
+        var l = L[i];
+        if (l.away && now - l.contact > holdMs) l.away = false;
+        integrate(l, STEP);
+      }
+      acc -= STEP;
+    }
+    for (var i = 0; i < L.length; i++){
+      var l = L[i]; paint(l);
+      if (l.away || Math.abs(l.p[0]) > .02 || Math.abs(l.p[1]) > .02 || Math.abs(l.p[2]-1) > .0005 ||
+          Math.abs(l.v[0]) > .02 || Math.abs(l.v[2]) > .0005) busy = true;
+      else if (!l.away){ l.p[0]=l.p[1]=0; l.p[2]=1; l.v[0]=l.v[1]=l.v[2]=0; paint(l); }
+    }
+    if (busy || (ptr && ptrNew)) raf = requestAnimationFrame(frame);
+    else { raf = 0; lastT = null; acc = 0; active = false; root.classList.remove('is-active'); }
+  }
+  function start(){
+    if (reduce) return;
+    if (!active){ active = true; root.classList.add('is-active'); lastT = null; }
+    if (!raf) raf = requestAnimationFrame(frame);
+  }
+  function onMove(e){
+    var ev = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+    var last = ev && ev.length ? ev[ev.length-1] : e; // nur letzte Position merken
+    ptr = {x:last.clientX, y:last.clientY}; ptrNew = true; start();
+  }
+  function onEnter(e){ measure(); onMove(e); }
+  function onLeave(){ ptr = null; ptrNew = false; }
+  root.addEventListener('pointerenter', onEnter, {passive:true});
+  root.addEventListener('pointerdown', onEnter, {passive:true});
+  root.addEventListener('pointermove', onMove, {passive:true});
+  root.addEventListener('pointerleave', onLeave, {passive:true});
+  root.addEventListener('pointercancel', onLeave, {passive:true});
+  var ro = window.ResizeObserver ? new ResizeObserver(function(){ fontPx = parseFloat(getComputedStyle(root).fontSize) || fontPx; measure(); }) : null;
+  if (ro) ro.observe(root);
+  window.addEventListener('scroll', measure, {passive:true});
+  measure();
+  return { destroy:function(){ cancelAnimationFrame(raf); if (ro) ro.disconnect(); window.removeEventListener('scroll', measure); }, poke:poke };
+}
+/* Demo: exakt der Video-Inhalt */
+(function(){
+  window.__dl = initDancingLetters(document.getElementById('dl'), {text:'ANIMATE'});
+})();
+</script>
+</body>
+</html>

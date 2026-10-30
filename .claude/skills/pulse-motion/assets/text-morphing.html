@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Text Morphing</title>
+<style>
+/* ===== CONFIG (hier hochdrehen) ===== */
+:root{
+  --stage-bg:#1f1f1f;          /* Buehnenfarbe (gemessen 1F1F1F) */
+  --text-color:#f5f5f5;        /* Wortfarbe */
+  --font:Roboto,Inter,Geist,Arial,"Liberation Sans",ui-sans-serif,system-ui,sans-serif;
+  --font-size:clamp(44px,7.3vw,90px); /* Schriftgroesse (Referenz 90px @1234 Buehne) */
+  --font-weight:700;
+  --letter-spacing:-0.01em;
+  /* Motion: per JS-Optionen (data-*) ueberschreibbar */
+  --morph-ms:1000;             /* Dauer des Uebergangs */
+  --hold-ms:1000;              /* Stillstand zwischen den Uebergaengen (Zyklus = 2000) */
+  --blur-max:8;                /* Blur-Faktor: blur = blur-max/f - blur-max (px) */
+  --threshold-k:255;           /* Alpha-Kontrast der Gooey-Schwelle (je hoeher, desto haerter) */
+  --threshold-b:-140;          /* Schwellenversatz (-140 = organische Blobs, -100 weicher) */
+}
+</style>
+<style>
+/* COMPONENT CSS */
+html,body{margin:0;height:100%}
+body{background:var(--stage-bg);display:grid;place-items:center;overflow:hidden;font-family:var(--font)}
+.tm{position:relative;width:min(92vw,900px);height:calc(var(--font-size)*1.5);contain:layout paint;
+  filter:url(#tm-threshold);-webkit-user-select:none;user-select:none;touch-action:manipulation}
+.tm__w{position:absolute;left:0;right:0;top:50%;margin:0;transform:translate3d(0,-50%,0);text-align:center;
+  font:var(--font-weight) var(--font-size)/1 var(--font);letter-spacing:var(--letter-spacing);
+  color:var(--text-color);white-space:nowrap;opacity:0}
+.tm__w.is-a{opacity:1}
+.tm.is-running .tm__w{will-change:filter,opacity}
+.tm__sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){.tm{filter:none}}
+</style>
+</head>
+<body>
+<!-- COMPONENT:START -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="tm-threshold" color-interpolation-filters="sRGB">
+      <feColorMatrix in="SourceGraphic" type="matrix"
+        values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 255 -140"/>
+    </filter>
+  </defs>
+</svg>
+<div class="tm" id="tm" role="img" aria-label="Develop, Deploy, Delight">
+  <span class="tm__w is-a" aria-hidden="true">Develop</span>
+  <span class="tm__w" aria-hidden="true">Deploy</span>
+  <span class="tm__sr" aria-live="polite"></span>
+</div>
+<!-- COMPONENT:END -->
+<script>
+/* Init: initTextMorphing(rootEl, {startOffsetMs (Vorlauf, Standard 400 = erster Uebergang nach 0.9 s), words, morphMs, holdMs, blurMax, threshold:[k,b], clickToAdvance}) */
+function initTextMorphing(root, opts){
+  opts = opts || {};
+  var cs = getComputedStyle(root);
+  var num = function(n, d){ var v = parseFloat(cs.getPropertyValue(n)); return isNaN(v) ? d : v; };
+  var words   = opts.words || ['Develop','Deploy','Delight'];
+  var morphMs = opts.morphMs != null ? opts.morphMs : num("--morph-ms",1000);
+  var holdMs  = opts.holdMs  != null ? opts.holdMs  : num("--hold-ms",1000);
+  var blurMax = opts.blurMax != null ? opts.blurMax : num('--blur-max',8);
+  var k = num('--threshold-k',255), b = num('--threshold-b',-140);
+  if (opts.threshold){ k = opts.threshold[0]; b = opts.threshold[1]; }
+  var fm = root.ownerDocument.querySelector('#tm-threshold feColorMatrix');
+  if (fm) fm.setAttribute('values','1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 '+k+' '+b);
+  var els = root.querySelectorAll('.tm__w'), sr = root.querySelector('.tm__sr');
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var idx = 0, cur = 0, state = 'hold', t0 = null, lastT = null, elapsed = opts.startOffsetMs != null ? opts.startOffsetMs : 400, lastKey = '', raf = 0, visible = true;
+  function setWord(el, w){ if (el.textContent !== w) el.textContent = w; }
+  setWord(els[0], words[0]); setWord(els[1], words[1 % words.length]); sr.textContent = words[0];
+  // a = aktuell sichtbares Element, b = eingehendes
+  function paint(f){
+    var key = f.toFixed(4);
+    if (key === lastKey) return; lastKey = key;
+    var a = els[cur], n = els[1-cur];
+    if (f <= 0){ a.style.cssText = 'opacity:1'; n.style.cssText = 'opacity:0'; return; }
+    if (f >= 1){ n.style.cssText = 'opacity:1'; a.style.cssText = 'opacity:0'; return; }
+    var g = 1 - f;
+    n.style.filter = 'blur(' + Math.min(blurMax / f - blurMax, 100) + 'px)';
+    n.style.opacity = Math.pow(f, 0.4);
+    a.style.filter = 'blur(' + Math.min(blurMax / g - blurMax, 100) + 'px)';
+    a.style.opacity = Math.pow(g, 0.4);
+  }
+  function startMorph(){
+    state = 'morph'; elapsed = 0; root.classList.add('is-running');
+    var nx = (idx + 1) % words.length;
+    setWord(els[1-cur], words[nx]);
+  }
+  function endMorph(){
+    idx = (idx + 1) % words.length; cur = 1 - cur; state = 'hold'; elapsed = 0;
+    root.classList.remove('is-running');
+    els[1-cur].style.cssText = 'opacity:0'; els[cur].style.cssText = 'opacity:1';
+    els[cur].classList.add('is-a'); els[1-cur].classList.remove('is-a');
+    sr.textContent = words[idx]; lastKey = '';
+    setWord(els[1-cur], words[(idx+1)%words.length]);
+  }
+  function frame(t){
+    raf = requestAnimationFrame(frame);
+    if (!visible) { lastT = t; return; }
+    var dt = lastT == null ? 0 : Math.min(t - lastT, 50); lastT = t;
+    elapsed += dt;
+    if (state === 'hold'){
+      if (elapsed >= (reduce ? holdMs + morphMs : holdMs)) { if (reduce){ endMorph(); } else startMorph(); }
+    } else {
+      var f = Math.min(elapsed / morphMs, 1);
+      paint(f);
+      if (f >= 1) endMorph();
+    }
+  }
+  function advance(){ if (state === 'hold'){ elapsed = holdMs; } }
+  if (opts.clickToAdvance) root.addEventListener('pointerdown', advance, {passive:true});
+  var io = 'IntersectionObserver' in window ? new IntersectionObserver(function(e){ visible = e[0].isIntersecting; }) : null;
+  if (io) io.observe(root);
+  raf = requestAnimationFrame(frame);
+  return { destroy:function(){ cancelAnimationFrame(raf); if (io) io.disconnect(); }, next:advance };
+}
+/* Demo: exakt der Video-Inhalt. Erster Uebergang nach ~0.9 s wie im Video. */
+(function(){
+  var inst = initTextMorphing(document.getElementById('tm'), {words:['Develop','Deploy','Delight']});
+  window.__tm = inst;
+})();
+</script>
+</body>
+</html>
