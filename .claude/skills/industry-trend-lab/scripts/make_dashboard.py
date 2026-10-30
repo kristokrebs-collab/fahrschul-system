@@ -3,17 +3,20 @@
 import argparse, json, pathlib, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
-TPL = HERE.parent / "assets" / "dashboard.html"
+ASSETS = HERE.parent / "assets"
+TEMPLATES = {"pruefstand": ("dashboard.html", "lab/results.json", "lab/dashboard.html"), "megatest": ("megatest.html", "lab/megatest.json", "lab/megatest-dashboard.html")}
 MARK = '<script id="results" type="application/json">null</script>'
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--results", default="lab/results.json")
-    ap.add_argument("--out", default="lab/dashboard.html")
+    ap.add_argument("--template", choices=sorted(TEMPLATES), default="pruefstand")
+    ap.add_argument("--results"); ap.add_argument("--out")
     a = ap.parse_args()
+    tpl, res, outp = TEMPLATES[a.template]
+    a.results, a.out = a.results or res, a.out or outp
     data = json.loads(pathlib.Path(a.results).read_text(encoding="utf-8"))
-    html = TPL.read_text(encoding="utf-8")
+    html = (ASSETS / tpl).read_text(encoding="utf-8")
     if MARK not in html:
         sys.exit("Platzhalter im Template nicht gefunden")
     blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")

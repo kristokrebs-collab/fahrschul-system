@@ -1,6 +1,6 @@
 # Style-Schnipsel nutzen & mischen
 
-Die 10 Styles in `references/styles/` sind **Inspiration, keine Vorlagen zum 1:1-Nachbau**. Gedacht ist: Schnipsel klauen (Palette, Typo-Haltung, eine Signature-Geste), an das eigene Projekt anpassen und mit den `pulse-motion`-Animationen kombinieren. Marken, Logos, Wortmarken, Fotos und Texte der Originalseiten **nicht** übernehmen; die Schriften sind proprietär → immer die genannten Ersatzschriften (Inter, Playfair …) nutzen.
+Die 12 Styles in `references/styles/` sind **Inspiration, keine Vorlagen zum 1:1-Nachbau**. Gedacht ist: Schnipsel klauen (Palette, Typo-Haltung, eine Signature-Geste), an das eigene Projekt anpassen und mit den `pulse-motion`-Animationen kombinieren. Marken, Logos, Wortmarken, Fotos und Texte der Originalseiten **nicht** übernehmen; die Schriften sind proprietär → immer die genannten Ersatzschriften (Inter, Playfair …) nutzen.
 
 ## 1) Drop-in in 3 Schritten
 ```html

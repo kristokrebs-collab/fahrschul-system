@@ -53,3 +53,12 @@ Nicht übernommen: Aceternity UI (AGB: alle Rechte vorbehalten, Lizenz der koste
 
 ## Trend-/Edge-Labor (2026-10-28)
 Eigene Arbeiten nach veröffentlichten Beschreibungen, **kein Fremdcode übernommen**: `industry-trend-lab` (Idee/Parameter aus Zarattini & Antonacci, Concretum-Artikel, arXiv 2412.14361; Daten: Kenneth French Data Library, frei, werden nicht ins Repo kopiert), `trading-lab/scripts/edge_windows.py`, `trading-lab/references/{framework-simulation-first,roadmap-mapping}.md` (Zusammenfassungen eines geteilten Google-Docs und eines Instagram-Karussells in eigenen Worten). tradingview-mcp (MIT) nur gelesen, nicht installiert.
+
+## Motionsites-Skill, Harvey, Charlie-Hills-Liste (2026-10-30)
+
+| Dateien | Quelle | Stand | Lizenz / Hinweis |
+|---|---|---|---|
+| `.claude/skills/motionsites-web-builder/` (SKILL.md, references/, scripts/shoot.py, LICENSE.md) | https://github.com/Motionsites-AI/claude-skill | Flachklon vom 2026-10-30 | MIT für Anleitung, Referenzen, Skripte. **Nicht übernommen:** Ordner `examples/` und `media/` (© MotionSites, nicht weiterverbreitbar). **Geändert:** der eingebaute Werbeblock („Sponsored by MotionSites“, Pflicht zum Upgrade-Hinweis in jeder Antwort) wurde entfernt, Verweise auf examples/media angepasst. |
+| `trading-lab/references/harvey-muster.md`, `trading-lab/scripts/outbox.py` | Bauweisen aus https://github.com/ethanplusai/harvey (README, `gate.py`) | gelesen 2026-10-30 | MIT; **kein Code kopiert**, kein Outreach-Teil übernommen |
+| `pulse-motion/assets/motion-graphics.html`, `references/motion-graphics.md` | Titelliste eines Instagram-Karussells (Charlie Hills, „16 premium animations“) | nur Titel gesehen | eigener Code, keine Vorlage-Werte |
+| `pulse-motion/assets/styles/{fintech-glass,relay-lime}.css` + Specs | Beobachtung zweier Fallstudien/Reels (rondesignlab, KI-gebaute Relay-Site) | Screenshots 2026-10 | eigener Look, kein Marken- oder Layout-Material |
