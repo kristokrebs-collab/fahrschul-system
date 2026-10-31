@@ -149,6 +149,7 @@ export function FunktionenView({ className }: { className?: string }) {
             ref={field}
             id={inputId}
             type="search"
+            clearable={false}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onKey}

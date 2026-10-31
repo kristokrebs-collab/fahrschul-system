@@ -8,6 +8,7 @@
 import { useMemo, useRef, useState } from "react";
 import { BASE_PARAMS, PAYLOAD_JSON_SCHEMA, buildPine } from "@/domain/industryTrend";
 import { Button } from "@/primitives/Button";
+import { CopyButton } from "@/primitives/CopyButton";
 import { Card } from "@/primitives/Card";
 import { Collapse } from "@/primitives/Expander";
 import { download } from "@/store/download";
@@ -37,14 +38,14 @@ export function PineCard() {
           <Button variant="ghost" size="sm" aria-expanded={shown} onClick={() => setShown((v) => !v)} data-testid="branchen-pine-toggle">
             {shown ? P.hide : P.generate}
           </Button>
-          <Button
+          <CopyButton
             variant="ghost"
             size="sm"
-            onClick={() => void copyText(out.code, area.current).then((ok) => pushToast(ok ? { kind: "success", title: P.copied } : { kind: "error", title: P.copyFail }))}
+            label={P.copy}
+            onCopy={() => copyText(out.code, area.current)}
+            onResult={(ok) => pushToast(ok ? { kind: "success", title: P.copied } : { kind: "error", title: P.copyFail })}
             data-testid="branchen-pine-copy"
-          >
-            {P.copy}
-          </Button>
+          />
           <Button variant="ghost" size="sm" onClick={() => void download(out.fileName, out.code, "text/plain;charset=utf-8")} data-testid="branchen-pine-save">
             {P.save}
           </Button>

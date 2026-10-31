@@ -14,6 +14,8 @@ export interface Toast {
   detail?: string;
   /** One button beside the island („Rückgängig“): runs, then the toast leaves. */
   action?: { label: string; onClick: () => void };
+  /** A real milestone: the island reports it once (`ToastIsland onMilestone`) so the app can burst a small confetti. Never for routine toasts. */
+  milestone?: boolean;
 }
 
 export type ToastInput = Omit<Toast, "id"> & { id?: number };

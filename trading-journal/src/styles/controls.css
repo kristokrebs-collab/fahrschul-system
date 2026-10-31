@@ -1,0 +1,245 @@
+/* Bedienelemente (Runde 10): Zustände und kleine Spielereien für Buttons, Chips, Felder, Auswahllisten, Falten.
+   Alles nur transform / opacity / clip-path. Die reichen Hover-Effekte hängen an `[data-rich]` (PageHost setzt es auf jeder
+   Seite außer Übersicht und Cockpit) und an `(hover: hover)`; Reduced Motion setzt base.css auf „sofort fertig“. Außerhalb
+   von `[data-rich]` bleibt jedes Pixel wie vorher. */
+
+/* Häkchen zeichnet sich: <svg class="fx-check"><path pathLength="1" …/></svg> (Button-Erfolg, Kopieren, Auswahlliste) */
+@keyframes fx-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+.fx-check path {
+  stroke-dasharray: 1;
+  animation: fx-draw 0.28s cubic-bezier(0.22, 1, 0.36, 1) 0.04s backwards;
+}
+
+/* Fehler: ein kurzes Schütteln des Buttons (die einzelne `translate`-Eigenschaft stört das `transform` der Feder nicht) */
+@keyframes fx-shake {
+  20% {
+    translate: -4px;
+  }
+  40% {
+    translate: 4px;
+  }
+  60% {
+    translate: -3px;
+  }
+  80% {
+    translate: 2px;
+  }
+}
+button[data-status="error"] {
+  animation: fx-shake 0.35s ease-in-out;
+}
+
+/* Platz für das längere von zwei Wörtern: <span class="fx-reserve" data-reserve="Kopieren">…</span> (kein Text im DOM) */
+.fx-reserve {
+  display: inline-grid;
+}
+.fx-reserve::before {
+  content: attr(data-reserve) / "";
+  grid-area: 1 / 1;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  /* TextRoll sets every letter in its own box (no kerning between them): the reserve measures the same way */
+  font-kerning: none;
+}
+
+/* Glanzstreifen und Text-Rollen beim Hover (Button): Streifen = ::after der Welle-Ebene `.btn-fx` (clippt, liegt hinter dem Text) */
+[data-fx~="shine"] {
+  --btn-shine: rgb(var(--veil-rgb, 255 255 255) / 0.13);
+}
+[data-variant="primary"][data-fx~="shine"] {
+  --btn-shine: rgb(var(--veil-ink-rgb, 4 4 4) / 0.1);
+}
+@media (hover: hover) {
+  [data-rich] [data-fx~="shine"] > .btn-fx::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 22%, var(--btn-shine) 48%, transparent 74%);
+    transform: translateX(-130%);
+  }
+  [data-rich] [data-fx~="shine"]:not(:disabled):hover > .btn-fx::after {
+    transform: translateX(130%);
+    transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  /* zwei Zeilen übereinander, beim Hover rollt die zweite herein (Kopie nur als Pseudo-Inhalt: der Name bleibt einfach) */
+  [data-rich] [data-fx~="roll"] .btn-roll {
+    position: relative;
+    display: block;
+    overflow: clip;
+  }
+  [data-rich] [data-fx~="roll"] .btn-roll > span {
+    display: block;
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  [data-rich] [data-fx~="roll"] .btn-roll::after {
+    content: attr(data-t) / "";
+    position: absolute;
+    inset: 0;
+    transform: translateY(100%);
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  [data-rich] [data-fx~="roll"]:not(:disabled):hover .btn-roll > span {
+    transform: translateY(-100%);
+  }
+  [data-rich] [data-fx~="roll"]:not(:disabled):hover .btn-roll::after {
+    transform: translateY(0);
+  }
+  /* Magnet-Zug (buttonMagnet.ts): die Rückkehr federt leicht */
+  [data-magnet] {
+    transition: translate 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+}
+
+/* Chip gewählt: ein kleines Abzeichen mit Häkchen springt an die Ecke (kein Platz im Fluss, nichts verschiebt sich); das Häkchen
+   wird von unten nach oben gezeichnet. Farbe des Abzeichens: --fx-tick (Standard: Schrift). */
+.fx-chip::before,
+.fx-chip::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+.fx-chip::before {
+  top: -5px;
+  right: -5px;
+  width: 15px;
+  height: 15px;
+  border-radius: 9999px;
+  background: var(--fx-tick, var(--color-fg));
+  scale: 0;
+  transition: scale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.fx-chip::after {
+  top: -2px;
+  right: 0;
+  width: 4px;
+  height: 8px;
+  border: solid var(--color-ink-950);
+  border-width: 0 2px 2px 0;
+  rotate: 45deg;
+  clip-path: inset(100% 0 0);
+  transition: clip-path 0.22s ease-out;
+}
+.fx-chip[aria-pressed="true"]::before,
+.fx-chip[aria-checked="true"]::before {
+  scale: 1;
+}
+.fx-chip[aria-pressed="true"]::after,
+.fx-chip[aria-checked="true"]::after {
+  clip-path: inset(0);
+  transition-delay: 0.12s;
+}
+
+/* Felder (nur reiche Seiten): die Beschriftung hebt sich beim Fokus, färbt sich bei einem Fehler; Suchfeld mit eigenem „×“ */
+[data-rich] [data-field] > .label {
+  transition:
+    color 0.2s,
+    translate 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-rich] [data-field]:focus-within > .label {
+  color: var(--color-fg);
+  translate: 0 -1px;
+}
+[data-rich] [data-field]:has([aria-invalid="true"]) > .label {
+  color: var(--color-loss);
+}
+.fx-clear {
+  display: none;
+}
+[data-rich] [data-input]:has(.fx-clear) input[type="search"] {
+  padding-right: 2.25rem;
+}
+[data-rich] [data-input]:has(.fx-clear) input[type="search"]::-webkit-search-cancel-button {
+  appearance: none;
+  display: none;
+}
+[data-rich] .fx-clear {
+  display: grid;
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
+  place-items: center;
+  border-radius: 9999px;
+  color: var(--color-mute);
+  scale: 0.5;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    scale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.15s,
+    visibility 0s 0.15s;
+}
+[data-rich] [data-input]:has(input:not(:placeholder-shown)) .fx-clear {
+  scale: 1;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+[data-rich] .fx-clear:hover {
+  color: var(--color-fg);
+}
+
+/* Fold: der Inhalt gleitet beim Aufklappen herein (erst nach dem ersten Antippen, nicht beim Laden), der Pfeil federt */
+@keyframes fx-fold-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+[data-rich] [data-fold][data-touched][open] > :not(summary) {
+  animation: fx-fold-in 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-rich] [data-fold] > summary svg {
+  transition-duration: 0.35s;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Auswahlliste (MorphSelect, nur Optik): Zeilen laufen gestaffelt ein, ein gleitender Marker folgt der aktiven Zeile, das Häkchen
+   der gewählten Zeile wird gezeichnet. Das Feld bekommt einen Hover und einen federnden Pfeil. Die Öffnen-Logik bleibt unberührt. */
+.ms-glide {
+  display: none;
+}
+@keyframes fx-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+[data-rich] button[aria-haspopup="listbox"]:not(:disabled):hover {
+  border-color: rgb(var(--veil-rgb, 255 255 255) / 0.24);
+}
+[data-rich] button[aria-haspopup="listbox"] > svg {
+  transition-duration: 0.35s;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+[data-ms-rich] .ms-glide {
+  display: block;
+  position: absolute;
+  z-index: -1;
+  left: 6px;
+  right: 6px;
+  top: 6px;
+  border-radius: 10px;
+  background: var(--color-ink-750);
+  box-shadow: inset 0 0 0 1px rgb(var(--veil-rgb, 255 255 255) / 0.14);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-ms-rich] [role="option"][data-active]:not([aria-selected="true"]) {
+  background-color: transparent;
+  box-shadow: none;
+}
+[data-ms-rich][data-state="open"] [role="option"] {
+  animation: fx-row-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 14ms + 30ms);
+}
+[data-ms-rich][data-state="open"] [aria-selected="true"] svg path {
+  stroke-dasharray: 1;
+  animation: fx-draw 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.18s backwards;
+}

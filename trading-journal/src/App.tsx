@@ -25,7 +25,7 @@ import { useEntitlement } from "@/billing/entitlements";
 import { billingActive } from "@/billing/store";
 import type { Feature } from "@/billing/types";
 import { CloudSyncHost } from "@/cloud/CloudSyncHost";
-import { Celebrate } from "@/motion/Celebrate";
+import { Celebrate, celebrateFrom } from "@/motion/Celebrate";
 import { IntroHost } from "@/intro/IntroHost";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { spring } from "@/motion/tokens";
@@ -169,7 +169,8 @@ function Toasts() {
   const toasts = useUi((s) => s.toasts);
   const dismiss = useUi((s) => s.dismissToast);
   const island = useMemo(() => toasts.map(toIslandToast), [toasts]);
-  return <ToastIsland toasts={island} onDismiss={dismiss} />;
+  // a toast flagged `milestone` (a real first, never a routine one) puffs a small confetti from its check
+  return <ToastIsland toasts={island} onDismiss={dismiss} onMilestone={(disc) => celebrateFrom(disc, { kind: "mini", tone: "win", squash: false })} />;
 }
 
 /** Trade detail with the 1h candle slice around the open trade (re-renders on detail / journal changes only). */

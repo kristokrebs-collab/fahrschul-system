@@ -9,6 +9,7 @@ import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
+import { CopyButton } from "@/primitives/CopyButton";
 import { Card } from "@/primitives/Card";
 import { Segmented } from "@/primitives/Segmented";
 import { Skeleton } from "@/primitives/Skeleton";
@@ -65,7 +66,6 @@ function MfaSection() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<{ message: string; key: number } | null>(null);
   const [accepted, setAccepted] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [askOff, setAskOff] = useState(false);
   const badge = useRef<HTMLSpanElement>(null);
 
@@ -142,17 +142,7 @@ function MfaSection() {
               <span className="text-[11px] uppercase tracking-[0.14em] text-faint">{SECURITY.manual}</span>
               <span className="flex max-w-full flex-wrap items-center justify-center gap-2">
                 <code className="break-all rounded-lg border border-line bg-ink-900 px-2.5 py-1 text-center font-mono text-[12.5px] tracking-wider text-fg">{groups(enroll.secret)}</code>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(enroll.secret).then(
-                      () => setCopied(true),
-                      () => undefined,
-                    );
-                  }}
-                >
-                  <TextRoll text={copied ? SECURITY.copied : SECURITY.copy} />
-                </Button>
+                <CopyButton text={enroll.secret} label={SECURITY.copy} doneLabel={SECURITY.copied} />
               </span>
             </div>
             <div className="grid gap-2">

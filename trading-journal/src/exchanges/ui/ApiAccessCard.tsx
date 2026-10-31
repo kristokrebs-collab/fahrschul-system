@@ -13,6 +13,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
+import { CopyButton } from "@/primitives/CopyButton";
 import { Input } from "@/primitives/Input";
 import { createApiToken, listApiTokens, revokeApiToken } from "../api";
 import { exchangeEnabled, toUiError } from "../store";
@@ -38,7 +39,6 @@ function webhookUrl(token: string): string {
 }
 
 function CopyRow({ label, value, testId }: { label: string; value: string; testId?: string }) {
-  const [copied, setCopied] = useState(false);
   return (
     <div className="grid gap-1">
       <span className="label">{label}</span>
@@ -46,18 +46,7 @@ function CopyRow({ label, value, testId }: { label: string; value: string; testI
         <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-fg" data-testid={testId}>
           {value}
         </code>
-        <Button
-          size="sm"
-          onClick={() => {
-            void navigator.clipboard?.writeText(value).then(
-              () => setCopied(true),
-              () => setCopied(false),
-            );
-            setTimeout(() => setCopied(false), 1_400);
-          }}
-        >
-          {copied ? API_CARD.copied : API_CARD.copy}
-        </Button>
+        <CopyButton text={value} label={API_CARD.copy} doneLabel={API_CARD.copied} />
       </div>
     </div>
   );

@@ -85,6 +85,22 @@ null React-Renders pro Tick), Loops endlich. Details: `src/motion/README.md`.
 - Ausnahmen nur deklariert (`// motion-exception: …`, z. B. `radar-sweep` nur solange ein Scan läuft).
 - Runde 10, Diagramme · Zahlen · Listen (nur unter `[data-rich]`, also nicht Übersicht und Cockpit; `src/chart/README.md`): Fächer als ein Canvas mit Fadenkreuz (Analyse › Monte Carlo), Text-Zahlen zählen beim ersten Sichtbarwerden hoch und rollen bei Änderung (`CountText`), die ersten 12 Zeilen einer Liste steigen gestaffelt auf und heben sich beim Hover (`Rows`, `data-lift`), Pillen rasten ein (`data-pill`), Raster-Zellen blenden diagonal ein (`data-diag`), ein Diagramm ohne Daten zeigt eine atmende Linie mit ehrlichem Text (`ChartPlaceholder`). Alles `transform` / `opacity`, einmal je Element, Reduced Motion = sofort fertig.
 
+### Bedienelemente (Runde 10)
+
+Jeder Zustand eines Knopfes hat eine Stimme, die reichen Feinheiten gibt es nur auf Seiten mit `[data-rich]` (Übersicht und Cockpit bleiben, wie sie waren; Sheets und Dialoge auch, sie liegen außerhalb der Seite).
+
+| Element | Zustand / Feinheit | Wie |
+|---|---|---|
+| Button | Ruhe · Hover · Fokus · gedrückt · Laden · **Erfolg** · **Fehler** · deaktiviert | `status` (oder `loading` / `success` / `error`): Erfolg = Häkchen zeichnet sich auf grünem Schleier, Fehler = ein kurzes Schütteln auf rotem Schleier; `useActionStatus()` setzt zurück |
+| Button (reich, Maus) | Glanzstreifen · Text-Rollen (Sekundär mit Text) · Magnet ≤ 4 px (große Primär/Sekundär) · Rand-Lauf (`run`, nur eine Hervorhebung) | `fx={false}` lässt Hauptaktionen (Speichern, Bezahlen, Anmelden, Löschen) unverändert |
+| Chip | Häkchen-Abzeichen an der Ecke springt auf (Feder), das Häkchen zeichnet sich | kein Platz im Fluss: nichts rückt |
+| Suchfeld | rundes „×“ springt auf, sobald Text da ist | nur reiche Seiten; sonst bleibt der Browser-Knopf |
+| Feld | Beschriftung leuchtet im Fokus, wird rot bei Fehler; ein neuer Fehler schüttelt das Feld einmal | `Field` |
+| Kopieren | Symbol → Häkchen, Text rollt „Kopieren“ → „Kopiert“, danach zurück; Breite bleibt | `CopyButton` |
+| Schritt-Feld | Ziffer rollt hoch/runter, Knöpfe federn beim Drücken | `Stepper` |
+| Auswahlliste | Zeilen laufen gestaffelt ein, Marker gleitet zur aktiven Zeile, Häkchen zeichnet sich; Öffnen-Logik unberührt | `MorphSelect` (nur Optik) |
+| Toast | gestaffelt rein (Symbol, Text, Wert, Aktion) und raus; Fortschrittsleiste; `milestone` = ein kleines Konfetti, nie bei Routine | `ToastIsland onMilestone` |
+
 ## Do / Don't
 
 **Do**

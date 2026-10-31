@@ -14,6 +14,7 @@ import { cleanChecklist, MAX_AUTHOR, MAX_CHANGES, MAX_CHECK_ITEM, MAX_CHECKLIST,
 import { MorphSelect } from "@/motion/pulse/MorphSelect";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
+import { CopyButton } from "@/primitives/CopyButton";
 import { Card } from "@/primitives/Card";
 import { Input, Textarea } from "@/primitives/Input";
 import { download } from "@/store/download";
@@ -96,13 +97,15 @@ export function PlaybookCard({ className }: { className?: string }) {
       pushToast({ kind: "success", title: P.exported });
     }
   };
-  const copy = async (): Promise<void> => {
+  const copy = async (): Promise<boolean> => {
     try {
       await navigator.clipboard.writeText(text);
       markExported();
       pushToast({ kind: "success", title: P.copied });
+      return true;
     } catch {
       pushToast({ kind: "error", title: P.copyFailed });
+      return false;
     }
   };
   const revLine = !pickedDraft
@@ -236,9 +239,7 @@ export function PlaybookCard({ className }: { className?: string }) {
             <Button size="sm" variant="primary" onClick={() => void saveFile()} data-testid="playbook-save">
               {P.save}
             </Button>
-            <Button size="sm" onClick={() => void copy()} data-testid="playbook-copy">
-              {P.copy}
-            </Button>
+            <CopyButton size="sm" label={P.copy} onCopy={copy} data-testid="playbook-copy" />
           </div>
         </section>
 

@@ -25,12 +25,23 @@ export interface FieldProps {
 
 /**
  * Bundle `Ae`: `grid min-w-0 content-start gap-1.5` with a `.label` label; suffix + error. NEW: `[data-field]` root
- * so `shakeField(inputOrId)` shakes the whole field, `invalidKey` for the prop-driven shake, error line fades in.
+ * so `shakeField(inputOrId)` shakes the whole field, `invalidKey` for the prop-driven shake, error line fades in. An `error`
+ * that newly appears (no `invalidKey` given) shakes the field once too. `[data-rich]` pages: the label lights up while the
+ * field has focus and turns loss-red while the control is `aria-invalid` (`controls.css`).
  */
 export function Field({ label, htmlFor, children, help, error, suffix, invalidKey, className }: FieldProps) {
   const reduced = useReducedFx();
   const root = useRef<HTMLDivElement>(null);
   const seenKey = useRef(invalidKey);
+
+  // an error that appears without an `invalidKey` shakes the field once as well (it never fires on mount)
+  const hadError = useRef(Boolean(error));
+  useEffect(() => {
+    const has = Boolean(error);
+    const appeared = has && !hadError.current;
+    hadError.current = has;
+    if (appeared && invalidKey === undefined) shakeField(root.current, { reduced });
+  }, [error, invalidKey, reduced]);
 
   useEffect(() => {
     if (seenKey.current === invalidKey) return;

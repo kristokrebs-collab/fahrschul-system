@@ -235,8 +235,18 @@ Sparkline) only get opacity/translate reveals.
 Fixed `z-[80] overflow-hidden pointer-events-none aria-hidden` confetti layer, mounted ONCE (in `App`, next to the toast island);
 renders null until a burst is queued. Dots are white and win-green, plus one red dot for `kind:"record"`; reduced motion: ring only.
 Store: `useUi.celebrate({x,y,tone,kind})` / `endCelebration(id)`, at most 3 bursts. `tween.burst/ripple/flash`, `spring.pop`.
+Kinds: `win` 28 dots · `streak` 36 · `record` 40 + a red dot · `mini` (Runde 10) 12 small dots at 55 % of the speed and a shorter life – the puff a
+toast flagged `milestone` sends from its check (`ToastIsland onMilestone`, `src/primitives/Toast.tsx`); only for a real first or goal, never for routine saves.
 
 ### Controls: `HoldButton` · `HoldConfirm` · `Switch`
+- `buttonMagnet.ts` (Runde 10) – `attachMagnet(el, x, y)`: the fine magnet pull of large primary / secondary `Button`s on `[data-rich]` pages (mouse only):
+  the button leans a tenth of the pointer's distance, ≤ 4 px across and 3 px up/down (`magnetOffset`), by the individual CSS `translate` property
+  (never `transform`, the press spring owns it), springs back on a CSS overshoot curve. The rect is read once per hover, `pointermove` writes one style per
+  frame; nothing runs at rest; a scroll under a resting pointer starts it on the first real move after the scroll.
+- `MorphSelect` on `[data-rich]` pages (Runde 10, looks only – the open logic, the press-hold read and the geometry are untouched): the panel
+  gets `data-ms-rich` when it mounts (read from the trigger's page, set in a layout effect, no state); then `controls.css` staggers the rows in
+  (`fx-row-in`, `--i` per row, capped at 8), a marker (`.ms-glide`, transform only) glides to the active row, the selected row's ✓ draws itself,
+  and the field gets a hover border and an overshoot chevron. Elsewhere (Übersicht, Cockpit, sheets) the panel is exactly as before.
 - `HoldButton { onConfirm; onRelease?; ref?; holdLabel?; armedLabel?; variant?; size?; duration?; fallback?; icon? }` – hold to confirm
   (fill on `tween.hold`, scale .97, early release springs back + shakes, completion flashes + draws a ✓ for `dwell.holdCheck`).
   Keyboard: hold Enter/Space. A detail-0 click (assistive tech) arms it and a second confirms within `dwell.armed` (`fallback`).

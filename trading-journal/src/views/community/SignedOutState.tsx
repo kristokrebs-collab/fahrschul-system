@@ -37,12 +37,12 @@ export function SignedOutState({ mfa = false }: { mfa?: boolean }) {
               )}
               <div className="mt-1 flex flex-wrap gap-2">
                 {mfa ? (
-                  <Button variant="primary" onClick={() => openAuthSheet("mfa", "card")}>
+                  <Button variant="primary" fx={false} onClick={() => openAuthSheet("mfa", "card")}>
                     {COMMUNITY.mfaAction}
                   </Button>
                 ) : (
                   <>
-                    <Button variant="primary" onClick={() => openAuthSheet("signin", "card")} data-testid="community-signin">
+                    <Button variant="primary" fx={false} onClick={() => openAuthSheet("signin", "card")} data-testid="community-signin">
                       {COMMUNITY.signIn}
                     </Button>
                     <Button onClick={() => openAuthSheet("signup", "card")}>{COMMUNITY.signUp}</Button>

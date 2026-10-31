@@ -97,7 +97,7 @@ export function PricingHero({ className }: { className?: string }) {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-line bg-ink-900 px-5 py-4">
           <span className="text-[14px] text-fg/90">{mode === "open" ? PREISE.heroHud(trial) : PREISE.heroHud(0)}</span>
           {mode === "open" && (
-            <Button variant="primary" disabled={!!busy} onClick={() => void startCheckout({ plan: "pro", interval })} data-testid="hero-cta">
+            <Button variant="primary" fx={false} disabled={!!busy} onClick={() => void startCheckout({ plan: "pro", interval })} data-testid="hero-cta">
               {PREISE.heroCta(trial)}
             </Button>
           )}

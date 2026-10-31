@@ -14,6 +14,7 @@ import { DEFAULT_PINE_ENGINE, toPine, tvChartUrl, type PineEngine } from "@/doma
 import { sanitizeSignalCfg } from "@/domain/signals";
 import { buttonBase, buttonSize, buttonVariant } from "@/primitives/Button";
 import { Button } from "@/primitives/Button";
+import { CopyButton } from "@/primitives/CopyButton";
 import { Card } from "@/primitives/Card";
 import { Collapse } from "@/primitives/Expander";
 import { Input } from "@/primitives/Input";
@@ -183,16 +184,14 @@ export function PineCard({ className }: { className?: string }) {
             </FieldRow>
             <div className="grid gap-2">
               <div className="flex flex-wrap items-center gap-2">
-                <Button
+                <CopyButton
                   size="sm"
                   variant="primary"
-                  onClick={() =>
-                    void copyText(out.code, ref).then((ok) => pushToast(ok ? { kind: "success", title: PINE.copied } : { kind: "error", title: PINE.copyFailed }))
-                  }
+                  label={PINE.copy}
+                  onCopy={() => copyText(out.code, ref)}
+                  onResult={(ok) => pushToast(ok ? { kind: "success", title: PINE.copied } : { kind: "error", title: PINE.copyFailed })}
                   data-testid="labor-pine-copy"
-                >
-                  {PINE.copy}
-                </Button>
+                />
                 <Button size="sm" onClick={() => download(out.fileName, out.code)} data-testid="labor-pine-save">
                   {PINE.save}
                 </Button>

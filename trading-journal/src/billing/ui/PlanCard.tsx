@@ -81,7 +81,7 @@ function SignedOut({ onNavigate }: { onNavigate?: PlanCardProps["onNavigate"] })
     <div className="grid gap-4">
       <p className="text-[13.5px] leading-relaxed text-mute">{BILLING.signInFirst}</p>
       <div className="flex flex-wrap gap-2">
-        <Button variant="primary" size="sm" onClick={() => openAuthSheet("signin", "card")}>
+        <Button variant="primary" size="sm" fx={false} onClick={() => openAuthSheet("signin", "card")}>
           Anmelden
         </Button>
         {onNavigate && (
@@ -195,7 +195,7 @@ function Current({
       >
         {!sub && !seatMember && (
           <>
-            <Button variant="primary" size="sm" onClick={() => openUpgrade(null, "pro")}>
+            <Button variant="primary" size="sm" fx={false} onClick={() => openUpgrade(null, "pro")}>
               Pro testen
             </Button>
             {onNavigate && (
@@ -206,17 +206,17 @@ function Current({
           </>
         )}
         {sub && (sub.status === "past_due" || sub.status === "unpaid") && (
-          <Button variant="primary" size="sm" disabled={!!busy} onClick={() => void openPortal("payment")}>
+          <Button variant="primary" size="sm" fx={false} disabled={!!busy} onClick={() => void openPortal("payment")}>
             {PLAN_CARD.pay}
           </Button>
         )}
         {sub?.status === "paused" && (
-          <Button variant="primary" size="sm" disabled={!!busy} onClick={() => void changeSubscription("resume")}>
+          <Button variant="primary" size="sm" fx={false} disabled={!!busy} onClick={() => void changeSubscription("resume")}>
             {PLAN_CARD.unpause}
           </Button>
         )}
         {sub?.cancelAtPeriodEnd && sub.status !== "paused" && (
-          <Button variant="primary" size="sm" disabled={!!busy} onClick={() => void changeSubscription("resume")}>
+          <Button variant="primary" size="sm" fx={false} disabled={!!busy} onClick={() => void changeSubscription("resume")}>
             {PLAN_CARD.resume}
           </Button>
         )}

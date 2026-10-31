@@ -674,6 +674,11 @@ export function MorphSelect<T extends string = string>({
 
   const isOpen = phase === "open";
   const mounted = phase !== "closed" || warm;
+  // Runde 10 (looks only): a field on a `[data-rich]` page gets the richer panel (`controls.css`, `[data-ms-rich]`); the panel lives in
+  // `document.body`, so it cannot inherit the page flag – set once when it mounts, never read by the open logic
+  useLayoutEffect(() => {
+    boxRef.current?.toggleAttribute("data-ms-rich", !!triggerRef.current?.closest("[data-rich]"));
+  }, [mounted]);
   const g: Geo = geo ?? { left: 0, top: 0, w: CONFIG.panelMinW, h: CONFIG.panelMaxH, up: false, sx0: 1, sy0: 1, ox: 0, scrollable: false, rowH: CONFIG.rowH };
   const cool = () => {
     if (phase === "closed" && document.activeElement !== triggerRef.current) setWarm(false);
@@ -783,9 +788,11 @@ export function MorphSelect<T extends string = string>({
                 aria-activedescendant={isOpen ? optId(active) : undefined}
                 onKeyDown={onListKey}
                 onScroll={onListScroll}
-                className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain px-1.5 outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain px-1.5 outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 style={{ gap: CONFIG.rowGap, paddingTop: CONFIG.listPad, paddingBottom: CONFIG.listPad, touchAction: "pan-y" }}
               >
+                {/* rich panels only (`controls.css`): the marker that glides to the active row */}
+                <div aria-hidden="true" className="ms-glide" style={{ height: g.rowH, transform: `translateY(${active * (g.rowH + CONFIG.rowGap)}px)` }} />
                 {options.map((o, i) => {
                   const isSel = o.value === value;
                   return (
@@ -802,12 +809,12 @@ export function MorphSelect<T extends string = string>({
                         isSel ? "bg-ink-700 font-medium text-fg" : "text-fg/80 data-[active]:bg-ink-750 data-[active]:text-fg",
                         i === active && "shadow-[inset_0_0_0_1px_rgb(var(--veil-rgb,255_255_255)/0.14)]",
                       )}
-                      style={{ height: g.rowH }}
+                      style={{ height: g.rowH, ["--i" as string]: Math.min(i, 8) }}
                     >
                       <span className="min-w-0 flex-1 truncate">{o.label}</span>
                       {o.hint && <span className="shrink-0 font-mono text-[11px] text-faint">{o.hint}</span>}
                       <svg viewBox="0 0 16 16" aria-hidden="true" className={cn("size-3.5 shrink-0 text-signal", !isSel && "opacity-0")} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 8.5l3.2 3.2L13 4.8" />
+                        <path pathLength={1} d="M3 8.5l3.2 3.2L13 4.8" />
                       </svg>
                     </div>
                   );
