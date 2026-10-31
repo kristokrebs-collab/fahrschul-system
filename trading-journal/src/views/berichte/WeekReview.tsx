@@ -228,7 +228,7 @@ export function ExperimentCard({ page, className }: { page: ReportPage; classNam
               <KV label="Sollwert" value={`${measureNoun(accepted.measure)}: ${targetText(accepted)}`} />
               <KV label="Mindeststichprobe" value={`${accepted.minTrades} Trades`} />
               <div className="flex flex-wrap gap-2">
-                <Button variant="ghost" size="sm" disabled={busy} onClick={() => undo(accepted.id, "Das Experiment ist wieder offen.")} data-testid="experiment-withdraw">
+                <Button variant="secondary" size="sm" disabled={busy} onClick={() => undo(accepted.id, "Das Experiment ist wieder offen.")} data-testid="experiment-withdraw">
                   Zurückziehen
                 </Button>
               </div>
@@ -258,7 +258,7 @@ export function ExperimentCard({ page, className }: { page: ReportPage; classNam
               {declined ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone="mute">abgelehnt</Badge>
-                  <Button variant="ghost" size="sm" disabled={busy} onClick={() => undo(proposal.experiment.id, "Der Vorschlag ist wieder offen.")} data-testid="experiment-undecline">
+                  <Button variant="secondary" size="sm" disabled={busy} onClick={() => undo(proposal.experiment.id, "Der Vorschlag ist wieder offen.")} data-testid="experiment-undecline">
                     Wieder öffnen
                   </Button>
                 </div>
@@ -267,7 +267,7 @@ export function ExperimentCard({ page, className }: { page: ReportPage; classNam
                   <Button variant="primary" disabled={busy} onClick={accept} data-testid="experiment-accept">
                     Experiment annehmen
                   </Button>
-                  <Button variant="ghost" disabled={busy} onClick={decline} data-testid="experiment-decline">
+                  <Button variant="secondary" disabled={busy} onClick={decline} data-testid="experiment-decline">
                     Ablehnen
                   </Button>
                 </div>

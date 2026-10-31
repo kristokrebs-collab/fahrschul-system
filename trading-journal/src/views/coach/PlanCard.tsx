@@ -118,7 +118,7 @@ export function PlanCard({ plan, list, events, settings, now, className }: { pla
               </Button>
             )}
             {pinned && (
-              <Button variant="ghost" size="sm" onClick={() => void release()} disabled={busy} data-testid="coach-plan-release">
+              <Button variant="secondary" size="sm" onClick={() => void release()} disabled={busy} data-testid="coach-plan-release">
                 Plan lösen
               </Button>
             )}

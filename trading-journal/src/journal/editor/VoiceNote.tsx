@@ -4,10 +4,10 @@
  * stops it. The recogniser is the BROWSER's service (on Chrome / Edge the vendor's cloud recogniser): the app records and stores
  * no audio, and the card says so on the spot. Without support, permission or network the reason is shown and typing stays as it is.
  */
+import { chipClass } from "@/primitives/chip";
 import { useEffect, useRef } from "react";
 import { GlyphMic, GlyphStop } from "@/assistant/icons";
 import { speechMessage, useSpeechInput } from "@/assistant/speech";
-import { cn } from "@/lib/cn";
 
 export const VOICE_STRINGS = {
   start: "Diktieren",
@@ -46,10 +46,7 @@ export function VoiceNote({ value, onChange, label, testId }: { value: string; o
           aria-pressed={on}
           aria-label={`${on ? VOICE_STRINGS.stop : VOICE_STRINGS.start}: ${label}`}
           data-testid={`${testId}-mic`}
-          className={cn(
-            "touch-hit inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] transition-colors duration-200 pointer-coarse:min-h-11 disabled:cursor-not-allowed disabled:opacity-40",
-            on ? "border-signal/60 bg-signal/15 text-fg" : "border-line-2 text-mute hover:border-white/40 hover:text-fg",
-          )}
+          className={chipClass(on, { tone: "loss", className: "py-1 font-normal" })}
         >
           {on ? <GlyphStop className="size-[14px]" /> : <GlyphMic className="size-[14px]" />}
           {on ? VOICE_STRINGS.stop : VOICE_STRINGS.start}

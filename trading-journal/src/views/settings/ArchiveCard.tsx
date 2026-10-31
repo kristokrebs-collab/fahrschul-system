@@ -102,7 +102,7 @@ function DeleteButton({ label, text = S.del, onDelete, disabled }: { label: stri
         </motion.span>
       ) : (
         <motion.span key="hold" {...confirmSwapMotion(reduced)} className="inline-flex">
-          <HoldConfirm ref={trigger} variant="ghost" size="sm" className="pointer-coarse:min-h-11" disabled={disabled} onAsk={() => setAsking(true)} onConfirm={run} aria-label={label}>
+          <HoldConfirm ref={trigger} variant="secondary" size="sm" className="pointer-coarse:min-h-11" disabled={disabled} onAsk={() => setAsking(true)} onConfirm={run} aria-label={label}>
             {text}
           </HoldConfirm>
         </motion.span>

@@ -54,7 +54,7 @@ export function IdeaCard({ className }: { className?: string }) {
       data-testid="labor-idea"
       action={
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="ghost" onClick={restore} data-testid="labor-idea-back">
+          <Button size="sm" variant="secondary" onClick={restore} data-testid="labor-idea-back">
             {IDEA.back}
           </Button>
           <Button size="sm" variant="ghost" onClick={dismiss} data-testid="labor-idea-hide">

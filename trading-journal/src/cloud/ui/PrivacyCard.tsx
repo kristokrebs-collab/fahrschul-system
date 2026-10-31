@@ -82,7 +82,7 @@ export function PrivacyCard({ className }: { className?: string }) {
         // the card floor (Sicherheit beside it is taller): the way to export / delete, like the Community footer
         <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
           <span className="text-[11.5px] text-faint">{PRIVACY_CARD.toDataHint}</span>
-          <Button size="sm" variant="ghost" onClick={() => toDataCard(reduced)} data-testid="privacy-to-data">
+          <Button size="sm" variant="secondary" onClick={() => toDataCard(reduced)} data-testid="privacy-to-data">
             {PRIVACY_CARD.toData}
             <span aria-hidden="true">↓</span>
           </Button>

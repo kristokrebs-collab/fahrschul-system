@@ -91,7 +91,7 @@ function SetupActions({ b, symbol }: { b: BestSetup; symbol: string | null }) {
         <Button variant="primary" onClick={toTrade} data-testid="setup-to-trade">
           {S.toTrade}
         </Button>
-        <Button variant="ghost" onClick={toCalc} data-testid="setup-to-calc">
+        <Button variant="secondary" onClick={toCalc} data-testid="setup-to-calc">
           {S.toCalc}
         </Button>
         <TestIdeaButton

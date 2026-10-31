@@ -52,6 +52,12 @@ export interface SeedOptions extends MockMarketOptions {
    * have the sheet in their way.
    */
   checkinPrompt?: boolean;
+  /**
+   * Leave the folded cards (`Fold`, "Mehr anzeigen": Markt, Einstellungen, Berichte) closed, as a first visit sees them. By
+   * default every fold is open on this device (`tj2-folds` `["*"]`) – specs that are not about folds read and type into those
+   * cards without opening them first.
+   */
+  foldsClosed?: boolean;
 }
 
 /** The finished tour (`storageKey("onboarding")` of both editions). */
@@ -64,6 +70,12 @@ export const ONBOARDING_DONE: Record<string, string> = {
 export const REVIEW_PROMPT_OFF: Record<string, string> = {
   "tj2-growth-review": JSON.stringify({ auto: false }),
   "tj2share-growth-review": JSON.stringify({ auto: false }),
+};
+
+/** Every folded card open (`storageKey("folds")` of both editions, `FOLD_ALL`). */
+export const FOLDS_OPEN: Record<string, string> = {
+  "tj2-folds": JSON.stringify(["*"]),
+  "tj2share-folds": JSON.stringify(["*"]),
 };
 
 /** The daily check-in prompt switched off for this device (`storageKey("checkin-device")` of both editions). */
@@ -99,7 +111,7 @@ function lageOff(extra: Record<string, unknown>, empty: boolean): Record<string,
  */
 export async function seed(page: Page, opts: SeedOptions = {}): Promise<void> {
   await mockMarket(page, opts.scenario ?? "live", opts);
-  const given = { ...(opts.firstRun ? {} : ONBOARDING_DONE), ...(opts.reviewPrompt ? {} : REVIEW_PROMPT_OFF), ...(opts.checkinPrompt ? {} : CHECKIN_PROMPT_OFF), ...(opts.extra ?? {}) };
+  const given = { ...(opts.firstRun ? {} : ONBOARDING_DONE), ...(opts.reviewPrompt ? {} : REVIEW_PROMPT_OFF), ...(opts.checkinPrompt ? {} : CHECKIN_PROMPT_OFF), ...(opts.foldsClosed ? {} : FOLDS_OPEN), ...(opts.extra ?? {}) };
   const extra = (opts.lage ?? !opts.synth) ? given : lageOff(given, !!opts.empty);
   await page.addInitScript(
     ({ fx, extra, announce }) => {

@@ -55,10 +55,10 @@ function Row({ item, quote, planOk, onRemove, onNews }: { item: WatchItem; quote
       <div className="flex flex-wrap items-center gap-1.5">
         {item.kind === "stock" && (
           <>
-            <Button size="sm" variant="ghost" onClick={onNews} data-testid="aktien-watch-news">
+            <Button size="sm" variant="secondary" onClick={onNews} data-testid="aktien-watch-news">
               {W.news}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => select(item.symbol)} aria-pressed={selected} data-testid="aktien-watch-select">
+            <Button size="sm" variant="secondary" onClick={() => select(item.symbol)} aria-pressed={selected} data-testid="aktien-watch-select">
               {W.select}
             </Button>
           </>
@@ -66,7 +66,7 @@ function Row({ item, quote, planOk, onRemove, onNews }: { item: WatchItem; quote
         {planOk && (
           <Button
             size="sm"
-            variant="ghost"
+            variant="secondary"
             onClick={() => {
               window.location.hash = planHash(item.symbol, "long");
             }}
@@ -75,7 +75,7 @@ function Row({ item, quote, planOk, onRemove, onNews }: { item: WatchItem; quote
             Plan →
           </Button>
         )}
-        <Button size="sm" variant="ghost" onClick={onRemove} aria-label={`${item.symbol} ${W.remove.toLowerCase()}`} data-testid="aktien-watch-remove">
+        <Button size="sm" variant="secondary" onClick={onRemove} aria-label={`${item.symbol} ${W.remove.toLowerCase()}`} data-testid="aktien-watch-remove">
           {W.remove}
         </Button>
       </div>
@@ -113,7 +113,7 @@ export function WatchlistCard({ onNews }: { onNews: (symbol: string) => void }) 
       className="h-full"
       data-testid="aktien-watchlist"
       action={
-        <Button size="sm" variant="ghost" onClick={() => void useQuotes.getState().load(items, true)} disabled={q.loading || items.length === 0} data-testid="aktien-watch-refresh">
+        <Button size="sm" variant="secondary" onClick={() => void useQuotes.getState().load(items, true)} disabled={q.loading || items.length === 0} data-testid="aktien-watch-refresh">
           {q.loading ? "Lädt …" : W.refresh}
         </Button>
       }

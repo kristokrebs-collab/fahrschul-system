@@ -7,6 +7,7 @@
  * Motion: rows rise in / collapse out (`AnimatePresence`, `spring.enter`, exit `tween.exit`), chips pop (`spring.pop`),
  * the advanced block opens through `Collapse`; reduced motion: instant.
  */
+import { chipClass } from "@/primitives/chip";
 import { AnimatePresence, motion } from "motion/react";
 import { useId, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { DEFAULT_WATCHLIST, type Grade, type SetupKind } from "@/domain/boxes";
@@ -223,7 +224,7 @@ function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; chi
       onClick={onClick}
       whileTap={reduced ? undefined : { scale: 0.94 }}
       transition={spring.press}
-      className={cn("min-h-9 rounded-full border px-3 text-[12px] font-medium transition-colors duration-200 pointer-coarse:min-h-11", on ? "border-transparent bg-fg text-ink-900" : "border-line-2 text-mute hover:border-white/30 hover:text-fg")}
+      className={chipClass(on, { className: "min-h-9 py-1" })}
     >
       {children}
     </motion.button>

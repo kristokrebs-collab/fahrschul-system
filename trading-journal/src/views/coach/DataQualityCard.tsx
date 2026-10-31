@@ -177,7 +177,7 @@ export function DataQualityCard({ now, className }: { now: number; className?: s
           <p className="text-[12px] leading-relaxed text-mute">{QUALITY_STRINGS.noMarkets}</p>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={() => void check()} disabled={busy} data-testid="quality-check">
+            <Button size="sm" variant="secondary" onClick={() => void check()} disabled={busy} data-testid="quality-check">
               {busy ? "Prüfe …" : gaps ? "Erneut prüfen" : "Kerzen prüfen"}
             </Button>
             <span className="num font-mono text-[11px] text-faint">{markets.slice(0, 5).join(" · ")}</span>

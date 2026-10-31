@@ -98,11 +98,11 @@ function InboxRowView({ row, list, now }: { row: InboxRow; list: readonly Enrich
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="ghost" aria-expanded={panel === "detail"} onClick={() => toggle("detail")} data-testid="inbox-view">
+        <Button size="sm" variant="secondary" aria-expanded={panel === "detail"} onClick={() => toggle("detail")} data-testid="inbox-view">
           {panel === "detail" ? "Zuklappen" : "Ansehen"}
         </Button>
         {canAct && (
-          <Button size="sm" variant="ghost" aria-expanded={panel === "skip"} onClick={() => toggle("skip")} data-testid="inbox-skip">
+          <Button size="sm" variant="secondary" aria-expanded={panel === "skip"} onClick={() => toggle("skip")} data-testid="inbox-skip">
             {e.skip ? "Grund ändern" : "Ausgelassen – Grund"}
           </Button>
         )}
@@ -110,7 +110,7 @@ function InboxRowView({ row, list, now }: { row: InboxRow; list: readonly Enrich
           <TestIdeaButton input={idea} size="sm" label="Im Labor testen" testId="inbox-test" />
         ) : null}
         {row.entry && (
-          <Button size="sm" variant="ghost" aria-expanded={panel === "link"} onClick={() => toggle("link")} data-testid="inbox-link">
+          <Button size="sm" variant="secondary" aria-expanded={panel === "link"} onClick={() => toggle("link")} data-testid="inbox-link">
             {e.tradeId ? "Verknüpfung ändern" : "Im Journal verknüpfen"}
           </Button>
         )}
@@ -234,7 +234,7 @@ export function SignalInboxCard({ list, now, className }: { list: readonly Enric
       data-open={open}
       innerClassName="grid content-start gap-4"
       action={
-        <Button size="sm" variant="ghost" aria-expanded={open} aria-controls={open && rep.total > 0 ? "inbox-body" : undefined} onClick={toggleOpen} data-testid="inbox-toggle">
+        <Button size="sm" variant="secondary" aria-expanded={open} aria-controls={open && rep.total > 0 ? "inbox-body" : undefined} onClick={toggleOpen} data-testid="inbox-toggle">
           {open ? "Einklappen" : "Aufklappen"}
         </Button>
       }

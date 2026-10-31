@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { Button } from "@/primitives/Button";
 import { isCloudAvailable } from "@/cloud";
 import type { GoalDraft } from "@/domain/growth/goals";
 import { cn } from "@/lib/cn";
@@ -222,9 +223,9 @@ export function StepSetups({ setups, onAdd }: { setups: readonly { id: string; n
         </ul>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={onAdd} className="touch-hit rounded-xl border border-line-2 bg-white/[0.03] px-4 py-2 text-[13px] font-semibold text-fg transition-colors hover:border-white/30">
+        <Button onClick={onAdd}>
           + {TOUR.setups.add}
-        </button>
+        </Button>
         <span className="text-[12px] text-mute">{TOUR.setups.addHint}</span>
       </div>
     </div>
@@ -240,9 +241,9 @@ export function StepBoerse({ onOpenAccount }: { onOpenAccount: () => void }) {
       <StepHead title={TOUR.boerse.title} lead={cloud ? TOUR.boerse.cloudLead : TOUR.boerse.offLead} />
       {cloud ? (
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" onClick={onOpenAccount} className="touch-hit rounded-xl border border-line-2 bg-white/[0.03] px-4 py-2 text-[13px] font-semibold text-fg transition-colors hover:border-white/30">
+          <Button onClick={onOpenAccount}>
             {TOUR.boerse.open}
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="flex gap-3 rounded-2xl border border-line bg-white/[0.02] px-4 py-3 text-[13px] leading-relaxed text-mute" data-testid="tour-exchange-off">
@@ -269,9 +270,9 @@ export function StepMehr({ onDemo }: { onDemo: () => void }) {
         ))}
       </dl>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={onDemo} data-testid="tour-demo" className="touch-hit rounded-xl border border-line-2 bg-white/[0.03] px-4 py-2 text-[13px] font-semibold text-fg transition-colors hover:border-white/30">
+        <Button onClick={onDemo} data-testid="tour-demo">
           {TOUR.mehr.demo}
-        </button>
+        </Button>
         <span className="max-w-[48ch] text-[12px] leading-relaxed text-mute">
           {TOUR.mehr.demoLead} {TOUR.mehr.demoHint}
         </span>

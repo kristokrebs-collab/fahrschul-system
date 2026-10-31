@@ -120,7 +120,7 @@ export function PostTradeReview({ trade, onDone }: PostTradeReviewProps) {
         </Field>
       </StaggerItem>
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" onClick={() => onDone(false)} disabled={busy} data-testid="post-trade-later">
+        <Button variant="secondary" onClick={() => onDone(false)} disabled={busy} data-testid="post-trade-later">
           {R.later}
         </Button>
         <span className="flex-1" />

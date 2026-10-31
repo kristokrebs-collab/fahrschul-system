@@ -148,23 +148,23 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
   const seen = useFirstInView(ref, !reduced);
 
   // what the bottom of the card offers – a real action or an honest line, never a dead button
-  let cta: { label: string; run: () => void; variant: "primary" | "ghost"; testId: string } | null = null;
+  let cta: { label: string; run: () => void; variant: "primary" | "secondary"; testId: string } | null = null;
   let note: string | null = null;
   if (mode !== "open") note = paid ? PREISE.ctaSoon : PREISE.closedCta;
   else if (!paid) {
-    if (!signedIn) cta = { label: PREISE.ctaFree, run: () => openAuthSheet("signup", "card"), variant: "ghost", testId: "cta-free" };
+    if (!signedIn) cta = { label: PREISE.ctaFree, run: () => openAuthSheet("signup", "card"), variant: "secondary", testId: "cta-free" };
     else note = isCurrent ? PREISE.current : PREISE.ctaFreeSignedIn;
   } else if (isCurrent) {
-    if (subscription) cta = { label: PREISE.ctaManage, run: () => void openPortal("manage"), variant: "ghost", testId: `cta-${plan}` };
+    if (subscription) cta = { label: PREISE.ctaManage, run: () => void openPortal("manage"), variant: "secondary", testId: `cta-${plan}` };
     else note = PREISE.current;
   } else if (subscription && current.plan !== "free")
-    cta = { label: PREISE.ctaSwitch, run: () => void openPortal("update"), variant: "ghost", testId: `cta-${plan}` };
+    cta = { label: PREISE.ctaSwitch, run: () => void openPortal("update"), variant: "secondary", testId: `cta-${plan}` };
   else if (!available) note = PREISE.ctaSoon;
   else
     cta = {
       label: PREISE.ctaTrial(trial),
       run: () => void startCheckout({ plan: plan as PaidPlanId, interval, ...(plan === "team" ? { seats } : {}) }),
-      variant: cat.recommended ? "primary" : "ghost",
+      variant: cat.recommended ? "primary" : "secondary",
       testId: `cta-${plan}`,
     };
 

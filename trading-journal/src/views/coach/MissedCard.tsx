@@ -69,11 +69,11 @@ function Row({ r, now }: { r: SignalRow; now: number }) {
         {idea ? (
           <TestIdeaButton input={idea} size="sm" label="Im Labor testen" testId="missed-test" />
         ) : (
-          <Button size="sm" variant="ghost" onClick={() => navigate("labor")} data-testid="missed-test" title="Öffnet das Labor – für diese Quelle gibt es keinen Regelentwurf">
+          <Button size="sm" variant="secondary" onClick={() => navigate("labor")} data-testid="missed-test" title="Öffnet das Labor – für diese Quelle gibt es keinen Regelentwurf">
             Im Labor testen
           </Button>
         )}
-        <Button size="sm" variant="ghost" aria-pressed={e.watch} onClick={() => setSignalWatched(e.id, !e.watch)} data-testid="missed-watch">
+        <Button size="sm" variant="secondary" aria-pressed={e.watch} onClick={() => setSignalWatched(e.id, !e.watch)} data-testid="missed-watch">
           {e.watch ? "Nicht mehr beobachten" : "Beobachten"}
         </Button>
       </div>

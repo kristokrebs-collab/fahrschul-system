@@ -348,7 +348,7 @@ Hauptgruppe nach Aufgabe** + Zwischenüberschrift `sub`, Seite + Anker + Abschni
 `g f` – **nicht im Dock, keine Dashboard-Karte**), der globalen Suche (Art `feature`), dem Finder der Befehlsnavigation und dem Assistenten („Wo finde ich …?“).
 `featureQuery.ts` = reine Fragen ans Register (ein tippfehlertoleranter Scorer für Absichten, Gruppen + Zwischenüberschriften, „Für dich“ aus
 `settings.assistant.interests`, „Zuletzt benutzt“ aus `searchStore.recent`, „Empfohlen / Neu“, `whereIs`); `featureOpen.ts` = `openFeature(id)` (Aktion oder Seite +
-Scrollen mit ehrlichem Toast, wenn die Stelle fehlt); `reveal.ts` = `whenShown` / `revealCard` / `revealSection` / `keepAligned` (aus `search/actions.ts`
+Scrollen mit ehrlichem Toast, wenn die Stelle fehlt); `reveal.ts` = `whenShown` / `revealCard` / `revealSection` / `keepAligned` / `openFoldsAround` (öffnet eingeklappte Karten, `Fold`, vor dem Sprung) (aus `search/actions.ts`
 herausgelöst, dort re-exportiert); `featureChips.ts` = die Chips „Zuletzt benutzte Funktionen“ der Befehlsnavigation (dynamischer Import, nur bei vorhandenen
 Einträgen); `NavFinder.tsx` (+ lazy `NavFinderResults.tsx`) = **das Feld „Was willst du tun?“ der Befehlsnavigation** mit dem deutlichen Weg „Alle Funktionen →“: Es
 findet jede Funktion, nicht nur Seiten (das Register lädt mit dem ersten Buchstaben), Enter öffnet den besten Treffer, Pfeile gehen von Feld zu Treffern zu den Seitenlinks, im

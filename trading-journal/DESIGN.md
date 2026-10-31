@@ -875,3 +875,31 @@ Messwerte (Chromium headless, Seite nach dem Laden, Cloud-Seiten angemeldet übe
 (*) Community 390: die Überschrift erscheint vor der Sitzung; der Platzhalter („Lade …“, 192 px) wächst, sobald sie da ist – derselbe Code wie vorher, der
 Wert hängt am Zeitpunkt. Das Platzhalter-Layout der Community während der Sitzungsprüfung bleibt eine offene Entscheidung (ein angemeldeter Besucher
 sähe sonst ein Gerüst, ein abgemeldeter ein Gerüst, das zur kurzen Werbeseite schrumpft).
+
+## Buttons und kürzere Seiten (Etappe 1c)
+
+**Ein kleines System statt vieler Einzelstile.** Vier Rollen, zwei Größen, ein Zustandssatz (`src/primitives/Button.tsx`):
+
+| Rolle | Aussehen | Wofür |
+|---|---|---|
+| `primary` | Weiß-Verlauf auf Tinte (unverändert) | genau eine Hauptaktion je Karte: Trade eintragen, Speichern, Bezahlen, Login |
+| `secondary` (Standard) | feine Linie `border-line`, leichter Schleier `bg-white/[0.05]`, beim Überfahren nur heller | alles Übliche |
+| `ghost` | kein Rand, keine Fläche, `text-mute`; erst beim Überfahren ein Schleier | Abbrechen, Zurück, Später, Schließen |
+| `danger` | rot getönt (unverändert) | Löschen, Beenden, Kündigen |
+
+- Größen `sm` (30 px) und `md` (36 px); bei grobem Zeiger bleibt die Tippfläche ≥ 44 px (`touch-hit`, kein Layout-Springen). Alle Varianten haben einen Rand
+  (`border-transparent` wo keiner zu sehen ist): gleiche Box, kein Verschieben beim Wechsel.
+- Zustände: Hover (nur die Fläche), Fokus (`--ring-glow-btn`, `--ring-glow-btn-danger`: Lücke in Tintenfarbe, 2-px-Ring, weiches Glühen; zeigt sich sofort, ohne Übergang),
+  gedrückt (`spring.press`, Skalierung .96, kein Ripple im reduzierten Modus), `disabled` (Deckkraft .5), `loading` (Beschriftung durchsichtig, kleiner Kreis in der Mitte,
+  gleiche Größe, `aria-busy`, Klicks werden ignoriert).
+- `chipClass(on, { size, tone })` (`src/primitives/chip.ts`) ist die eine Form für Ein/Aus-Pillen (Filter, Auswahl): aus = ruhige Linie, an = einfacher Schleier ohne Rand.
+- Die shadcn-Hülle `src/ui/button.tsx` nimmt dieselben Klassen aus `buttonVariant` (kein zweites System).
+- Idee übernommen aus 21st.dev („Button“ mit primary/secondary/tertiary/ghost und Ladezustand, Spinner über der durchsichtigen Beschriftung); kein Code, kein neues Paket.
+
+**Seiten kürzen: „Mehr anzeigen“ (`Fold`, `src/primitives/Fold.tsx`).** Was einmal eingestellt oder nur ab und zu gebraucht wird, steht als eine ruhige Zeile
+(Titel, ein ehrlicher Satz, Chevron; ≥ 56 px, die ganze Zeile ist die Tippfläche). Aufgeklappt: die Karte, darüber eine leise Zeile „Zuklappen: …“. Ein natives
+`details`: der Inhalt bleibt im DOM (Suche, Vorleser, Funktionsfinder), Tastatur geht, nichts wird gemessen oder in der Höhe animiert. Der Sprung des Funktionsfinders,
+der Suche und des Assistenten (`revealCard` / `revealSection`) sowie der Sprung zu einem ungültigen Feld (`revealInvalid`) öffnen eine Karte vorher (`openFoldsAround`).
+Die Wahl wird je Browser gemerkt (`tj2-folds`). Eingeklappt: Markt – Squeeze, Preis- & RSI-Struktur, Ähnliche Situationen, Alarme & Zustellprotokoll, Ereignisphasen,
+Box-Einstellungen; Einstellungen – Live-Daten, Hyblock-Connector, Datenarchiv, Version & Speicher; Berichte – Transaktionsbuch. Die Übersicht und das Cockpit sind unberührt.
+

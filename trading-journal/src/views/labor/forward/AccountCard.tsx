@@ -154,7 +154,7 @@ export function AccountCard({ account: a, className }: { account: ForwardAccount
             </Button>
           )}
           {a.status !== "ended" && (
-            <Button size="sm" variant="ghost" onClick={() => setAsk(ask === "end" ? null : "end")} aria-expanded={ask === "end"} data-testid="forward-end">
+            <Button size="sm" variant="secondary" onClick={() => setAsk(ask === "end" ? null : "end")} aria-expanded={ask === "end"} data-testid="forward-end">
               {F.end}
             </Button>
           )}
@@ -185,13 +185,13 @@ export function AccountCard({ account: a, className }: { account: ForwardAccount
         )}
 
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="ghost" onClick={() => setRulesOpen((o) => !o)} aria-expanded={rulesOpen} aria-controls={`${uid}-rules`} data-testid="forward-rules-toggle">
+          <Button size="sm" variant="secondary" onClick={() => setRulesOpen((o) => !o)} aria-expanded={rulesOpen} aria-controls={`${uid}-rules`} data-testid="forward-rules-toggle">
             {rulesOpen ? F.rulesHide : F.rulesShow}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setTradesOpen((o) => !o)} aria-expanded={tradesOpen} aria-controls={`${uid}-trades`} data-testid="forward-trades-toggle">
+          <Button size="sm" variant="secondary" onClick={() => setTradesOpen((o) => !o)} aria-expanded={tradesOpen} aria-controls={`${uid}-trades`} data-testid="forward-trades-toggle">
             {tradesOpen ? F.tradesHide(a.trades.length) : F.tradesShow(a.trades.length)}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setCmpOpen((o) => !o)} aria-expanded={cmpOpen} aria-controls={`${uid}-cmp`} data-testid="forward-compare-toggle">
+          <Button size="sm" variant="secondary" onClick={() => setCmpOpen((o) => !o)} aria-expanded={cmpOpen} aria-controls={`${uid}-cmp`} data-testid="forward-compare-toggle">
             {F.cmpTitle}
           </Button>
         </div>

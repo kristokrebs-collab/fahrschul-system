@@ -13,6 +13,7 @@
  * Opening a finished report marks it seen (`settings.coach.reports.seen`, after a short look – flipping through does
  * not count). Registered by the integrator (P14) as page `berichte`.
  */
+import { Fold } from "@/primitives/Fold";
 import { lazy, Suspense, useEffect, useMemo, type ReactNode } from "react";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
 import { BERICHTE_HIGHLIGHT, BERICHTE_LEAD, BERICHTE_TITLE, withReportSeen } from "@/domain/coach";
@@ -266,7 +267,7 @@ export function BerichteView({ className }: { className?: string }) {
       )}
       {/* F70: independent of the period and the focus – the whole journal as a ledger */}
       {/* no `Cell` (Reveal): the ledger grows with every 50 rows and a reveal waits for 15 % of its element in view – a card that tall would stay at opacity 0 */}
-      <div className="flex min-w-0 flex-col lg:col-span-12 [&>*]:flex-1">
+      <Fold id="berichte-ledger" title="Transaktionsbuch" hint="Käufe, Verkäufe, Gebühren und Funding aus deinem Journal, mit Abgleich und CSV" className="lg:col-span-12">
         <Suspense
           fallback={
             // the head of the book alone (year, zone, summary, reconciliation) is ≈ 640 px at 1280 and ≈ 900 px at 390: the floor of the
@@ -280,7 +281,7 @@ export function BerichteView({ className }: { className?: string }) {
         >
           <LedgerSection acc={page.acc} />
         </Suspense>
-      </div>
+      </Fold>
       {/* the same figures, looked at over the whole journal instead of one period */}
       <FeatureLinks
         className="lg:col-span-12"

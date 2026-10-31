@@ -82,7 +82,7 @@ export function GoalSheet() {
       footer={
         <>
           <span className="flex-1" />
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button variant="ghost" onClick={onClose}>Abbrechen</Button>
           <Button variant="primary" onClick={send} disabled={!valid || busy === "goal"} data-testid="goal-send">
             {MENTOR.goalSend}
           </Button>

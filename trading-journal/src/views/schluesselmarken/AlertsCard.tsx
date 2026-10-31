@@ -134,7 +134,7 @@ export const AlertsCard = memo(function AlertsCard() {
             </div>
             <Button
               size="sm"
-              variant="ghost"
+              variant="secondary"
               disabled={log.length === 0}
               onClick={() => {
                 clearDeliveryLog();
@@ -156,7 +156,7 @@ export const AlertsCard = memo(function AlertsCard() {
             </ul>
           )}
           {log.length > SHOWN && !all && (
-            <Button size="sm" variant="ghost" className="justify-self-start" onClick={() => setAll(true)}>
+            <Button size="sm" variant="secondary" className="justify-self-start" onClick={() => setAll(true)}>
               Alle {log.length} anzeigen
             </Button>
           )}

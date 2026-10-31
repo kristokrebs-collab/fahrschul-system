@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { Button } from "@/primitives/Button";
 import { useMemo, useState, type ReactNode } from "react";
 import { useEntitlement } from "@/billing/entitlements";
 import { openUpgrade } from "@/billing/store";
@@ -7,13 +7,10 @@ import { holdLabel, holdMs } from "@/domain/excursion";
 import { fillStats } from "@/domain/fills";
 import type { EnrichedTrade, Setup } from "@/domain/types";
 import { stripEnrichment } from "@/domain/csv";
-import { cn } from "@/lib/cn";
 import { date as fmtDate, n2, price as fmtPrice, signed, time as fmtTime } from "@/lib/format";
 import { useProvider } from "@/market";
 import { measureAndStore, measurablePair, MEASURE_HINTS, type MeasureStatus } from "@/market/excursion";
 import { StaggerItem } from "@/motion/Stagger";
-import { spring } from "@/motion/tokens";
-import { useReducedFx } from "@/motion/useReducedFx";
 import { useEnriched, useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
 import { openTimeMachine } from "@/views/timemachine/sheetStore";
@@ -64,7 +61,6 @@ export function executionFacts(t: EnrichedTrade, currency: string): [string, str
  * the trade has data for it; each is a `StaggerItem` of the detail body cascade.
  */
 export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps) {
-  const reduced = useReducedFx();
   const provider = useProvider();
   const saveTrade = useJournal((s) => s.saveTrade);
   const all = useEnriched();
@@ -139,16 +135,9 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
           ) : (
             <div className="flex flex-wrap items-center gap-2 text-[12px] text-mute">
               {canMeasure ? (
-                <motion.button
-                  type="button"
-                  onClick={() => void measure()}
-                  disabled={measuring}
-                  whileTap={reduced ? undefined : { scale: 0.96 }}
-                  transition={spring.press}
-                  className="rounded-full border border-line-2 px-3 py-1.5 text-[12px] text-fg transition-colors hover:border-white/40 disabled:opacity-50 pointer-coarse:min-h-11"
-                >
+                <Button size="sm" onClick={() => void measure()} disabled={measuring}>
                   {measuring ? "Misst …" : "MAE/MFE messen"}
-                </motion.button>
+                </Button>
               ) : null}
               <span>{measureNote ?? (cannot ? MEASURE_HINTS[cannot as Exclude<MeasureStatus, "ok">] : "Wie weit lief der Trade gegen und für dich?")}</span>
             </div>
@@ -259,20 +248,12 @@ function Pill({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function ActionButton({ children, onClick, icon, disabled }: { children: ReactNode; onClick: () => void; icon: string; disabled?: boolean }) {
-  const reduced = useReducedFx();
   return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      whileTap={reduced || disabled ? undefined : { scale: 0.96 }}
-      transition={spring.press}
-      className={cn("inline-flex items-center gap-1.5 rounded-full border border-line-2 px-3 py-1.5 text-[12px] font-medium text-fg transition-colors hover:border-white/40 disabled:opacity-50 pointer-coarse:min-h-11")}
-    >
+    <Button size="sm" onClick={onClick} disabled={disabled} className="gap-1.5">
       <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d={icon} />
       </svg>
       {children}
-    </motion.button>
+    </Button>
   );
 }

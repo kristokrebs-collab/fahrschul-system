@@ -194,7 +194,7 @@ export const SimilarCard = memo(function SimilarCard() {
                   ]}
                 />
               </div>
-              <Button size="sm" variant="ghost" onClick={() => setShowFeatures((s) => !s)} aria-expanded={showFeatures} aria-controls={ids.features} data-testid="similar-features-toggle">
+              <Button size="sm" variant="secondary" onClick={() => setShowFeatures((s) => !s)} aria-expanded={showFeatures} aria-controls={ids.features} data-testid="similar-features-toggle">
                 {showFeatures ? SIM.featuresClose : SIM.featuresOpen} · {SIM.featuresCount(prefs.features.length)}
               </Button>
             </div>
@@ -326,7 +326,7 @@ export const SimilarCard = memo(function SimilarCard() {
                         ))}
                       </ul>
                       {summary.counters.length > FIRST_COUNTERS && (
-                        <Button size="sm" variant="ghost" onClick={() => setAllCounters((a) => !a)} className="justify-self-start" data-testid="similar-counters-more">
+                        <Button size="sm" variant="secondary" onClick={() => setAllCounters((a) => !a)} className="justify-self-start" data-testid="similar-counters-more">
                           {allCounters ? SIM.counters.fewer : SIM.counters.all(summary.counters.length)}
                         </Button>
                       )}
@@ -355,7 +355,7 @@ export const SimilarCard = memo(function SimilarCard() {
                     ))}
                   </ul>
                   {result.hits.length > FIRST_HITS && (
-                    <Button size="sm" variant="ghost" onClick={() => setAllHits((a) => !a)} className="justify-self-start" data-testid="similar-hits-more">
+                    <Button size="sm" variant="secondary" onClick={() => setAllHits((a) => !a)} className="justify-self-start" data-testid="similar-hits-more">
                       {allHits ? SIM.sample.fewer : SIM.sample.all(result.hits.length)}
                     </Button>
                   )}

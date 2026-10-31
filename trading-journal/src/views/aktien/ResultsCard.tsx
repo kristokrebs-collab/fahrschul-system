@@ -70,21 +70,21 @@ function HitRow({ hit, rank, market, onWatch, watched, timeZone, daily, planOk }
         {hit.turnover != null && <span className="num text-[11.5px] text-faint">Umsatz ≈ {volumeText(hit.turnover)}</span>}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="ghost" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls={sid} data-testid="aktien-hit-chart">
+        <Button size="sm" variant="secondary" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls={sid} data-testid="aktien-hit-chart">
           {open ? R.hideChart : R.chart}
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => onWatch(hit)} data-testid="aktien-hit-watch">
+        <Button size="sm" variant="secondary" onClick={() => onWatch(hit)} data-testid="aktien-hit-watch">
           {watched ? R.onWatchlist : R.toWatchlist}
         </Button>
         {market === "stock" && (
-          <Button size="sm" variant="ghost" onClick={() => select(hit.symbol)} data-testid="aktien-hit-select">
+          <Button size="sm" variant="secondary" onClick={() => select(hit.symbol)} data-testid="aktien-hit-select">
             {AKTIEN.watchlist.select}
           </Button>
         )}
         {planOk && (
           <Button
             size="sm"
-            variant="ghost"
+            variant="secondary"
             onClick={() => {
               window.location.hash = planHash(hit.symbol, hit.side);
             }}

@@ -122,7 +122,7 @@ function MemoryPanel() {
                   ))}
                 </ul>
                 <div>
-                  <Button size="sm" variant="ghost" onClick={() => setMem(forgetInterests)} data-testid="assistant-interests-clear">
+                  <Button size="sm" variant="secondary" onClick={() => setMem(forgetInterests)} data-testid="assistant-interests-clear">
                     Interessen löschen
                   </Button>
                 </div>

@@ -285,7 +285,7 @@ export function FunktionenView({ className }: { className?: string }) {
         <section ref={groupTop} aria-labelledby={`${inputId}-group`} className="grid min-w-0 gap-5" data-testid="funktionen-group-view" data-group={current.group.id} data-n={current.items.length}>
           <Reveal index={0} className="grid gap-3">
             <div>
-              <Button size="sm" onClick={back} aria-label={FUNKTIONEN.group.backLabel} data-testid="funktionen-back">
+              <Button variant="ghost" size="sm" onClick={back} aria-label={FUNKTIONEN.group.backLabel} data-testid="funktionen-back">
                 <span aria-hidden="true">←</span>
                 {FUNKTIONEN.group.back}
               </Button>

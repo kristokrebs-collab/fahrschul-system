@@ -147,19 +147,19 @@ const LevelRow = memo(function LevelRow({ entry, onEdit, onCopy, onRemove, onTog
             <Switch size="sm" checked={l.enabled} onCheckedChange={(v) => onToggle(l, v)} aria-label={`${l.name} ${l.enabled ? "ausschalten" : "einschalten"}`} className="touch-hit" />
           </span>
         )}
-        <Button size="sm" variant="ghost" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <Button size="sm" variant="secondary" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
           {KL.history}
         </Button>
         {fixed ? (
-          <Button size="sm" variant="ghost" onClick={() => navigate("settings")} title={KL.fixedHelp}>
+          <Button size="sm" variant="secondary" onClick={() => navigate("settings")} title={KL.fixedHelp}>
             {KL.toSettings}
           </Button>
         ) : (
-          <Button size="sm" variant="ghost" onClick={() => onEdit(l)}>
+          <Button size="sm" variant="secondary" onClick={() => onEdit(l)}>
             {KL.edit}
           </Button>
         )}
-        <Button size="sm" variant="ghost" onClick={() => onCopy(l)}>
+        <Button size="sm" variant="secondary" onClick={() => onCopy(l)}>
           {KL.duplicate}
         </Button>
         {!fixed &&
@@ -169,12 +169,12 @@ const LevelRow = memo(function LevelRow({ entry, onEdit, onCopy, onRemove, onTog
               <Button size="sm" variant="danger" onClick={() => onRemove(l)} data-testid="keylevel-remove-yes">
                 {KL.yes}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setAsk(false)}>
+              <Button size="sm" variant="secondary" onClick={() => setAsk(false)}>
                 {KL.no}
               </Button>
             </span>
           ) : (
-            <Button size="sm" variant="ghost" onClick={() => setAsk(true)} aria-label={`${l.name} löschen`}>
+            <Button size="sm" variant="secondary" onClick={() => setAsk(true)} aria-label={`${l.name} löschen`}>
               {KL.remove}
             </Button>
           ))}

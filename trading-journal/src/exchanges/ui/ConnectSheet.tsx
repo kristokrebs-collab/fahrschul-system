@@ -204,7 +204,7 @@ export function ConnectSheet() {
     step === 0 ? (
       <>
         <span className="flex-1" />
-        <Button onClick={close}>Abbrechen</Button>
+        <Button variant="ghost" onClick={close}>Abbrechen</Button>
         <Button variant="primary" onClick={() => setStep(1)} data-testid="connect-next">
           {CONNECT.next}
         </Button>

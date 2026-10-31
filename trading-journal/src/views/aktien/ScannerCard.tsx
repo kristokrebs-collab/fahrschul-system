@@ -178,7 +178,7 @@ export function ScannerCard() {
       data-testid="aktien-scanner"
       action={
         running ? (
-          <Button size="sm" variant="ghost" onClick={abort} data-testid="aktien-abort">
+          <Button size="sm" variant="secondary" onClick={abort} data-testid="aktien-abort">
             {S.abort}
           </Button>
         ) : (
@@ -259,14 +259,14 @@ export function ScannerCard() {
                 <div className="grid gap-1">
                   <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-mute">{S.block}</span>
                   <div className="flex items-center gap-1.5">
-                    <Button size="sm" variant="ghost" aria-label="Vorheriger Block" disabled={prefs.stock.block <= 1 || running} onClick={() => setPrefs({ stock: { ...prefs.stock, block: Math.max(1, prefs.stock.block - 1) } })} data-testid="aktien-block-prev">
+                    <Button size="sm" variant="secondary" aria-label="Vorheriger Block" disabled={prefs.stock.block <= 1 || running} onClick={() => setPrefs({ stock: { ...prefs.stock, block: Math.max(1, prefs.stock.block - 1) } })} data-testid="aktien-block-prev">
                       ‹
                     </Button>
                     <span className="num min-w-[5.5rem] text-center font-mono text-[13px] text-fg" data-testid="aktien-block">
                       {prefs.stock.block}
                       {blocksKnown ? ` von ${nf.format(blocksKnown)}` : ""}
                     </span>
-                    <Button size="sm" variant="ghost" aria-label="Nächster Block" disabled={running || (blocksKnown != null && prefs.stock.block >= blocksKnown)} onClick={() => setPrefs({ stock: { ...prefs.stock, block: prefs.stock.block + 1 } })} data-testid="aktien-block-next">
+                    <Button size="sm" variant="secondary" aria-label="Nächster Block" disabled={running || (blocksKnown != null && prefs.stock.block >= blocksKnown)} onClick={() => setPrefs({ stock: { ...prefs.stock, block: prefs.stock.block + 1 } })} data-testid="aktien-block-next">
                       ›
                     </Button>
                   </div>

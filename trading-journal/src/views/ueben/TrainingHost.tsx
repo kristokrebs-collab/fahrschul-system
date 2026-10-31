@@ -130,7 +130,7 @@ function SessionGone({ onNext }: { onNext: () => void }) {
       <div className="grid justify-items-center gap-3">
         <DotMatrix text="--" tone="mute" size={4} gap={2} glow={false} />
         <p className="max-w-[44ch] text-[13px] text-mute">Dieser Fall ist nicht mehr im Journal.</p>
-        <Button variant="ghost" size="sm" onClick={onNext}>
+        <Button variant="secondary" size="sm" onClick={onNext}>
           {TRAIN.skip}
         </Button>
       </div>

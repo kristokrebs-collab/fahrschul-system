@@ -143,7 +143,7 @@ function Body({ groupId }: { groupId: string }) {
       </StaggerItem>
 
       <StaggerItem className="flex flex-wrap items-center justify-end gap-2">
-        <Button onClick={closeSheet}>Abbrechen</Button>
+        <Button variant="ghost" onClick={closeSheet}>Abbrechen</Button>
         <Button variant="primary" onClick={post} disabled={!ready || !complete || busy === "case"} data-testid="case-post">
           {CASES.post}
         </Button>

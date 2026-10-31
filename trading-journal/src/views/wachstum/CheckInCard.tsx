@@ -118,7 +118,7 @@ export function CheckInCard({ today }: { today: TodayState }) {
           </ul>
         )}
         <WeekStrip week={today.week} todayKey={today.key} />
-        <Button variant={has ? "ghost" : "primary"} onClick={() => openCheckin(today.key)} data-testid="growth-checkin-open">
+        <Button variant={has ? "secondary" : "primary"} onClick={() => openCheckin(today.key)} data-testid="growth-checkin-open">
           {has ? C.ctaEdit : C.cta}
         </Button>
         <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3" data-testid="growth-reviews" data-open={unreviewed.length}>

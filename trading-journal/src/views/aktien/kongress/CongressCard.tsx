@@ -198,7 +198,7 @@ export default function CongressCard({ watchlist, symbol }: AktienSlotProps) {
       className="h-full"
       data-testid="aktien-kongress"
       action={
-        <Button size="sm" variant="ghost" onClick={reload} disabled={busy} data-testid="kongress-refresh">
+        <Button size="sm" variant="secondary" onClick={reload} disabled={busy} data-testid="kongress-refresh">
           {busy ? "Lädt …" : KONGRESS.refresh}
         </Button>
       }
@@ -259,7 +259,7 @@ export default function CongressCard({ watchlist, symbol }: AktienSlotProps) {
               {KONGRESS.filters.ticker}
             </CheckChip>
             {filterOn && (
-              <Button size="sm" variant="ghost" onClick={() => patch({ ...NO_FILTER })} data-testid="kongress-filter-reset">
+              <Button size="sm" variant="secondary" onClick={() => patch({ ...NO_FILTER })} data-testid="kongress-filter-reset">
                 {KONGRESS.filters.reset}
               </Button>
             )}
@@ -291,7 +291,7 @@ export default function CongressCard({ watchlist, symbol }: AktienSlotProps) {
               <p className="text-mute">{shownFail.message}</p>
               <p className="text-[12px] text-faint">Quelle: {CONGRESS_SOURCE_LABEL} – eine Behördenseite ohne Zusage zur Erreichbarkeit. Es werden keine Meldungen erfunden.</p>
               <div>
-                <Button size="sm" variant="ghost" onClick={reload} data-testid="kongress-retry">
+                <Button size="sm" variant="secondary" onClick={reload} data-testid="kongress-retry">
                   {KONGRESS.retry}
                 </Button>
               </div>
@@ -334,7 +334,7 @@ export default function CongressCard({ watchlist, symbol }: AktienSlotProps) {
           )}
           {reading && reading.capped && !busy && (
             <div>
-              <Button size="sm" variant="ghost" onClick={() => setCap((c) => c + READ_STEP)} data-testid="kongress-read-more">
+              <Button size="sm" variant="secondary" onClick={() => setCap((c) => c + READ_STEP)} data-testid="kongress-read-more">
                 {KONGRESS.readMore}
               </Button>
             </div>
@@ -427,7 +427,7 @@ export default function CongressCard({ watchlist, symbol }: AktienSlotProps) {
             )}
             {filtered.lines.length > shown && (
               <div>
-                <Button size="sm" variant="ghost" onClick={() => setShown((n) => n + PAGE)} data-testid="kongress-more">
+                <Button size="sm" variant="secondary" onClick={() => setShown((n) => n + PAGE)} data-testid="kongress-more">
                   Weitere {Math.min(PAGE, filtered.lines.length - shown)} anzeigen
                 </Button>
               </div>

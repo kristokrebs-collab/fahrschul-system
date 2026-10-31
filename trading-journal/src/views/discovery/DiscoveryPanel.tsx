@@ -183,11 +183,11 @@ export function DiscoveryPanel(props: DiscoveryPanelProps) {
         )}
         <div className="flex flex-wrap items-center gap-2">
           {busy ? (
-            <Button size="sm" onClick={cancel} data-testid="discovery-cancel">
+            <Button variant="ghost" size="sm" onClick={cancel} data-testid="discovery-cancel">
               {DISC.cancel}
             </Button>
           ) : (
-            <Button size="sm" variant={res ? "ghost" : "primary"} onClick={() => void start()} disabled={tooFew} data-testid="discovery-start">
+            <Button size="sm" variant={res ? "secondary" : "primary"} onClick={() => void start()} disabled={tooFew} data-testid="discovery-start">
               {res ? DISC.again : DISC.start}
             </Button>
           )}

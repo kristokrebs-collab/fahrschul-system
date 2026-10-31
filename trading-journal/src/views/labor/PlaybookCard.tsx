@@ -259,7 +259,7 @@ export function PlaybookCard({ className }: { className?: string }) {
             </Button>
             <input ref={fileRef} type="file" accept=".json,application/json,text/plain" className="sr-only" tabIndex={-1} aria-label={P.file} onChange={(e) => void onFile(e.target.files?.[0])} data-testid="playbook-file" />
             {(input || checked || fileError) && (
-              <Button size="sm" variant="ghost" onClick={() => { setInput(""); setChecked(null); setFileError(null); reset(); }}>
+              <Button size="sm" variant="secondary" onClick={() => { setInput(""); setChecked(null); setFileError(null); reset(); }}>
                 {P.clear}
               </Button>
             )}
@@ -385,7 +385,7 @@ export function PlaybookCard({ className }: { className?: string }) {
               <div className="flex flex-wrap gap-2">
                 {!createdId ? (
                   appliedRev == null && (
-                    <Button size="sm" variant={sibling && rel && rel.kind !== "none" && rel.kind !== "other" ? "ghost" : "primary"} disabled={full} onClick={() => create(checked.playbook)} data-testid="playbook-create">
+                    <Button size="sm" variant={sibling && rel && rel.kind !== "none" && rel.kind !== "other" ? "secondary" : "primary"} disabled={full} onClick={() => create(checked.playbook)} data-testid="playbook-create">
                       {sibling && rel && rel.kind !== "none" && rel.kind !== "other" ? P.update.separate : P.create}
                     </Button>
                   )

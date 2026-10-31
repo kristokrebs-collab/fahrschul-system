@@ -182,7 +182,7 @@ export default function ExtractSheet() {
       footer={
         <>
           <span className="flex-1" />
-          <Button onClick={close} data-testid="extract-cancel">
+          <Button variant="ghost" onClick={close} data-testid="extract-cancel">
             {phase.name === "preview" || phase.name === "empty" || phase.name === "error" ? "Schließen" : S.cancel}
           </Button>
           {phase.name === "select" && (

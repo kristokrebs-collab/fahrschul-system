@@ -149,7 +149,7 @@ export function LimitsCard({ report, now, warnings: all }: { report: LimitReport
             {overridden ? (
               <span className="flex flex-wrap items-center gap-2">
                 <span className="text-[11.5px] text-warn">{S.overridden(new Date(override!.until).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }))}</span>
-                <Button size="sm" variant="ghost" onClick={clearOverride}>
+                <Button size="sm" variant="secondary" onClick={clearOverride}>
                   {S.clearOverride}
                 </Button>
               </span>

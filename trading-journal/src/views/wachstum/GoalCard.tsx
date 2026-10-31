@@ -98,7 +98,7 @@ export function GoalCard({ g, index = 0 }: { g: GoalProgress; index?: number }) 
           <Button size="sm" onClick={() => void logSelf(true)}>
             {G.selfYes}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => void logSelf(false)}>
+          <Button size="sm" variant="secondary" onClick={() => void logSelf(false)}>
             {G.selfNo}
           </Button>
         </div>
@@ -110,7 +110,7 @@ export function GoalCard({ g, index = 0 }: { g: GoalProgress; index?: number }) 
             <Button size="sm" variant="danger" onClick={() => void drop()} data-testid="goal-drop-yes">
               Ja
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>
+            <Button size="sm" variant="secondary" onClick={() => setConfirm(false)}>
               Nein
             </Button>
           </span>
@@ -162,7 +162,7 @@ export function GoalsCard({ goals, week, className }: { goals: readonly GoalProg
                   ))}
                 </div>
               </Collapse>
-              <Button variant="ghost" size="sm" onClick={() => setMore((m) => !m)} aria-expanded={more} data-testid="goal-more">
+              <Button variant="secondary" size="sm" onClick={() => setMore((m) => !m)} aria-expanded={more} data-testid="goal-more">
                 {more ? G.less : G.more(rest.length)}
               </Button>
             </>

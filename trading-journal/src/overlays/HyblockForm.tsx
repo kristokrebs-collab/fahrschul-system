@@ -216,7 +216,7 @@ export function HyblockForm({ last, live, onClose, onSave, now, className }: Hyb
                 {HYBLOCK_FORM_STRINGS.live}
               </Button>
             )}
-            <Button onClick={cancel}>{HYBLOCK_FORM_STRINGS.cancel}</Button>
+            <Button variant="ghost" onClick={cancel}>{HYBLOCK_FORM_STRINGS.cancel}</Button>
             <Button variant="primary" type="submit" disabled={busy}>
               {HYBLOCK_FORM_STRINGS.save}
             </Button>

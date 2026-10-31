@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
+import { Button } from "@/primitives/Button";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 import type { ScreenshotRef } from "@/domain/types";
@@ -142,9 +143,9 @@ export function ShotLightbox({ shots, index, onIndex, onClose, title = "Screensh
                 {i + 1} / {shots.length}
                 {shot.caption ? <span className="ml-2 font-sans text-fg/85">{shot.caption}</span> : null}
               </span>
-              <button type="button" onClick={onClose} className="rounded-full border border-line-2 px-3 py-1.5 text-[12px] text-fg transition-colors hover:border-white/40 pointer-coarse:min-h-11" aria-label="Screenshot schließen">
+              <Button size="sm" onClick={onClose} aria-label="Screenshot schließen">
                 Schließen
-              </button>
+              </Button>
             </div>
             <div
               ref={stageRef}

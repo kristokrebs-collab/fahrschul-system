@@ -110,6 +110,11 @@ function useActiveSection(items: readonly SectionNavItem[], nav: RefObject<HTMLE
       for (const e of entries) {
         const id = idOf.get(e.target);
         if (!id) continue;
+        // a section folded away (`Fold`, display none) has no box: it is not "passed", whatever the observer says about its (0,0) rect
+        if (e.boundingClientRect.height === 0 && !e.isIntersecting) {
+          passed.set(id, false);
+          continue;
+        }
         passed.set(id, e.isIntersecting || e.boundingClientRect.top < (e.rootBounds?.top ?? line));
       }
       compute();

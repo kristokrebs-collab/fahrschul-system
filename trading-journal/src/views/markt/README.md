@@ -170,3 +170,7 @@ Tests: `views.markt.squeeze.history.test.tsx`, e2e `backfill.spec.ts`.
 - Fünf Teile mit `SectionTitle` und `SectionNav`: **Jetzt** (Beste Setups, Box-Status, Chart) · **Einordnung** (Squeeze, Struktur, Ähnliche Situationen) · **Marken & Alarme** (Schlüsselmarken, Tagesplan, Alarme) · **Termine** (Heute wichtig, Termine, Ereignisphasen) · **Beobachten** (RSI-Linien, Scanner, Box-Einstellungen). Die Karten behalten ihre `data-testid`.
 - Späte Karten stehen vorher als `PendingCard` in Endgröße (`@/ui/PendingCard`); Termine zeigen sieben Tage, das Briefing vier Zeilen je Abschnitt, bis ein Knopf mehr zeigt.
 - Der Satz „Keine professionelle Finanzberatung.“ steht nur im `AnalysisNote` am Seitenende.
+
+## Etappe 1c (kürzere Seite)
+- Sechs Karten stehen eingeklappt in einer Zeile (`Fold`, „Mehr anzeigen“): Squeeze, Preis- & RSI-Struktur, Ähnliche Situationen, Alarme & Zustellprotokoll, Ereignisphasen (in `TermineSection`), Box-Einstellungen. Die `data-testid` der Karten bleiben im DOM; der Funktionsfinder öffnet die Karte beim Ansprung. Höhe bei 390 px: 21 273 → 11 200 px.
+

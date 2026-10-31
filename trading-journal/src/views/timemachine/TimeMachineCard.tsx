@@ -296,16 +296,16 @@ export function TimeMachineCard(props: TimeMachineProps) {
   const header = (
     <div className="flex flex-wrap items-center gap-2">
       {busy ? (
-        <Button size="sm" onClick={run.cancel} data-testid="tm-cancel">
+        <Button variant="ghost" size="sm" onClick={run.cancel} data-testid="tm-cancel">
           {TM.cancel}
         </Button>
       ) : (
-        <Button size="sm" variant={r ? "ghost" : "primary"} onClick={run.start} disabled={run.status === "invalid"} data-testid="tm-start">
+        <Button size="sm" variant={r ? "secondary" : "primary"} onClick={run.start} disabled={run.status === "invalid"} data-testid="tm-start">
           {r ? TM.rerun : TM.start}
         </Button>
       )}
       {props.onClose && (
-        <Button size="sm" variant="ghost" onClick={props.onClose} data-testid="tm-close">
+        <Button size="sm" variant="secondary" onClick={props.onClose} data-testid="tm-close">
           {TM.close}
         </Button>
       )}

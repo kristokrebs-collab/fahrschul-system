@@ -248,7 +248,7 @@ function BackupRow({ entry: b, ids, confirming, busy, onAsk, onCancel, onRestore
           </Button>
         </motion.span>
       ) : (
-        <HoldConfirm ref={trigger} variant="ghost" size="sm" disabled={busy} onAsk={onAsk} onConfirm={onRestore} aria-label={`${DATA_STRINGS.restore}: ${when}`}>
+        <HoldConfirm ref={trigger} variant="secondary" size="sm" disabled={busy} onAsk={onAsk} onConfirm={onRestore} aria-label={`${DATA_STRINGS.restore}: ${when}`}>
           {DATA_STRINGS.restore}
         </HoldConfirm>
       )}

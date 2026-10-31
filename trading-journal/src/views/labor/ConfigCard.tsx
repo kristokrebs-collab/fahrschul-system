@@ -193,7 +193,7 @@ export function ConfigCard({ signal, className }: { signal: SignalCfg; className
             {cfg.symbol} · {LABOR.estimate(pages, false)}
           </p>
           {busy ? (
-            <Button onClick={cancelLab} data-testid="labor-cancel">
+            <Button variant="ghost" onClick={cancelLab} data-testid="labor-cancel">
               {LABOR.cancel}
             </Button>
           ) : (

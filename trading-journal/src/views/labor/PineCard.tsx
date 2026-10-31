@@ -146,7 +146,7 @@ export function PineCard({ className }: { className?: string }) {
           </p>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant={shown ? "ghost" : "primary"} onClick={() => setShown((s) => !s)} aria-expanded={shown} data-testid="labor-pine-make">
+            <Button size="sm" variant={shown ? "secondary" : "primary"} onClick={() => setShown((s) => !s)} aria-expanded={shown} data-testid="labor-pine-make">
               {shown ? PINE.hide : PINE.generate}
             </Button>
             {link ? (
