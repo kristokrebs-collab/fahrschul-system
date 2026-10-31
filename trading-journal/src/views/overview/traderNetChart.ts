@@ -3,11 +3,18 @@
  * symmetric scale, the price as a thin line on its own scale (no axis – the numbers are in the readout), the time axis,
  * the nearest point for the crosshair and the readout. The canvas component only paints what this returns.
  */
-import { netText, type NetPoint, type TraderNetView } from "@/domain/signals";
+import { netDayText, netText, type NetPoint, type TraderNetView } from "@/domain/signals";
 import { n0, n1 } from "@/lib/format";
 
 export const NET_CHART_H = 176;
-const PAD = { l: 34, r: 8, t: 10, b: 20 } as const;
+/** The room around the plot box (CSS px). */
+export interface NetPad {
+  l: number;
+  r: number;
+  t: number;
+  b: number;
+}
+const PAD: NetPad = { l: 34, r: 8, t: 10, b: 20 };
 
 export interface NetGeometry {
   w: number;
@@ -38,8 +45,9 @@ export function niceMax(v: number): number {
   return 10 * e;
 }
 
-export function netGeometry(points: readonly NetPoint[], w: number, h: number = NET_CHART_H): NetGeometry | null {
-  if (points.length < 2 || !(w > PAD.l + PAD.r + 20)) return null;
+/** `pad` = the room around the plot box (the big Markt card leaves more: a price axis on the right). */
+export function netGeometry(points: readonly NetPoint[], w: number, h: number = NET_CHART_H, pad: NetPad = PAD): NetGeometry | null {
+  if (points.length < 2 || !(w > pad.l + pad.r + 20)) return null;
   const tMin = points[0]!.t;
   const tMax = points[points.length - 1]!.t;
   if (!(tMax > tMin)) return null;
@@ -47,10 +55,10 @@ export function netGeometry(points: readonly NetPoint[], w: number, h: number = 
   const prices = points.map((p) => p.price).filter((p): p is number => p !== null && Number.isFinite(p));
   const pMin = prices.length ? Math.min(...prices) : null;
   const pMax = prices.length ? Math.max(...prices) : null;
-  const left = PAD.l;
-  const right = w - PAD.r;
-  const top = PAD.t;
-  const bottom = h - PAD.b;
+  const left = pad.l;
+  const right = w - pad.r;
+  const top = pad.t;
+  const bottom = h - pad.b;
   const ph = bottom - top;
   const zeroY = top + ph / 2;
   return {
@@ -86,11 +94,10 @@ export function nearestIndex(points: readonly NetPoint[], geo: NetGeometry, px: 
   return lo > 0 && Math.abs(points[lo - 1]!.t - t) <= Math.abs(points[lo]!.t - t) ? lo - 1 : lo;
 }
 
-const dayFmt = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
 const dateTimeFmt = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "UTC", hourCycle: "h23" });
 
 /** `28.10.` (UTC day, the axis) */
-export const dayLabel = (t: number): string => dayFmt.format(new Date(t));
+export const dayLabel = netDayText;
 /** `28.10., 14:00 UTC` (the readout) */
 export const stampLabel = (t: number): string => `${dateTimeFmt.format(new Date(t))} UTC`;
 

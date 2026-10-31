@@ -38,6 +38,7 @@ import { RsiLinesCard } from "./RsiLinesCard";
 import { ScannerCard } from "./ScannerCard";
 import { MarktStand } from "./MarktStand";
 import { MARKT } from "./strings";
+import { NETCARD } from "./traderNetStrings";
 import { TREND } from "./trendStrings";
 
 // F05: the structure card (store, analysis, texts) is its own chunk – loaded when the page is opened, never with the app
@@ -45,6 +46,9 @@ const TrendStructureCard = lazy(() => import("./TrendStructureCard").then((m) =>
 
 // F19: „Ähnliche Situationen“ – own chunk too (domain search, market hook, texts), the hit sheet is a third one
 const SimilarCard = lazy(() => import("./SimilarCard").then((m) => ({ default: m.SimilarCard })));
+
+// „Top-Trader: Netto Long/Short“ (the big card for the biggest Binance accounts, canvas plot) – own chunk, loaded with the page
+const TraderNetCard = lazy(() => import("./TraderNetCard"));
 
 // F07: „Squeeze-Beobachtung“ (reads the data archive) – own chunk, loaded with the page
 const SqueezeCard = lazy(() => import("./SqueezeCard"));
@@ -205,7 +209,14 @@ export function MarktView({ className }: { className?: string }) {
       {!focus && (
         <>
           <section aria-labelledby={ids.context} className="contents">
-            <SectionTitle id={ids.context} section="context" title="Einordnung" sub="Squeeze, Preis- und RSI-Struktur und ähnliche Situationen – Beobachtungen aus Kerzen und Archiv, keine Signale." className="lg:col-span-12" />
+            <SectionTitle id={ids.context} section="context" title="Einordnung" sub="Wie die größten Konten positioniert sind, Squeeze, Preis- und RSI-Struktur und ähnliche Situationen – Beobachtungen aus Börsen-Statistik, Kerzen und Archiv, keine Signale." className="lg:col-span-12" />
+            {/* the big card sits first: it is the picture of who is positioned how, right under the chart of „Jetzt“ and before the
+                folded rows (Squeeze reads the same positioning from the archive) */}
+            <Cell index={2} span="lg:col-span-12">
+              <Suspense fallback={<PendingCard title={NETCARD.title} testId="markt-trader-net-loading" height={{ base: 826, sm: 671, lg: 735 }} />}>
+                <TraderNetCard />
+              </Suspense>
+            </Cell>
             <Cell index={3} span="lg:col-span-12">
               <Fold id="markt-squeeze" title="Squeeze-Beobachtung" hint="Funding, Open Interest und Positionierung vor und nach einem Ausbruch">
                 <Suspense fallback={<PendingCard title="Squeeze-Beobachtung" testId="markt-squeeze-loading" height={{ base: 800, lg: 470 }} />}>

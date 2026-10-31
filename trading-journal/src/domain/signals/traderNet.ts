@@ -11,6 +11,8 @@
  * - `flip` = the LAST sign change that stuck: the zero crossing (linearly interpolated between two points) after which
  *   the net stayed on the current side (the dead band does not count as the other side). `null` = no change in the
  *   loaded history (then `holdMs` tells how long the side has held at least).
+ * - `previousFlip` = the sign change before that one (the one that started the run the last flip ended), `null` = none in the
+ *   loaded history. Together they answer "seit <Umschlag> netto Short – erstmals seit <vorheriger Umschlag>" (`netTitle`).
  * - Fewer than `TRADER_NET_MIN_POINTS` points → `status: "short"` (zu wenig Verlauf), none → `"none"`; nothing is
  *   invented or smoothed. A candle price is attached to a point only when a candle covers its time.
  *
@@ -77,6 +79,8 @@ export interface TraderNetView {
   side: NetSide | null;
   /** the last sign change that stuck, `null` = none in the loaded history */
   flip: NetFlip | null;
+  /** the sign change before `flip` (it started the run that `flip` ended), `null` = none in the loaded history */
+  previousFlip: NetFlip | null;
   /** with no flip: how long the side has held in the loaded history, at least (ms) */
   holdMs: number;
   /** side changes (through the dead band) over the loaded history */
@@ -116,7 +120,42 @@ export function priceAt(bars: readonly NetPriceBar[], t: number, barMs: number):
   return t - bar.time < barMs && Number.isFinite(bar.open) ? bar.open : null;
 }
 
-const EMPTY: TraderNetView = { status: "none", points: [], count: 0, last: null, side: null, flip: null, holdMs: 0, changes: 0, spanMs: 0, priceNow: null };
+interface Crossing {
+  at: number;
+  index: number;
+  from: Side;
+  to: Side;
+  /** index of the newest firm point of the side the crossing left */
+  lastOther: number;
+}
+
+/**
+ * The last sign change that stuck inside `points[0 … end)`: the side of its newest firm point is the one the net ended on;
+ * walking back to the newest firm point of the other side, the crossing is the first step after it that reaches the
+ * current sign (linearly interpolated). `null` = no change in that part of the history.
+ */
+function lastCrossing(points: readonly NetPoint[], end: number): Crossing | null {
+  let current: NetSide = "neutral";
+  for (let i = 0; i < end; i++) {
+    const s = sideOf(points[i]!.net);
+    if (s !== "neutral") current = s;
+  }
+  if (current === "neutral") return null;
+  const other: Side = current === "long" ? "short" : "long";
+  let j = end - 1;
+  while (j >= 0 && sideOf(points[j]!.net) !== other) j--;
+  if (j < 0) return null;
+  const want = current === "long" ? 1 : -1;
+  let m = j + 1;
+  while (m < end && sign(points[m]!.net) !== want) m++;
+  const a = points[m - 1]!;
+  const b = points[m]!;
+  const dn = b.net - a.net;
+  const at = dn === 0 ? b.t : a.t + ((0 - a.net) / dn) * (b.t - a.t);
+  return { at, index: m, from: other, to: current, lastOther: j };
+}
+
+const EMPTY: TraderNetView = { status: "none", points: [], count: 0, last: null, side: null, flip: null, previousFlip: null, holdMs: 0, changes: 0, spanMs: 0, priceNow: null };
 
 /**
  * The net view from the position series and the candles. `now` (ms) only ages the flip; `barMs` is the candle length.
@@ -145,36 +184,25 @@ export function buildTraderNet(positions: readonly NetRatioPoint[] | null | unde
     if (state !== "neutral" && s !== state) changes++;
     state = s;
   }
-  const current = state; // last firm side (`neutral` only when the whole history sat inside the band)
-
-  // walk back over the current run: points of the current side, or inside the dead band
-  let flip: NetFlip | null = null;
-  if (current !== "neutral") {
-    let j = points.length - 1;
-    while (j >= 0 && sideOf(points[j]!.net) !== (current === "long" ? "short" : "long")) j--;
-    if (j >= 0) {
-      // j = newest firm point of the other side; the crossing is the first step after it that reaches the current sign
-      const want = current === "long" ? 1 : -1;
-      let m = j + 1;
-      while (m < points.length && sign(points[m]!.net) !== want) m++;
-      const a = points[m - 1]!;
-      const b = points[m]!;
-      const dn = b.net - a.net;
-      const at = dn === 0 ? b.t : a.t + ((0 - a.net) / dn) * (b.t - a.t);
-      const nowPrice = priceNow !== null && Number.isFinite(priceNow) ? priceNow : null;
-      // the price at the crossing: the covering candle's open (interpolation is not claimed)
-      const pAt = priceAt(sortedBars, Math.round(at), barMs);
-      flip = {
-        at,
-        from: current === "long" ? "short" : "long",
-        to: current,
-        index: m,
-        ageMs: Math.max(0, now - at),
-        priceAt: pAt,
-        priceChangePct: pAt !== null && nowPrice !== null && pAt > 0 ? ((nowPrice - pAt) / pAt) * 100 : null,
-      };
-    }
-  }
+  const nowPrice = priceNow !== null && Number.isFinite(priceNow) ? priceNow : null;
+  const flipOf = (c: Crossing): NetFlip => {
+    // the price at the crossing: the covering candle's open (interpolation is not claimed)
+    const pAt = priceAt(sortedBars, Math.round(c.at), barMs);
+    return {
+      at: c.at,
+      from: c.from,
+      to: c.to,
+      index: c.index,
+      ageMs: Math.max(0, now - c.at),
+      priceAt: pAt,
+      priceChangePct: pAt !== null && nowPrice !== null && pAt > 0 ? ((nowPrice - pAt) / pAt) * 100 : null,
+    };
+  };
+  const lastCross = lastCrossing(points, points.length);
+  const flip = lastCross ? flipOf(lastCross) : null;
+  // the sign change before it: look at the history up to the newest firm point of the side the last flip left
+  const prevCross = lastCross ? lastCrossing(points, lastCross.lastOther + 1) : null;
+  const previousFlip = prevCross ? flipOf(prevCross) : null;
   return {
     status: "ok",
     points,
@@ -182,6 +210,7 @@ export function buildTraderNet(positions: readonly NetRatioPoint[] | null | unde
     last,
     side: sideOf(last.net),
     flip,
+    previousFlip,
     holdMs: flip ? 0 : Math.max(0, spanMs),
     changes,
     spanMs,
@@ -207,6 +236,10 @@ export function durationText(ms: number): string | null {
   if (h < 48) return `${h} Std.`;
   return `${Math.floor(h / 24)} Tage`;
 }
+
+const dayFmt = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
+/** `28.10.` – the UTC day of a time (the chart axes and the headline use this one clock, the readout says "UTC"). */
+export const netDayText = (t: number): string => dayFmt.format(new Date(t));
 
 /** `seit 40 Min.` / `seit 5 Std.` / `seit 3 Tagen` / `seit gerade eben`. */
 export function sinceText(ms: number): string {
@@ -242,6 +275,58 @@ export function netWhy(v: TraderNetView): { status: "met" | "unmet"; reason: str
   if (v.side === "long") return { status: "met", reason: `Die größten Konten auf Binance sind netto Long (${netText(v.last.net)})${since}. Das stützt ein Long, zählt aber nicht in die Bewertung: die Top-Trader-Kombi prüft dieselben Positionen schon.` };
   if (v.side === "short") return { status: "unmet", reason: `Die größten Konten auf Binance sind netto Short (${netText(v.last.net)})${since}. Das spricht nicht für ein Long, ändert die Bewertung aber nicht: die Top-Trader-Kombi prüft dieselben Positionen schon.` };
   return { status: "unmet", reason: `Die größten Konten auf Binance sind ausgeglichen (${netText(v.last.net)}) – weder Long noch Short im Vorteil. Ohne Einfluss auf die Bewertung.` };
+}
+
+// ------------------------------------------------------------------ headline of the big card
+
+export type NetTitleKind = "since-previous" | "first-in-history" | "no-flip" | "balanced" | "short" | "none";
+export interface NetTitleSegment {
+  text: string;
+  /** a date or the side: the part the eye should find first */
+  strong?: boolean;
+}
+export interface NetTitle {
+  kind: NetTitleKind;
+  /** the whole sentence (the segments joined) */
+  text: string;
+  segments: readonly NetTitleSegment[];
+  /** the side the sentence is about (`null` = none / too little data / balanced) */
+  side: Exclude<NetSide, "neutral"> | null;
+}
+
+const asTitle = (kind: NetTitleKind, side: NetTitle["side"], segments: NetTitleSegment[]): NetTitle => ({ kind, side, segments, text: segments.map((x) => x.text).join("") });
+/** `20 Tagen` / `36 Std.` – a length in a sentence ("im geladenen Verlauf von …"). */
+const lengthText = (ms: number): string => (durationText(ms) ?? "wenigen Minuten").replace(/ Tage$/, " Tagen");
+
+/**
+ * The headline of the big card, said in words and only from what the loaded history shows (never "seit März" from
+ * nowhere):
+ *  - `since-previous`  the net is on its side since the last flip, and the sign change before it ended an earlier run on
+ *    this side: "Top-Trader (Binance) sind seit 28.10. netto Short – erstmals seit 03.10."
+ *  - `first-in-history` the last flip is the only one: "… seit 28.10. netto Short – im geladenen Verlauf von 20 Tagen erstmals."
+ *  - `no-flip`         never flipped: "… sind seit mindestens 20 Tagen netto Short – kein Umschlag im geladenen Verlauf."
+ *  - `balanced`        the newest point sits inside the dead band
+ *  - `short` / `none`  too few points / no series (a blocked region, a Bybit or OKX source …); the reason is the card's detail line
+ * "erstmals seit <Datum>" is the date of the sign change BEFORE the last one (the one that ended the earlier run on this side).
+ * A sentence that ends on a date has no extra full stop (`28.10.` is the stop).
+ */
+export function netTitle(v: TraderNetView | null | undefined): NetTitle {
+  const who = TRADER_NET_SOURCE;
+  if (!v || v.status === "none" || !v.last || !v.side) return asTitle("none", null, [{ text: "Keine Top-Trader-Daten von Binance" }]);
+  if (v.status === "short") return asTitle("short", null, [{ text: `Zu wenig Verlauf: erst ${v.count} Punkte von Binance geladen, ab ${TRADER_NET_MIN_POINTS} zeichnet die Karte den Verlauf.` }]);
+  const word = (side: Side): string => (side === "long" ? "Long" : "Short");
+  if (v.side === "neutral") {
+    return v.flip
+      ? asTitle("balanced", null, [{ text: `${who} sind gerade ausgeglichen – zuletzt netto ` }, { text: word(v.flip.to), strong: true }, { text: " seit " }, { text: netDayText(v.flip.at), strong: true }])
+      : asTitle("balanced", null, [{ text: `${who} sind gerade ausgeglichen – kein Umschlag im geladenen Verlauf von ${lengthText(v.spanMs)}.` }]);
+  }
+  const side = v.side;
+  if (!v.flip) {
+    return asTitle("no-flip", side, [{ text: `${who} sind seit mindestens ${lengthText(v.spanMs)} netto ` }, { text: word(side), strong: true }, { text: " – kein Umschlag im geladenen Verlauf." }]);
+  }
+  const head: NetTitleSegment[] = [{ text: `${who} sind seit ` }, { text: netDayText(v.flip.at), strong: true }, { text: " netto " }, { text: word(side), strong: true }];
+  if (v.previousFlip) return asTitle("since-previous", side, [...head, { text: " – erstmals seit " }, { text: netDayText(v.previousFlip.at), strong: true }]);
+  return asTitle("first-in-history", side, [...head, { text: ` – im geladenen Verlauf von ${lengthText(v.spanMs)} erstmals.` }]);
 }
 
 /** What the series is and is not (one sentence each, shown under the chart and in the help text). */
