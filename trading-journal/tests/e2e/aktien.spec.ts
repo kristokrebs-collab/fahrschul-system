@@ -483,7 +483,8 @@ test.describe("Aktien", () => {
     // the Congress tracker is there with its caveats (its own spec: aktien-kongress.spec.ts); no function answers here, so it says why it has no rows
     await expect(page.getByTestId("aktien-kongress")).toContainText("Kongress-Tracker");
     await expect(page.getByTestId("kongress-caveats")).toContainText("bis zu 45 Tage");
-    await expect(page.locator("#aktien-watchlist-h")).toHaveText("Watchlist");
+    // the title's letters rise once on first view (`SplitText` carries the word twice while it plays)
+    await expect(page.locator("#aktien-watchlist-h")).toContainText("Watchlist");
     await expect(page.getByTestId("aktien-watchlist")).toContainText("0 / 50");
     await expectNoHorizontalScroll(page);
     await shot(page, info, "aktien-0-seite");

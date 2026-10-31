@@ -105,7 +105,7 @@ export function ProtokollCard() {
           )}
         </section>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-4">
           <input id={fileId} ref={input} type="file" accept=".jsonl,.json,.txt,application/x-ndjson,text/plain" className="sr-only" tabIndex={-1} aria-label={P.importBtn} onChange={(e) => void onFile(e)} data-testid="branchen-log-file" />
           <Button variant="ghost" size="sm" onClick={() => void exportFile()} disabled={!protocol.length} data-testid="branchen-log-export">
             {P.exportBtn}

@@ -251,7 +251,7 @@ export function ErgebnisCard() {
           {E.lead}
         </p>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-4">
           <input id={fileId} ref={input} type="file" accept=".json,application/json" className="sr-only" tabIndex={-1} aria-label={E.fileLabel} onChange={(e) => void onFile(e)} data-testid="branchen-file" />
           <Button variant="ghost" size="sm" onClick={() => input.current?.click()} data-testid="branchen-pick">
             {E.pick}

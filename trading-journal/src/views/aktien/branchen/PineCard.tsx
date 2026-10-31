@@ -33,7 +33,7 @@ export function PineCard() {
           {P.honest}
         </p>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-4">
           <Button variant="ghost" size="sm" aria-expanded={shown} onClick={() => setShown((v) => !v)} data-testid="branchen-pine-toggle">
             {shown ? P.hide : P.generate}
           </Button>

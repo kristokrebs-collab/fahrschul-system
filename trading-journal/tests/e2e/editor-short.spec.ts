@@ -7,7 +7,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { collectErrors, hasTouch, isMobile, screenshot, seed, stored, toast } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR, type HitBoxMiss } from "./hitbox";
 
-const fab = (page: Page) => page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" });
+const fab = (page: Page) => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" });
 const LAYOUT_KEY = "tj2-trade-form-layout";
 
 interface StoredTrade {
