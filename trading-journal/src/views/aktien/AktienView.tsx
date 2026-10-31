@@ -5,10 +5,11 @@
  *   News        NewsCard (headlines of the watchlist, keyword hint, "neu seit dem letzten Besuch")
  *   Analyse     AnalystSlot (Quartalszahlen · DCF · Kaufthese – `src/views/analyst`)
  *   Kongress    CongressSlot (the STOCK Act reports of members of the House, `kongress/`)
+ *   Branchen-Trend  BranchenCard (lazy chunk `branchen/`: Ampel of the 48 US industries, check of a lab run's result, Pine export, paper protocol)
  * Every number comes from a data source named next to it; a source that cannot be reached is an empty state with the
  * reason. The app never sends an order.
  */
-import { Suspense, useCallback, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from "react";
 import { watchlistOfSettings } from "@/domain/watchlist";
 import { cn } from "@/lib/cn";
 import { stockData } from "@/market/stocks/client";
@@ -40,7 +41,11 @@ const NAV = [
   { id: "aktien-analyse-dcf", label: "DCF-Rechner" },
   { id: "aktien-analyse-these", label: "Kaufthese" },
   { id: "aktien-kongress", label: "Kongress" },
+  { id: "aktien-branchen", label: "Branchen-Trend" },
 ] as const;
+
+/** Branchen-Trend is its own lazy chunk (`./branchen/BranchenCard`): the page opens without it and without a request for its data. */
+const BranchenCard = lazy(() => import("./branchen/BranchenCard"));
 
 function Section({ id, title, sub, children }: { id: string; title: string; sub: string; children: ReactNode }) {
   return (
@@ -55,6 +60,7 @@ function Section({ id, title, sub, children }: { id: string; title: string; sub:
 const SLOT_SIZE: Record<string, number | { base: number; lg: number }> = {
   "aktien-analyse": { base: 3093, lg: 2179 },
   "aktien-kongress": { base: 1672, lg: 889 },
+  "aktien-branchen": { base: 8389, lg: 4037 },
 };
 function SlotFallback({ id }: { id: string }) {
   return (
@@ -120,6 +126,13 @@ export function AktienView({ className }: { className?: string }) {
         <Cell index={0} span="lg:col-span-12">
           <Suspense fallback={<SlotFallback id="aktien-kongress" />}>
             <CongressSlot {...slotProps} />
+          </Suspense>
+        </Cell>
+      </Section>
+      <Section id="aktien-branchen" title={T.branchen.title} sub={T.branchen.sub}>
+        <Cell index={0} span="lg:col-span-12">
+          <Suspense fallback={<SlotFallback id="aktien-branchen" />}>
+            <BranchenCard />
           </Suspense>
         </Cell>
       </Section>
