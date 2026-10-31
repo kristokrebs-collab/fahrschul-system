@@ -427,3 +427,10 @@ PW_BASE_URL=http://127.0.0.1:4173 PW_CLOUD_BASE_URL=http://127.0.0.1:4174 \
 
 Die Specs laufen ohne echtes Supabase / Stripe / Bitunix (Netzwerk wird in den Tests nachgebildet). Den echten
 Durchstich (Schritte 3–5) einmal von Hand mit Testkonten prüfen.
+
+## Vorschau pro Pull Request
+
+Netlify baut eine Vorschau (`https://deploy-preview-<Nummer>--<deine-site>.netlify.app`) nur für Pull Requests, die auf den
+Produktionszweig der Seite zielen. Zielt ein PR auf einen anderen Zweig (zum Beispiel auf den eines früheren PR), gibt es
+keine Vorschau; dann die Basis des PR auf den Produktionszweig stellen und einmal pushen. Der erste Build danach dauert
+etwa 2 bis 5 Minuten, den Link schreibt Netlify als Kommentar in den PR.
