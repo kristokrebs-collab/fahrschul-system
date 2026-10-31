@@ -106,7 +106,7 @@ async function signIn(page: Page): Promise<void> {
   await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
-const fab = (page: Page) => page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" });
+const fab = (page: Page) => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" });
 const journalCount = (page: Page) => page.evaluate(() => (window as unknown as { __tjJournal: { getState(): { trades: unknown[] } } }).__tjJournal.getState().trades.length);
 
 async function openEditorWithShots(page: Page, n = 2) {

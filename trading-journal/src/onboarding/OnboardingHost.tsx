@@ -4,15 +4,15 @@ import { useIntroSettled } from "@/intro/introStore";
 import { useJournal } from "@/store/journalStore";
 import { useShareRoute } from "@/store/router";
 import { useUi } from "@/store/uiStore";
-import { autoStartDecision, markSeen, readOnboarding, resumeOnboarding, startOnboarding, useOnboarding } from "./onboardingStore";
+import { autoStartDecision, markSeen, readOnboarding, resumeOnboarding, useOnboarding } from "./onboardingStore";
 
 const OnboardingTour = lazy(() => import("./OnboardingTour"));
 
 /**
  * Leaf host of the first-run tour (P13): mount once in `App` after `<SetupEditor/>`, before `<Celebrate/>`.
- *   - Starts the tour by itself once: journal loaded and EMPTY, nothing stored yet, the intro finished, no other
- *     dialog open and no shared link on screen (P14: a `#share/<token>` visitor sees the tour once they open the app). A journal that already has trades marks the trader as `seen` – existing traders are never
- *     interrupted (they find "Einführung starten" in the settings, the search and the shortcut sheet).
+ *   - No longer starts the tour by itself (Etappe 1a): the empty first visit shows `FirstRunEmpty`, one action, no modal. A journal that
+ *     has trades marks the trader as `seen`, so that state never shows for them (the tour stays under "Einführung starten" in the
+ *     settings, the search and the shortcut sheet).
  *   - Brings a paused tour back when the setup editor it stepped aside for has closed.
  *   - Loads the tour chunk only when it is needed.
  */
@@ -35,9 +35,15 @@ export function OnboardingHost() {
     const d = autoStartDecision({ stored: readOnboarding(), loaded: journalLoaded, tradeCount, introSettled, busy });
     if (d === "wait") return;
     decided.current = true;
+    // Etappe 1a: the tour no longer opens by itself – an empty journal shows the first-run state (`FirstRunEmpty`, one action)
+    // instead of a modal. An existing trader is still marked `seen`, so that state never shows for them.
     if (d === "seen") markSeen();
-    else if (d === "start") startOnboarding("auto");
   }, [journalLoaded, tradeCount, introSettled, busy]);
+
+  // a journal that gets its first trade (any way: header, sidebar, bar, import) counts as seen – the first-run state is for the empty start only
+  useEffect(() => {
+    if (journalLoaded && tradeCount > 0) markSeen();
+  }, [journalLoaded, tradeCount]);
 
   useEffect(() => {
     if (!paused) {

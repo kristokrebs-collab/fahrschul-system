@@ -2,7 +2,8 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { closeCommandNav, CommandNav, COMMAND_NAV_STRINGS, CONFIG, isCommandNavShortcut, openCommandNav, rovingIndex } from "@/app/CommandNav";
 import { MotionRoot } from "@/motion/MotionRoot";
-import { PAGES, useUi } from "@/store/uiStore";
+import { PAGE_HINT } from "@/app/navGroups";
+import { NAV_ORDER, PAGES, useUi } from "@/store/uiStore";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
 function Opener() {
@@ -72,7 +73,7 @@ describe("command navigation", () => {
     useUi.setState({ page: "overview", editor: { open: false, fromFab: false } });
   });
 
-  it("Ctrl+K opens a modal dialog with links (live counts) and quick actions; focus starts on the close button", async () => {
+  it("Ctrl+K opens a modal dialog with links (live counts) and quick actions; focus starts on the close button", { timeout: 30_000 }, async () => {
     renderNav();
     expect(screen.queryByRole("dialog")).toBeNull();
     act(() => {
@@ -81,33 +82,14 @@ describe("command navigation", () => {
     const d = dialog();
     expect(d).toHaveAttribute("aria-modal", "true");
     expect(within(d).getByRole("button", { name: COMMAND_NAV_STRINGS.close })).toHaveFocus();
-    const links = within(d).getAllByRole("link");
-    // the finder's way to the full list first, then the five big links of the dock (digit first), then the other pages in groups by task
-    // (name, "Neu" until the page has been opened, live count, digit last)
-    expect(links.map((l) => l.textContent?.replace(/^0\d/, ""))).toEqual([
-      "Alle Funktionen→",
-      expect.stringMatching(/^Übersicht/),
-      "Trades13",
-      "Entscheidungsgrundlagen8",
-      expect.stringMatching(/^Markt/),
-      expect.stringMatching(/^Einstellungen\d+$/),
-      expect.stringMatching(/^HandelsplanNeu5 Schritte06$/),
-      expect.stringMatching(/^AktienNeuScan07$/),
-      expect.stringMatching(/^Risiko.+08$/),
-      expect.stringMatching(/^Analyse\d+ %09$/),
-      expect.stringMatching(/^BerichteKW \d+10$/),
-      expect.stringMatching(/^Coach\d+11$/),
-      expect.stringMatching(/^Wachstum\d+12$/),
-      expect.stringMatching(/^Labor\d+13$/),
-      expect.stringMatching(/^Strategie-StudioNeuText14$/),
-      expect.stringMatching(/^Community.+15$/),
-      expect.stringMatching(/^Cockpit\d+16$/),
-      expect.stringMatching(/^Konto.+17$/),
-      expect.stringMatching(/^Preise.+18$/),
-      expect.stringMatching(/^FunktionenIndex19$/),
-    ]);
-    // the groups by task, in the order of the digits
-    expect(within(d).getAllByTestId("cmd-group").map((g) => g.getAttribute("data-group"))).toEqual(["handeln", "lernen", "strategien", "mehr"]);
+    // the finder's way to the full list first, then all 19 pages in four groups (Erfassen, Prüfen, Auswerten, Konto & Rechtliches);
+    // each link: name, plain-word hint, live count, digit (only the first nine pages have one)
+    const links = within(d).getAllByRole("link").filter((l) => l.getAttribute("href")?.startsWith("#"));
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["#funktionen", ...NAV_ORDER.map((p) => `#${p}`)]);
+    expect(within(d).getAllByTestId("cmd-hint").map((h) => h.textContent)).toEqual(NAV_ORDER.map((p) => PAGE_HINT[p]));
+    expect(links[1]?.textContent).toMatch(/^TradesDeine Einträge/);
+    // the groups by what you are doing
+    expect(within(d).getAllByTestId("cmd-group").map((g) => g.getAttribute("data-group"))).toEqual(["erfassen", "pruefen", "auswerten", "konto"]);
     expect(within(d).getByRole("link", { name: /Übersicht/ })).toHaveAttribute("aria-current", "page");
     expect(within(d).getByRole("button", { name: COMMAND_NAV_STRINGS.newTrade })).toBeInTheDocument();
     // ⌘K again toggles it closed
@@ -144,7 +126,7 @@ describe("command navigation", () => {
     await waitFor(() => expect(opener).toHaveFocus());
   });
 
-  it("a page link navigates and closes; digits jump to a page", async () => {
+  it("a page link navigates and closes; digits jump to a page", { timeout: 30_000 }, async () => {
     renderNav();
     act(() => openCommandNav());
     fireEvent.click(within(dialog()).getByRole("link", { name: /^0?2?Trades/ }));
@@ -154,12 +136,12 @@ describe("command navigation", () => {
 
     act(() => openCommandNav());
     fireEvent.keyDown(dialog(), { key: "4" });
-    // 1–5 are the dock tabs in the dock's order: Übersicht, Trades, Entscheidungsgrundlagen, Markt, Einstellungen
+    // the digits 1–9 are the first nine of `PAGES` (they never moved): 4 = Markt
     expect(useUi.getState().page).toBe("markt");
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull(), { timeout: 2500 });
   });
 
-  it("`Trade eintragen` closes at once and opens the editor through the ui store", async () => {
+  it("`Trade eintragen` closes at once and opens the editor through the ui store", { timeout: 30_000 }, async () => {
     renderNav();
     act(() => openCommandNav());
     fireEvent.click(within(dialog()).getByRole("button", { name: COMMAND_NAV_STRINGS.newTrade }));

@@ -5,11 +5,9 @@ import { KEYS, readJson, writeJson } from "./storage";
 /* ---------------------------------------------------------------- types */
 
 /**
- * Every page of the app, in the order of a trader's work. The first five are the dock tabs in the dock's order (digits 1–5 in the
- * command navigation); then come the pages by task – plan and trade (Handelsplan, Aktien, Risiko), evaluate and learn (Analyse,
- * Berichte, Coach, Wachstum), build strategies (Labor, Strategie-Studio) and the rest (Community, Cockpit, Konto, Preise,
- * Funktionen). This order is the digit order of the command navigation, the order of its groups, the tie
- * order of the search and the order of the `g` shortcuts in the cheat sheet – the dock and the slide direction use `NAV_ORDER`.
+ * Every page of the app, in the historic order. The first five were the dock tabs; then the pages by task. This order is the
+ * digit order of the command navigation (1–9), the tie order of the search and the order of the `g` shortcuts in the cheat sheet –
+ * it stays, so keys never move. What the reader SEES (sidebar, menu, `[` / `]`, slide direction) is `NAV_GROUP_PAGES` / `NAV_ORDER`.
  */
 export const PAGES = ["overview", "trades", "setups", "markt", "settings", "plan", "aktien", "risiko", "analyse", "berichte", "coach", "wachstum", "labor", "studio", "community", "cockpit", "konto", "preise", "funktionen"] as const;
 export type Page = (typeof PAGES)[number];
@@ -36,10 +34,25 @@ export const PAGE_KEYS: Record<Page, PageKey> = {
   plan: "h",
   aktien: "i",
 };
-/** The five tabs of the dock (fits 390 px with the FAB); every other page is reached via CommandNav, search, `g`+letter and links. */
-export const DOCK_PAGES = ["overview", "trades", "setups", "markt", "settings"] as const satisfies readonly Page[];
-/** Spatial order of the pages: the dock tabs left to right, then the rest – the page slide direction and `[` / `]` follow it. */
-export const NAV_ORDER: readonly Page[] = [...DOCK_PAGES, ...PAGES.filter((p) => !(DOCK_PAGES as readonly Page[]).includes(p))];
+/**
+ * The navigation in four groups by what you are doing (Etappe 1a) – the order of the sidebar (md+), of the menu behind „Mehr“
+ * and of `[` / `]`. Every page is in exactly one group (`tests/unit/app.navOrder.test.ts`). Names and plain-word hints:
+ * `@/app/navGroups`.
+ */
+export const NAV_GROUP_IDS = ["erfassen", "pruefen", "auswerten", "konto"] as const;
+export type NavGroupId = (typeof NAV_GROUP_IDS)[number];
+export const NAV_GROUP_PAGES: Record<NavGroupId, readonly Page[]> = {
+  erfassen: ["trades", "plan", "setups"],
+  pruefen: ["overview", "markt", "aktien", "risiko"],
+  auswerten: ["analyse", "berichte", "coach", "wachstum", "cockpit", "labor", "studio"],
+  konto: ["settings", "konto", "community", "preise", "funktionen"],
+};
+/** The three tabs of the bottom bar below 768 px (beside „Mehr“ and „+ Trade“); every other page is reached via „Mehr“ (menu with search), the sidebar, `g`+letter and links. */
+export const DOCK_PAGES = ["overview", "trades", "markt"] as const satisfies readonly Page[];
+/** Spatial order of the pages: the four groups top to bottom – the page slide direction and `[` / `]` follow it. */
+export const NAV_ORDER: readonly Page[] = NAV_GROUP_IDS.flatMap((g) => NAV_GROUP_PAGES[g]);
+/** Direction of the page slide: on a phone the bar's tabs sit left to right first (Übersicht, Trades, Markt), then the groups – a tab to the right slides in from the right. */
+export const SLIDE_ORDER: readonly Page[] = [...DOCK_PAGES, ...NAV_ORDER.filter((p) => !(DOCK_PAGES as readonly Page[]).includes(p))];
 
 export type AccFilter = "all" | "makro" | "scalp";
 export type SortKey = "date" | "pnl" | "r" | "setup";
@@ -136,6 +149,10 @@ export const CELEBRATION_TTL_MS = 4000;
 export interface UiPrefs {
   theme: "dark" | "light";
   hideLocalBanner: boolean;
+  /** Sidebar (md+): `auto` follows the width (rail below 1280 px), `open` / `closed` is the reader's own choice. */
+  sidebar: "auto" | "open" | "closed";
+  /** Groups the reader folded in the wide sidebar; `null` = not chosen yet (short screens fold every group but the current one). */
+  sidebarClosed: NavGroupId[] | null;
   sparkline: "readings" | "live";
   topTraderBase: "accounts" | "positions";
   useProxy: boolean;
@@ -186,6 +203,8 @@ export const DEFAULT_CHART: ChartPrefs = { interval: "4h", rangeDays: 30, pane: 
 export const DEFAULT_PREFS: UiPrefs = {
   theme: "dark",
   hideLocalBanner: false,
+  sidebar: "auto",
+  sidebarClosed: null,
   sparkline: "readings",
   topTraderBase: "accounts",
   useProxy: false,
@@ -263,12 +282,14 @@ export interface UiState extends UiPrefs {
 
 /* ---------------------------------------------------------- persistence */
 
-const PREF_KEYS: ReadonlyArray<keyof UiPrefs> = ["theme", "hideLocalBanner", "sparkline", "topTraderBase", "useProxy", "chart", "flags"];
+const PREF_KEYS: ReadonlyArray<keyof UiPrefs> = ["theme", "hideLocalBanner", "sidebar", "sidebarClosed", "sparkline", "topTraderBase", "useProxy", "chart", "flags"];
 
 function pickPrefs(s: UiPrefs): UiPrefs {
   return {
     theme: s.theme,
     hideLocalBanner: s.hideLocalBanner,
+    sidebar: s.sidebar,
+    sidebarClosed: s.sidebarClosed,
     sparkline: s.sparkline,
     topTraderBase: s.topTraderBase,
     useProxy: s.useProxy,
@@ -285,6 +306,8 @@ export function loadPrefs(): UiPrefs {
   return {
     theme: raw.theme === "light" ? "light" : "dark",
     hideLocalBanner: raw.hideLocalBanner === true,
+    sidebar: raw.sidebar === "open" || raw.sidebar === "closed" ? raw.sidebar : "auto",
+    sidebarClosed: Array.isArray(raw.sidebarClosed) ? raw.sidebarClosed.filter((g): g is NavGroupId => (NAV_GROUP_IDS as readonly string[]).includes(g)) : null,
     sparkline: raw.sparkline === "live" ? "live" : "readings",
     topTraderBase: raw.topTraderBase === "positions" ? "positions" : "accounts",
     useProxy: raw.useProxy === true,

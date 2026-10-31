@@ -53,6 +53,13 @@
   --animate-fx-spin: fx-spin 9s linear infinite;
 }
 
+/* Tippfläche (Apple HIG / WCAG 2.5.5): mindestens 44 × 44 px. Die einzige Quelle: `touch-hit*` und `.tap*` (base.css) und die
+   Utilities `min-h-tap` / `min-w-tap` / `size-tap` lesen sie; `static` schreibt sie immer nach :root, auch wenn nur CSS sie liest. */
+@theme static {
+  --spacing-tap: 44px;
+}
+
+
 /* Local fallback face for Doto so the dot-matrix numerals keep their box while the webfont loads (no CLS). */
 @font-face {
   font-family: "Doto Fallback";

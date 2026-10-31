@@ -33,7 +33,7 @@ import { ShotsField } from "@/journal/screenshots/ShotsField";
 import { RatingDots } from "@/journal/ui/RatingDots";
 import { TagInput, tagSuggestions } from "@/journal/ui/TagInput";
 import { winCelebration } from "./celebration";
-import { FAB_LABEL } from "@/app/Dock";
+import { FAB_LABEL } from "@/app/navGroups";
 import { HoldConfirm, confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
 import { AutoHeight } from "@/views/trades/AutoHeight";
 import { DETAIL_DIM_HANDOFF } from "./TradeDetail";

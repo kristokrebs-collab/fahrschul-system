@@ -3,7 +3,7 @@
  * (not only a page), and the help names the late areas without promising what the app does not do.
  */
 import { describe, expect, it, vi } from "vitest";
-import { PAGE_LABELS } from "@/app/Dock";
+import { PAGE_LABELS } from "@/app/navGroups";
 import { respond, type EngineEnv } from "@/assistant/engine";
 import { EMPTY_MEMORY } from "@/assistant/memory";
 import { INTEREST_QUESTION } from "@/assistant/tools";

@@ -29,10 +29,19 @@ export function LegalLink({ doc, className, children }: { doc: LegalDoc; classNa
   );
 }
 
-export function LegalLinks({ className }: { className?: string }) {
+export function LegalLinks({ className, roomy = false }: { className?: string; roomy?: boolean }) {
   if (!legalShown()) return null;
   const docs: LegalDoc[] = ["impressum", "datenschutz", "agb"];
   if (legalConfig().urls.widerruf) docs.push("widerruf");
+  // `roomy` (menu, sidebar): every link is its own 44 px tall box with padding on both sides – the tap areas never overlap
+  if (roomy)
+    return (
+      <nav aria-label="Rechtliches" className={cn("flex flex-wrap items-center text-[11.5px] text-mute", className)} data-testid="legal-links">
+        {docs.map((d) => (
+          <LegalLink key={d} doc={d} className="inline-flex min-h-tap items-center px-2.5" />
+        ))}
+      </nav>
+    );
   return (
     <nav aria-label="Rechtliches" className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-mute", className)} data-testid="legal-links">
       {docs.map((d, i) => (

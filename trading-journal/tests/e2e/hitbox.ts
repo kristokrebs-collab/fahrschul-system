@@ -113,7 +113,7 @@ export async function auditHitBoxes({ selector, root, min = 44 }: { selector: st
           break;
         }
       }
-    const where = el.closest("header") ? "header" : el.closest('[role="toolbar"][aria-label="Navigation"]') ? "dock" : el.closest("footer") ? "footer" : el.closest('[role="dialog"]') ? `dialog ${el.closest('[role="dialog"]')?.getAttribute("aria-label") ?? ""}` : (el.closest("[data-testid]")?.getAttribute("data-testid") ?? el.closest("section[aria-label], article[aria-label]")?.getAttribute("aria-label") ?? "page");
+    const where = el.closest("header") ? "header" : el.closest('[role="toolbar"][aria-label="Navigation"]') ? "dock" : el.closest('[data-layer="Seitenleiste"]') ? "sidebar" : el.closest("footer") ? "footer" : el.closest('[role="dialog"]') ? `dialog ${el.closest('[role="dialog"]')?.getAttribute("aria-label") ?? ""}` : (el.closest("[data-testid]")?.getAttribute("data-testid") ?? el.closest("section[aria-label], article[aria-label]")?.getAttribute("aria-label") ?? "page");
     out.push({ name: short(el), w: Math.round(r.width), h: Math.round(r.height), ew, eh, stolenBy: short(stolen), where });
   }
   window.scrollTo({ top: 0, behavior: "instant" });

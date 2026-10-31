@@ -1,4 +1,4 @@
-# `src/app` – shell wiring (`main.tsx`, `App.tsx`, header, dock, footer, banner)
+# `src/app` – shell wiring (`main.tsx`, `App.tsx`, header, bottom bar / sidebar, footer, banner)
 
 Plan 1.4/1.5 (boot, router, banner), 6.6 (shell), 3.3 (dock/page morphs). The `Übersicht` page lives in
 `src/views/overview` (see the section at the end).
@@ -149,8 +149,9 @@ banner opens or closes.
 | cockpit | d | `CockpitView` | `customDashboards`; boards limit `dashboards` | |
 | konto · preise | k · p | `KontoPage` · `PreiseView` | – | |
 
-- `uiStore`: `PAGES`, `PAGE_KEYS`, `DOCK_PAGES` (5 tabs, fit 390 px), `NAV_ORDER` (dock first – direction of the page
-  switch and `[` / `]`). `Dock.tsx` exports `PAGE_LABELS` / `PAGE_ICON` for every page.
+- `uiStore`: `PAGES` (historic order, the digits 1–9 and the `g` keys), `PAGE_KEYS`, `NAV_GROUP_PAGES` / `NAV_ORDER` (the four groups – sidebar, menu and
+  `[` / `]`), `DOCK_PAGES` (the three tabs of the bottom bar), `SLIDE_ORDER` (direction of the page slide). `navGroups.ts` holds `PAGE_LABELS` / `PAGE_ICON` for every page (`Dock.tsx` re-exports them).
+  Since Etappe 1a see "Navigation in vier Gruppen" below – the dock rows of the table above are the PHONE bar only.
 - Every other page: CommandNav (⌘K / menu: four big links + a grid with icon, live count `shellStats.pageCounts`, digit;
   hover / focus / press preloads the chunk), the global search, `g` + key, in-page links (settings → "Weitere
   Einstellungen", CloudSyncHost → Konto, "Bericht bereit" → Berichte).
@@ -259,12 +260,16 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
 
 | file | export | notes |
 |---|---|---|
-| `Header.tsx` | `Header`, `WORDMARK`, `SUBTITLE`, `HEADER_CTA`, `MENU_LABEL`, `headerIntroTarget` | sticky, parked above the edge during intro "stage", slides down (`spring.sheet`) otherwise; logo tile `₿` → `navigate("overview")` + `replayIntro()` + AsciiCascade decode of the wordmark (held until "build" when the intro replays), DancingLetters wordmark on hover, menu button `Navigation öffnen` → CommandNav, sync `StatusPill` (`hidden md:inline-flex`, label `modeLabelFor(mode, storage)` – `Nicht gespeichert` (tone loss) when nothing persists; tones cloud→live, local→warn, error→error, connecting→muted), `Magnetic` → `.shiny-cta` `Trade eintragen` (`max-sm:sr-only`) → `openEditor()` |
-| `Dock.tsx` | `Dock`, `DockItem`, `PAGE_LABELS`, `FAB_LABEL`, `DOCK`, `DOCK_INTRO_KEY`, `dockBell`, `dockLayout` | `role="toolbar" aria-label="Navigation"`, 4 tabs (`Übersicht | Trades | Entscheidungsgrundlagen | Einstellungen`, icons `grid|list|target|sliders`), `aria-current="page"`, tab markers `DockMarker` (disc + dot, compositor FLIP on `spring.layout`, `data-dock-marker`), `whileTap .94`; transform-only magnification (`spring.dock`, mouse only, off under reduced motion, see "Dock"); FAB disc `layoutId="new-trade-{fabCycle}"` `borderRadius 999`, unmounted while `editor.open && editor.fromFab` |
+| `Header.tsx` | `Header`, `WORDMARK`, `SUBTITLE`, `HEADER_CTA`, `MENU_LABEL`, `MENU_WORD`, `headerIntroTarget` | (Etappe 1a: the header CTA is `NewTradeButton` and only below 768 px – from there it stands atop the sidebar; Assistent / Vollbild / Menü show their word from 1280 px, tooltip + `aria-label` below; the ordinary local mode is the `LocalModeBadge` here) sticky, parked above the edge during intro "stage", slides down (`spring.sheet`) otherwise; logo tile `₿` → `navigate("overview")` + `replayIntro()` + AsciiCascade decode of the wordmark (held until "build" when the intro replays), DancingLetters wordmark on hover, menu button `Navigation öffnen` → CommandNav, sync `StatusPill` (`hidden md:inline-flex`, label `modeLabelFor(mode, storage)` – `Nicht gespeichert` (tone loss) when nothing persists; tones cloud→live, local→warn, error→error, connecting→muted), `Magnetic` → `.shiny-cta` `Trade eintragen` (`max-sm:sr-only`) → `openEditor()` |
+| `Dock.tsx` | `Dock`, `DockItem`, `PAGE_LABELS`, `FAB_LABEL`, `FAB_CAPTION`, `MORE_LABEL`, `DOCK`, `DOCK_INTRO_KEY`, `dockBell`, `dockLayout` | Etappe 1a: the PHONE bar (< 768 px, renders nothing from there): `Übersicht | Trades | + Trade (centre, larger) | Markt | Mehr` with a visible caption under every icon, „Mehr“ opens the menu (`aria-haspopup="dialog"`) and carries the disc on every page the bar does not name, no red dot (captions replace it). Earlier text: `role="toolbar" aria-label="Navigation"`, tabs (icons `grid|list|target|sliders`), `aria-current="page"`, tab markers `DockMarker` (disc + dot, compositor FLIP on `spring.layout`, `data-dock-marker`), `whileTap .94`; transform-only magnification (`spring.dock`, mouse only, off under reduced motion, see "Dock"); FAB disc `layoutId="new-trade-{fabCycle}"` `borderRadius 999`, unmounted while `editor.open && editor.fromFab` |
 | `Footer.tsx` | `Footer`, `FooterOutline`, `FOOTER_TEXT`, `CONFIG`, `nextFooterShown` | pulse-motion `motion-footer`, in normal flow (never covers page content): a sentinel at the footer's top edge + 2 IntersectionObservers reveal at ≥ 72 % of the footer in view / hide at ≤ 50 %; staggered fade-up (pack timings), tilted Marquee band of live stats (mounted on the first reveal, `paused` while hidden; BTC price = MotionValue text), DancingSvgWord outline wordmark (stroke draw 4 s on first reveal, hover gradient + radial mask `userSpaceOnUse`), attribution, `Nach oben`; bottom padding clears the dock |
 | `CommandNav.tsx` | `CommandNav`, `openCommandNav`, `closeCommandNav`, `toggleCommandNav`, `useCommandNavOpen`, `isCommandNavShortcut`, `rovingIndex`, `CONFIG` | pulse-motion `immersive-full-screen-navigation`: ⌘K / Ctrl+K (ignored while another modal is open) or the header button; black panel wipes in from the left (WAAPI transform, 800 ms), brand, page links with live counts, quick actions (`Trade eintragen` → `openEditor()`, `CSV-Export`, `Backup herunterladen` via `@/store/backup`, `Vollbild` / `App installieren` where offered, then the install / Samsung dark-mode hints), staggered; close wipes right. `useDialogBehaviour` (page isolated after the wipe), arrows/Home/End/1–4; unmounted while closed. Single grid column `minmax(0,1fr)` + page names `clamp(22px,4.6vw,64px)`: nothing overflows at 390 |
 | `shellStats.ts` / `cssEasing.ts` | `useShellStats`, `shellStatTexts`, `useLivePriceText` / `expoCurve`, `springCurve` | journal figures for footer + nav; pack curves as CSS `linear()` |
-| `LocalModeBanner.tsx` | `LocalModeBanner`, `useLocalBannerOpen`, `LOCAL_BANNER_*`, `CLOUD_BANNER_*` | `WarnBanner` (exit `tween.exit`), text 1:1 + Netlify sentence when `!hasClaudeRuntime()`, close `aria-label="Hinweis schließen"` → `setPref("hideLocalBanner", true)`; with a configured cloud (P09, `cloudEnabled()`) the claude.ai sentence becomes the login hint + `Anmelden` (opens the login sheet), signed in: `Sync pausiert` / `2FA-Code` + `Code eingeben` |
+| `LocalModeBanner.tsx` | `LocalModeBanner`, `useLocalBannerOpen`, `useLocalBadgeOpen`, `useLocalModeCopy`, `LOCAL_BANNER_*`, `CLOUD_BANNER_*` | Etappe 1a: the banner is ONLY the red, not dismissible `Speichern nicht möglich.` (no usable storage; import / export buttons). The ordinary `Lokaler Modus.` text (claude.ai sentence 1:1, standalone + backup sentence, file build, cloud: login hint / `Sync pausiert` / `2FA-Code`) is `useLocalModeCopy()`, read by the badge; `hideLocalBanner` stays in `tj2-ui` but nothing reads it any more |
+| `LocalModeBadge.tsx` | `LocalModeBadge`, `LOCAL_BADGE` | small header badge (warn dot + `Lokaler Modus` / `Lokal` / dot only below 640 px, 44 px tap area); a tap opens a Radix popover with the explanation, `Anmelden` / `Code eingeben` where the cloud applies, and `Backup öffnen` (`openFeature("backup")`); only in local mode with a working storage |
+| `NewTradeButton.tsx` | `NewTradeButton` | the primary action `Trade eintragen` (`.shiny-cta`, `Magnetic`, `openEditor()`), one component for the header (< 768 px) and the sidebar (≥ 768 px) |
+| `Sidebar.tsx` | `Sidebar`, `sidebarExpanded`, `SIDEBAR_WIDTH`, `SIDEBAR_AUTO_QUERY` | see "Navigation in vier Gruppen" |
+| `navGroups.ts` | `NAV_GROUPS`, `NAV_GROUP_LABELS`, `NAV_GROUP_HINTS`, `PAGE_HINT`, `PAGE_LABELS`, `PAGE_ICON`, `groupOfPage`, `WIDE_QUERY` | the four groups, the plain-word hint of every page and the page names – texts only, first-load module |
 | `BottomFade.tsx` | `BottomFade`, `EdgeBlur`, `BOTTOM_BANDS`, `bandMask`, `bandBox` | `fixed z-[45] h-28` gradient (`BOTTOM_BANDS = []`, no blur) |
 | `HeaderTicker.tsx` | `HeaderTicker`, `tickerPrice`, `tickerChange`, `tickerChangePct`, `tickerDecimals`, `tickerJump`, `priceStep` | live price + 24 h change from `priceMv` / `open24hMv`, glide on `spring.price` |
 | `PageHost.tsx` | `PageHost`, `pageDirection`, `layerRole`, `PAGE_ENTER_X`, `PAGE_EXIT_X` | see "Page host" |
@@ -356,13 +361,99 @@ Feld sind Ziffern und Pos1/Ende Text, das erste Esc leert; `FeatureLinks.tsx` = 
 ist nur im Lazy-Chunk der Seite / Suche / des Assistenten – die Erstladung importiert es nicht (`shellStats` zeigt für die Seite den festen Text „Index“).
 Dokumente zum Register: `docs/COVERAGE.md` (eine Zeile je F01–F74; Test `tests/unit/features.registry.test.ts`) und `docs/UEBERSICHT.md` (Karte Aufgabe → Seite → Abschnitt).
 
+## Navigation in vier Gruppen (Etappe 1a)
+
+Ziel: alles ist leicht zu finden, nichts wird abgeschafft. Die 19 Ziele (vier Ur-Tabs + 15 Lazy-Seiten) stehen in **vier Gruppen nach dem, was man gerade tut** – in der Seitenleiste (ab 768 px), im Menü hinter „Mehr“ (unter 768 px,
+dieselbe Befehlsnavigation mit dem Feld „Was willst du tun?“ oben), in `[` / `]` und in der Schieberichtung. Zuordnung (`NAV_GROUP_PAGES`, `src/store/uiStore.ts`), Begründung und das Wort, das ein Anfänger versteht (`PAGE_HINT`, `navGroups.ts`):
+
+| Gruppe | Seite | Anfänger-Wort | warum hier |
+|---|---|---|---|
+| **Erfassen** – „Trades eintragen und vorbereiten“ | Trades | Deine Einträge | die Liste, in die man erfasst |
+| | Handelsplan | Vor dem Trade planen | der Plan gehört vor den Eintrag |
+| | Entscheidungsgrundlagen | Deine Regeln | die Regeln, nach denen man einen Trade einträgt |
+| **Prüfen** – „Lage und Markt ansehen, Risiko prüfen“ | Übersicht | Heute im Blick | der Stand auf einen Blick (Startseite, unverändert) |
+| | Markt | Kurse und Signale | Live-Lage, Boxen, Top-Trader- und Wal-Daten |
+| | Aktien | Aktien-Scanner und News | Kandidaten ansehen und gegenprüfen |
+| | Risiko | Wie viel einsetzen? | Größe, Stop und Grenzen gegenprüfen |
+| **Auswerten** – „Aus deinen Trades lernen, Ideen testen“ | Analyse | Was funktioniert? | Zahlen zu den eigenen Trades |
+| | Berichte | Woche und Monat | Rückblick |
+| | Coach | Rückmeldung zu dir | Muster in den eigenen Fehlern |
+| | Wachstum | Disziplin und Routinen | Prozess statt Kontostand |
+| | Cockpit | Dein eigenes Dashboard | die eigene Auswahl der Auswertungen |
+| | Labor | Strategien testen | Historie prüfen |
+| | Strategie-Studio | Strategie in Worten | Idee → Regeln → Test |
+| **Konto & Rechtliches** – „App, Konto, Hilfe und Impressum“ | Einstellungen | App einstellen | |
+| | Konto | Login und Sync | |
+| | Community | Gruppen und Rangliste | braucht das Konto (Cloud) |
+| | Preise | Pläne und Preise | |
+| | Funktionen | Alles, was die App kann | die Hilfe, auch der Weg zur Demo |
+| | (Impressum · Datenschutz · AGB) | | `LegalLinks` am Fuß der Gruppe, in der Seitenleiste und im Menü; bleiben auch im Fuß der Seite |
+
+Die Reihenfolge von `PAGES` bleibt (die Ziffern 1–9 und die `g`-Buchstaben wandern nicht); die Ziffern stehen als kleine Zahl an den ersten neun Seiten im Menü.
+
+- **Unter 768 px – die untere Leiste** (`Dock.tsx`, der bestehende Dock umgebaut, nicht doppelt gebaut): `Übersicht · Trades · [+ Trade] · Markt · Mehr`. Der Mittelknopf ist größer (52 px) und steht höher; unter jedem Symbol steht sein Wort
+  (10 px, Tooltip-Platte entfällt). „Mehr“ öffnet das Menü und leuchtet (Scheibe) auf jeder Seite, die nicht in der Leiste steht – man sieht, wo man ist. Bewegung und Federn unverändert: Hop nach Druckdauer, Flick, Scrubben, Federn
+  `spring.pop` / `spring.layout`, Marker als WAAPI-FLIP, Magnetic, Einflug einmal je Sitzung, Ping-Ring am Mittelknopf, Morph des Editors aus der Scheibe. `toolbar` „Navigation“ bleibt (Tests und Screenreader).
+- **Ab 768 px – die Seitenleiste** (`Sidebar.tsx`, `data-layer="Seitenleiste"`, `sticky` unter der Kopfleiste): oben `Trade eintragen` (dieselbe Taste wie in der Kopfleiste, `NewTradeButton`), darunter die vier Gruppen mit Titel, jede Seite 44 px hoch mit
+  Name und Anfänger-Wort; am Fuß Rechtliches und „Einklappen“. **Breit** (256 px) ab 1624 px (= Seitenspalte 1320 + Ränder 48 + Leiste 256; darunter lässt die schmale Leiste den Seiten die Breite, für die sie gebaut und reserviert sind – die Markt-Seite wuchs neben der breiten Leiste bei 1440 px nach dem ersten Bild um 87 px), sonst die **schmale Leiste** (64 px: Symbole, Name + Wort im Tooltip, `aria-label`). `uiStore.sidebar` = `auto | open | closed`
+  (`tj2-ui`, bleibt erhalten); `auto` folgt der Breite, damit die Seiten ihren Platz behalten (`--sidebar-w` auf `<html>` hält den Fuß der Seite frei). Die Gruppentitel sind Knöpfe (`aria-expanded`): 19 Zeilen à 44 px passen auf keinen Bildschirm unter 1300 px Höhe, darum faltet `auto` dort „Auswerten“ und „Konto & Rechtliches“ (außer eine davon hält die aktuelle Seite), „Erfassen“ (Trades) und „Prüfen“ (Übersicht, Markt) bleiben offen; Auswerten-Seiten und Einstellungen sind dann zwei Tipps entfernt (`closedGroups`, `uiStore.sidebarClosed`: `null` = nicht gewählt, sonst die gefalteten Gruppen, in `tj2-ui`); wer eine Seite einer gefalteten Gruppe öffnet (Link, Taste, Suche), sieht sie wieder aufgeklappt, die aktuelle Zeile scrollt ins Bild. In der schmalen Leiste fehlen die Titel, dort scrollt die Liste. Ein Marker (`spring.layout`, nur Transform) gleitet von Zeile zu Zeile, die Namen
+  blenden beim Ausklappen ein (`spring.smooth`); die Breite selbst schaltet in einem Schritt um (kein Umbruch der langen Seite pro Frame). Dock und Seitenleiste sind nie zusammen da (`useMediaQuery(WIDE_QUERY)`).
+- **Kopfleiste** bleibt schlank: ab 768 px ohne eigene `Trade eintragen`-Taste (sie steht in der Seitenleiste), Assistent / Vollbild / Menü zeigen ab 1280 px ihr Wort, darunter Tooltip + `aria-label`; „Lokaler Modus“ ist ein kleines Schild
+  (`LocalModeBadge`, Tipp erklärt es) statt des Banners. Das rote „Speichern nicht möglich.“ bleibt ein Banner (es geht um verlorene Daten, nicht um einen Hinweis).
+- **44 px**: ein Token (`--spacing-tap`, `tokens.css`, `@theme static`) für `touch-hit*` und die neuen `.tap` / `.tap-y` (die Box selbst ≥ 44 px, für jeden Zeiger) sowie `min-h-tap` / `size-tap`; kein zweites `44px` in `base.css`
+  (`tests/unit/styles.tap.test.ts`). Kopfleisten-Knöpfe, Seitenleistenzeilen, Leistenknöpfe und das Schild nutzen es; Zeilen liegen untereinander (keine überlappenden Tippflächen).
+- **Erster Besuch**: das Einführungs-Fenster öffnet sich nicht mehr von selbst. Ein leeres Journal zeigt – nur beim allerersten Besuch, auf Übersicht und Trades – einen Leerzustand mit genau einer Aktion („Ersten Trade eintragen“,
+  `FirstRunEmpty`, merkt sich den Besuch als `seen`). Wer das Fenster früher gesehen hat (`done` / `skipped`) oder schon Trades hat (`seen`), sieht ihn nie. Die Tour bleibt unter Einstellungen → Einführung & Hilfe, in der Suche und im Tastenblatt.
+
+### Messung vorher / nachher (Etappe 1a)
+
+`tests/e2e/nav-baseline.spec.ts` (mobil 390 × 844, Desktop 1440 × 900, `NAV_BASELINE_OUT=<datei>`; `NAV_ONLY_HIT=1` misst nur die Tippflächen der Hülle) – dieselbe Messung auf der alten und der neuen Navigation, gleiche Seed-Daten:
+
+| Messwert | mobil vorher | mobil nachher | Desktop vorher | Desktop nachher |
+|---|---|---|---|---|
+| Seitenlänge, Mittel der fünf Hauptseiten (px) | 12 469 | 12 382 | 6 786 | 6 746 |
+| längste Seite (Markt, px) | 20 982 | 20 871 | 11 342 | 11 299 |
+| Taps bis „Trade eintragen“-Editor, jede der 19 Seiten | 1 | 1 | 1 | 1 |
+| Taps von der Übersicht zu einer Seite, Mittel der 19 | 1,74 | 1,84 | 1,74 | **1,00** |
+| … Höchstwert | 2 | 2 | 2 | **1** |
+| Tippflächen ≥ 44 px, Hülle (Kopfleiste / Leiste bzw. Seitenleiste / Menü) | 100 / 100 / 100 % | 100 / 100 / 100 % | 20 / 100 / 93 % | 100 / 77* / 100 % |
+| Tippflächen ≥ 44 px, die fünf Hauptseiten | 99,4 – 100 % | 99,4 – 100 % | 8 – 73 % | 10 – 76 % |
+
+Die Seiten selbst sind nicht kürzer geworden (Inhalt unverändert, Übersicht und Cockpit unangetastet) – die Länge schwankt nur um die Seitenleisten-Breite (±1 %). Gewonnen hat das **Finden**: am Computer ist jede Seite ein Tipp entfernt (vorher
+zwei für 15 von 19), mobil sind die drei Seiten der Leiste ein Tipp, alles andere zwei („Mehr“, dann die Seite) – **mobil sind zwei Seiten schlechter geworden: Entscheidungsgrundlagen und Einstellungen waren Dock-Tabs (1 Tipp), jetzt 2**
+(Mittel 1,74 → 1,84). Das ist der Preis der Vorgabe „Übersicht, Trades, Markt, Mehr“; die Seiten stehen im Menü in „Erfassen“ und „Konto & Rechtliches“, und `g e` / `g s` / die Suche gehen weiter.
+\* 5 von 22 Zeilen der Seitenleiste meldet die Trefferprüfung als zu klein, wenn der Bildschirm nur 900 px hoch ist: es sind Zeilen am unteren Rand der scrollenden Liste, die der Fuß verdeckt (kein zu kleines Ziel;
+in `nav-groups.spec.ts` mit hohem Fenster geprüft: keine Fläche unter 44 px, keine überlappt). Die Hauptseiten am Computer (Zeiger „fein“) bleiben so dicht wie vorher: `touch-hit` gilt dort nur für grobe Zeiger – nicht Teil dieser Etappe.
+
+### Fresh-eyes-Prüfung (Etappe 1a, Screenshots 320 / 768 / 1440, 60-Sekunden-Test)
+
+| Frage | Antwort eines Fremden | Beleg |
+|---|---|---|
+| Wo trage ich einen Trade ein? | Mobil: der rote Knopf „Trade“ in der Mitte der unteren Leiste, auch das „+“ oben rechts. Computer: „Trade eintragen“ ganz oben in der Seitenleiste. Ein Tipp von jeder der 19 Seiten. | `nav-baseline.spec.ts` (Taps 1 / 1), `shots2/390-markt.png`, `shots3/1440-overview.png` |
+| Wo sehe ich Markt? | Mobil: dritter Knopf der Leiste, mit Wort. Computer: Seitenleiste, Gruppe „Prüfen“. | wie oben |
+| Wo sind die Einstellungen? | Mobil: „Mehr“ → Gruppe „Konto & Rechtliches“, erste Karte (2 Tipps). Computer: Seitenleiste, Gruppe „Konto & Rechtliches“ (auf einem 900 px hohen Fenster erst aufklappen: 2 Tipps; ab 1300 px Höhe sofort sichtbar). | `shots2/390-finder.png` |
+| Wo sind Wal- / Top-Trader-Daten? | Top-Trader: Suchfeld im Menü („Top Trader“ → „Top-Trader-Positionierung“, Übersicht) und Markt-Seite. **Wal-Daten gibt es in der App nicht** (keine On-Chain-Wale); „Wale“ fand vorher nichts – jetzt führt es zu den Top-Trader-Quoten und sagt im Eintrag, dass es Binance-Top-Trader sind. | Finder-Lauf (`Q Wale`), `features.ts` `top-trader` |
+
+| Nr | Schwere | Befund | Beleg | Korrektur |
+|---|---|---|---|---|
+| 1 | stört | 320 px: die Kopfleiste lief über, „Trade eintragen“ stand außerhalb des Bildschirms | `shots2/320-markt.png` (vorher) | Kurs-Anzeige unter 360 px aus, Abstände enger (`Header.tsx`), `nav-groups.spec.ts` „320 px“ |
+| 2 | stört | breite Seitenleiste bei 1440 px: die Markt-Seite wuchs nach dem ersten Bild um 87 px (Grenze 60), weil ihre Platzhalter für 1320 px Spaltenbreite gemessen sind | `layout-shift.spec.ts` markt (desktop) 11 411 → 11 498 px | `auto` zeigt die breite Leiste erst ab 1624 px (Spalte 1320 + Ränder + Leiste), darunter die schmale; Platzhalter der Beste-Setups-Karte folgt nun der Kartenbreite |
+| 3 | stört | breite Seitenleiste auf 900 px Höhe: „Trades“ lag unter dem Rand (19 Zeilen à 44 px passen nirgends) | `touch.spec.ts` Tablet, `back.spec.ts` | Gruppen faltbar; auf kurzen Bildschirmen sind „Auswerten“ und „Konto“ gefaltet, „Erfassen“ und „Prüfen“ offen; aktuelle Zeile scrollt ins Bild |
+| 4 | stört | Menü am Computer: Karten zu schmal, „Handelsplan“ → „H“, Hinweise abgeschnitten | `shots3/1440-menu.png` | Karten mindestens 236 px breit (drei je Reihe) |
+| 5 | stört | Kontrast der Gruppentitel und Hinweise in der Seitenleiste unter 4,5 : 1 (axe, dunkel und hell) | `nav-groups.spec.ts` (Barrierefreiheit) | `text-mute` statt `text-faint` |
+| 6 | stört | Rechtliches-Links (Impressum, Datenschutz, AGB) in Menü, Seitenleiste und Fuß: Tippflächen überlappten oder waren 17 px hoch | Trefferprüfung Menü 93 % → 100 % | eigene 44-px-Zeilen (`LegalLinks roomy`) |
+| 7 | Politur | Schmale Leiste (Standard bei 768 – 1623 px) zeigt nur Symbole; die Namen stehen im Tooltip und im Menü-Knopf der Kopfleiste | `shots3/1440-overview.png` | offen: Entscheidung Auftraggeber – breit als Standard (kostet bei 1440 px die Markt-Platzhalter, siehe 2) oder Platzhalter der Markt-Seite neu messen |
+| 8 | Politur | Das Suchfeld findet Funktionen, nicht Seiten: „Einstellungen“ führt zu „Box-Einstellungen …“, die Seite selbst steht darunter in der Liste | Finder-Lauf | nicht geändert (zwei Suchen wären eine zweite Suche); die Gruppenliste liegt direkt unter dem Feld |
+| 9 | Politur | „Mehr“ wartet auf die gestaffelte Einblendung des Menüs (bis 1,8 s) | Zeitablauf `CONFIG.delays` | unverändert (pulse-motion-Maße); offen |
+
+Nicht geprüft: Safari / iOS (nur Chromium), echte Touch-Geräte (nur Emulation und CDP-Touch), Screenreader (nur axe), die Cloud-Edition `build:e2e-cloud`, die Teilen-Edition.
+
 ## Zusammenhang & Navigation (Feinschliff, Runde 8)
 
-- **Reihenfolge der Seiten** steht an einer Stelle: `PAGES` in `src/store/uiStore.ts` – die fünf Dock-Tabs in Dock-Reihenfolge (Übersicht, Trades, Entscheidungsgrundlagen, Markt, Einstellungen), dann
-  Handelsplan, Aktien, Risiko · Analyse, Berichte, Coach, Wachstum · Labor, Strategie-Studio · Community, Cockpit, Konto, Preise, Funktionen. Dieselbe Reihenfolge ist die Zahlenfolge der Befehlsnavigation (1–5 = Dock),
-  die Folge von `[` / `]` und der Schieberichtung (`NAV_ORDER`), die Gleichstand-Reihenfolge der Suche und die Folge der `g`-Kürzel im Tastenblatt. Das Dock selbst bleibt unverändert.
-- **Befehlsnavigation** (`CommandNav.tsx`): oben das Feld „Was willst du tun?“, dann die fünf Dock-Seiten groß, darunter die übrigen Seiten in vier Gruppen nach Aufgabe (`NAV_GROUPS`: Planen & Handeln · Auswerten & Lernen ·
-  Strategien · Mehr). Die jüngsten Seiten (`NEW_PAGES`: Handelsplan, Aktien, Strategie-Studio) tragen ein kleines „Neu“, bis sie einmal geöffnet waren (nur dieser Browser, `visited-pages`, ein beschädigter Speicher
+- **Reihenfolge der Seiten** (Stand Runde 8; seit Etappe 1a sehen Leser die vier Gruppen, `PAGES` bleibt für Ziffern und `g`-Buchstaben): `PAGES` in `src/store/uiStore.ts` – die fünf früheren Dock-Tabs (Übersicht, Trades, Entscheidungsgrundlagen, Markt, Einstellungen), dann
+  Handelsplan, Aktien, Risiko · Analyse, Berichte, Coach, Wachstum · Labor, Strategie-Studio · Community, Cockpit, Konto, Preise, Funktionen. Dieselbe Reihenfolge ist die Zahlenfolge der Befehlsnavigation (1–9),
+  die Gleichstand-Reihenfolge der Suche und die Folge der `g`-Kürzel im Tastenblatt; `[` / `]` folgen `NAV_ORDER` (die Gruppen), die Schieberichtung `SLIDE_ORDER`.
+- **Befehlsnavigation** (`CommandNav.tsx`): oben das Feld „Was willst du tun?“, darunter alle 19 Seiten in vier Gruppen nach Aufgabe (`NAV_GROUPS`: Erfassen · Prüfen · Auswerten · Konto & Rechtliches – Stand Etappe 1a; früher fünf große Links + Planen & Handeln · Auswerten & Lernen · Strategien · Mehr). Die jüngsten Seiten (`NEW_PAGES`: Handelsplan, Aktien, Strategie-Studio) tragen ein kleines „Neu“, bis sie einmal geöffnet waren (nur dieser Browser, `visited-pages`, ein beschädigter Speicher
   heißt „noch nichts geöffnet“). `tests/unit/app.navOrder.test.ts` hält Reihenfolge, Gruppen, Buchstaben (je Seite einer, eindeutig) und die Marke fest.
 - **„Siehe auch“** zwischen Seiten: Tabelle `seeAlso.ts` (Daten, kein Register-Import), Baustein `<SeeAlso at="plan.exit" />` in `FeatureLinks.tsx`; höchstens drei Links je Zeile, höchstens drei Zeilen je Seite,
   nur auf eine andere Seite, nur zu Funktionen, die das Register selbst als verwandt nennt (`tests/unit/seeAlso.test.tsx`). Neue Zeile: Eintrag in der Tabelle, die Zeile an der Karte, der Test sagt, wenn eines fehlt.

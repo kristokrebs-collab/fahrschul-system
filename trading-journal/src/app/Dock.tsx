@@ -7,59 +7,21 @@ import { useTouchMoveGuard } from "@/motion/a11y";
 import { flickStep, haptic, lastPressMs, mixSpring, physics, pressTempo, rubberClamp, setNavTempo, useAxisDrag, type AxisDragRelease } from "@/motion/physics";
 import { pressScale, radius, spring, stagger, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
-import { useCanHover } from "@/motion/useMediaQuery";
+import { useCanHover, useMediaQuery } from "@/motion/useMediaQuery";
 import { isSafeFx } from "@/app/pwa";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { Icon, type IconName } from "@/primitives/icons";
+import { openCommandNav, useCommandNavOpen } from "@/app/CommandNav";
+import { FAB_LABEL, PAGE_ICON, PAGE_LABELS, WIDE_QUERY } from "@/app/navGroups";
+import { Icon } from "@/primitives/icons";
 import { Magnetic } from "@/primitives/Magnetic";
 import { navigate } from "@/store/router";
 import { storageKey } from "@/store/storage";
 import { DOCK_PAGES, useUi, type Page } from "@/store/uiStore";
 
-/** Bundle `Dhe` + the feature pages (P14). */
-export const PAGE_LABELS: Record<Page, string> = {
-  overview: "Übersicht",
-  trades: "Trades",
-  setups: "Entscheidungsgrundlagen",
-  settings: "Einstellungen",
-  markt: "Markt",
-  analyse: "Analyse",
-  risiko: "Risiko",
-  coach: "Coach",
-  berichte: "Berichte",
-  labor: "Labor",
-  wachstum: "Wachstum",
-  community: "Community",
-  cockpit: "Cockpit",
-  konto: "Konto",
-  preise: "Preise",
-  funktionen: "Funktionen",
-  studio: "Strategie-Studio",
-  plan: "Handelsplan",
-  aktien: "Aktien",
-};
-export const FAB_LABEL = "Trade eintragen";
-export const PAGE_ICON: Record<Page, IconName> = {
-  overview: "grid",
-  trades: "list",
-  setups: "target",
-  settings: "sliders",
-  markt: "candles",
-  analyse: "chart",
-  risiko: "shield",
-  coach: "coach",
-  berichte: "report",
-  labor: "flask",
-  wachstum: "sprout",
-  community: "users",
-  cockpit: "gauge",
-  konto: "user",
-  preise: "tag",
-  funktionen: "compass",
-  studio: "pen",
-  plan: "route",
-  aktien: "stocks",
-};
+export { FAB_LABEL, PAGE_ICON, PAGE_LABELS };
+/** Short caption under the centre button of the bottom bar (the long name is its accessible name). */
+export const FAB_CAPTION = "Trade";
+export const MORE_LABEL = "Mehr";
 
 /**
  * pulse-motion `dock` (measured) + its magnification remix. Label: opacity `1 − e^(−t/τ)` in 38 ms / out 35 ms, rises
@@ -84,7 +46,7 @@ export const DOCK_CONFIG = {
 } as const;
 
 /** Items rest at `base`; the item under the pointer magnifies to `magnification` (px); the bell ends at `distance`. */
-export const DOCK = { magnification: 44 * (1 + DOCK_CONFIG.magnify), distance: 140, panelHeight: 60, base: 44, sigma: DOCK_CONFIG.sigma } as const;
+export const DOCK = { magnification: 44 * (1 + DOCK_CONFIG.magnify), distance: 140, panelHeight: 74, base: 44, sigma: DOCK_CONFIG.sigma } as const;
 
 const TIP_IN = expoCurve(DOCK_CONFIG.tipInTauMs);
 const TIP_OUT = expoCurve(DOCK_CONFIG.tipOutTauMs);
@@ -298,6 +260,10 @@ export interface DockItemProps {
   /** Intro stage: the icon waits hidden and pops in (same stagger) when the dock rises on "build". */
   waiting?: boolean;
   index?: number;
+  /** Visible caption under the icon (the bar's words: „Übersicht“, „Mehr“ …); with it the hover plate is not needed and not rendered. */
+  caption?: string;
+  /** The button opens a dialog (`Mehr`): announced with `aria-haspopup` / `aria-expanded`. */
+  popup?: { expanded: boolean };
   /** The hop to play when this item becomes active (press tempo / flick); `undefined` → the tuned tap hop. */
   takeHop?: () => HopTransition | undefined;
   ref?: Ref<HTMLButtonElement>;
@@ -312,7 +278,7 @@ export interface DockItemProps {
  * (CSS `:hover` / `:focus-visible`, no React state). On activation the icon hops (`spring.pop` with an upward launch);
  * `whileTap pressScale.icon` (.92).
  */
-export function DockItem({ label, onClick, active = false, tab = false, fx, layer, intro = false, waiting = false, index = 0, takeHop, ref, className, children }: DockItemProps) {
+export function DockItem({ label, onClick, active = false, tab = false, fx, layer, intro = false, waiting = false, index = 0, caption, popup, takeHop, ref, className, children }: DockItemProps) {
   const reduced = useReducedFx();
   const press = usePressable({ scale: pressScale.icon });
   const hop = useMotionValue(0);
@@ -343,7 +309,9 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
       type="button"
       onClick={onClick}
       aria-label={label}
-      aria-current={active ? "page" : undefined}
+      aria-current={active && !popup ? "page" : undefined}
+      aria-haspopup={popup ? "dialog" : undefined}
+      aria-expanded={popup ? popup.expanded : undefined}
       whileTap={press.whileTap}
       transition={press.transition}
       style={{ x: fx.x }}
@@ -373,7 +341,13 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
           </motion.span>
         </motion.span>
       </motion.span>
-      {tab && active && <DockMarker kind="dot" className="absolute -bottom-1.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-signal" style={MARKER_BG_STYLE} />}
+      {tab && active && !caption && <DockMarker kind="dot" className="absolute -bottom-1.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-signal" style={MARKER_BG_STYLE} />}
+      {caption && (
+        <span aria-hidden="true" data-dock-caption="" className={cn("absolute left-1/2 top-full mt-[3px] -translate-x-1/2 whitespace-nowrap text-[10px] font-medium leading-3 tracking-[0.01em] transition-colors duration-200", active ? "text-fg" : "text-mute group-hover/dock:text-fg")}>
+          {caption}
+        </span>
+      )}
+      {!caption && (
       <motion.span aria-hidden="true" className="pointer-events-none absolute bottom-full left-1/2 z-10 -translate-x-1/2" style={{ y: tipY, marginBottom: DOCK_CONFIG.tipGap }}>
         {/* pack label (fades in, rising from +6 px on the 1000/38 spring) on an opaque Nothing plate that is uncovered by
             clip-path instead of fading, so page text behind it is either fully covered or untouched (SH-03).
@@ -384,17 +358,31 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
           </span>
         </span>
       </motion.span>
+      )}
     </motion.button>
   );
 }
 
 /* ------------------------------------------------------------------ dock */
 
-/** Slots in DOM order: the dock tabs (`DOCK_PAGES`), the divider (moves, never scales), the FAB. */
-const SLOT_COUNT = DOCK_PAGES.length + 2;
-const DIVIDER = DOCK_PAGES.length;
-const FAB_SLOT = DOCK_PAGES.length + 1;
-const SCALABLE: readonly boolean[] = Array.from({ length: SLOT_COUNT }, (_, k) => k !== DIVIDER);
+/**
+ * Slots in DOM order: Übersicht, Trades, the centre button „+ Trade“, Markt, „Mehr“ (opens the menu: the four groups with the
+ * search). The tabs come from `DOCK_PAGES`; the centre button sits in the middle of the row.
+ */
+type DockSlot = { kind: "page"; page: Page } | { kind: "fab" } | { kind: "more" };
+const MID = Math.ceil(DOCK_PAGES.length / 2);
+const SLOTS: readonly DockSlot[] = [
+  ...DOCK_PAGES.slice(0, MID).map((page): DockSlot => ({ kind: "page", page })),
+  { kind: "fab" },
+  ...DOCK_PAGES.slice(MID).map((page): DockSlot => ({ kind: "page", page })),
+  { kind: "more" },
+];
+const SLOT_COUNT = SLOTS.length;
+const FAB_SLOT = SLOTS.findIndex((x) => x.kind === "fab");
+const MORE_SLOT = SLOTS.findIndex((x) => x.kind === "more");
+/** Slot index of each dock page, in `DOCK_PAGES` order. */
+const PAGE_SLOT: readonly number[] = DOCK_PAGES.map((p) => SLOTS.findIndex((x) => x.kind === "page" && x.page === p));
+const SCALABLE: readonly boolean[] = Array.from({ length: SLOT_COUNT }, () => true);
 
 interface Geometry {
   /** resting slot centres (client px, minus any shift still in flight) */
@@ -464,6 +452,10 @@ export function Dock() {
   const openEditor = useUi((s) => s.openEditor);
   const reduced = useReducedFx();
   const canHover = useCanHover();
+  const wide = useMediaQuery(WIDE_QUERY, false);
+  const moreOpen = useCommandNavOpen();
+  // „Mehr“ is the tab of every page the bar does not name (Handelsplan, Analyse, Einstellungen …)
+  const moreActive = !(DOCK_PAGES as readonly Page[]).includes(page);
   const magnify = canHover && !reduced;
   const phase = useIntroPhase();
   // Samsung-Internet-safe effects: the session entrance rises without the blur filter (read once per mount)
@@ -595,7 +587,8 @@ export function Dock() {
 
   /** Tab activation (tap, keyboard, scrub release). The active tab again → back to the top of the page (iOS). */
   const activateTab = (k: number, pressMs: number) => {
-    const p = DOCK_PAGES[k];
+    const slot = SLOTS[k];
+    const p = slot?.kind === "page" ? slot.page : undefined;
     if (!p) return;
     if (p === useUi.getState().page) {
       // native smooth scroll (compositor), instant under reduced motion
@@ -607,6 +600,7 @@ export function Dock() {
   const onTabClick = (k: number) => (e: MouseEvent<HTMLButtonElement>) => activateTab(k, e.detail === 0 ? Number.NaN : lastPressMs());
   const activateSlot = (k: number) => {
     if (k === FAB_SLOT) openEditor({ fromFab: true });
+    else if (k === MORE_SLOT) openCommandNav();
     else activateTab(k, Number.NaN);
   };
 
@@ -685,7 +679,7 @@ export function Dock() {
       const g = geometry.current;
       if (!g) return;
       const first = g.centres[0] ?? m.clientX;
-      const last = g.centres[FAB_SLOT] ?? m.clientX;
+      const last = g.centres[SLOT_COUNT - 1] ?? m.clientX;
       // the bell follows the finger 1:1 inside the row and rubber-bands past its ends (iOS)
       if (!reduced) pointerTarget.set(rubberClamp(m.clientX, first - DOCK.base / 2, last + DOCK.base / 2, DOCK.base));
       markScrub(slotAtX(m.clientX));
@@ -701,9 +695,9 @@ export function Dock() {
         const to = at + step;
         if (at >= 0 && to >= 0 && to < DOCK_PAGES.length) {
           setNavTempo(r.tempo);
-          intendHop(to, flickHop(r.speed));
+          intendHop(PAGE_SLOT[to] ?? 0, flickHop(r.speed));
           navigate(DOCK_PAGES[to] as Page);
-        } else if (at >= 0) bumpSlot(at); // at the end of the row: a dip instead of a switch
+        } else if (at >= 0) bumpSlot(PAGE_SLOT[at] ?? 0); // at the end of the row: a dip instead of a switch
         return "none";
       }
       if (item >= 0 && Math.abs(r.clientY - scrub.current.startY) <= SCRUB_RELEASE_Y) activateSlot(item);
@@ -757,6 +751,8 @@ export function Dock() {
   const breathing = fabVisible && !editor.open && canHover && !reduced && phase !== "stage";
   const layoutKey = `${page}|${editor.open ? 1 : 0}`;
   const entrance = dockEntrance(phase, intro, reduced, safeFx);
+  // from 768 px the sidebar is the navigation; all hooks above have run, so the switch never changes their order
+  if (wide) return null;
 
   return (
     // layoutRoot (SH-01): the nav is position:fixed, so Motion must never read a page-scroll clamp (the document got
@@ -793,57 +789,87 @@ export function Dock() {
         animate={entrance.animate}
         transition={entrance.transition}
         style={{ ...drag.style, height: DOCK.panelHeight }}
-        className="pointer-events-auto relative mx-2 flex max-w-full items-end gap-3 px-3 pb-2 [-webkit-touch-callout:none]"
+        className="pointer-events-auto relative mx-2 flex max-w-full items-end gap-2.5 px-3 pb-[22px] [-webkit-touch-callout:none] min-[360px]:gap-3.5"
       >
         <DockTray left={tray.left} right={tray.right} mid={tray.mid} />
-        {DOCK_PAGES.map((p, k) => (
-          <DockItem
-            key={p}
-            ref={slotRefs[k]}
-            tab
-            fx={slots[k] as DockSlotFx}
-            intro={intro}
-            waiting={phase === "stage"}
-            index={k}
-            takeHop={takeHop[k]}
-            label={PAGE_LABELS[p]}
-            active={page === p}
-            onClick={onTabClick(k)}
-            className={page === p ? "text-ink-950" : "text-mute hover:text-fg"}
-          >
-            <Icon name={PAGE_ICON[p]} />
-          </DockItem>
-        ))}
-        <motion.span ref={slotRefs[DIVIDER]} aria-hidden="true" className="relative mb-2.5 h-7 w-px self-end bg-line-2 will-change-transform" style={{ x: (slots[DIVIDER] as DockSlotFx).x }} />
-        <DockItem
-          ref={slotRefs[FAB_SLOT]}
-          fx={slots[FAB_SLOT] as DockSlotFx}
-          intro={intro}
-          waiting={phase === "stage"}
-          index={FAB_SLOT}
-          label={FAB_LABEL}
-          onClick={() => openEditor({ fromFab: true })}
-          className="text-ink-950"
-          layer={
-            <>
-              {/* breathing ring: 3 × fx-ping (= tween.pingFew) each time it mounts, compositor only */}
-              {breathing && <span className="fx-ping bg-signal" style={FAB_PING_STYLE} />}
-              {fabVisible && (
-                <motion.span
-                  layoutId={`new-trade-${fabCycle}`}
-                  layoutDependency={layoutKey}
-                  className="absolute inset-0 rounded-full bg-gradient-to-br from-(--color-fab-from) to-signal"
-                  style={{ borderRadius: radius.fab }}
-                  initial={fabCycle > 0 && !reduced ? { scale: 0.9 } : false}
-                  animate={{ scale: 1 }}
-                  transition={{ layout: spring.sheet, scale: spring.pop }}
-                />
-              )}
-            </>
-          }
-        >
-          <Icon name="plus" />
-        </DockItem>
+        {SLOTS.map((slot, k) => {
+          if (slot.kind === "fab")
+            return (
+              <DockItem
+                key="fab"
+                ref={slotRefs[k]}
+                fx={slots[k] as DockSlotFx}
+                intro={intro}
+                waiting={phase === "stage"}
+                index={k}
+                label={FAB_LABEL}
+                caption={FAB_CAPTION}
+                onClick={() => openEditor({ fromFab: true })}
+                // the centre button: a little larger than the tabs and standing taller than the row
+                className="size-[52px] text-ink-950 [&_[data-dock-caption]]:text-fg"
+                layer={
+                  <>
+                    {/* breathing ring: 3 × fx-ping (= tween.pingFew) each time it mounts, compositor only */}
+                    {breathing && <span className="fx-ping bg-signal" style={FAB_PING_STYLE} />}
+                    {fabVisible && (
+                      <motion.span
+                        layoutId={`new-trade-${fabCycle}`}
+                        layoutDependency={layoutKey}
+                        className="absolute inset-0 rounded-full bg-gradient-to-br from-(--color-fab-from) to-signal"
+                        style={{ borderRadius: radius.fab }}
+                        initial={fabCycle > 0 && !reduced ? { scale: 0.9 } : false}
+                        animate={{ scale: 1 }}
+                        transition={{ layout: spring.sheet, scale: spring.pop }}
+                      />
+                    )}
+                  </>
+                }
+              >
+                <Icon name="plus" />
+              </DockItem>
+            );
+          if (slot.kind === "more")
+            return (
+              <DockItem
+                key="more"
+                ref={slotRefs[k]}
+                tab
+                fx={slots[k] as DockSlotFx}
+                intro={intro}
+                waiting={phase === "stage"}
+                index={k}
+                label={MORE_LABEL}
+                caption={MORE_LABEL}
+                popup={{ expanded: moreOpen }}
+                // „Mehr“ lights up on every page that is not a tab: you always see where you are
+                active={moreActive}
+                onClick={() => openCommandNav()}
+                className={moreActive ? "text-ink-950" : "text-mute hover:text-fg"}
+              >
+                <Icon name="more" />
+              </DockItem>
+            );
+          const p = slot.page;
+          return (
+            <DockItem
+              key={p}
+              ref={slotRefs[k]}
+              tab
+              fx={slots[k] as DockSlotFx}
+              intro={intro}
+              waiting={phase === "stage"}
+              index={k}
+              takeHop={takeHop[k]}
+              label={PAGE_LABELS[p]}
+              caption={PAGE_LABELS[p]}
+              active={page === p}
+              onClick={onTabClick(k)}
+              className={page === p ? "text-ink-950" : "text-mute hover:text-fg"}
+            >
+              <Icon name={PAGE_ICON[p]} />
+            </DockItem>
+          );
+        })}
       </motion.div>
     </motion.nav>
   );

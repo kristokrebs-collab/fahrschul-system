@@ -1,14 +1,15 @@
 /**
- * First-run tour (P13) end to end in jsdom: auto start on an empty journal, the six steps with real writes (capital
- * and currency into the settings, a process goal through P08's `addGoalFromDraft`), the honest exchange hint without
- * the cloud, stepping aside for the setup editor and coming back, the final hold, and no auto start for a journal
- * that already has trades.
+ * First-run tour (P13) end to end in jsdom: the six steps with real writes (capital and currency into the settings, a
+ * process goal through P08's `addGoalFromDraft`), the honest exchange hint without the cloud, stepping aside for the
+ * setup editor and coming back, the final hold. Since Etappe 1a the tour never opens by itself (the empty first visit shows
+ * the first-run state, `FirstRunEmpty`, instead of a modal); it is started on purpose – from the settings, the search, the
+ * shortcut sheet – which these tests do with `startOnboarding()`. A journal with trades is still marked seen.
  */
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { OnboardingHost } from "@/onboarding/OnboardingHost";
-import { ONBOARDING_KEY, readOnboarding, useOnboarding } from "@/onboarding/onboardingStore";
+import { ONBOARDING_KEY, readOnboarding, startOnboarding, useOnboarding } from "@/onboarding/onboardingStore";
 import { useJournal } from "@/store/journalStore";
 import { useShareRoute } from "@/store/router";
 import { useUi } from "@/store/uiStore";
@@ -41,7 +42,7 @@ describe("Onboarding tour", () => {
     useOnboarding.setState({ open: false, step: 0, source: "manual", paused: false, loaded: false });
   });
 
-  it("a share-link visitor (#share/<token>) is not toured over the shared trade; opening the app starts it", async () => {
+  it("the tour no longer opens by itself: an empty journal, with or without a share link, stays quiet and stores nothing", { timeout: 30_000 }, async () => {
     await act(async () => {
       useJournal.setState({ trades: [] });
       useShareRoute.setState({ token: "AbCdEfGhIjKlMnOpQrStUv" });
@@ -53,6 +54,12 @@ describe("Onboarding tour", () => {
     await act(async () => {
       useShareRoute.setState({ token: null });
     });
+    await new Promise((r) => setTimeout(r, 60));
+    expect(screen.queryByRole("dialog", { name: "Einführung" })).toBeNull();
+    expect(useOnboarding.getState().open).toBe(false);
+    expect(readOnboarding()).toBeNull();
+    // started on purpose, it opens
+    await act(async () => startOnboarding());
     expect(await screen.findByRole("dialog", { name: "Einführung" })).toBeInTheDocument();
   });
 
@@ -64,11 +71,12 @@ describe("Onboarding tour", () => {
     expect(screen.queryByRole("dialog", { name: "Einführung" })).toBeNull();
   });
 
-  it("empty journal: starts by itself, walks the six steps with real writes and ends with the hold", async () => {
+  it("started on purpose on an empty journal: walks the six steps with real writes and ends with the hold", { timeout: 30_000 }, async () => {
     await act(async () => {
       useJournal.setState({ trades: [] });
     });
     mount();
+    await act(async () => startOnboarding());
     const dialog = await screen.findByRole("dialog", { name: "Einführung" });
     expect(step()).toBe("start");
     expect(within(dialog).getByRole("list", { name: "Fortschritt der Einführung" })).toBeInTheDocument();
@@ -143,6 +151,7 @@ describe("Onboarding tour", () => {
       useJournal.setState({ trades: [] });
     });
     mount();
+    await act(async () => startOnboarding());
     await screen.findByRole("dialog", { name: "Einführung" });
     await act(async () => {
       useOnboarding.setState({ step: 4 });
@@ -163,6 +172,7 @@ describe("Onboarding tour", () => {
       useJournal.setState({ trades: [] });
     });
     mount();
+    await act(async () => startOnboarding());
     await screen.findByRole("dialog", { name: "Einführung" });
     await next();
     expect(step()).toBe("konten");

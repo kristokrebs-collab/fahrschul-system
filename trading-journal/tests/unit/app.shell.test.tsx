@@ -71,13 +71,15 @@ describe("App shell", () => {
     expect(screen.getByText("Makro & Scalp · Entscheidungen, Win-Rate, Backtest")).toBeInTheDocument();
     expect(screen.getByText("Trade Journal")).toBeInTheDocument(); // SplitText: sr-only text, letters aria-hidden
     const dock = screen.getByRole("toolbar", { name: "Navigation" });
-    for (const label of ["Übersicht", "Trades", "Entscheidungsgrundlagen", "Einstellungen", "Trade eintragen"]) {
+    for (const label of ["Übersicht", "Trades", "Markt", "Mehr", "Trade eintragen"]) {
       expect(within(dock).getByRole("button", { name: label })).toBeInTheDocument();
     }
     expect(within(dock).getByRole("button", { name: "Übersicht" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("Netto-P&L · Gesamt")).toBeInTheDocument();
     expect(screen.getByText("BTC/USDT · Binance")).toBeInTheDocument();
-    expect(screen.getByText("Nur dieser Browser")).toBeInTheDocument();
+    // local mode is a small badge in the header (a tap explains it), not a banner above the page
+    expect(screen.getByTestId("local-badge")).toBeInTheDocument();
+    expect(screen.queryByText("Lokaler Modus.")).toBeNull();
     // first (cold) mount of the whole app: transforms + overview render exceed 5 s when the workers run in parallel
   }, 20_000);
 
@@ -91,8 +93,13 @@ describe("App shell", () => {
     expect(location.hash).toBe("#trades");
     expect(await screen.findByTestId("page-trades", {}, SWITCH)).toBeInTheDocument();
     expect(within(dock).getByRole("button", { name: "Trades" })).toHaveAttribute("aria-current", "page");
+    // every other page is behind „Mehr“: the menu with the four groups
     await act(async () => {
-      fireEvent.click(within(dock).getByRole("button", { name: "Einstellungen" }));
+      fireEvent.click(within(dock).getByRole("button", { name: "Mehr" }));
+    });
+    const menu = screen.getByRole("dialog", { name: "Navigation" });
+    await act(async () => {
+      fireEvent.click(within(menu).getByRole("link", { name: /^Einstellungen/ }));
     });
     expect(useUi.getState().page).toBe("settings");
     expect(location.hash).toBe("#settings");
@@ -119,13 +126,15 @@ describe("App shell", () => {
     for (const layer of ["Suche", "Tastenkürzel", "Einführung", "Cloud"]) expect(document.querySelector(`[data-layer="${layer}"]`)).not.toBeNull();
   });
 
-  it("shows the local-mode banner and hides it via the close button (pref persisted)", async () => {
+  it("local mode is a badge in the header; a tap opens the explanation with the same sentences (no banner)", async () => {
     renderApp();
-    expect(screen.getByText("Lokaler Modus.")).toBeInTheDocument();
-    expect(screen.getByText("Lokaler Modus.").closest('[role="status"]')?.textContent).toContain("Nutze Backup (JSON) unter Einstellungen → Daten.");
-    fireEvent.click(screen.getByRole("button", { name: "Hinweis schließen" }));
-    expect(useUi.getState().hideLocalBanner).toBe(true);
-    expect(JSON.parse(localStorage.getItem("tj2-ui") ?? "{}").hideLocalBanner).toBe(true);
+    const badge = screen.getByTestId("local-badge");
+    expect(within(screen.getByRole("banner")).getByTestId("local-badge")).toBe(badge);
+    expect(screen.queryByTestId("local-badge-panel")).toBeNull();
+    fireEvent.click(badge);
+    const panel = await screen.findByTestId("local-badge-panel");
+    expect(panel.textContent).toContain("Nutze Backup (JSON) unter Einstellungen → Daten.");
+    expect(within(panel).getByRole("button", { name: "Backup öffnen" })).toBeInTheDocument();
   });
 
   it("keeps the overview mounted but hidden on other tabs and shows the same instance again", { timeout: 20_000 }, async () => {
@@ -168,7 +177,7 @@ describe("App shell", () => {
     await waitFor(() => expect(header.querySelector('[data-pulse="ascii-cascade"]')).not.toBeNull());
     expect(screen.getAllByText("Trade Journal")).toHaveLength(1);
     // no new focusables in the dock; the menu button lives in the header
-    const menu = within(header).getByRole("button", { name: "Navigation öffnen" });
+    const menu = within(header).getByRole("button", { name: "Menü, Navigation öffnen" });
     expect(menu).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(menu);
     expect(screen.getByRole("dialog", { name: "Navigation" })).toBeInTheDocument();

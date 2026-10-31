@@ -174,10 +174,23 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
       position: absolute;
       left: 50%;
       top: 50%;
-      width: max(100%, 44px);
-      height: max(100%, 44px);
+      width: max(100%, var(--spacing-tap));
+      height: max(100%, var(--spacing-tap));
       transform: translate(-50%, -50%);
     }
+  }
+}
+
+/* `tap` / `tap-y`: the box ITSELF is at least 44 px (every pointer, not just coarse ones) – for the navigation (sidebar rows, header
+   buttons, bottom bar), where a mouse user gets the same calm, large targets. `touch-hit` stays the invisible extension for
+   dense places. Two neighbours never overlap: rows are laid out with their own 44 px, not stretched into each other. */
+@layer components {
+  .tap {
+    min-height: var(--spacing-tap);
+    min-width: var(--spacing-tap);
+  }
+  .tap-y {
+    min-height: var(--spacing-tap);
   }
 }
 
@@ -193,8 +206,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
       position: absolute;
       left: 50%;
       top: 50%;
-      width: max(100%, 44px);
-      height: max(100%, 44px);
+      width: max(100%, var(--spacing-tap));
+      height: max(100%, var(--spacing-tap));
       transform: translate(-50%, -50%);
     }
   }
@@ -213,7 +226,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
       left: 0;
       right: 0;
       top: 50%;
-      height: max(100%, 44px);
+      height: max(100%, var(--spacing-tap));
       transform: translateY(-50%);
     }
   }

@@ -5,6 +5,9 @@ import { openCommandNav, useCommandNavOpen, COMMAND_NAV_ID } from "@/app/Command
 import { FullscreenButton } from "@/app/DisplayActions";
 import { AssistantButton } from "@/assistant/AssistantButton";
 import { HeaderTicker } from "@/app/HeaderTicker";
+import { LocalModeBadge } from "@/app/LocalModeBadge";
+import { NewTradeButton } from "@/app/NewTradeButton";
+import { useLocalBadgeOpen } from "@/app/LocalModeBanner";
 import { cloudEnabled } from "@/cloud/env";
 import { useCloudSession } from "@/cloud/session";
 import { AccountPill } from "@/cloud/ui/AccountPill";
@@ -16,16 +19,15 @@ import { DancingLetters } from "@/motion/pulse/DancingLetters";
 import { StatusPill, type StatusTone } from "@/motion/StatusPill";
 import { pressScale, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { Magnetic } from "@/primitives/Magnetic";
-import { Icon } from "@/primitives/icons";
 import { modeLabelFor, useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
-import { useUi } from "@/store/uiStore";
 
 export const WORDMARK = "Trade Journal";
 export const SUBTITLE = "Makro & Scalp · Entscheidungen, Win-Rate, Backtest";
 export const HEADER_CTA = "Trade eintragen";
-export const MENU_LABEL = "Navigation öffnen";
+/** Accessible name of the menu button: starts with the visible word („Menü“, label-in-name) and says what it opens. */
+export const MENU_LABEL = "Menü, Navigation öffnen";
+export const MENU_WORD = "Menü";
 
 const MODE_TONE: Record<StoreMode, StatusTone> = { cloud: "live", local: "warn", error: "error", connecting: "muted" };
 
@@ -168,7 +170,10 @@ function Wordmark({ decode, onDecoded }: { decode: number; onDecoded: () => void
   );
 }
 
-/** Three short bars (pack hamburger, Nothing grey); opens the full-screen command navigation (⌘K / Ctrl+K). */
+/**
+ * Three short bars (pack hamburger, Nothing grey); opens the menu: the search („Was willst du tun?“) and all pages in four groups
+ * (⌘K / Ctrl+K). From 1280 px the word „Menü“ stands beside the icon, below it the icon keeps its tooltip and `aria-label`.
+ */
 function MenuButton() {
   const open = useCommandNavOpen();
   return (
@@ -180,12 +185,15 @@ function MenuButton() {
       aria-expanded={open}
       aria-controls={open ? COMMAND_NAV_ID : undefined}
       title="Navigation (⌘K / Strg+K)"
-      className="touch-hit group/menu relative grid size-9 shrink-0 place-items-center rounded-xl border border-line-2 bg-ink-850 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg"
+      className="tap group/menu relative inline-flex shrink-0 xl:px-3 items-center justify-center gap-2 rounded-xl border border-line-2 bg-ink-850 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg"
     >
       <span aria-hidden="true" className="flex w-4 flex-col gap-[3px]">
         <span className="h-px w-full bg-current transition-transform duration-200 ease-out group-hover/menu:translate-x-[2px]" />
         <span className="h-px w-full bg-current" />
         <span className="h-px w-2/3 bg-current transition-transform duration-200 ease-out group-hover/menu:translate-x-[3px]" />
+      </span>
+      <span aria-hidden="true" className="max-xl:hidden text-[12.5px] font-medium text-fg">
+        {MENU_WORD}
       </span>
     </button>
   );
@@ -201,7 +209,6 @@ function MenuButton() {
 export function Header() {
   const mode = useJournal((s) => s.mode);
   const storage = useJournal((s) => s.storage);
-  const openEditor = useUi((s) => s.openEditor);
   const reduced = useReducedFx();
   const phase = useIntroPhase();
   const [decode, setDecode] = useState(0);
@@ -210,7 +217,9 @@ export function Header() {
   // signed in, the account pill carries the sync state (`Sync · live`, `Offline` …): one status, not two (P1-04) – a
   // journal that cannot persist still says so
   const accountSync = useCloudSession((s) => s.phase === "signedIn") && cloudEnabled();
-  const showMode = !accountSync || storage === "unavailable";
+  // the ordinary local mode is the badge (tap = explanation); the pill stays for cloud / offline / connecting / unsaved
+  const badge = useLocalBadgeOpen();
+  const showMode = (!accountSync || storage === "unavailable") && !badge;
   // five quick taps on the logo open / close the layer diagnostics (decision 7); the replay of a single tap waits for
   // the multi-tap window (MULTI_TAP.gapMs), so a series never replays the intro (which parks the header) mid-way
   const [taps] = useState(() => createTapCounter());
@@ -250,7 +259,7 @@ export function Header() {
         <motion.button
           type="button"
           onClick={onLogo}
-          className="touch-hit flex min-w-0 items-center gap-3 text-left"
+          className="touch-hit tap-y flex min-w-0 items-center gap-3 text-left"
           aria-label="Übersicht"
           initial={false}
           animate="rest"
@@ -274,8 +283,9 @@ export function Header() {
           </motion.span>
           <Wordmark decode={decode} onDecoded={() => setDecode(0)} />
         </motion.button>
-        <div className="flex shrink-0 items-center gap-3">
-          <HeaderTicker />
+        <div className="flex shrink-0 items-center gap-2 min-[360px]:gap-3">
+          {/* decorative: leaves below 360 px, where the 44 px buttons and the primary action need the room (320 px: the CTA was cut off) */}
+          <HeaderTicker className="max-[359px]:hidden" />
           {showMode && (
             <span className="hidden md:inline-flex" title={label.text}>
               <StatusPill tone={MODE_TONE[mode]} expanded label={label.text} feed="sync" />
@@ -283,18 +293,15 @@ export function Header() {
           )}
           {/* P09: login / sync state of the cloud (renders nothing without cloud) – the ONE `auth-sheet` morph source */}
           <AccountPill />
+          <LocalModeBadge />
           {/* grey-bar fix: hide the browser UI + system bars (Fullscreen API); lg+ only (at 768 the wordmark would run into the ticker) – narrower screens reach it in the command navigation */}
-          <AssistantButton />
-          <FullscreenButton className="max-lg:hidden" />
+          <AssistantButton label="Assistent" className="xl:px-3 max-xl:size-tap" />
+          <FullscreenButton className="max-lg:hidden xl:px-3 max-xl:size-tap" showLabel />
           <MenuButton />
-          <Magnetic intensity={0.25} range={120}>
-            <button type="button" onClick={() => openEditor()} className="shiny-cta inline-flex items-center gap-2 max-sm:!px-3 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:justify-center">
-              <span className="size-3.5 [&>svg]:size-full" aria-hidden="true">
-                <Icon name="plus" />
-              </span>
-              <span className="max-sm:sr-only">{HEADER_CTA}</span>
-            </button>
-          </Magnetic>
+          {/* from 768 px the primary action stands at the top of the sidebar (the same button) – the header stays slim */}
+          <div className="md:hidden">
+            <NewTradeButton className="max-sm:!px-3" labelClassName="max-sm:sr-only" />
+          </div>
         </div>
       </div>
       <HeaderEdge />

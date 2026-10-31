@@ -1,6 +1,6 @@
 import { motion, useIsPresent, type Transition } from "motion/react";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { PAGE_LABELS } from "@/app/Dock";
+import { PAGE_LABELS } from "@/app/navGroups";
 import { FEATURE_REGISTRY } from "@/app/features";
 import { KeyCombo, Kbd } from "@/app/Kbd";
 import { fullscreenSupported } from "@/app/pwa";

@@ -144,7 +144,7 @@ test("editor: Ausführung with fills, Tags & Bewertung, Psyche and a screenshot 
   const errors = collectErrors(page);
   await setup(page);
   await gotoTrades(page);
-  await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" }).click();
+  await page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" }).click();
   const editor = page.getByRole("dialog", { name: "Trade eintragen" });
   await expect(editor).toBeVisible();
   await expect(editor.locator("[inert] #f-entry")).toHaveCount(0);

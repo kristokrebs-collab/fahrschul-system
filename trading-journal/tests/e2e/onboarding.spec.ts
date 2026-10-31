@@ -1,6 +1,9 @@
 /**
- * P13 first-run tour end to end (the app's real routes, see `uxHarness.ts`): an empty journal starts the tour by
- * itself after the intro; Konten & Kapital writes the settings; Setups steps aside for the editor and comes back; the
+ * First run (Etappe 1a): NO modal any more – an empty first visit shows one empty state with one action („Ersten Trade eintragen“),
+ * which remembers the visit and opens the editor; whoever saw the former modal (a stored outcome) or has trades never sees it.
+ *
+ * P13 tour end to end (the app's real routes, see `uxHarness.ts`), started on purpose from Einstellungen → Einführung & Hilfe;
+ * Konten & Kapital writes the settings; Setups steps aside for the editor and comes back; the
  * Börse step tells the truth without the cloud; Ziel + "Halten zum Starten" (a real pointer hold) adds the goal,
  * celebrates and remembers "done" – a reload stays quiet. Skipping is remembered too, and the settings card starts the
  * tour again. A journal with trades is never interrupted. Mobile: the sheet fits (no horizontal scroll). No console errors.
@@ -24,17 +27,47 @@ test.describe("Einführung", () => {
     test.skip(!UX_PROJECTS.includes(info.project.name), "P13 runs on mobile + desktop");
   });
 
-  test("first run: five steps with real writes, the hold starts the journal, a reload stays quiet", async ({ page }) => {
+  test("first run: no modal; one empty state with one action opens the editor, remembers the visit, and stays gone after a reload", async ({ page }) => {
     const errors = collectErrors(page);
     await openUx(page, "app", "overview", { empty: true, firstRun: true });
+    const box = page.getByTestId("first-run-empty");
+    await expect(box).toBeVisible({ timeout: 20_000 });
+    await page.waitForTimeout(2500);
+    await expect(tour(page)).toHaveCount(0);
+    await expect(box.getByRole("button")).toHaveCount(1);
+    await expectNoHorizontalScroll(page);
+    await box.getByRole("button", { name: "Ersten Trade eintragen" }).click();
+    await expect(page.getByRole("dialog", { name: "Trade eintragen" })).toBeVisible();
+    expect(await stored<{ status: string }>(page, "tj2-onboarding")).toMatchObject({ status: "seen" });
+    await page.keyboard.press("Escape");
+    await page.reload();
+    await page.locator("main").waitFor();
+    await page.waitForTimeout(2000);
+    await expect(page.getByTestId("first-run-empty")).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test("whoever saw the former modal (a stored outcome) never sees the empty state", async ({ page }) => {
+    const errors = collectErrors(page);
+    await openUx(page, "app", "overview", { empty: true, firstRun: true, extra: { "tj2-onboarding": JSON.stringify({ status: "skipped", at: "", v: 1 }), "tj2share-onboarding": JSON.stringify({ status: "skipped", at: "", v: 1 }) } });
+    await page.waitForTimeout(2500);
+    await expect(page.getByTestId("first-run-empty")).toHaveCount(0);
+    await expect(tour(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test("the tour: five steps with real writes, the hold starts the journal, a reload stays quiet", async ({ page }) => {
+    const errors = collectErrors(page);
+    await openUx(page, "app", "settings", { empty: true, firstRun: true });
+    await page.getByRole("button", { name: "Einführung starten" }).click();
     await expect(tour(page)).toBeVisible({ timeout: 20_000 });
     await expect(step(page)).toHaveAttribute("data-step", "start");
     await expect(tour(page).getByRole("list", { name: "Fortschritt der Einführung" })).toBeVisible();
     await expectNoHorizontalScroll(page);
 
     await next(page, "konten");
-    await page.getByLabel(/Startkapital Makro/).fill("25.000");
-    await page.getByLabel(/Startkapital Scalp/).fill("5000");
+    await tour(page).getByLabel(/Startkapital Makro/).fill("25.000");
+    await tour(page).getByLabel(/Startkapital Scalp/).fill("5000");
     await page.getByRole("radio", { name: "EUR" }).click();
     await expectNoHorizontalScroll(page);
     await next(page, "setups");
@@ -83,6 +116,7 @@ test.describe("Einführung", () => {
   test("skip is remembered; the settings card starts the tour again; Zurück goes back", async ({ page }) => {
     const errors = collectErrors(page);
     await openUx(page, "app", "settings", { empty: true, firstRun: true });
+    await page.getByRole("button", { name: "Einführung starten" }).click();
     await expect(tour(page)).toBeVisible({ timeout: 20_000 });
     await page.getByTestId("tour-skip").click();
     await expect(tour(page)).toBeHidden();

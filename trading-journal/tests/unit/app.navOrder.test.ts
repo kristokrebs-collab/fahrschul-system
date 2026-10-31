@@ -3,26 +3,41 @@
  * (`g` + letter), the search and the assistant read the same list. A page added later must find its place in every one of them.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { PAGE_ICON, PAGE_LABELS } from "@/app/Dock";
+import { groupOfPage, PAGE_HINT, PAGE_ICON, PAGE_LABELS } from "@/app/navGroups";
 import { COMMAND_NAV_STRINGS, markPageVisited, NAV_GROUPS, NEW_PAGES, readVisitedPages } from "@/app/CommandNav";
 import { shortcutList } from "@/app/shortcuts";
 import { buildSearchIndex } from "@/search/sources";
 import { defaultSettings } from "@/domain/defaults";
-import { DOCK_PAGES, NAV_ORDER, PAGE_KEYS, PAGES } from "@/store/uiStore";
+import { DOCK_PAGES, NAV_ORDER, PAGE_KEYS, PAGES, SLIDE_ORDER } from "@/store/uiStore";
 
 describe("order of the pages", () => {
-  it("starts with the dock tabs in the dock's order: the digits 1–5 of the navigation are the tabs", () => {
-    expect(PAGES.slice(0, DOCK_PAGES.length)).toEqual([...DOCK_PAGES]);
-    expect([...NAV_ORDER]).toEqual([...PAGES]);
+  it("keeps the digits of the navigation: the first five of PAGES are the former dock tabs; the bar's tabs are real pages", () => {
+    expect(PAGES.slice(0, 5)).toEqual(["overview", "trades", "setups", "markt", "settings"]);
+    for (const p of DOCK_PAGES) expect(PAGES).toContain(p);
+    expect([...DOCK_PAGES]).toEqual(["overview", "trades", "markt"]);
   });
 
-  it("groups every other page of the navigation exactly once, in the order of the digits", () => {
-    const rest = PAGES.slice(DOCK_PAGES.length);
-    expect(NAV_GROUPS.flatMap((g) => g.pages)).toEqual([...rest]);
+  it("puts every one of the 19 pages into exactly one of the four groups; the navigation order is the groups flat", () => {
+    expect(NAV_GROUPS.map((g) => g.id)).toEqual(["erfassen", "pruefen", "auswerten", "konto"]);
+    expect(NAV_GROUPS.map((g) => g.label)).toEqual(["Erfassen", "Prüfen", "Auswerten", "Konto & Rechtliches"]);
+    const flat = NAV_GROUPS.flatMap((g) => g.pages);
+    expect([...flat].sort()).toEqual([...PAGES].sort());
+    expect(new Set(flat).size).toBe(PAGES.length);
+    expect([...NAV_ORDER]).toEqual(flat);
     for (const g of NAV_GROUPS) {
       expect(COMMAND_NAV_STRINGS.groups[g.id], g.id).toBeTruthy();
-      expect(g.pages.length, g.id).toBeGreaterThanOrEqual(2);
+      expect(g.pages.length, g.id).toBeGreaterThanOrEqual(3);
+      for (const p of g.pages) expect(groupOfPage(p)).toBe(g.id);
     }
+    // the slide direction on a phone: the bar's tabs first, left to right
+    expect(SLIDE_ORDER.slice(0, DOCK_PAGES.length)).toEqual([...DOCK_PAGES]);
+    expect([...SLIDE_ORDER].sort()).toEqual([...PAGES].sort());
+  });
+
+  it("gives every page a plain-word hint (no empty, no duplicates) – what a beginner understands", () => {
+    const hints = PAGES.map((p) => PAGE_HINT[p]);
+    for (const h of hints) expect(h.length).toBeGreaterThan(5);
+    expect(new Set(hints).size).toBe(PAGES.length);
   });
 
   it("gives each page a label, an icon and one letter of its own for `g`, and shows the letters in the sheet", () => {

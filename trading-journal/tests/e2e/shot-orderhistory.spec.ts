@@ -53,7 +53,7 @@ async function signIn(page: Page): Promise<void> {
   await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
-const fab = (page: Page) => page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" });
+const fab = (page: Page) => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" });
 type Journal = { __tjJournal: { getState(): { trades: Record<string, unknown>[] } } };
 const journalCount = (page: Page) => page.evaluate(() => (window as unknown as Journal).__tjJournal.getState().trades.length);
 

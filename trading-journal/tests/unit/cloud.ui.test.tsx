@@ -2,7 +2,7 @@
  * P09 cloud UI: Konto page states (no cloud / signed out / signed in), the login sheet's validation and error paths
  * (Supabase chunk mocked), the code slots, the privacy switches and the cloud variant of the local-mode banner.
  */
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const signInPassword = vi.fn();
@@ -23,7 +23,7 @@ vi.mock("@/cloud/runtime", async (orig) => {
   };
 });
 
-const { LocalModeBanner } = await import("@/app/LocalModeBanner");
+const { LocalModeBadge } = await import("@/app/LocalModeBadge");
 const { setCloudEnabledForTests } = await import("@/cloud/env");
 const { DEFAULT_PRIVACY, readPrivacy, usePrivacy } = await import("@/cloud/privacy");
 const { resetCloudSession, useCloudSession, openAuthSheet } = await import("@/cloud/session");
@@ -214,15 +214,18 @@ describe("PrivacyCard + banner", () => {
     expect(readPrivacy().leaderboard).toBe(true);
   });
 
-  it("local banner with a cloud: talks about the login, not about claude.ai", () => {
+  it("local badge with a cloud: its explanation talks about the login, not about claude.ai", async () => {
     resetJournal();
     useUi.setState({ hideLocalBanner: false });
     useCloudSession.setState({ phase: "signedOut" });
     act(() => useJournal.setState({ mode: "local", storage: "ok" }));
-    render(<LocalModeBanner />);
-    expect(screen.getByText(/Melde dich an, dann ist dein Journal auf allen Geräten synchron/)).toBeInTheDocument();
-    expect(screen.queryByText(/claude\.ai/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Anmelden" }));
+    render(<LocalModeBadge />);
+    fireEvent.click(screen.getByTestId("local-badge"));
+    const panel = await screen.findByTestId("local-badge-panel");
+    expect(within(panel).getByText(/Melde dich an, dann ist dein Journal auf allen Geräten synchron/)).toBeInTheDocument();
+    expect(within(panel).queryByText(/claude\.ai/)).toBeNull();
+    fireEvent.click(within(panel).getByRole("button", { name: "Anmelden" }));
     expect(useCloudSession.getState().sheet).toMatchObject({ open: true, view: "signin", source: "banner" });
   });
 });
+

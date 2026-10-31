@@ -56,7 +56,7 @@ export function NavFinder({ onOpen, onAll }: NavFinderProps) {
             e.preventDefault();
             onAll();
           }}
-          className="inline-flex items-center gap-1 rounded-md text-[12.5px] text-mute underline decoration-line-2 underline-offset-4 outline-none transition-colors hover:text-fg hover:decoration-fg focus-visible:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white pointer-coarse:min-h-11"
+          className="inline-flex items-center gap-1 rounded-md text-[12.5px] text-mute underline decoration-line-2 underline-offset-4 outline-none transition-colors hover:text-fg hover:decoration-fg focus-visible:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white min-h-tap"
         >
           {NAV_FINDER_STRINGS.all}
           <span aria-hidden="true">→</span>

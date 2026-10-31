@@ -144,7 +144,7 @@ test.describe("editor from the FAB", () => {
     const errors = collectErrors(page);
     await seed(page);
     await gotoOverview(page);
-    const fab = page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" });
+    const fab = page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" });
     await fab.click();
     for (let i = 0; i < 3; i++) {
       await page.waitForTimeout(80);

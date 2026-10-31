@@ -1,8 +1,9 @@
 /**
  * Zusammenhang & Navigation (Feinschliff, Runde 8), mit echten Klicks, mobil 390 + Desktop:
- *  - die Befehlsnavigation: die fünf Dock-Seiten in Dock-Reihenfolge, dann vier Gruppen nach Aufgabe; die Zahlen 1–5 sind die Dock-
- *    Tabs, 6–9 Handelsplan, Aktien, Risiko, Analyse; "Neu" an den drei jüngsten Seiten, bis sie einmal offen waren;
- *  - die Tasten: `g` + Buchstabe (h, i, f …) und `[` / `]` in der Reihenfolge der Seiten;
+ *  - die Befehlsnavigation (das Menü hinter „Mehr“ / der Menü-Knopf): alle 19 Seiten in vier Gruppen (Erfassen, Prüfen, Auswerten,
+ *    Konto & Rechtliches) mit je einem Anfänger-Wort; die Zahlen 1–9 springen wie immer zu den ersten neun Seiten der Liste
+ *    (Übersicht, Trades, Grundlagen, Markt, Einstellungen, Handelsplan, Aktien, Risiko, Analyse); "Neu" an den drei jüngsten Seiten;
+ *  - die Tasten: `g` + Buchstabe (h, i, f …) und `[` / `]` in der Reihenfolge der Navigation;
  *  - "Siehe auch" zwischen Seiten: ein Klick öffnet die Stelle und bringt die Karte ins Bild;
  *  - der Finder (Menü und Suche `/`) findet die spät gekommenen Bereiche mit Worten des Traders;
  *  - Barrierefreiheit (axe) der Navigation und der Zeilen, dunkel und hell.
@@ -51,21 +52,23 @@ test.describe("Navigation: Reihenfolge, Gruppen, Zahlen, Tasten", () => {
     await openPage(page, "overview");
     const nav = await openNav(page);
     const pages = nav.getByRole("navigation", { name: "Seiten" });
-    const hrefs = await pages.locator("a").evaluateAll((els) => els.map((e) => e.getAttribute("href")));
-    expect(hrefs).toEqual(["#overview", "#trades", "#setups", "#markt", "#settings", "#plan", "#aktien", "#risiko", "#analyse", "#berichte", "#coach", "#wachstum", "#labor", "#studio", "#community", "#cockpit", "#konto", "#preise", "#funktionen"]);
-    const groups = await nav.getByTestId("cmd-group").evaluateAll((els) => els.map((e) => ({ id: e.getAttribute("data-group"), name: e.getAttribute("aria-label"), n: e.querySelectorAll("a").length })));
+    const hrefs = await pages.locator('a[href^="#"]').evaluateAll((els) => els.map((e) => e.getAttribute("href")));
+    expect(hrefs).toEqual(["#trades", "#plan", "#setups", "#overview", "#markt", "#aktien", "#risiko", "#analyse", "#berichte", "#coach", "#wachstum", "#cockpit", "#labor", "#studio", "#settings", "#konto", "#community", "#preise", "#funktionen"]);
+    const groups = await nav.getByTestId("cmd-group").evaluateAll((els) => els.map((e) => ({ id: e.getAttribute("data-group"), name: e.getAttribute("aria-label"), n: e.querySelectorAll('a[href^="#"]').length })));
     expect(groups).toEqual([
-      { id: "handeln", name: "Planen & Handeln", n: 3 },
-      { id: "lernen", name: "Auswerten & Lernen", n: 4 },
-      { id: "strategien", name: "Strategien", n: 2 },
-      { id: "mehr", name: "Mehr", n: 5 },
+      { id: "erfassen", name: "Erfassen", n: 3 },
+      { id: "pruefen", name: "Prüfen", n: 4 },
+      { id: "auswerten", name: "Auswerten", n: 7 },
+      { id: "konto", name: "Konto & Rechtliches", n: 5 },
     ]);
+    // every page says in plain words what it is for
+    await expect(nav.getByTestId("cmd-hint")).toHaveCount(19);
     // "Neu" on exactly the three newest pages
     const fresh = await nav.getByTestId("cmd-new").evaluateAll((els) => els.map((e) => e.closest("a")?.getAttribute("href")));
     expect(fresh).toEqual(["#plan", "#aktien", "#studio"]);
     await expectNoHorizontalScroll(page);
 
-    // the digits: 1–5 are the dock tabs, 6 is the first page of the groups
+    // the digits: 1–9 are the first nine pages of the list (they never moved), 6 is the Handelsplan
     await page.keyboard.press("4");
     await expect(page).toHaveURL(/#markt$/);
     await expect(navDialog(page)).toBeHidden({ timeout: 10_000 });
@@ -96,7 +99,7 @@ test.describe("Navigation: Reihenfolge, Gruppen, Zahlen, Tasten", () => {
     await page.locator("body").press("g");
     await page.locator("body").press("i");
     await expect(page).toHaveURL(/#aktien$/);
-    // `]` goes on to the next page in the order of the navigation: Aktien → Risiko → Analyse; `[` goes back
+    // `]` goes on to the next page in the order of the navigation (Prüfen: … Aktien → Risiko, then Auswerten: Analyse); `[` goes back
     await page.locator("body").press("]");
     await expect(page).toHaveURL(/#risiko$/);
     await page.locator("body").press("]");

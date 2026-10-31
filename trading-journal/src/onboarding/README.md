@@ -1,4 +1,9 @@
-# `src/onboarding` – first-run tour (P13)
+# `src/onboarding` – first-run tour (P13) and the first-run empty state (Etappe 1a)
+
+**Since Etappe 1a the tour no longer opens by itself.** An empty first visit shows `FirstRunEmpty` (`FirstRunEmpty.tsx`, mounted in `App.tsx` above the page): a dashed empty state with exactly ONE action, „Ersten Trade eintragen“
+(it stores `seen` and opens the editor) and one line of text saying where the tour and the demo live. It shows only when the journal is loaded and empty, nothing is stored under `onboarding` (a visitor who saw the former modal has
+`done` / `skipped`, a trader with trades `seen` – they never see it), no share link is on screen, and only on Übersicht and Trades (`firstRunVisible`, pure). `OnboardingHost` still marks a journal with trades as `seen` (also when the first
+trade arrives later), but never calls `startOnboarding("auto")`; the tour starts only on purpose (Einstellungen → Einführung & Hilfe, the search, the shortcut sheet). Everything below describes the tour itself.
 
 Six short steps that set the journal up for real, then get out of the way: **Start → Konten & Kapital → Setups →
 Börse → Mehr → Ziel**. Only on the first run, after the intro, skippable at every step, restartable from the settings, the

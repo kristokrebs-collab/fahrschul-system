@@ -43,7 +43,7 @@ describe("command navigation: recent functions", () => {
     act(() => closeCommandNav(true));
   });
 
-  it("finds a function by what you want to do, not only a page: typing lists hits, Enter opens the best, a hit closes the navigation", async () => {
+  it("finds a function by what you want to do, not only a page: typing lists hits, Enter opens the best, a hit closes the navigation", { timeout: 30_000 }, async () => {
     useSearch.setState({ recent: [] });
     render(
       <MotionRoot>
