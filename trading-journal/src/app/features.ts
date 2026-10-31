@@ -433,7 +433,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     group: "pruefen",
     sub: "Chancen finden",
     page: "overview",
-    anchor: { testid: "trader-net" },
+    anchor: { testid: "trader-net", heading: "Top Trader" },
     place: "Einstiegs-Check › Top-Trader (Binance)",
     keywords: ["Top-Trader", "netto", "Long", "Short", "umgeschlagen", "Vorzeichen", "Wale", "Positionierung", "Nulllinie", "Binance"],
     intents: ["wale netto short", "wale flippen", "top trader netto", "große konten long short", "seit wann sind top trader short", "positionierung gedreht", "netto long minus short", "whales short", "umschlag top trader"],

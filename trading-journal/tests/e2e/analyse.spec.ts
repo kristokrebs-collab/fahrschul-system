@@ -239,8 +239,16 @@ test.describe("Analyse", () => {
     await waitForStableLayout(page);
     const card = page.getByTestId("ana-custom");
     await card.scrollIntoViewIfNeeded();
-    await card.getByTestId("custom-metric").click();
-    await page.getByRole("option", { name: "Ø R" }).click();
+    // scrolling mounts the cards around it (`Later`) – let them settle, the open list closes when its trigger moves
+    await waitForStableLayout(page);
+    // a tap that lasts longer than the press-hold time (a busy runner) is read as a hold and does not open the list: tap
+    // again until it is open (`aria-expanded` says so, a second tap on an open list would close it)
+    const metric = card.getByTestId("custom-metric");
+    await expect(async () => {
+      if ((await metric.getAttribute("aria-expanded")) !== "true") await metric.click();
+      await page.getByRole("option", { name: "Ø R" }).click({ timeout: 3_000 });
+      await expect(metric).toContainText("Ø R", { timeout: 2_000 });
+    }).toPass({ timeout: 40_000 });
     await card.getByRole("radio", { name: "Long" }).click();
     await expect(card.getByTestId("custom-preview")).toContainText("Ø R · Long · nach Session");
     await card.getByTestId("custom-save").click();

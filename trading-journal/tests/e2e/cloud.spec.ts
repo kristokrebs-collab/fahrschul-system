@@ -79,7 +79,11 @@ test.describe("Konto & Cloud", () => {
     await seed(page);
     await open(page);
     await expect(page.getByText("Ein Journal. Alle Geräte.")).toBeVisible();
-    await expect(page.getByText("Melde dich an, dann ist dein Journal auf allen Geräten synchron.", { exact: false })).toBeVisible();
+    // the local-mode hint is a badge now (Runde 9): a tap explains it, Escape puts it away again
+    await page.getByTestId("local-badge").click();
+    await expect(page.getByTestId("local-badge-panel").getByText("Melde dich an, dann ist dein Journal auf allen Geräten synchron.", { exact: false })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("local-badge-panel")).toHaveCount(0);
     await expectNoHorizontalScroll(page);
     await shot(page, info, "signed-out");
 
