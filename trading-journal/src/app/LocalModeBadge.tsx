@@ -1,10 +1,16 @@
 import { Popover as PopoverPrimitive } from "radix-ui";
 import { useState } from "react";
 import { useLocalBadgeOpen, useLocalModeCopy } from "@/app/LocalModeBanner";
+import { useIdleCycle } from "@/app/shellFx";
 import { openAuthSheet } from "@/cloud/session";
 import { cn } from "@/lib/cn";
+import { PulseDot } from "@/motion/PulseDot";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Icon } from "@/primitives/icons";
+
+/** The badge's dot pulses again this long after the last time (ms). */
+const PULSE_EVERY_MS = 60_000;
 
 export const LOCAL_BADGE = {
   /** visible word (wide header) and the short word (narrow) */
@@ -29,6 +35,8 @@ export function LocalModeBadge({ className }: { className?: string }) {
   const show = useLocalBadgeOpen();
   const copy = useLocalModeCopy();
   const [open, setOpen] = useState(false);
+  const reduced = useReducedFx();
+  const round = useIdleCycle({ active: show && !open, firstMs: PULSE_EVERY_MS, everyMs: PULSE_EVERY_MS, max: 3 }, reduced);
   if (!show) return null;
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
@@ -42,7 +50,8 @@ export function LocalModeBadge({ className }: { className?: string }) {
             className,
           )}
         >
-          <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-warn" />
+          {/* a soft pulse: three rings when the badge appears, then again once a minute (three times at most) – never a loop */}
+          <PulseDot key={round} tone="warn" size={6} rings={1} />
           <span aria-hidden="true" className="max-sm:hidden xl:hidden">
             {LOCAL_BADGE.short}
           </span>

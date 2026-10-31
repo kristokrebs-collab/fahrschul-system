@@ -39,6 +39,7 @@
  */
 import { animate, frame, type AnimationPlaybackControls } from "motion/react";
 import { Activity, memo, startTransition, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { groupOfPage, WIDE_QUERY } from "@/app/navGroups";
 import { isSafeFx } from "@/app/pwa";
 import { cn } from "@/lib/cn";
 import { useHoldProjectionOnHide, useSettleProjectionOnShow } from "@/motion/activityProjection";
@@ -47,18 +48,32 @@ import { consumeNavTempo, contextSpringAt } from "@/motion/physics";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { detachShell, showPage } from "@/store/router";
-import { PAGES, SLIDE_ORDER, type Page } from "@/store/uiStore";
+import { NAV_GROUP_IDS, NAV_ORDER, PAGES, SLIDE_ORDER, type Page } from "@/store/uiStore";
 
 export type PageRole = "current" | "leaving" | "parked";
 
 /** Enter/exit offsets of the page transition (px), mirrored from `PageSwitch`. */
 export const PAGE_ENTER_X = 16;
 export const PAGE_EXIT_X = 12;
-const ENTER_FROM = (dir: number) => `translateX(${dir * PAGE_ENTER_X}px) scale(0.985)`;
+/**
+ * Runde 10 – the slide is DIRECTED by the navigation: a step inside one group is short (12 px), the usual step to the neighbouring
+ * group is the old 16 px, and every further group boundary crossed lengthens it by 4 px, to a calm 24. The exit keeps the old
+ * ratio (12 : 16). Duration and spring are the same for all of them (the rest thresholds scale with the slide, so they all settle
+ * together); the Übersicht ↔ Trades step, by far the most common, is unchanged.
+ */
+export function pageShiftPx(from: Page, to: Page): number {
+  const gap = Math.abs(NAV_GROUP_IDS.indexOf(groupOfPage(from)) - NAV_GROUP_IDS.indexOf(groupOfPage(to)));
+  return PAGE_ENTER_X - 4 + Math.min(3, gap) * 4;
+}
+/** The order the reader SEES: the sidebar's groups from 768 px, the bottom bar's tabs then the groups below it. */
+function slideOrder(): readonly Page[] {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(WIDE_QUERY).matches ? NAV_ORDER : SLIDE_ORDER;
+}
+const ENTER_FROM = (dir: number, px: number) => `translateX(${dir * px}px) scale(0.985)`;
 // same transform template at both ends (the jsdom / JS fallback can only mix matching templates); `none` is set after
 const ENTER_TO = "translateX(0px) scale(1)";
 const EXIT_FROM = "translateX(0px)";
-const EXIT_TO = (dir: number) => `translateX(${-dir * PAGE_EXIT_X}px)`;
+const EXIT_TO = (dir: number, px: number) => `translateX(${-dir * Math.round((px * PAGE_EXIT_X) / PAGE_ENTER_X)}px)`;
 const BLUR_FROM = "blur(4px)";
 const BLUR_TO = "blur(0px)";
 /**
@@ -170,8 +185,8 @@ export function afterNextPaint(fn: () => void): () => void {
 }
 
 /** Pure: slide direction of a switch in navigation order (`SLIDE_ORDER`: the bar's tabs, then the groups; `+1` → the new page comes from the right). */
-export function pageDirection(from: Page, to: Page): 1 | -1 {
-  return SLIDE_ORDER.indexOf(to) >= SLIDE_ORDER.indexOf(from) ? 1 : -1;
+export function pageDirection(from: Page, to: Page, order: readonly Page[] = SLIDE_ORDER): 1 | -1 {
+  return order.indexOf(to) >= order.indexOf(from) ? 1 : -1;
 }
 
 /** Pure: the role of `page`'s layer, or `null` when it is not mounted. */
@@ -185,6 +200,8 @@ interface Nav {
   current: Page;
   leaving: Page | null;
   dir: 1 | -1;
+  /** slide distance of this switch (px, `pageShiftPx`) */
+  px: number;
   /** increments per switch; the transition effect runs once per value */
   seq: number;
 }
@@ -302,11 +319,11 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
     if (target === page) return;
     return afterNextPaint(() => startTransition(() => setTarget(page)));
   }, [page, target]);
-  const [nav, setNav] = useState<Nav>(() => ({ current: page, leaving: null, dir: 1, seq: 0 }));
+  const [nav, setNav] = useState<Nav>(() => ({ current: page, leaving: null, dir: 1, px: PAGE_ENTER_X, seq: 0 }));
   let view = nav;
   if (nav.current !== target) {
     // state from props: the previous page becomes the leaving layer (a still-leaving older page is dropped at once)
-    view = { current: target, leaving: nav.current, dir: pageDirection(nav.current, target), seq: nav.seq + 1 };
+    view = { current: target, leaving: nav.current, dir: pageDirection(nav.current, target, slideOrder()), px: pageShiftPx(nav.current, target), seq: nav.seq + 1 };
     setNav(view);
   }
 
@@ -346,7 +363,7 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
     [],
   );
 
-  const { current, leaving, dir, seq } = view;
+  const { current, leaving, dir, px, seq } = view;
   useLayoutEffect(() => {
     // shown again before it was parked: the layer was collapsed after its exit – give it its height back BEFORE the
     // queued scroll restore runs, or the restore is clamped to the document without it (Übersicht at 1 400 px → Trades →
@@ -368,7 +385,8 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
     const exitEl = layers.current.get(leaving);
     // a dock flick hands over its tempo (one-shot): a fast flick gets a slightly shorter, livelier slide; every other
     // switch (tap, keyboard, back button) gets `spring.pageEnter` itself
-    const enterSpring = contextSpringAt(ENTER_SPRING, consumeNavTempo());
+    // the rest thresholds follow the slide's length (0.5 px / 2 px·s⁻¹ on `px`): every switch settles at the same moment
+    const enterSpring = contextSpringAt(px === PAGE_ENTER_X ? ENTER_SPRING : { ...ENTER_SPRING, restDelta: 50 / px, restSpeed: 200 / px }, consumeNavTempo());
     const enter: AnimationPlaybackControls[] = [];
     const exit: AnimationPlaybackControls[] = [];
     if (exitEl) {
@@ -381,7 +399,7 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
         if (enterEl) focusLayer(enterEl);
         else focused.blur();
       }
-      exit.push(animate(exitEl, reduced ? { opacity: [1, 0] } : { transform: [EXIT_FROM, EXIT_TO(dir)], opacity: [1, 0] }, tween.exit));
+      exit.push(animate(exitEl, reduced ? { opacity: [1, 0] } : { transform: [EXIT_FROM, EXIT_TO(dir, px)], opacity: [1, 0] }, tween.exit));
     }
     if (enterEl) {
       enterEl.style.top = "";
@@ -393,9 +411,9 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
         // Samsung-Internet-safe effects (`data-safe-fx`, decision 7): no blur – a filter over the whole page layer is the
         // most expensive thing the tablet's compositor could run during a switch; slide + fade stay
         const blur = !isSafeFx();
-        enterEl.style.transform = ENTER_FROM(dir);
+        enterEl.style.transform = ENTER_FROM(dir, px);
         enterEl.style.filter = blur ? BLUR_FROM : "none";
-        enter.push(animate(enterEl, { transform: [ENTER_FROM(dir), ENTER_TO] }, enterSpring));
+        enter.push(animate(enterEl, { transform: [ENTER_FROM(dir, px), ENTER_TO] }, enterSpring));
         enter.push(animate(enterEl, blur ? { opacity: [0, 1], filter: [BLUR_FROM, BLUR_TO] } : { opacity: [0, 1] }, ENTER_FADE));
       } else {
         // a parked page may still carry its last exit offset
@@ -436,7 +454,7 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
         if (live()) setNav((n) => (n.seq === seq && n.leaving ? { ...n, leaving: null } : n));
       });
     });
-  }, [current, leaving, dir, seq, reduced]);
+  }, [current, leaving, dir, px, seq, reduced]);
 
   return (
     <div className={cn("relative", className)}>

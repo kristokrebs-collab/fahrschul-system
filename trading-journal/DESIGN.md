@@ -903,3 +903,16 @@ der Suche und des Assistenten (`revealCard` / `revealSection`) sowie der Sprung 
 Die Wahl wird je Browser gemerkt (`tj2-folds`). Eingeklappt: Markt – Squeeze, Preis- & RSI-Struktur, Ähnliche Situationen, Alarme & Zustellprotokoll, Ereignisphasen,
 Box-Einstellungen; Einstellungen – Live-Daten, Hyblock-Connector, Datenarchiv, Version & Speicher; Berichte – Transaktionsbuch. Die Übersicht und das Cockpit sind unberührt.
 
+## Rahmen in Bewegung: Seitenleiste, untere Leiste, Menü, Kopfzeile (Runde 10)
+
+Die Hülle bewegt sich reicher als der Inhalt – ruhig, mit Federn aus `src/motion`, an wenigen Stellen verspielt; Übersicht und Cockpit bleiben im Inhalt unverändert.
+- **Seitenleiste.** Die schmale Leiste (64 px) öffnet sich bei Maus, Tastaturfokus oder Berührung **über** die Seite auf 256 px; die Seite behält ihren Platz. Eine einzige Feder
+  (CSS `linear()`) führt Beschnitt, Kante und Schatten; die Namen blenden von oben nach unten gestaffelt ein. Die Markierung gleitet und streckt sich beim Reisen. Fest ausklappen bleibt die Wahl des Lesers.
+- **Zeichnen.** Die Symbole der Seitenleiste zeichnen sich beim ersten Laden einmal pro Sitzung Strich für Strich von oben nach unten (`stroke-dashoffset`, leichter Lichtakzent); die untere Leiste zeichnet das Symbol beim Wechsel neu.
+- **Untere Leiste und Menü.** „Trade“ in der Mitte lässt ab und zu ein Halo atmen und einen Lichtstreifen laufen (höchstens achtmal je Seitenaufruf, nie bei offenem Editor); Aktion und Form unverändert. „Mehr“ ist am Handy ein Blatt
+  von unten (Ziehen am Kopf schließt), alle Einträge starten innerhalb von 0,6 s; der Burger wird zum Kreuz.
+- **Kopfzeile.** Der Kurs ist ein Zählwerk (`RollingDigits`), das Schild „Lokaler Modus“ pulsiert dreimal sanft (danach höchstens dreimal im Minutentakt), Hell/Dunkel dreht Sonne und Mond, und der Kreis des Themenwechsels wächst ruhiger (620 ms).
+- **Seitenwechsel.** Die Schieberichtung folgt der Reihenfolge, die der Leser sieht (die Gruppen der Seitenleiste), die Länge den überquerten Gruppen (12 – 24 px); Dauer und Feder bleiben.
+- **Finder im Menü.** Das Feld wärmt sich bei Fokus auf, die Treffer öffnen sich auf einer Feder, steigen gestaffelt ein, die Auswahl gleitet.
+- Regeln wie überall: nur `transform` / `opacity` / `clip-path`, `prefers-reduced-motion` = sofort fertig, keine Dauerschleife (Glanz und Puls sind endlich und schlafen bei verdecktem Tab), Tippflächen ≥ 44 px. Einzelheiten: `src/app/README.md`.
+
