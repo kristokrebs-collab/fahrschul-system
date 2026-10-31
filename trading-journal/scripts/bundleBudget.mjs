@@ -27,12 +27,14 @@ import { gzipSync } from "node:zlib";
  * holds the whole first-load app code that P13 still split into ~80 shared chunks), recharts 103.3, react 65.8,
  * motion 50.1, lwc 55.1 (lazy), largest lazy chunk 62.4 (Supabase client). The first-load budget is TIGHTER than P13's
  * (840 → 800); `index` moves to ~10 % above the new measure.
+ * Runde 9: `index` 560 → 575 – the short trade form (editor stays in the main chunk), the sidebar and the four-group menu
+ * add ~12 KiB gz together; the first-load total (780 / 800 KiB) is the limit that matters and stays.
  */
 export const BUDGETS = {
   initialJs: 800,
   initialCss: 46,
   chunk: 120,
-  named: { index: 560, react: 72, motion: 58, recharts: 114, lwc: 62 },
+  named: { index: 575, react: 72, motion: 58, recharts: 114, lwc: 62 },
 };
 
 /** Lazy P13 chunks (file name prefix) that must stay out of the first load. */
