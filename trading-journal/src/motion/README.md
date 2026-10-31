@@ -1,5 +1,7 @@
 # `src/motion` – motion system
 
+Welche der 177 Inventarpunkte (Effekte, Knöpfe, Text, Scroll, Diagramme) vorhanden, neu, offen oder bewusst nicht gebaut sind: [`docs/ANIMATIONEN-MATRIX.md`](../../docs/ANIMATIONEN-MATRIX.md).
+
 Apple-grade motion layer for the Trade Journal, tuned for 120 Hz. Everything animates only `transform`, `opacity`,
 `filter` and `clip-path`; size/position changes go through `layout`/`layoutId`; every `layout` element sets
 `borderRadius` via `style` from `radius`; every spring/tween/stagger/dwell comes from `tokens.ts` (no local timing

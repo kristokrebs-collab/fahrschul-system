@@ -4,6 +4,8 @@ Abgeleitet aus dem Bestand (PR #3: Übersicht, Trades, Grundlagen, Einstellungen
 `src/primitives`, `src/motion`). Keine neue Richtung – dieses Dokument hält fest, was die App schon ist, damit jede neue
 Seite und jede Verfeinerung gleich aussieht. Regel des Owners: „alles in dem Stil lassen“ – nur verfeinern und ergänzen.
 
+Bewegung im Überblick: [`docs/ANIMATIONEN-MATRIX.md`](docs/ANIMATIONEN-MATRIX.md) – alle 177 Inventarpunkte einzeln (vorhanden, neu, offen, bewusst nicht, nicht prüfbar).
+
 ## Designthese
 
 **Ein schwarzes Messinstrument im Nothing-Stil: Tinte, Haarlinien und Mono-Labels treten zurück, damit die eine Zahl
