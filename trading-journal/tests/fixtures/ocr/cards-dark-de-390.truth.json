@@ -1,0 +1,92 @@
+{
+  "trades": [
+    {
+      "pair": "BTC/USDT",
+      "side": "long",
+      "qty": 0.0159,
+      "entry": 80726.1,
+      "exit": 80507.1,
+      "pnl": -5.0911759,
+      "leverage": 13,
+      "openTime": "2026-10-24 14:17:29",
+      "closeTime": "2026-10-24 15:01:11"
+    },
+    {
+      "pair": "BTC/USDT",
+      "side": "short",
+      "qty": 0.01,
+      "entry": 81132.4,
+      "exit": 80946.1,
+      "pnl": 0.86043695,
+      "leverage": 15,
+      "openTime": "2026-10-24 03:09:40",
+      "closeTime": "2026-10-24 12:43:30"
+    },
+    {
+      "pair": "BTC/USDT",
+      "side": "short",
+      "qty": 0.0268,
+      "entry": 81724.4,
+      "exit": 81899.6,
+      "pnl": -7.72619518,
+      "leverage": 5,
+      "openTime": "2026-10-22 09:31:09",
+      "closeTime": "2026-10-24 01:24:47"
+    },
+    {
+      "pair": "SOL/USDT",
+      "side": "long",
+      "qty": 21.1,
+      "entry": 168.49,
+      "exit": 169.19,
+      "pnl": 9.99570218,
+      "leverage": 8,
+      "openTime": "2026-10-20 13:19:38",
+      "closeTime": "2026-10-22 04:57:50"
+    },
+    {
+      "pair": "XRP/USDT",
+      "side": "long",
+      "qty": 310,
+      "entry": 0.5375,
+      "exit": 0.539,
+      "pnl": 0.25261469,
+      "leverage": 13,
+      "openTime": "2026-10-19 18:53:36",
+      "closeTime": "2026-10-20 10:54:53"
+    },
+    {
+      "pair": "BTC/USDT",
+      "side": "long",
+      "qty": 0.0427,
+      "entry": 80189.6,
+      "exit": 80213.8,
+      "pnl": -3.44674021,
+      "leverage": 13,
+      "openTime": "2026-10-18 10:23:53",
+      "closeTime": "2026-10-19 18:26:26"
+    },
+    {
+      "pair": "BTC/USDT",
+      "side": "short",
+      "qty": 0.0089,
+      "entry": 82026.3,
+      "exit": 81872,
+      "pnl": 0.53378927,
+      "leverage": 15,
+      "openTime": "2026-10-17 22:31:52",
+      "closeTime": "2026-10-18 08:20:16"
+    },
+    {
+      "pair": "BTC/USDT",
+      "side": "short",
+      "qty": 0.0262,
+      "entry": 80037.5,
+      "exit": 79888.2,
+      "pnl": 1.53484265,
+      "leverage": 20,
+      "openTime": "2026-10-16 14:48:20",
+      "closeTime": "2026-10-17 20:36:18"
+    }
+  ]
+}

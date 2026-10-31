@@ -1,0 +1,14 @@
+{
+  "source": "TradingView-Konnektor, mcp-tv-get-economic-calendar (country US, category money, importance high), Titel 'Fed Interest Rate Decision'",
+  "fetchedAt": "2026-10-25",
+  "note": "Zweite, unabhängige Quelle für die FOMC-Entscheidungstage 2026 (nur das Datum zählt; die Uhrzeit des Konnektors wird nicht verwendet, die Fed-Seite nennt keine). Fenster 2026-01-01 bis 2026-10-30.",
+  "decisions": [
+    { "date": "2026-01-28", "at": "2026-01-28T19:00:00.000Z" },
+    { "date": "2026-03-18", "at": "2026-03-18T18:00:00.000Z" },
+    { "date": "2026-04-29", "at": "2026-04-29T18:00:00.000Z" },
+    { "date": "2026-06-17", "at": "2026-06-17T18:00:00.000Z" },
+    { "date": "2026-07-29", "at": "2026-07-29T18:00:00.000Z" },
+    { "date": "2026-09-16", "at": "2026-09-16T18:00:00.000Z" },
+    { "date": "2026-10-28", "at": "2026-10-28T18:00:00.000Z" }
+  ]
+}

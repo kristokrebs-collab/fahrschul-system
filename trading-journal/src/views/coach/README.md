@@ -1,0 +1,114 @@
+# `src/views/coach` – "Coach" (P04)
+
+`CoachView` (export of `index.ts`, `h1` "Coach") – a rule-based, evidence-first trading coach over the account of the
+Hero's switch (`uiStore.acc`). Everything is computed on the device from the journal by `@/domain/coach` (see its
+README): deterministic, with evidence trades, minimum samples and an honest confidence. Nothing here needs a server or
+an API key; the optional AI wording (`ask.ts`) only rephrases numbers that were already computed.
+
+| Row (lg, 12 columns) | Cards |
+|---|---|
+| header | `PageHeader` (title, lead with `COACH_LEAD_FILL` = `storageKey("fill-coach")`, account switch) |
+| Hero | `HeroCard` (12) – trading score as the hero numeral, lesson of the week, rotating tips, the score's parts |
+| Fragen · Heute | `ChatCard` (7) · `TodayCard` (5) |
+| Leaks & Edges | `EdgesCard` (12) |
+| Plan · Timeline | `PlanCard` (5) · `TimelineCard` (7) |
+| Profil | `ProfileCard` (12) |
+| Verpasste Chancen | `MissedCard` (12) – F32 |
+
+Phones: one column in the same order, no horizontal scroll at 390 px. Every cell is a `Reveal` (ends at
+`transform: none`).
+
+## Cards and effects
+- **Hero** (`HeroCard.tsx`): the trading score as the one big number (`ScoreHero`: Doto in the size of Analyse's Sharpe,
+  `NumberCascade`, `/ 100` muted in Plex Sans, the verdict pill; no `COACH` wordmark – the `h1` says it), the lesson of the week – the
+  first time per lesson (`storageKey("coach-lesson-<hash>")`) its words fill in with `PixelTextFill`, afterwards the key
+  phrase carries a `TactileHighlight` (`tab={false}`); short tips cycle with `TextMorph` (finite, `aria-hidden`, the list
+  is in an `sr-only` copy); the score's parts (`ScoreParts`: Edge · Disziplin · Risikokonstanz · Journaling as four
+  growing bars, the biggest lever), "Zu wenig Daten" under 10 trades.
+- **Frag deinen Coach** (`ChatCard.tsx`): German questions → `askJournal` (`@/domain/coach/nlq`). "Coach denkt …"
+  shimmers for one reveal, then the answer types itself (`CoachStream`, 65 ms / character, capped), the facts land with
+  `ValueFlash`, bars grow (`scaleX`), a line answer draws (`EquityDraw`), the `ConfidenceMeter` fills, the evidence trades
+  cascade (`StaggerItem`, `TradeRows`). Suggestion chips from the journal (`suggestQuestions`) and the follow-ups of the
+  last answer. A question the parser does not understand gets the honest fallback with examples – never a guess.
+  History in memory (`coachStore.ts`, max 12).
+- **Optional AI wording** (`ask.ts`): "Mit KI formulieren" is shown only when the cloud is configured, the user is signed
+  in, the plan has `coachAi` and the server says `GET /api/v1/coach/ask → { enabled: true }` (asked once per session).
+  Without a key nothing of it is visible – no broken button. The request carries the computed answer only (facts,
+  evidence aggregates); note excerpts of the evidence trades go along only after the opt-in switch (`settings.coach.ai.notes`).
+  A refusal / unverified number / error keeps the computed answer and says so in one line.
+- **Heute** (`TodayCard.tsx`): trades, P&L and patterns of today, the patterns as rows (open the trade), the live alert of
+  the watcher (advice + "Pause · mm:ss" as an error / warn `StatusPill` whose ring runs down on `useNowMv` – no render per
+  second), "Fokus heute" = the first plan step. A critical alert sends one signal-red `BorderBeam` lap (clipped wrapper).
+- **Leaks & Edges** (`EdgesCard.tsx`): edges and leaks from `findEdges` (single factors and 2-way combinations, `minN`,
+  bootstrap CI, BH-FDR, stability over both halves). Edges show a `ConfidenceMeter` and "klar / Tendenz"; leaks get one
+  red `SpotlightSweep`; each item: Ø R vs. the rest with the CI, n, the halves, the what-if ("ohne diese Trades" / "nur
+  diese Trades", with CI) and the evidence trades in an expander. Below 2 × `minN` closed trades: honest empty state.
+- **Plan** (`PlanCard.tsx`): the three strongest recommendations as a `MilestoneRail`, each with its week status
+  (`goalActual` of the reports domain). "Plan übernehmen" pins the plan (`settings.coach.plan`) and creates the goals
+  (`addGoalFromDraft`, P08); "Neuen Vorschlag übernehmen" when the pinned plan differs from today's analysis; "Plan lösen".
+- **Timeline** (`TimelineCard.tsx`): every detected behaviour, newest first, grouped by day, filter chips with counts
+  (`aria-pressed`), rows open the trade, 6 per page (ends with the plan beside it), „Ältere anzeigen“ pages on.
+- **Profil** (`ProfileCard.tsx`): Personal Trading Intelligence – strengths, weaknesses, best time / asset / setup, the
+  traits orbiting (`OrbitSpread`, focusable group) around „Du.“ – the headline stands once, above the trait list; under
+  `sm` the ring rests without its cards (the list carries every value). Under 10 trades an empty state.
+
+- **Verpasste Chancen** (`MissedCard.tsx`, F32): signals of the app (valid entry, Box-Setup, confirmed own key level) the journal holds no trade for –
+  „regelgerecht, nicht gehandelt“ (`@/domain/missed`, see its README). Rows: time, side, source, market · timeframe, the headline the trader
+  saw, **Im Labor testen** (opens the Labor page; no draft yet) and **Beobachten** (a mark, persisted). The archive starts empty: the
+  card says what is stored from now on (this device, 300 events / 120 days, only while the app is open) and that the past cannot be added.
+  It states plainly that traits of the missed signals are NOT set against comparable failures until they have an outcome (see below) –
+  and names the sample; no cause is claimed.
+
+- **Signal-Posteingang** (`SignalInboxCard.tsx`, F28, volle Breite, einklappbar): the archived signals with status (neu · angesehen · gehandelt · bewusst ausgelassen · abgelaufen), filter chips
+  (status, „Nur Einstiege“, „Nur meine Märkte“), order by a written-out relevance (`@/domain/missed/inbox`). Per entry: **Ansehen** (marks it seen, shows the marks and, once computed, the outcome), **Ausgelassen – Grund**
+  (five reasons, reversible), **Im Labor testen** (`TestIdeaButton` → „Diese Idee testen“ for the entry check and Box setups; key-level hits have no translation), **Im Journal verknüpfen** (trades of the same market within ±24 h).
+  The marks live on the archive event (this device). No counter in the page header (no such pattern exists; the dashboard is untouched).
+- **Verpasste Chancen** (`MissedCard.tsx`, F32) shows the **Ausgang** per signal (target first / stop first / still open / not usable) – evaluated **automatically**, see „Automatische Auswertung“ –
+  and, from 20 missed signals with an outcome, the traits of the missed winners against the missed losers – with counterexamples, the sample and the interval, no cause.
+- **Signalbilanz** (`SignalBalanceCard.tsx`, F25, 7) and **Daten- und Alarmqualität** (`DataQualityCard.tsx`, F27, 5): see `@/domain/missed` README. Shared helpers: `signalUi.tsx` (chips, outcome badge, the `OutcomeControl`),
+  `signalOutcomes.ts` (loader + cache `tj2-signal-outcomes`), `signalAuto.ts` (the automatic evaluation), `candleCheck.ts` (on-demand gap check, 1h candles, 14 days).
+- **Automatische Auswertung der Ausgänge** (F32, `signalAuto.ts`, `SignalOutcomeHost.tsx`, rule `@/domain/missed/autoplan`): the outcomes are no longer behind a button. The shared control
+  (`OutcomeControl`, in Verpasste Chancen and Signalbilanz) says „Wird automatisch ausgewertet.“, shows **„Zuletzt berechnet: 25.10. 14:32 (automatisch) · Quelle: Binance USDⓈ-M, Kerzen 15 Minuten“**
+  („Zwischenspeicher dieses Browsers“ when nothing had to be fetched, „EU-Proxy“ on the fallback route) and **„Neu berechnen“** (reads every signal without a final outcome at once; the click is
+  disabled while a run is in flight). Triggers: a card that shows outcomes mounts (Posteingang, Verpasste Chancen, Signalbilanz → `useOutcomes` → `requestAutoOutcomes("page")`; while one is open it
+  also looks again every 15 min) and once ~12 s after the app started when entry signals are stored (`SignalOutcomeHost` in `DeferredHosts`, gate `coach`, then at most 3 runs without such a page).
+  A run is queued with `requestIdleCallback` (≤ 5 s late; a timer without it), works one market per slice (the main thread gets a turn in between) and takes what the plan says: **at most 20 signals of at most 3 markets**, the newest first, per market within 30 days
+  of its newest signal, **2 minutes between two runs**; final outcomes are never read again, a signal waits for the first closed candle after it, an `open` one is read again only with a newer closed
+  15m candle and ≥ 15 min after the last look, a failed load waits 30 min. It is the same `computeOutcomes`, the same lab source (`historySource`, cache first, the lab's own token bucket) and a
+  subset of what the click loads – never more. It holds back, and the card says why („Automatische Auswertung pausiert: …“), while the tab is in the background (a run in flight stops between two
+  pages and keeps what it read), with the browser's data-saver, with a low battery (≤ 20 %, not charging) and offline (`@/domain/evolve/environment`); „Neu berechnen“ still works then. Failures stay
+  honest: „Nicht auswertbar: <Grund>“, never counted as a result, never cached. Open results are cached with the time they were read (a reload shows them and reads them again only with a new
+  candle). No setting, no server, nothing from the journal leaves the device (market data only); the assistant only quotes the cache.
+- Tests: `views.coach.signalchain.test.tsx`, `views.coach.missed.test.tsx`, `views.coach.signalOutcomes.test.ts`, `views.coach.signalAuto.test.ts` (fake idle scheduler), `missed.autoplan.test.ts`, e2e `signal-chain.spec.ts`.
+
+## Watcher, trade panel, state
+- `CoachWatcher.tsx`: **`useCoachWatch()` / `CoachWatcher`** – after a save, `coachAlert` (pure, domain) compares the
+  journal before and after; a new pattern of severity ≥ 2 on the saved trade becomes ONE toast (advice + suggested
+  pause) and the live alert of the Heute card. Bulk changes (> 3 records: import, restore, sync), stale records
+  (`updatedAt` older than 5 min) and changes the app makes on its own (`MACHINE_FIELDS`: the MAE / MFE backfill,
+  drawings) are ignored; each event is toasted once per session; the work runs off the save's task.
+- `TradeCoachPanel.tsx`: **`<TradeCoachPanel tradeId />`** for the trade detail – grade A–D (`spring.pop`), verdict,
+  plan vs. execution, MAE / MFE, rules, context, triggered behaviours, similar trades (buttons open them). Sections are
+  `StaggerItem`s, so they cascade with the detail body. Renders nothing for an unknown id.
+- `hooks.ts`: `eventsOf` (detectors, cached per enriched list + settings + days), `analyse` (edges, recommendations,
+  plan, score, profile, lesson, tips; cached per closed list), `useCoachBase`, `useMinuteClock`, `useCoach`.
+- `coachStore.ts`: chat history, live alert, timeline filter (per tab, in memory).
+- `ui.tsx`: shared bits (verdict badge, severity dot, bars / line chart, evidence rows, key-value list).
+
+## Contracts for the integrator (P14)
+- page `coach` → `CoachView` (lazy), `h1` "Coach".
+- App.tsx: `<CoachWatcher />` once, as a leaf with `data-layer`, after `SetupEditor`, before `Celebrate`.
+- `src/overlays/TradeDetail.tsx`: `<TradeCoachPanel tradeId={trade.id} />` (e.g. under the psyche section).
+- Gate: plan feature `coach` (page), `coachAi` (AI wording – checked here as well).
+
+## Inhalt-Leiste (Auffindbarkeit)
+
+Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Zehn Chips für die Karten von „Fragen“ bis „Datenqualität“ (gefunden über ihre `data-testid`). Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.
+
+## Signalprotokoll und Quellenzeilen (F25 · F28 · F27)
+
+`SignalDetail.tsx` sits in the expanded inbox entry: the **Voraussetzungen** list (a word per line – erfüllt / nicht erfüllt / keine Daten – never colour alone), the **Regelstand** (with a warning line when the settings have changed
+since) and the dated **Verlauf** (`signalHistory`). `BasisLine.tsx`: `JournalBasis` (one line under the page header – the journal on this device, how many trades, the oldest and the newest) and `ArchiveBasis` (the signal archive:
+how many events, the oldest and newest signal) at the end of Posteingang, Verpasste Chancen and Signalbilanz; both through `SourceStand`, a missing time says „keine Daten“. The balance has a group „Regelstand“. The quality card
+counts the sent log lines by origin (`quality-delivery-sources`). Test-IDs: `detail-protocol` · `detail-prereq` · `detail-rules` · `detail-history` · `coach-basis` · `inbox-basis` · `balance-basis-line` · `missed-basis`.
+Tests: `views.coach.signalprotocol.test.tsx`, `views.coach.signalchain.test.tsx`, `views.coach.missed.test.tsx`, `views.coach.test.tsx`.

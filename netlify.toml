@@ -1,0 +1,166 @@
+# Netlify deploys the trading journal (Vite app) from the trading-journal/ subfolder.
+# Two editions on one site:
+#   /          personal edition ("persönlich", `npm run build` → dist/)
+#   /teilen/   share edition ("zum Teilen": empty journal, neutral setups, own tj2share-* storage;
+#              `npm run build:share` → dist/teilen/, the build fails if a personal string leaks)
+# The personal build empties dist/, so it must run first.
+# The legacy static dashboard stays reachable at /dashboard.html (copied into dist at build time).
+[build]
+  base = "trading-journal"
+  command = "npm ci && npm run build && npm run build:share"
+  publish = "dist"
+
+[build.environment]
+  # Node 22 LTS (Stripe SDK 23 and the Netlify Functions need ≥ 20)
+  NODE_VERSION = "22"
+  # `tsc -b` of this project peaks at ≈ 2.7 GB (measured); Node's default heap limit on the build image can be lower, and the deploy
+  # then died after ≈ 90 s without an error in the checks. 4 GB leaves room.
+  NODE_OPTIONS = "--max-old-space-size=4096"
+
+# ── Netlify Functions (P09–P12): `trading-journal/netlify/functions` (relative to `base`) ──────────────────────────────
+# Every function declares its own route in code (`export const config = { path: "/api/v1/…" }`) – no redirect needed,
+# a path-routed function wins over the SPA fallbacks below. Server secrets (SUPABASE_SECRET_KEY, STRIPE_*, EXCHANGE_ENC_KEY_V1,
+# ANTHROPIC_API_KEY …) live in the site's environment variables (scope "Functions", marked secret) – see SETUP.md.
+#   /api/v1/account/{backups,delete,export}  /api/v1/audit  /api/v1/log                    (P09)
+#   /api/v1/billing/{status,checkout,portal,code,referral}  /api/v1/stripe/webhook          (P10, the webhook needs the raw body)
+#   /api/v1/exchange/{connect,disconnect,sync,positions,backfill}  /api/v1/hooks/tradingview/:token
+#   /api/v1/trades[/*]                                                                       (P11)
+#   /api/v1/social/{share,shared/:token,groups,invite/*,leaderboard}  /api/v1/feedback      (P12)
+#   /api/v1/coach/ask                                                                        (P04, optional Premium-KI)
+#   /api/v1/shot-extract                                                                     (F29, optional Premium-KI: Screenshot-Import, Bilder ≤ 6 MB Request)
+#   /api/v1/sec/{facts,filings}                                                              (F68 / F69, SEC EDGAR: Env SEC_USER_AGENT nötig, sonst „Einrichtung nötig“; same-origin, keine CSP-Änderung)
+#   /api/v1/stocks/{bars,quote,symbols,news}                                                 (F67/F68, public data: Yahoo chart + RSS, Nasdaq Trader; no key, only tickers go out)
+# Scheduled functions (the cron lives in their code, `config.schedule`; they run on PUBLISHED deploys only):
+#   exchange-sync-cron   */30 * * * *   Bitunix read-only sync (SYNC_CRON_ENABLED=false switches it off)
+#   backup-nightly       @daily         nightly server backup of the journal docs (P09)
+#   social-aggregate     @daily         leaderboard snapshots + community distribution (k ≥ 10, P12)
+#   alert-watch-cron     */5 * * * *    E-Mail-Alarm bei geschlossener App (F21): needs RESEND_API_KEY + ALERT_FROM and migration 0008,
+#                                       does nothing without them; /api/v1/alerts/test = status + test mail. Binance is read direct, on
+#                                       451 through the /api/binance proxy below (set the functions region to the EU if both are blocked)
+# Background function: exchange-backfill-background (first import of a new exchange connection, up to 15 min).
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Same-origin proxy for Binance USDⓈ-M PUBLIC market data (no keys, GET only), BEFORE the SPA fallbacks.
+# The app reads Binance directly from the browser; `src/market` switches the top-trader / retail ratio feeds to
+# /api/binance/* only when it must: the browser cannot read /futures/data/* (CORS / network) while the rest of Binance
+# answers, Binance is geo-blocked, or the user turned on "EU-Proxy verwenden". A probe of /api/binance/fapi/v1/time
+# must return Binance JSON first (without these rules it gets the SPA's index.html and the proxy stays off).
+# Netlify forwards the query string and proxies from its CDN edge next to the visitor. CSP: covered by 'self'.
+# Only the endpoints the app uses are mapped; anything else under /api/binance falls through to the SPA (HTML).
+[[redirects]]
+  from = "/api/binance/futures/data/*"
+  to = "https://fapi.binance.com/futures/data/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/time"
+  to = "https://fapi.binance.com/fapi/v1/time"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/klines"
+  to = "https://fapi.binance.com/fapi/v1/klines"
+  status = 200
+  force = true
+
+# one request for the prices of ALL symbols (the e-mail alarm's cron, F21 – the app itself reads single tickers)
+[[redirects]]
+  from = "/api/binance/fapi/v1/ticker/price"
+  to = "https://fapi.binance.com/fapi/v1/ticker/price"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/premiumIndex"
+  to = "https://fapi.binance.com/fapi/v1/premiumIndex"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/ticker/24hr"
+  to = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/openInterest"
+  to = "https://fapi.binance.com/fapi/v1/openInterest"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/fundingRate"
+  to = "https://fapi.binance.com/fapi/v1/fundingRate"
+  status = 200
+  force = true
+
+# "Börsenhistorie nachladen" (F26): the 5-minute mark-price candles of the history load
+[[redirects]]
+  from = "/api/binance/fapi/v1/markPriceKlines"
+  to = "https://fapi.binance.com/fapi/v1/markPriceKlines"
+  status = 200
+  force = true
+
+# order book snapshot of the Ausführbarkeits-Check (F44): spread and depth for the planned size, one request on a click
+[[redirects]]
+  from = "/api/binance/fapi/v1/depth"
+  to = "https://fapi.binance.com/fapi/v1/depth"
+  status = 200
+  force = true
+
+# Share edition: its own SPA fallback, BEFORE the catch-all (existing files such as /teilen/assets/* win anyway;
+# `/teilen` without slash is served as /teilen/index.html by Netlify itself – no extra rule, rules ignore the slash).
+[[redirects]]
+  from = "/teilen/*"
+  to = "/teilen/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Security headers. The CSP allows exactly what the browser talks to:
+#   connect-src  same origin (/api/v1 functions, /api/binance proxy), Binance / Bybit / OKX public market data, and the
+#                Supabase project (REST, Auth, Storage over https, Realtime over wss). The project ref is not fixed in
+#                this repo, so the host is the wildcard *.supabase.co – after the setup it may be narrowed to
+#                https://<ref>.supabase.co wss://<ref>.supabase.co (SETUP.md, step 7).
+#   img-src      screenshots from Supabase Storage (signed URLs), data: (2FA QR code), blob: (local screenshots / share PNG).
+#   worker-src   blob: – Monte Carlo and the backtest run in inline workers; 'self' – the screenshot reader's own worker script.
+#   script-src   'wasm-unsafe-eval' – ONLY WebAssembly may compile (the local screenshot OCR, tesseract.js core); no eval() of
+#                strings, no foreign script host. The worker script, core and language data come from /ocr/<version>/ of this
+#                site (self-hosted: nothing about a screenshot leaves the device, nothing is fetched from a CDN).
+# Stripe Checkout / Customer Portal are full-page redirects (no Stripe.js), Bitunix / Stripe / Anthropic are reached by
+# the functions only – none of them needs a client entry. The CSP applies on Netlify only (check a deploy preview).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://fapi.binance.com wss://fstream.binance.com https://api.bybit.com wss://stream.bybit.com https://www.okx.com https://*.supabase.co wss://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; manifest-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    X-Frame-Options = "DENY"
+
+# Hashed build assets never change: cache them for a year (index.html stays revalidated, so a deploy is picked up at once).
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/teilen/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Local screenshot reader (OCR): the version is part of the path (`src/journal/ocr/assets.ts`), so the files may be cached for
+# good. They are fetched only when a screenshot is read for the first time – nothing precaches them, the first load never
+# touches them. (Also reachable from the share edition at /teilen/: it reuses these files.)
+[[headers]]
+  for = "/ocr/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

@@ -1,0 +1,114 @@
+{
+  "trades": [
+    {
+      "pair": "SOL/USDT",
+      "side": "long",
+      "qty": 13.2,
+      "entry": 168.86,
+      "exit": 169.47,
+      "pnl": 5.54664046,
+      "leverage": 13,
+      "openTime": "2026-10-23 19:27:56",
+      "closeTime": "2026-10-24 15:18:24"
+    },
+    {
+      "pair": "ETH/USDT",
+      "side": "short",
+      "qty": 0.531,
+      "entry": 3377.78,
+      "exit": 3392.84,
+      "pnl": -10.18285677,
+      "leverage": 13,
+      "openTime": "2026-10-23 09:02:47",
+      "closeTime": "2026-10-23 14:54:22"
+    },
+    {
+      "pair": "ETH/USDT",
+      "side": "short",
+      "qty": 0.948,
+      "entry": 3440.02,
+      "exit": 3449.61,
+      "pnl": -12.9248011,
+      "leverage": 15,
+      "openTime": "2026-10-21 11:21:46",
+      "closeTime": "2026-10-23 06:03:03"
+    },
+    {
+      "pair": "SOL/USDT",
+      "side": "long",
+      "qty": 5.7,
+      "entry": 168.79,
+      "exit": 169.39,
+      "pnl": 2.11643497,
+      "leverage": 10,
+      "openTime": "2026-10-21 08:35:19",
+      "closeTime": "2026-10-21 10:01:23"
+    },
+    {
+      "pair": "ETH/USDT",
+      "side": "long",
+      "qty": 0.307,
+      "entry": 3412.71,
+      "exit": 3420.25,
+      "pnl": 0.95986083,
+      "leverage": 5,
+      "openTime": "2026-10-20 00:25:54",
+      "closeTime": "2026-10-21 04:16:53"
+    },
+    {
+      "pair": "ETH/USDT",
+      "side": "long",
+      "qty": 1.111,
+      "entry": 3436.39,
+      "exit": 3431.01,
+      "pnl": -10.52083478,
+      "leverage": 3,
+      "openTime": "2026-10-18 09:00:25",
+      "closeTime": "2026-10-19 21:50:34"
+    },
+    {
+      "pair": "SOL/USDT",
+      "side": "short",
+      "qty": 20.8,
+      "entry": 167.74,
+      "exit": 168.09,
+      "pnl": -12.01063374,
+      "leverage": 3,
+      "openTime": "2026-10-16 15:46:26",
+      "closeTime": "2026-10-18 07:55:01"
+    },
+    {
+      "pair": "ETH/USDT",
+      "side": "long",
+      "qty": 0.69,
+      "entry": 3451.48,
+      "exit": 3441.19,
+      "pnl": -9.80800312,
+      "leverage": 3,
+      "openTime": "2026-10-15 13:32:12",
+      "closeTime": "2026-10-16 13:27:42"
+    },
+    {
+      "pair": "SOL/USDT",
+      "side": "short",
+      "qty": 14.5,
+      "entry": 170.73,
+      "exit": 170.63,
+      "pnl": -1.69883552,
+      "leverage": 20,
+      "openTime": "2026-10-14 08:02:28",
+      "closeTime": "2026-10-15 12:37:07"
+    },
+    {
+      "pair": "SOL/USDT",
+      "side": "long",
+      "qty": 9.5,
+      "entry": 169.14,
+      "exit": 170,
+      "pnl": 5.95634314,
+      "leverage": 3,
+      "openTime": "2026-10-12 22:04:39",
+      "closeTime": "2026-10-14 02:43:43"
+    }
+  ]
+}

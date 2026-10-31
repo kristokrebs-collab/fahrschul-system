@@ -1,0 +1,463 @@
+# `src/app` – shell wiring (`main.tsx`, `App.tsx`, header, bottom bar / sidebar, footer, banner)
+
+Plan 1.4/1.5 (boot, router, banner), 6.6 (shell), 3.3 (dock/page morphs). The `Übersicht` page lives in
+`src/views/overview` (see the section at the end).
+
+## Boot (`src/main.tsx`)
+
+```ts
+void bootJournal();      // migrate + sync hydrate, then claude.ai probe (Fall A/B) – @/store/journalStore
+installRouter();         // hash grammar #{page}[?query], hashchange, filter mirror, dialog back stack (back closes the topmost dialog first) – @/store/router, @/store/backStack
+bootMarket();            // startMarket(settings); follows settings.market.symbol → setSymbol, hyblock.timeframe → setPeriod
+installE2eHooks({…});    // no-op unless the e2e seed set the flag (see "E2E hooks")
+createRoot(#root).render(<StrictMode><MotionRoot><App/></MotionRoot></StrictMode>)
+```
+Font hints (`document.fonts.load` for Doto / IBM Plex Mono / Sans) run before the first render; they never block, and a
+rejected load (offline file, blocked font host) is caught – no unhandled `NetworkError`.
+
+## Editions and builds
+
+Two editions × two targets, chosen at build time (`src/edition.ts`: `__TJ_EDITION__` personal | share, `__TJ_TARGET__`
+web | file → `EDITION`, `IS_SHARE`, `BUILD_TARGET`, `IS_FILE_BUILD`, `isFileProtocol()`):
+
+| command | output | edition |
+|---|---|---|
+| `npm run build` | `dist/` (web root; the legacy `/dashboard.html` is copied along) | personal – the user's setups, levels, capital, `tj2-*` storage (same keys as the other journal version) |
+| `npm run build:share` | `dist/teilen/` (base `/teilen/`) | share – empty journal, neutral setups (`s_mtf`, `s_bt`), levels unset, `tj2share-*` storage; manifest / app name "Trade Journal (Teilen)" |
+| `npm run build:single` | `release/trade-journal-persoenlich.html`, `release/trade-journal-teilen.html` (`scripts/build-single.mjs [outDir]`, `vite.single.config.ts`) | both, each ONE self-contained HTML file (JS, CSS, fonts and favicon inline; manifest / touch-icon links dropped – they cannot work under `file://`) that opens from disk |
+
+- Privacy guard (`scripts/privacyGuard.ts`, Vite plugin in `generateBundle`): every share build (web and file) fails when a
+  personal string or number from `src/domain/edition/personal.ts` ends up in the bundle. Edition data and copy go through
+  `ED` (`@/domain/edition`), never `edition/personal` directly; storage keys through `storageKey()` / `KEYS`.
+- Netlify (repo root `netlify.toml`): `npm ci && npm run build && npm run build:share`; `/teilen/*` → `/teilen/index.html` before the
+  catch-all, so the personal app is the site root and the share edition is `/teilen/`.
+- Dev: `vite` serves the personal edition, `vite --mode share` the share edition at `/teilen/`. Vitest runs as personal.
+- File builds: `LocalModeBanner` says `Datei-Version.`; with no usable storage (Android `content://` opens) the journal runs in
+  memory and the header pill says `Nicht gespeichert` (`modeLabelFor`); Settings → Live-Daten hides the EU-proxy switch.
+
+## Display: installable, fullscreen, bottom inset (grey-bar fix, tablet audit §1)
+
+The grey strip above the One UI taskbar in the user's screenshot is HOST UI (the browser's bottom toolbar / sheet, most likely
+Samsung Internet's), drawn outside web content: no page z-index can cover it. The app offers the two ways out and follows it:
+- **Installable**: `public/manifest.webmanifest` (`display: standalone`, `start_url`/`scope` `./` – works under `/` and `/teilen/`,
+  ink theme/background `#0a0a0a`, Nothing icons in `public/icons/`: dot-matrix ₿ + one signal dot, `any` + `maskable` PNG 192/512,
+  SVG, `apple-touch-icon` 180; the PNGs are Chromium renders of the dot-matrix SVG design in `public/icons/icon.svg`), linked in `index.html` with
+  `mobile-web-app-capable` / `apple-mobile-web-app-*`; the favicon is an inline `data:` SVG (works in the single files too).
+  `beforeinstallprompt` is kept (no mini-infobar over the dock) → CommandNav action `App installieren`; where no prompt exists
+  (iOS, Firefox, before the prompt fires) on a touch device a hint says how to add it to the home screen. Not in file:// builds.
+- **Fullscreen**: `Vollbild` / `Vollbild beenden` (`requestFullscreen({ navigationUI: "hide" })`, webkit fallback) in the header
+  (lg+) and in the CommandNav; hidden where the API is missing (iPhone Safari).
+- **Bottom inset**: `installViewportInset()` (App effect) writes `--vv-bottom` = host UI laid over the layout viewport's bottom
+  (`innerHeight − (visualViewport.offsetTop + height)`, rAF-coalesced, written only on change, 0 while pinch-zoomed and for
+  keyboard-sized gaps ≥ 120 px – the dock stays behind the keyboard as on iOS). `--safe-bottom` (base.css) feeds the dock,
+  footer padding, bottom fade and focus scroll padding.
+- **Forced darkening**: `color-scheme: only dark` (meta + CSS + `prefers-color-scheme` block). Chromium Auto Dark / WebView
+  force-dark leave the page alone; Samsung Internet's night mode re-colours pages unless the user enables Settings → Labs →
+  "Use website dark theme" – the CommandNav shows that hint in Samsung Internet only. No page-side opt-out exists beyond this.
+- **Header**: opaque `bg-ink-900` (no 97 % alpha: scrolled text ghosted through under the pills).
+
+| file | export | notes |
+|---|---|---|
+| `pwa.ts` | `canInstall`, `promptInstall`, `useCanInstall`, `isStandalone`, `useStandalone`, `isSamsungInternet`, `isIosSafari`, `fullscreenSupported`, `isFullscreen`, `toggleFullscreen`, `useFullscreen`, `useFullscreenSupported`, `bottomInset`, `installViewportInset`, `VV_KEYBOARD_MIN`, `DISPLAY_STRINGS` | listeners installed on import (guarded for jsdom / file://) |
+| `DisplayActions.tsx` | `FullscreenButton`, `GlyphFullscreen` | header button (`aria-pressed`), renders nothing without the API; the Settings owner can mount `FullscreenButton` too |
+
+## Layer diagnostics + Samsung-Internet-safe effects (decision 7)
+
+The user still sees the grey bar in normal Samsung Internet (not in TradingView). Measured on their screenshots: the bottom
+47 CSS px × ~780 CSS px, centred, flush on the One UI taskbar, flat rgb(27,27,27) (Samsung's night mode darkens the page:
+ink-900 → 4, white → ~30), drawn OVER an open dialog's dim layer (z ≥ 70 if it were ours). No page layer of that size is
+known, so the app now lets the device answer it:
+- **`?debug=layers`** in the URL (search or hash query) or **five quick taps on the header logo** (each ≤ 450 ms apart,
+  `MULTI_TAP`; a single tap's intro replay now waits for that window) open `LayerDiagnostics` (lazy chunk, `LayerDiagHost`
+  in App, nothing runs while closed). It outlines and labels every `position: fixed | sticky` layer and named inner part
+  (`data-layer`) with `#n name · w×h · z`, draws an opaque red/black **Prüfstreifen** over the bottom 64 px at z
+  2147483647 with a 16/32/48 px ruler (a grey bar still covering it is browser UI; a bar under it is ours), and a panel
+  with inner / client / visual-viewport size, DPR, safe-area insets (probe elements), `--vv-bottom` / `--safe-bottom`,
+  the layers under the bottom centre, a hide toggle per layer (noise film included), the safe-effects switch and
+  **Kopieren** (plain-text report, Clipboard API with an `execCommand` / selectable textarea fallback). Minimieren keeps
+  only outlines + strip for a clean screenshot. Close: ×, Esc, five logo taps. Everything it changed is restored on close.
+- **`data-safe-fx`** on `<html>` (`pwa.ts`, set on import before the first paint for Samsung Internet; `?safefx=1/0`
+  forces it anywhere): base.css drops every `backdrop-filter`, the dock label plates fade (opacity) instead of the
+  clip-path reveal, the dock's extra `will-change` layers, the header CTA's masked shine layers (a plain inset red under-glow instead), the fixed noise film
+  (`body::before`, an SVG-filter image over the viewport) and the toast's blurred win glow; the dock's session entrance
+  rises without its blur filter (`dockEntrance(…, noBlur)`), PageHost's entering page slides and fades without its
+  4 px blur, and the motion primitives' content entrances fade without blur (`Reveal` / `RevealItem` on scroll,
+  `StaggerItem` sheet / dialog sections – `@/motion/safeFx`, the attribute's single source; `pwa.ts` re-exports it).
+- The toast island's live region is a 0×0 box at rest (no empty full-viewport fixed layer between toasts); it opens to
+  `inset-0` while a toast shows or exits, staying in the DOM / accessibility tree throughout.
+- Layer names: `Header`, `Dock`, `Dock-Leiste`, `Unterer Verlauf`, `Toast-Insel`, `Navigation (Vollbild)` (`data-layer`).
+
+| file | export | notes |
+|---|---|---|
+| `layerDiag.ts` | `diagRequested`, `createTapCounter`, `MULTI_TAP`, `useLayerDiagOpen`, `setLayerDiagOpen`, `toggleLayerDiag`, `collectLayers`, `refreshBoxes`, `readViewport`, `layersAt`, `layerName`, `layerEffects`, `layerLine`, `formatReport`, `copyText`, `DIAG_ATTR` | pure helpers + DOM reads (overlay open only) |
+| `LayerDiagnostics.tsx` | default overlay, `DIAG_TITLE`, `DIAG_HINT`, `PROBE_H` | one DOM walk / s + on resize / visual-viewport change, box refresh on scroll ≤ 10 Hz |
+| `pwa.ts` | `SAFE_FX_ATTR`, `wantsSafeFx`, `isSafeFx`, `setSafeFx` | see above |
+
+## Dock: touch physics (additive, `@/motion/physics`)
+- **Tap hop by press length**: `hopFor(lastPressMs())` – a tap ≤ 150 ms, keyboard (click `detail 0`) and programmatic switches get
+  EXACTLY `{ ...spring.pop, velocity: −600 }`; a press ≥ 400 ms a calm `spring.smooth` lift at −300 px/s; blended between.
+- **Re-tap the active tab** → native smooth scroll to the top (instant under reduced motion) + a `spring.pop` dip of the icon.
+- **Touch scrub** (touch / pen, toolbar `touch-action: none`): after 10 px horizontal the magnification runs under the finger
+  (amount 0.45, the pointer rubber-banded past the row ends), the item under the finger shows its label (`data-scrub`, written only
+  on change, CSS mirrors the hover variants) with a selection haptic; release over an item activates it (not when released > 40 px
+  above / below the press). **Flick** (< 250 ms, > 600 px/s, > 24 px): one tab per flick, finger right = next tab; the new icon hops
+  faster (`flickHop`, ≤ −750 px/s) and PageHost takes the tempo (`setNavTempo` → `contextSpringAt(spring.pageEnter, tempo)`); at the
+  row's end the active icon dips instead.
+- **Long press** (400 ms still) shows the item's label; releasing then does nothing (Android tooltip behaviour).
+- Mouse magnification, tooltips, FAB, intro entrance: unchanged.
+
+## `App.tsx`
+
+```
+<ErrorBoundary variant="app">              (P13: full stage, "Neu laden")
+<MorphDialogProvider>                     (effect: installViewportInset() → --vv-bottom, see "Display"; idle: preloadPage("markt"))
+  <ScenarioWatcher/>                       toast `Lage: …` when the Lage-Ampel changes (decision 23; once per change, never on load, tj2-lage-last)
+  <Header/>                                HeaderEdge + HeaderTicker; mode pill + AccountPill (P09, renders nothing without cloud)
+  <main class="mx-auto max-w-[1320px] px-4 pb-10 pt-6 sm:px-6">
+    <LocalModeBanner/>                     mode === "local" && !hideLocalBanner
+    <Banners/>                             P10 BillingBanner (lazy) only when billingActive()
+    <motion.div layout="position" layoutDependency={bannerOpen}>
+      <Routed/>                            #share/<token> → SharedView (P12, lazy, page boundary) | <Pages/>
+    </motion.div>
+  </main>
+  <Footer/> <BottomFade/> <Dock/> <CommandNav/> <Toasts/>
+  <Detail/> <EditorHost/> <SetupEditor/>   each behind its own widget boundary (fallback null)
+  hosts (P14, leaves after SetupEditor, before Celebrate – each a HostSlot: widget boundary + data-layer):
+  <HostSlot Suche/Tastenkürzel/Einführung/Cloud>   GlobalSearchHost, ShortcutHost, OnboardingHost, CloudSyncHost
+  <FeatureHosts/>                          lazy chunk DeferredHosts (table below)
+  <Celebrate/> <IntroHost/> <LayerDiagHost/>
+</MorphDialogProvider>
+```
+`Pages` reads the page through `useDeferredValue` → `<PageHost keepAlive={["overview"]} cascade={["settings"]}>`;
+`renderPage(page)` wraps every page in `<ErrorBoundary variant="page" resetKeys={[page]}>`. The four original pages are
+static; every other page is a lazy chunk (`pages.ts`) behind `Suspense` with `<PageSkeleton page>` and, for a paid page,
+`PageGate` (`PAGE_FEATURE` → `useEntitlement`; locked → `LockedPage`: the page's `h1` + `UpgradeTeaser`, the page chunk
+is never downloaded). Every store subscription lives in a leaf host, so the shell itself only re-renders when the local
+banner opens or closes.
+
+## Pages and navigation (P14)
+
+| page | key | chunk | gate (`plans.ts`) | dock |
+|---|---|---|---|---|
+| overview, trades, setups, settings | o t s e | static | – | ✓ (digits 1–4) |
+| markt | m | `MarktView` | scanner card: `boxScanner` | ✓ |
+| analyse | a | `AnalyseView` | page `analyticsPro`, Monte Carlo + Ruin `monteCarlo` | |
+| risiko | r | `RisikoView` | `riskLive` | |
+| coach · berichte | c · b | `CoachView` · `BerichteView` | `coach` · `reports` | |
+| labor · wachstum | l · w | `LaborView` · `WachstumView` | `backtestLab` · `growth` | |
+| community | g | `CommunityView` | – (cloud only inside) | |
+| cockpit | d | `CockpitView` | `customDashboards`; boards limit `dashboards` | |
+| konto · preise | k · p | `KontoPage` · `PreiseView` | – | |
+
+- `uiStore`: `PAGES` (historic order, the digits 1–9 and the `g` keys), `PAGE_KEYS`, `NAV_GROUP_PAGES` / `NAV_ORDER` (the four groups – sidebar, menu and
+  `[` / `]`), `DOCK_PAGES` (the three tabs of the bottom bar), `SLIDE_ORDER` (direction of the page slide). `navGroups.ts` holds `PAGE_LABELS` / `PAGE_ICON` for every page (`Dock.tsx` re-exports them).
+  Since Etappe 1a see "Navigation in vier Gruppen" below – the dock rows of the table above are the PHONE bar only.
+- Every other page: CommandNav (⌘K / menu: four big links + a grid with icon, live count `shellStats.pageCounts`, digit;
+  hover / focus / press preloads the chunk), the global search, `g` + key, in-page links (settings → "Weitere
+  Einstellungen", CloudSyncHost → Konto, "Bericht bereit" → Berichte).
+- `pages.ts`: `LOADERS` import the view MODULES (never a barrel – a barrel pulls lazy code into the first load),
+  `lazyView(page)` (`retryableLazy`: a failed download – offline, a deploy replaced the chunk – is tried again by the
+  boundary's "Erneut versuchen", a plain `React.lazy` would keep its rejection), `preloadPage`, `PAGE_FEATURE`.
+- Router (`@/store/router`): `#analyse?dim=`, `#berichte?p=`, `#plan?symbol=&side=` (prefills market and direction of the Handelsplan, in memory only), `#community?invite=` (`QUERY_PAGES`, the page's query
+  state lives in a lazily loaded seam that mirrors into the URL), `#share/<token>` (`useShareRoute`; leaving it with
+  any navigation). The tour (OnboardingHost) and the "Bericht bereit" wipe wait while a share link is on screen.
+- `introBoot.ts`: `OTHER_PAGES` = every page but the overview (the intro plays only on the overview).
+
+## Feature hosts (`DeferredHosts.tsx`, one lazy chunk)
+
+| host | package | gate | does |
+|---|---|---|---|
+| `BillingHost` | P10 | – | upgrade / cancel sheets, Stripe return, `?ref=` (inert without billing) |
+| `ExchangeHost` | P11 | – | connect / dry-run / CSV sheets, server pulls (CSV without cloud too) |
+| `BoxAlertHost` | P02 | `boxScanner` | box alerts + watchlist scanner while `settings.boxes.alerts` |
+| `CoachWatcher` | P04 | `coach` | live coach alerts after a save |
+| `ReportReadyHost` | P04 | (`reports` inside) | "Bericht bereit" wipe → Berichte |
+| `RiskGuardHost` | P05 | `riskLive` | limit / cooldown toasts after a save |
+| `PostTradeReviewHost` | P08 | `growth` | review prompt for closed trades |
+| `SocialHost` | P12 | – | share sheet |
+| `ReplayHost`, `ExcursionBackfillHost` | P06 | (replay gate at the button) | replay sheet, idle MAE / MFE backfill |
+
+## E2E hooks (`e2eHooks.ts`)
+
+The Playwright seed sets `localStorage["__e2e-hooks"] = "1"`; only then `installE2eHooks` puts `__tjJournal`, `__tjUi`,
+`__tjTheme` (main.tsx), `__tjGuard` (DeferredHosts) and `__tjCockpitRegistry` (CockpitView) on `window`. A normal visit
+never gets them; they expose nothing a visitor could not reach through the dev tools of their own browser.
+
+### Page host (`PageHost.tsx`) – replaces `PageSwitch` in the shell
+`<PageHost page renderPage keepAlive onTransitioning>`: the PageSwitch visual spec (enter `x dir·16` + scale .985 + blur 4 px → none
+– after a fast dock flick the slide runs on `contextSpringAt(spring.pageEnter, consumeNavTempo())`, otherwise the token itself –
+exit `−dir·12` + fade). Each property is a single `transform` / `opacity` / `filter` animation via `animate(el, …)`, so Motion runs it
+on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyframes, see `src/motion/README.md`), opacity/filter on
+`tween.page`, exit `tween.exit`. Layers end at `transform: none` / `filter: none`. `data-safe-fx`: no blur (slide + fade only).
+- `cascade` (module-level array, the shell passes `["settings"]`): pages wrapped in their own `LayoutCascade` – a scoped layout
+  group, since `MotionRoot` has none (see `src/motion/README.md`).
+- Keep-alive pages (the overview) live in React `<Activity mode="hidden">`: state and DOM are kept, effects are destroyed while hidden
+  and re-run on show, and the page is pre-rendered hidden at idle priority when the app starts elsewhere. Overview effects must stay
+  re-entrant and cheap (ChartCard's `history()` hits the cache; the chart is recreated from the `candles` prop). The hidden DOM stays in
+  the document: no real `<table>`, no labels/texts that collide with selectors of other pages (`13 Trades`, `Entscheidungsgrundlage`,
+  `Startkapital … USDT`). MotionValue text may show its last value for one tick after the page is shown again.
+- Motion around a hide / show: the host puts `HideHold` in front of a keep-alive page (`useHoldProjectionOnHide`: no `layoutId`
+  snapshots of a page that is being hidden) and `ShowSettle` behind it (`useSettleProjectionOnShow`: the re-mounted nodes are not all
+  measured by the next layout update – that measured every node inside the Übersicht's `content-visibility: auto` cells, ≈ 20 ms).
+- The leaving page is pinned absolutely, `aria-hidden`, and offset by the scroll delta from `showPage()`. It swallows pointer input
+  (capture listeners – no interaction during a transition, like iOS); focus inside it moves at the switch into the shown page (its
+  `h1`, else its layer – `focusLayer`, a temporary `tabindex="-1"` without outline), and focus that lands in it later (Tab from the
+  shown page's end, the back button) is sent there too – a plain `blur()` left the sequential-focus point in the invisible page, so
+  the next Tab walked its hidden controls. The entering page swallows pointer input while it is still invisible (opacity 0 until the
+  leaving page has faded, SH-02): it lies above the fading page, so a tap meant for that one acted on the new page. The leaving page is NOT
+  `inert` and has no `pointer-events: none` – both are inherited and restyled every element of the page fading out in the switch
+  frame (≈ 2 200 on the Übersicht, 20–30 ms; `visibility` likewise, `flick/restyle.mjs`). A parked page is `inert` (free: display
+  none inside). When its exit has played it is collapsed (height 0 + overflow hidden, layout kept – no 0 × 0 resize for its
+  observers); it is parked
+  (keep-alive) or unmounted only once the switch has settled and the main thread is idle (`requestIdleCallback`, ≤ `PARK_TIMEOUT_MS`
+  600 ms; a 50 ms timer without it): the hide of the Übersicht (≈ 50 ms – every effect and ~600 motion components detach) and the
+  unmount of a page no longer land in the middle of the new page's entrance. Switching back before that shows the page without a
+  re-mount (the layer is restored in the switch's layout effect, BEFORE `showPage()` applies the queued scroll restore – a collapsed
+  layer clamped it: Übersicht at 1 400 px → Trades → back within ≈ 1 s landed at ≈ 420 px).
+- `transitioning` has the same contract as PageSwitch (`true` at the switch commit, `false` once enter and exit finished).
+- Scroll memory: the router parks restores (`navigate` / `applyRoute` → `restoreScroll`, top on first visit / deep link); PageHost
+  calls `showPage(page)` at the commit that shows the page (layout effect, before paint); `detachShell` on unmount. `PageSwitch` is no
+  longer used by the shell (it stays in the `@/motion` barrel).
+
+### Dock – transform-only magnification
+- Label/pill: pack `dock` taus (38/35 ms label, 40/45 ms pill + 25 ms delay) and the 1000/38 rise spring as CSS `linear()`
+  transitions (`DOCK_CONFIG`); the label is an opaque plate uncovered by clip-path (SH-03). `motion.nav layoutRoot` (SH-01) and
+  `layoutDependency = page|editor.open` on the new-trade disc. Intro: parked during "stage", rises on `spring.reveal` at "build" (`dockEntrance`).
+- `dockLayout` windowed Gaussian bell (`dockBell`, σ 48, amplitude 0.8, amount on the pack's 400/20 spring), per-slot `x` on the button and `scale` (originY 1) on its visual; a stretchable tray:
+  caps translate ∓W/2, the middle scales by 1 + W/mid. Item centres are measured once per pointerenter in `frame.read`.
+- Tab markers (`DockMarker`: the white disc behind the active icon, the red dot under it) are NO layout nodes: a switch slides the
+  new tab's marker in from the box the old one left (captured in its cleanup, before removal) as one `spring.layout` transform
+  animation (Motion → WAAPI, `markerFlip` divides the magnified visual's scale out) – the compositor runs it while the page
+  commits (the former `dock-bg` / `dock-dot` shared-layout morph was driven per frame from JS and stalled 67–83 ms mid-switch).
+  PageHost takes the new page one painted frame later, so the slide has started on the compositor before the page's commit.
+- The magnified transforms are MotionValues on motion components, so the `new-trade-{fabCycle}` shared transition accounts for them
+  through latestValues – never drive it imperatively. The unmounting `new-trade-{fabCycle}` disc snapshots itself when the editor opens
+  (a `layoutId` node's `projection.unmount` → `willUpdate`), and the sheet panel takes that snapshot as the new lead –
+  no layout group involved (`MotionRoot` has none, see `src/motion/README.md`).
+- FAB ↔ editor is a ONE-WAY morph: the disc and the FAB sheet share `layoutId="new-trade-{fabCycle}"`; `closeEditor` bumps
+  `uiStore.fabCycle` for a FAB editor, so the disc remounts under a fresh id (it can never resume from the exiting sheet – that
+  drew a sheet-sized red blob) and acknowledges the return with a scale .9 → 1 on `spring.pop`.
+- Icons hop on activation (`spring.pop`), the FAB carries an `fx-ping` ring that pings 3× (`tween.pingFew`) whenever the FAB
+  (re)appears with the editor closed, then rests (no endless loop at idle); entrance once per session (`tj2-dock-intro`: `spring.sheet`
+  y, `tween.reveal` opacity/blur, `stagger.cards`), CSS tooltips (`duration-200 ease-out` = `tween.tooltipIn`), the nav itself is
+  `pointer-events-none` (items opt back in). Dock icons use `Magnetic remeasure` (the layout changes under the pointer while magnifying).
+- No declared motion exception any more (`dock-magnify` is gone).
+
+### Edges, banner, ticker
+- `Header`: `HeaderEdge` – hairline, shade, edge blur (`TOP_BANDS = []`, off for perf: shade + hairline only) and the red
+  reading progress. Where the browser has `ScrollTimeline` (Chromium / Samsung Internet ≥ 115, `scrollDrivenEdge()`) they are
+  three scroll-driven WAAPI animations on one document timeline (shade / hairline over the first 24 px via `rangeEnd`, the bar
+  over the whole range, exact – no spring lag), created once and run by the compositor: no scroll listener, no per-frame read
+  (Motion's `useScroll` read scrollTop / clientHeight / scrollHeight every scroll frame and forced the frame's style recalc
+  there – 52× per 3 200 px on the desktop probe). Without it: the Motion edge (`useScroll`, bar on `spring.smooth`); logo flip/press (`spring.tilt` / `spring.press`). `HeaderTicker`: the live price glides on
+  `spring.price` (pure helpers `tickerPrice`, `tickerChange`, `priceStep`).
+- `BottomFade`: the plain gradient only – `BOTTOM_BANDS` is `[]` (perf fallback applied: the fixed full-width strip under the dock
+  was re-blurred on every composited frame and pegged the display compositor). `EdgeBlur` returns null for `[]`; re-enable bands only
+  with a strip that nothing animates over. `TOP_BANDS` is `[]` too (final perf pass: the strip is only visible while content scrolls under it, so it was re-blurred on every
+  scroll frame – `scrollTrades` dropped@120 130 → 58 without it).
+- `LocalModeBanner`: `popLayout`, enter reveal, exit `tween.exit`; its only dot is WarnBanner's (3 pings, then rest – the extra,
+  endlessly pinging `PulseDot` is gone).
+
+| file | export | notes |
+|---|---|---|
+| `Header.tsx` | `Header`, `WORDMARK`, `SUBTITLE`, `HEADER_CTA`, `MENU_LABEL`, `MENU_WORD`, `headerIntroTarget` | (Etappe 1a: the header CTA is `NewTradeButton` and only below 768 px – from there it stands atop the sidebar; Assistent / Vollbild / Menü show their word from 1280 px, tooltip + `aria-label` below; the ordinary local mode is the `LocalModeBadge` here) sticky, parked above the edge during intro "stage", slides down (`spring.sheet`) otherwise; logo tile `₿` → `navigate("overview")` + `replayIntro()` + AsciiCascade decode of the wordmark (held until "build" when the intro replays), DancingLetters wordmark on hover, menu button `Navigation öffnen` → CommandNav, sync `StatusPill` (`hidden md:inline-flex`, label `modeLabelFor(mode, storage)` – `Nicht gespeichert` (tone loss) when nothing persists; tones cloud→live, local→warn, error→error, connecting→muted), `Magnetic` → `.shiny-cta` `Trade eintragen` (`max-sm:sr-only`) → `openEditor()` |
+| `Dock.tsx` | `Dock`, `DockItem`, `PAGE_LABELS`, `FAB_LABEL`, `FAB_CAPTION`, `MORE_LABEL`, `DOCK`, `DOCK_INTRO_KEY`, `dockBell`, `dockLayout` | Etappe 1a: the PHONE bar (< 768 px, renders nothing from there): `Übersicht | Trades | + Trade (centre, larger) | Markt | Mehr` with a visible caption under every icon, „Mehr“ opens the menu (`aria-haspopup="dialog"`) and carries the disc on every page the bar does not name, no red dot (captions replace it). Earlier text: `role="toolbar" aria-label="Navigation"`, tabs (icons `grid|list|target|sliders`), `aria-current="page"`, tab markers `DockMarker` (disc + dot, compositor FLIP on `spring.layout`, `data-dock-marker`), `whileTap .94`; transform-only magnification (`spring.dock`, mouse only, off under reduced motion, see "Dock"); FAB disc `layoutId="new-trade-{fabCycle}"` `borderRadius 999`, unmounted while `editor.open && editor.fromFab` |
+| `Footer.tsx` | `Footer`, `FooterOutline`, `FOOTER_TEXT`, `CONFIG`, `nextFooterShown` | pulse-motion `motion-footer`, in normal flow (never covers page content): a sentinel at the footer's top edge + 2 IntersectionObservers reveal at ≥ 72 % of the footer in view / hide at ≤ 50 %; staggered fade-up (pack timings), tilted Marquee band of live stats (mounted on the first reveal, `paused` while hidden; BTC price = MotionValue text), DancingSvgWord outline wordmark (stroke draw 4 s on first reveal, hover gradient + radial mask `userSpaceOnUse`), attribution, `Nach oben`; bottom padding clears the dock |
+| `CommandNav.tsx` | `CommandNav`, `openCommandNav`, `closeCommandNav`, `toggleCommandNav`, `useCommandNavOpen`, `isCommandNavShortcut`, `rovingIndex`, `CONFIG` | pulse-motion `immersive-full-screen-navigation`: ⌘K / Ctrl+K (ignored while another modal is open) or the header button; black panel wipes in from the left (WAAPI transform, 800 ms), brand, page links with live counts, quick actions (`Trade eintragen` → `openEditor()`, `CSV-Export`, `Backup herunterladen` via `@/store/backup`, `Vollbild` / `App installieren` where offered, then the install / Samsung dark-mode hints), staggered; close wipes right. `useDialogBehaviour` (page isolated after the wipe), arrows/Home/End/1–4; unmounted while closed. Single grid column `minmax(0,1fr)` + page names `clamp(22px,4.6vw,64px)`: nothing overflows at 390 |
+| `shellStats.ts` / `cssEasing.ts` | `useShellStats`, `shellStatTexts`, `useLivePriceText` / `expoCurve`, `springCurve` | journal figures for footer + nav; pack curves as CSS `linear()` |
+| `LocalModeBanner.tsx` | `LocalModeBanner`, `useLocalBannerOpen`, `useLocalBadgeOpen`, `useLocalModeCopy`, `LOCAL_BANNER_*`, `CLOUD_BANNER_*` | Etappe 1a: the banner is ONLY the red, not dismissible `Speichern nicht möglich.` (no usable storage; import / export buttons). The ordinary `Lokaler Modus.` text (claude.ai sentence 1:1, standalone + backup sentence, file build, cloud: login hint / `Sync pausiert` / `2FA-Code`) is `useLocalModeCopy()`, read by the badge; `hideLocalBanner` stays in `tj2-ui` but nothing reads it any more |
+| `LocalModeBadge.tsx` | `LocalModeBadge`, `LOCAL_BADGE` | small header badge (warn dot + `Lokaler Modus` / `Lokal` / dot only below 640 px, 44 px tap area); a tap opens a Radix popover with the explanation, `Anmelden` / `Code eingeben` where the cloud applies, and `Backup öffnen` (`openFeature("backup")`); only in local mode with a working storage |
+| `NewTradeButton.tsx` | `NewTradeButton` | the primary action `Trade eintragen` (`.shiny-cta`, `Magnetic`, `openEditor()`), one component for the header (< 768 px) and the sidebar (≥ 768 px) |
+| `Sidebar.tsx` | `Sidebar`, `sidebarExpanded`, `SIDEBAR_WIDTH`, `SIDEBAR_AUTO_QUERY` | see "Navigation in vier Gruppen" |
+| `navGroups.ts` | `NAV_GROUPS`, `NAV_GROUP_LABELS`, `NAV_GROUP_HINTS`, `PAGE_HINT`, `PAGE_LABELS`, `PAGE_ICON`, `groupOfPage`, `WIDE_QUERY` | the four groups, the plain-word hint of every page and the page names – texts only, first-load module |
+| `BottomFade.tsx` | `BottomFade`, `EdgeBlur`, `BOTTOM_BANDS`, `bandMask`, `bandBox` | `fixed z-[45] h-28` gradient (`BOTTOM_BANDS = []`, no blur) |
+| `HeaderTicker.tsx` | `HeaderTicker`, `tickerPrice`, `tickerChange`, `tickerChangePct`, `tickerDecimals`, `tickerJump`, `priceStep` | live price + 24 h change from `priceMv` / `open24hMv`, glide on `spring.price` |
+| `PageHost.tsx` | `PageHost`, `pageDirection`, `layerRole`, `PAGE_ENTER_X`, `PAGE_EXIT_X` | see "Page host" |
+| `ScenarioWatcher.tsx` | `ScenarioWatcher`, `TRIGGER_LAST_KEY` | renders null; `useFeedSelect("kline_4h", selectClosed4h)` → `scenario` – re-renders only when a 4h bar closes; toast only on key change with a newer close time |
+| `marketBoot.ts` | `bootMarket(): () => void` | see boot |
+| `toasts.ts` | `toIslandToast(uiToast)`, `toastLifetime` | `success→ok`, `error→error`, `signal/info→warn` (info glyph); passes the lifetime (`TOAST_MS` or the toast's `duration`, `0` = sticky) as the island `duration` – the island owns the countdown, `uiStore` never auto-dismisses |
+| `useDetailCandles.ts` | `useDetailCandles()`, `sliceAround`, `DETAIL_WINDOW_MS` | 1h cache slice ±3 d around `tradeTime(trade)` (identity per detail id), `history()` for the missing edge |
+| `pages.ts` / `overlays.ts` | the four static views + the lazy page registry (`lazyView`, `preloadPage`, `PAGE_FEATURE`) / the app overlays | single seam for the shell and for tests (`vi.mock("@/app/pages")`, `vi.mock("@/app/overlays")`) |
+
+## What the integrator should check
+
+- **Strings**: dock/FAB/header use the bundle strings `Entscheidungsgrundlagen` and `Trade eintragen` (Plan 6.6), not the task
+  shorthand `Grundlagen` / `Neuer Trade`. The FAB is the gradient disc of the bundle; `.shiny-cta` stays on the header CTA.
+- **Chart controls**: interval `1m | 1h | 4h` (uiStore `ChartInterval` has no `1w`); pane `– | Ratio | OI` where `–` is stored as
+  `tj2-ui.flags.chartPaneOff` (uiStore `ChartPane` has no `none`); range `1W | 1M | 3M` (`1m` → 7 days only).
+- **Toasts**: `uiStore.toasts` is the single toast source (journal store + overlays push there); `primitives/toastStore` is unused by the shell.
+- **Market hooks**: cards use `useFeedSelect` / `useHealthSelect` keys + `deriveMarket` (`views/overview/useMarket.ts`) instead of
+  `useMarketView()`, so they re-render on structural changes only; every live number is a MotionValue leaf (`priceMv` odometer, ages
+  and countdowns on `nowMv`, see `src/motion/README.md` "Market panel live leaves").
+- **Falling-Knife card** sits in the Top-Trader card (bundle placement), not in the market panel.
+- Hyblock-MCP live mode (`Top Trader · Hyblock`, `Live · alle 5 min`) is not wired; the card is Binance-only (`Top Trader · Binance`).
+
+## `src/views/overview`
+
+`OverviewView` = `grid gap-5 lg:grid-cols-12`: Hero (12) · ChartCard (12) · BacktestCompare (5) | WinRateCard (3) | ProjectionCard (4) ·
+EquityCard (7) | TopTraderCard (5) · RankingCard (7) | ChecklistCard (5) · MonthlyCard (5) | RecentTrades (7) · PatternsCard (12).
+Every card reads `uiStore.acc` through `useAccountView(acc)`; all German strings come from `@/domain/*` or the bundle. Helpers:
+`ExplanationView` / `toExplainerData` (domain `Explanation` → primitives `Explainer`), `Bar` (fill on first view, `barDelay` =
+`stagger.lead` + capped `stagger.reveal`), `MarketLive.tsx` (the panel's MotionValue leaves), `marketMath.ts` (pure keys / deadlines /
+flow windows), `useMarket.ts` (`useMarketPanelView(levels)`, `useMotionSelect`, `usePriceClass`, `usePriceSource`, `useGlide`,
+`useOrderFlowMeter`, `useTopTraderView`, `useForceRefresh` – 5 forced feeds, 5-s cooldown). The page is kept alive while hidden (see
+"Page host"); cells below the hero are `Reveal`s (never the ChartCard body).
+Tests: `tests/unit/app.shell.test.tsx`, `tests/unit/views.overview.{hero,market,recent}.test.tsx`; the market is mocked through
+`tests/unit/views.overview.harness.tsx` (`fakeMarket(actual)` → deterministic snapshot + fake provider, `bootFixtureJournal()`).
+
+## UX shell (P13): themes, shortcuts, error states
+
+**Themes.** `main.tsx` calls `applyInitialTheme()` + `installThemeTransition()` BEFORE `createRoot` (the CSP forbids an
+inline script, so this is the earliest point): `data-theme` (`dark` | `light`), `data-theme-pref` (`dark` | `light` |
+`system`), `data-accent` (absent for Signalrot), `color-scheme` and the `color-scheme` / `theme-color` metas – the first
+React commit already paints the stored theme. Everything visual lives in `src/styles/themes.css` (see
+`src/store/README.md` → `themeStore.ts`). Dark + Signalrot is byte-identical to the design before P13.
+
+- `themeTransition.ts` – the switch (declared `// motion-exception: theme-reveal`): View Transitions API → the NEW page is
+  revealed by a growing `clip-path` circle from the tapped control (`tween.reveal`); fallback: a paper/ink disc
+  (`data-layer="Theme-Wechsel"`) grows, the theme flips underneath, the disc fades; `data-safe-fx` → plain fade;
+  reduced motion → instant. Finite, nothing left behind.
+- `ThemeCard.tsx` – "Darstellung" for the settings page: Dunkel / Hell / System as live miniatures + the accent
+  (Signalrot, Kobalt, Violett). Both are radio groups (roving tab stop, arrows select). Mount: `import { ThemeCard } from "@/app/ThemeCard"`.
+- `toggleTheme(origin?)` (`@/store/themeStore`) – Hell ↔ Dunkel; bound to `t` and the search command; CommandNav may add it.
+
+**Shortcuts.** `shortcuts.ts` is the registry (`shortcutList()`): `g` + page key (derived from `PAGES` / `PAGE_KEYS` at
+call time, so new pages get a chord for free; window `CHORD_MS` 1200), `[` / `]` previous / next page, `n` new trade,
+`t` theme, `/` and ⌘⇧F / Ctrl+⇧F search, `?` the sheet; ⌘K (CommandNav) and Esc are listed only. `matchKey` is pure
+(Shift / AltGr for `? / [ ]` on German layouts; Ctrl / ⌘ / Alt / key repeat never match). Never fires from a text
+field (`isEditableTarget`: inputs, textareas, contenteditable, comboboxes) or while a modal dialog is open (`modalOpen`).
+- `ShortcutHost.tsx` – the window listener + the chord hint (`data-layer="Tastenkürzel-Hinweis"`, "g … dann" with the
+  page keys) + the lazy sheet. Mount once in `App` after `<SetupEditor/>`, before `<Celebrate/>`.
+- `ShortcutSheet.tsx` – the cheat sheet (`Sheet`): the most important keys as a `MagnifyRow` toolbar, then every group,
+  and "Einführung noch einmal ansehen". `Kbd.tsx` – `Kbd` / `KeyCombo` key caps.
+
+**Error states.** `ErrorBoundary.tsx` – `variant="app"` (full ink stage, "Neu laden"), `"page"` ("Erneut versuchen" +
+"Neu laden", the shell stays usable), `"widget"` (compact tile, the rest keeps running). The mark is a dot-matrix "ERR"
+that glitches ONCE (seeded `glitchFrames`, `fxTiming.matrixFps`, rests on the clean word; reduced motion: clean word).
+Every catch goes to `reportError(error, { source: "boundary", … })` (P09: sent only with the trader's opt-in).
+`resetKeys` re-arms it (wrap `renderPage` with `resetKeys={[page]}`).
+
+**Dev harness.** `/dev/ux.html` (`npm run dev`): `?view=app` (default) = the integrated app; `?view=cockpit`,
+`?view=cards` (ThemeCard + OnboardingCard), `?view=crash`, `?view=crash-widget`. Since P14 the e2e specs run on the real
+routes of the production build (`tests/e2e/uxHarness.ts`: the page error state is a lazy chunk that cannot be loaded,
+the widget error state a throwing cockpit widget).
+
+Tests: `tests/unit/theme.{store,transition,codemod,card,budget}.test.*`, `shortcuts.{registry,host}.test.*`,
+`app.errorBoundary.test.tsx`; e2e `theme.spec.ts`, `search.spec.ts` (shortcuts too), `a11y.spec.ts`.
+
+## Funktionsregister und Seite „Funktionen“ (Auffindbarkeit)
+
+`features.ts` ist die einzige Wahrheit, welche Funktionen es gibt und wo sie stehen (F-IDs, Name, **Aufgabe in einfachen Worten** `task`, ein Satz Nutzen, **eine
+Hauptgruppe nach Aufgabe** + Zwischenüberschrift `sub`, Seite + Anker + Abschnitt `place` oder Öffner, Stichwörter, **Absichten** `intents`, „Siehe auch“ `see`,
+`since` / `star`, Status `fertig` / `teilweise` mit Lücke, Plan-Gate, Gerätehinweis). Gelesen von der Seite `funktionen` (`src/views/funktionen`, Hash `#funktionen`,
+`g f` – **nicht im Dock, keine Dashboard-Karte**), der globalen Suche (Art `feature`), dem Finder der Befehlsnavigation und dem Assistenten („Wo finde ich …?“).
+`featureQuery.ts` = reine Fragen ans Register (ein tippfehlertoleranter Scorer für Absichten, Gruppen + Zwischenüberschriften, „Für dich“ aus
+`settings.assistant.interests`, „Zuletzt benutzt“ aus `searchStore.recent`, „Empfohlen / Neu“, `whereIs`); `featureOpen.ts` = `openFeature(id)` (Aktion oder Seite +
+Scrollen mit ehrlichem Toast, wenn die Stelle fehlt); `reveal.ts` = `whenShown` / `revealCard` / `revealSection` / `keepAligned` / `openFoldsAround` (öffnet eingeklappte Karten, `Fold`, vor dem Sprung) (aus `search/actions.ts`
+herausgelöst, dort re-exportiert); `featureChips.ts` = die Chips „Zuletzt benutzte Funktionen“ der Befehlsnavigation (dynamischer Import, nur bei vorhandenen
+Einträgen); `NavFinder.tsx` (+ lazy `NavFinderResults.tsx`) = **das Feld „Was willst du tun?“ der Befehlsnavigation** mit dem deutlichen Weg „Alle Funktionen →“: Es
+findet jede Funktion, nicht nur Seiten (das Register lädt mit dem ersten Buchstaben), Enter öffnet den besten Treffer, Pfeile gehen von Feld zu Treffern zu den Seitenlinks, im
+Feld sind Ziffern und Pos1/Ende Text, das erste Esc leert; `FeatureLinks.tsx` = „Auch hier: …“-Zeile für Seiten, deren Nachbarfunktionen sonst zufällig gefunden würden (Coach). Das Register
+ist nur im Lazy-Chunk der Seite / Suche / des Assistenten – die Erstladung importiert es nicht (`shellStats` zeigt für die Seite den festen Text „Index“).
+Dokumente zum Register: `docs/COVERAGE.md` (eine Zeile je F01–F74; Test `tests/unit/features.registry.test.ts`) und `docs/UEBERSICHT.md` (Karte Aufgabe → Seite → Abschnitt).
+
+## Navigation in vier Gruppen (Etappe 1a)
+
+Ziel: alles ist leicht zu finden, nichts wird abgeschafft. Die 19 Ziele (vier Ur-Tabs + 15 Lazy-Seiten) stehen in **vier Gruppen nach dem, was man gerade tut** – in der Seitenleiste (ab 768 px), im Menü hinter „Mehr“ (unter 768 px,
+dieselbe Befehlsnavigation mit dem Feld „Was willst du tun?“ oben), in `[` / `]` und in der Schieberichtung. Zuordnung (`NAV_GROUP_PAGES`, `src/store/uiStore.ts`), Begründung und das Wort, das ein Anfänger versteht (`PAGE_HINT`, `navGroups.ts`):
+
+| Gruppe | Seite | Anfänger-Wort | warum hier |
+|---|---|---|---|
+| **Erfassen** – „Trades eintragen und vorbereiten“ | Trades | Deine Einträge | die Liste, in die man erfasst |
+| | Handelsplan | Vor dem Trade planen | der Plan gehört vor den Eintrag |
+| | Entscheidungsgrundlagen | Deine Regeln | die Regeln, nach denen man einen Trade einträgt |
+| **Prüfen** – „Lage und Markt ansehen, Risiko prüfen“ | Übersicht | Heute im Blick | der Stand auf einen Blick (Startseite, unverändert) |
+| | Markt | Kurse und Signale | Live-Lage, Boxen, Top-Trader- und Wal-Daten |
+| | Aktien | Aktien-Scanner und News | Kandidaten ansehen und gegenprüfen |
+| | Risiko | Wie viel einsetzen? | Größe, Stop und Grenzen gegenprüfen |
+| **Auswerten** – „Aus deinen Trades lernen, Ideen testen“ | Analyse | Was funktioniert? | Zahlen zu den eigenen Trades |
+| | Berichte | Woche und Monat | Rückblick |
+| | Coach | Rückmeldung zu dir | Muster in den eigenen Fehlern |
+| | Wachstum | Disziplin und Routinen | Prozess statt Kontostand |
+| | Cockpit | Dein eigenes Dashboard | die eigene Auswahl der Auswertungen |
+| | Labor | Strategien testen | Historie prüfen |
+| | Strategie-Studio | Strategie in Worten | Idee → Regeln → Test |
+| **Konto & Rechtliches** – „App, Konto, Hilfe und Impressum“ | Einstellungen | App einstellen | |
+| | Konto | Login und Sync | |
+| | Community | Gruppen und Rangliste | braucht das Konto (Cloud) |
+| | Preise | Pläne und Preise | |
+| | Funktionen | Alles, was die App kann | die Hilfe, auch der Weg zur Demo |
+| | (Impressum · Datenschutz · AGB) | | `LegalLinks` am Fuß der Gruppe, in der Seitenleiste und im Menü; bleiben auch im Fuß der Seite |
+
+Die Reihenfolge von `PAGES` bleibt (die Ziffern 1–9 und die `g`-Buchstaben wandern nicht); die Ziffern stehen als kleine Zahl an den ersten neun Seiten im Menü.
+
+- **Unter 768 px – die untere Leiste** (`Dock.tsx`, der bestehende Dock umgebaut, nicht doppelt gebaut): `Übersicht · Trades · [+ Trade] · Markt · Mehr`. Der Mittelknopf ist größer (52 px) und steht höher; unter jedem Symbol steht sein Wort
+  (10 px, Tooltip-Platte entfällt). „Mehr“ öffnet das Menü und leuchtet (Scheibe) auf jeder Seite, die nicht in der Leiste steht – man sieht, wo man ist. Bewegung und Federn unverändert: Hop nach Druckdauer, Flick, Scrubben, Federn
+  `spring.pop` / `spring.layout`, Marker als WAAPI-FLIP, Magnetic, Einflug einmal je Sitzung, Ping-Ring am Mittelknopf, Morph des Editors aus der Scheibe. `toolbar` „Navigation“ bleibt (Tests und Screenreader).
+- **Ab 768 px – die Seitenleiste** (`Sidebar.tsx`, `data-layer="Seitenleiste"`, `sticky` unter der Kopfleiste): oben `Trade eintragen` (dieselbe Taste wie in der Kopfleiste, `NewTradeButton`), darunter die vier Gruppen mit Titel, jede Seite 44 px hoch mit
+  Name und Anfänger-Wort; am Fuß Rechtliches und „Einklappen“. **Breit** (256 px) ab 1624 px (= Seitenspalte 1320 + Ränder 48 + Leiste 256; darunter lässt die schmale Leiste den Seiten die Breite, für die sie gebaut und reserviert sind – die Markt-Seite wuchs neben der breiten Leiste bei 1440 px nach dem ersten Bild um 87 px), sonst die **schmale Leiste** (64 px: Symbole, Name + Wort im Tooltip, `aria-label`). `uiStore.sidebar` = `auto | open | closed`
+  (`tj2-ui`, bleibt erhalten); `auto` folgt der Breite, damit die Seiten ihren Platz behalten (`--sidebar-w` auf `<html>` hält den Fuß der Seite frei). Die Gruppentitel sind Knöpfe (`aria-expanded`): 19 Zeilen à 44 px passen auf keinen Bildschirm unter 1300 px Höhe, darum faltet `auto` dort „Auswerten“ und „Konto & Rechtliches“ (außer eine davon hält die aktuelle Seite), „Erfassen“ (Trades) und „Prüfen“ (Übersicht, Markt) bleiben offen; Auswerten-Seiten und Einstellungen sind dann zwei Tipps entfernt (`closedGroups`, `uiStore.sidebarClosed`: `null` = nicht gewählt, sonst die gefalteten Gruppen, in `tj2-ui`); wer eine Seite einer gefalteten Gruppe öffnet (Link, Taste, Suche), sieht sie wieder aufgeklappt, die aktuelle Zeile scrollt ins Bild. In der schmalen Leiste fehlen die Titel, dort scrollt die Liste. Ein Marker (`spring.layout`, nur Transform) gleitet von Zeile zu Zeile, die Namen
+  blenden beim Ausklappen ein (`spring.smooth`); die Breite selbst schaltet in einem Schritt um (kein Umbruch der langen Seite pro Frame). Dock und Seitenleiste sind nie zusammen da (`useMediaQuery(WIDE_QUERY)`).
+- **Kopfleiste** bleibt schlank: ab 768 px ohne eigene `Trade eintragen`-Taste (sie steht in der Seitenleiste), Assistent / Vollbild / Menü zeigen ab 1280 px ihr Wort, darunter Tooltip + `aria-label`; „Lokaler Modus“ ist ein kleines Schild
+  (`LocalModeBadge`, Tipp erklärt es) statt des Banners. Das rote „Speichern nicht möglich.“ bleibt ein Banner (es geht um verlorene Daten, nicht um einen Hinweis).
+- **44 px**: ein Token (`--spacing-tap`, `tokens.css`, `@theme static`) für `touch-hit*` und die neuen `.tap` / `.tap-y` (die Box selbst ≥ 44 px, für jeden Zeiger) sowie `min-h-tap` / `size-tap`; kein zweites `44px` in `base.css`
+  (`tests/unit/styles.tap.test.ts`). Kopfleisten-Knöpfe, Seitenleistenzeilen, Leistenknöpfe und das Schild nutzen es; Zeilen liegen untereinander (keine überlappenden Tippflächen).
+- **Erster Besuch**: das Einführungs-Fenster öffnet sich nicht mehr von selbst. Ein leeres Journal zeigt – nur beim allerersten Besuch, auf Übersicht und Trades – einen Leerzustand mit genau einer Aktion („Ersten Trade eintragen“,
+  `FirstRunEmpty`, merkt sich den Besuch als `seen`). Wer das Fenster früher gesehen hat (`done` / `skipped`) oder schon Trades hat (`seen`), sieht ihn nie. Die Tour bleibt unter Einstellungen → Einführung & Hilfe, in der Suche und im Tastenblatt.
+
+### Messung vorher / nachher (Etappe 1a)
+
+`tests/e2e/nav-baseline.spec.ts` (mobil 390 × 844, Desktop 1440 × 900, `NAV_BASELINE_OUT=<datei>`; `NAV_ONLY_HIT=1` misst nur die Tippflächen der Hülle) – dieselbe Messung auf der alten und der neuen Navigation, gleiche Seed-Daten:
+
+| Messwert | mobil vorher | mobil nachher | Desktop vorher | Desktop nachher |
+|---|---|---|---|---|
+| Seitenlänge, Mittel der fünf Hauptseiten (px) | 12 469 | 12 382 | 6 786 | 6 746 |
+| längste Seite (Markt, px) | 20 982 | 20 871 | 11 342 | 11 299 |
+| Taps bis „Trade eintragen“-Editor, jede der 19 Seiten | 1 | 1 | 1 | 1 |
+| Taps von der Übersicht zu einer Seite, Mittel der 19 | 1,74 | 1,84 | 1,74 | **1,00** |
+| … Höchstwert | 2 | 2 | 2 | **1** |
+| Tippflächen ≥ 44 px, Hülle (Kopfleiste / Leiste bzw. Seitenleiste / Menü) | 100 / 100 / 100 % | 100 / 100 / 100 % | 20 / 100 / 93 % | 100 / 77* / 100 % |
+| Tippflächen ≥ 44 px, die fünf Hauptseiten | 99,4 – 100 % | 99,4 – 100 % | 8 – 73 % | 10 – 76 % |
+
+Die Seiten selbst sind nicht kürzer geworden (Inhalt unverändert, Übersicht und Cockpit unangetastet) – die Länge schwankt nur um die Seitenleisten-Breite (±1 %). Gewonnen hat das **Finden**: am Computer ist jede Seite ein Tipp entfernt (vorher
+zwei für 15 von 19), mobil sind die drei Seiten der Leiste ein Tipp, alles andere zwei („Mehr“, dann die Seite) – **mobil sind zwei Seiten schlechter geworden: Entscheidungsgrundlagen und Einstellungen waren Dock-Tabs (1 Tipp), jetzt 2**
+(Mittel 1,74 → 1,84). Das ist der Preis der Vorgabe „Übersicht, Trades, Markt, Mehr“; die Seiten stehen im Menü in „Erfassen“ und „Konto & Rechtliches“, und `g e` / `g s` / die Suche gehen weiter.
+\* 5 von 22 Zeilen der Seitenleiste meldet die Trefferprüfung als zu klein, wenn der Bildschirm nur 900 px hoch ist: es sind Zeilen am unteren Rand der scrollenden Liste, die der Fuß verdeckt (kein zu kleines Ziel;
+in `nav-groups.spec.ts` mit hohem Fenster geprüft: keine Fläche unter 44 px, keine überlappt). Die Hauptseiten am Computer (Zeiger „fein“) bleiben so dicht wie vorher: `touch-hit` gilt dort nur für grobe Zeiger – nicht Teil dieser Etappe.
+
+### Fresh-eyes-Prüfung (Etappe 1a, Screenshots 320 / 768 / 1440, 60-Sekunden-Test)
+
+| Frage | Antwort eines Fremden | Beleg |
+|---|---|---|
+| Wo trage ich einen Trade ein? | Mobil: der rote Knopf „Trade“ in der Mitte der unteren Leiste, auch das „+“ oben rechts. Computer: „Trade eintragen“ ganz oben in der Seitenleiste. Ein Tipp von jeder der 19 Seiten. | `nav-baseline.spec.ts` (Taps 1 / 1), `shots2/390-markt.png`, `shots3/1440-overview.png` |
+| Wo sehe ich Markt? | Mobil: dritter Knopf der Leiste, mit Wort. Computer: Seitenleiste, Gruppe „Prüfen“. | wie oben |
+| Wo sind die Einstellungen? | Mobil: „Mehr“ → Gruppe „Konto & Rechtliches“, erste Karte (2 Tipps). Computer: Seitenleiste, Gruppe „Konto & Rechtliches“ (auf einem 900 px hohen Fenster erst aufklappen: 2 Tipps; ab 1300 px Höhe sofort sichtbar). | `shots2/390-finder.png` |
+| Wo sind Wal- / Top-Trader-Daten? | Top-Trader: Suchfeld im Menü („Top Trader“ → „Top-Trader-Positionierung“, Übersicht) und Markt-Seite. **Wal-Daten gibt es in der App nicht** (keine On-Chain-Wale); „Wale“ fand vorher nichts – jetzt führt es zu den Top-Trader-Quoten und sagt im Eintrag, dass es Binance-Top-Trader sind. | Finder-Lauf (`Q Wale`), `features.ts` `top-trader` |
+
+| Nr | Schwere | Befund | Beleg | Korrektur |
+|---|---|---|---|---|
+| 1 | stört | 320 px: die Kopfleiste lief über, „Trade eintragen“ stand außerhalb des Bildschirms | `shots2/320-markt.png` (vorher) | Kurs-Anzeige unter 360 px aus, Abstände enger (`Header.tsx`), `nav-groups.spec.ts` „320 px“ |
+| 2 | stört | breite Seitenleiste bei 1440 px: die Markt-Seite wuchs nach dem ersten Bild um 87 px (Grenze 60), weil ihre Platzhalter für 1320 px Spaltenbreite gemessen sind | `layout-shift.spec.ts` markt (desktop) 11 411 → 11 498 px | `auto` zeigt die breite Leiste erst ab 1624 px (Spalte 1320 + Ränder + Leiste), darunter die schmale; Platzhalter der Beste-Setups-Karte folgt nun der Kartenbreite |
+| 3 | stört | breite Seitenleiste auf 900 px Höhe: „Trades“ lag unter dem Rand (19 Zeilen à 44 px passen nirgends) | `touch.spec.ts` Tablet, `back.spec.ts` | Gruppen faltbar; auf kurzen Bildschirmen sind „Auswerten“ und „Konto“ gefaltet, „Erfassen“ und „Prüfen“ offen; aktuelle Zeile scrollt ins Bild |
+| 4 | stört | Menü am Computer: Karten zu schmal, „Handelsplan“ → „H“, Hinweise abgeschnitten | `shots3/1440-menu.png` | Karten mindestens 236 px breit (drei je Reihe) |
+| 5 | stört | Kontrast der Gruppentitel und Hinweise in der Seitenleiste unter 4,5 : 1 (axe, dunkel und hell) | `nav-groups.spec.ts` (Barrierefreiheit) | `text-mute` statt `text-faint` |
+| 6 | stört | Rechtliches-Links (Impressum, Datenschutz, AGB) in Menü, Seitenleiste und Fuß: Tippflächen überlappten oder waren 17 px hoch | Trefferprüfung Menü 93 % → 100 % | eigene 44-px-Zeilen (`LegalLinks roomy`) |
+| 7 | Politur | Schmale Leiste (Standard bei 768 – 1623 px) zeigt nur Symbole; die Namen stehen im Tooltip und im Menü-Knopf der Kopfleiste | `shots3/1440-overview.png` | offen: Entscheidung Auftraggeber – breit als Standard (kostet bei 1440 px die Markt-Platzhalter, siehe 2) oder Platzhalter der Markt-Seite neu messen |
+| 8 | Politur | Das Suchfeld findet Funktionen, nicht Seiten: „Einstellungen“ führt zu „Box-Einstellungen …“, die Seite selbst steht darunter in der Liste | Finder-Lauf | nicht geändert (zwei Suchen wären eine zweite Suche); die Gruppenliste liegt direkt unter dem Feld |
+| 9 | Politur | „Mehr“ wartet auf die gestaffelte Einblendung des Menüs (bis 1,8 s) | Zeitablauf `CONFIG.delays` | unverändert (pulse-motion-Maße); offen |
+
+Nicht geprüft: Safari / iOS (nur Chromium), echte Touch-Geräte (nur Emulation und CDP-Touch), Screenreader (nur axe), die Cloud-Edition `build:e2e-cloud`, die Teilen-Edition.
+
+## Zusammenhang & Navigation (Feinschliff, Runde 8)
+
+- **Reihenfolge der Seiten** (Stand Runde 8; seit Etappe 1a sehen Leser die vier Gruppen, `PAGES` bleibt für Ziffern und `g`-Buchstaben): `PAGES` in `src/store/uiStore.ts` – die fünf früheren Dock-Tabs (Übersicht, Trades, Entscheidungsgrundlagen, Markt, Einstellungen), dann
+  Handelsplan, Aktien, Risiko · Analyse, Berichte, Coach, Wachstum · Labor, Strategie-Studio · Community, Cockpit, Konto, Preise, Funktionen. Dieselbe Reihenfolge ist die Zahlenfolge der Befehlsnavigation (1–9),
+  die Gleichstand-Reihenfolge der Suche und die Folge der `g`-Kürzel im Tastenblatt; `[` / `]` folgen `NAV_ORDER` (die Gruppen), die Schieberichtung `SLIDE_ORDER`.
+- **Befehlsnavigation** (`CommandNav.tsx`): oben das Feld „Was willst du tun?“, darunter alle 19 Seiten in vier Gruppen nach Aufgabe (`NAV_GROUPS`: Erfassen · Prüfen · Auswerten · Konto & Rechtliches – Stand Etappe 1a; früher fünf große Links + Planen & Handeln · Auswerten & Lernen · Strategien · Mehr). Die jüngsten Seiten (`NEW_PAGES`: Handelsplan, Aktien, Strategie-Studio) tragen ein kleines „Neu“, bis sie einmal geöffnet waren (nur dieser Browser, `visited-pages`, ein beschädigter Speicher
+  heißt „noch nichts geöffnet“). `tests/unit/app.navOrder.test.ts` hält Reihenfolge, Gruppen, Buchstaben (je Seite einer, eindeutig) und die Marke fest.
+- **„Siehe auch“** zwischen Seiten: Tabelle `seeAlso.ts` (Daten, kein Register-Import), Baustein `<SeeAlso at="plan.exit" />` in `FeatureLinks.tsx`; höchstens drei Links je Zeile, höchstens drei Zeilen je Seite,
+  nur auf eine andere Seite, nur zu Funktionen, die das Register selbst als verwandt nennt (`tests/unit/seeAlso.test.tsx`). Neue Zeile: Eintrag in der Tabelle, die Zeile an der Karte, der Test sagt, wenn eines fehlt.
+- **Register** (`features.ts`): zwölf Gruppen in der Reihenfolge des Tages (Heute vorbereiten · Trade prüfen & Chart · Aktien beobachten & bewerten · Trade planen · Risiko & Disziplin · Strategie entwickeln & testen ·
+  Aus Fehlern lernen · Auswerten & Berichte · Üben & Wachsen · Trades eintragen & Daten · Community & Teilen · Konto, Einstellungen & Hilfe); ein Block (Zwischenüberschrift) hat höchstens acht Einträge, höchstens
+  acht Sterne insgesamt, Aufgaben in der Du-Form, die Handelsplan-Schritte heißen alle „Handelsplan: …“. `tests/unit/features.anchors.test.ts` prüft für jeden Eintrag, dass sein Anker in einem Modul steht, das SEINE Seite erreicht;
+  `tests/e2e/funktionen-anker.spec.ts` findet ihn im DOM.
