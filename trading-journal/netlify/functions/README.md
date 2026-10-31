@@ -243,3 +243,16 @@ pseudonymised IP through `rate_hit`, with a per-instance counter as the fallback
 Tests: `tests/unit/stocks.server.test.ts` (fixtures of real Yahoo / Nasdaq / RSS answers from 2026-10-25 in `tests/fixtures/stocks/`,
 `fetch` mocked: parsing and cleaning, the directory filter, gate and rate limit, error mapping, cache headers, in-flight sharing, budget).
 The deployed functions were **not run live** (no deploy from the sandbox); the formats were checked against real upstream answers.
+
+## `klines-proxy.mts` (F16, Labor fallback)
+
+`GET /api/v1/klines?venue=spot|futures&symbol=BTCUSDT&interval=4h[&startTime=][&endTime=][&limit=]` – a relay of PUBLIC Binance candles for
+browsers that cannot read the Binance host themselves; the last rung of the Backtest-Labor's fallback chain (`venue=spot`,
+`src/views/labor/historySource.ts`). No key, no account, nothing personal: only a symbol, an interval and a time window go out. A public relay
+never runs open: two upstream URLs built in the code (`data-api.binance.vision` spot, `fapi.binance.com` futures – the caller names a venue, never
+a host or path), symbol `[A-Z0-9]{5,20}`, interval from a list, integers only, `limit` ≤ the venue's page (1000 / 1500), 8-s limit on the upstream
+call (504 `upstream_timeout` with a German message), 451 / 429 / 502 named (never an empty 200), Binance's own 400 passed on (`-1121` = unknown
+market), cache (a full page of old history: 1 day at the CDN edge; near "now": 20 s; identical requests in one instance cost one upstream call),
+120 requests a minute per IP and instance. Response header `x-klines-venue` – the app labels spot candles as spot. Spot answers from any region;
+Binance Futures answers 451 from the default function region (the `/api/binance` rewrite stays the way to Futures). Test:
+`tests/unit/functions.klines.test.ts`.

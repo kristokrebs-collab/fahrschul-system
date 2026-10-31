@@ -11,9 +11,37 @@ Honest backtests on real Binance USDⓈ-M history: `h1 Labor`. Import from `@/vi
 | `useLabor` | zustand: `cfg` (`LabConfig`, localStorage `storageKey("labor")`), `status` idle/loading/running/done/error/cancelled, `phase`, `progress`, `load {done,total}`, `result` (`LabResult`), `bars` (execution bars of the run, memory only), `runs` (≤ `RUNS_MAX` summaries, localStorage `storageKey("labor-runs")`), `replayId`, `fundingUsed`, `runCfg`; actions `setCfg`, `setParam`, `openReplay`, `clearRuns`. |
 | `startLab(signalCfg, now?)` / `cancelLab()` | loads the history (`loadLabData`) and runs the job (`runLab`: inline worker per run, idle chunks under `file://` / single-file / no Worker). A newer start aborts an older one. Load errors → honest German text (blocked / rate / symbol); a failure of the computation itself is `Der Lauf ist fehlgeschlagen.` (never blamed on the network). |
 | `planOf(cfg, signal)` / `pagesEstimate(cfg, signal, now?)` | intervals to load, warm-up, completed params; page estimate for `labor-estimate`. |
-| `loadLabData`, `LAB_BUDGET`, `LAB_CACHE_PREFIX`, `__setHistoryDeps` | the lab's own loader: `binanceRest` → same-origin `proxyRest` on 451 / CORS / network (never in the file build), own `TokenBucket` (300 weight / min, sequential pages), IndexedDB cache (`tj-market`, key `${storageKey("labor")}:{symbol}:{interval}`, closed bars only; funding `…:funding`). |
+| `loadLabData`, `LAB_BUDGET`, `LAB_CACHE_PREFIX`, `__setHistoryDeps` | the lab's own loader (`historySource.ts`), see "Candle source: hang-proof and honest" below: every request has a 12-s limit over the WHOLE answer, retries with back-off, abort reaches the request, a fallback chain names the source; own `TokenBucket`s (300 weight / min for Binance, sequential pages), IndexedDB cache (`tj-market`, key `${storageKey("labor")}:{symbol}:{interval}` for the Binance-Futures series, `…:bybit:…` / `…:spot:…` for the others, closed bars only; funding `…:funding`). |
+| `retryLab()`, `useLabor.loadStatus / errorDetail / dataSource` | "Erneut versuchen" (forgets which sources hung, repeats the last set-up); what the loader is doing now; the reason per source after a failed load; the source of the SHOWN result. |
 | `labReplayModel(trade, bars, intervalMs)` | pure replay model of a backtest trade for the journal's `ReplayChart` + `ScrubTimeline`. |
 | `assumptionLines`, `principleLines`, `LABOR` | the assumptions the run makes (data, costs, what is NOT simulated) and the German copy. |
+
+## Candle source: hang-proof and honest
+`historySource.ts` (tests: `tests/unit/labor.historyRoute.test.ts`, `views.labor.source.test.tsx`, e2e `labor-robust.spec.ts`).
+- **Cause of "Lade Kerzen 0 von 2 …" for ever (reproduced with a stalled body):** the 15-s timer of `fetchJson` was cleared as soon as
+  the response HEADERS arrived (a body that stalls hung for ever), `Abbrechen` never reached the request under way (only checked between
+  pages), a timeout switched to nothing (only 451 / network / CORS went to the proxy, and never to another source), and a rate-limit back-off
+  waited a silent minute. Now: `fetchJson` keeps the timer until the body is read; `withDeadline` enforces the limit again in the loader (a client
+  that ignores its signal cannot hold the load); the abort ends the request, a back-off pause and a budget wait at once.
+- **Per request:** limit `HISTORY_TIMING.timeoutMs` (12 s); `attemptsFor(kind, proven)`: a source that has not answered yet is asked once more
+  after a network error / 5xx (back-off 0.8 s, 2.4 s) but NOT after a timeout (the next source is), 451 / CORS / unknown market / offline are
+  never repeated; a source that has answered gets 3 attempts. The budget wait is capped (`maxBudgetWaitMs` 20 s) – a longer ban is an error with a reason.
+- **Chain (`LoadRequest.fallback`, only the Labor run sets it):** `binance` (Futures) → `proxy` (the same series via `/api/binance`, never in the file
+  build) → `bybit` (USDT-Perp, `bybitRest`, windows `start…end` emulate "first n bars from startTime") → `spot` (`data-api.binance.vision`,
+  `src/market/sources/binanceSpot.ts`) → `spot-app` (`/api/v1/klines?venue=spot`, `netlify/functions/klines-proxy.mts`). All other consumers of
+  `loadLabData` (signal checks, replay, studio …) stay on `binance → proxy` and keep their Binance wording. One load uses ONE source for all its
+  intervals; each source has its own cache namespace (`cachePrefixOf`); funding history only from the two Futures sources (otherwise the flat
+  assumption, said in the assumptions). `bad_symbol` / `offline` end the chain. A source that hung is skipped for 60 s by the next load
+  (`forgetRoutes()` / `retryLab()` asks all again). OKX is not in the chain: the adapter has no paging and its CORS is unverified.
+- **Result:** `LoadedData.source` (+ `failed`: every source asked before, with the reason), `useLabor.dataSource`. `RunCard`'s source line
+  (`labor-stand`): "Binance USDⓈ-M, geschlossene Kerzen" for Futures, "Spot, nicht Futures (Binance), …" / "Bybit USDT-Perp, nicht Binance, …" otherwise,
+  plus `labor-source-note` (why, what it means); `AssumptionsCard` names the source in its first line ("… von Binance Spot, nicht Futures") and adds the
+  same note; a run from another market is marked in the comparison (`RunSummary.src`, never replaces the Futures run) and in the reference label
+  ("· Quelle Spot"). `sourceStrings.ts` has all German copy (status line, reasons, notes).
+- **While loading:** `labor-load-note` under the percentage = the status (`Frage Binance-Futures … 5 s`, `Binance-Futures: keine Antwort in 12 s. Weiter
+  mit dem EU-Proxy der App …`); progress is real pages (`Lade Kerzen n von m`, the total follows the active source's page size). **When all fail:**
+  `labor-run` shows the message + `labor-error-detail` (one line per source) + `labor-retry` ("Erneut versuchen"; not for a typo, an idea with errors or
+  a period without candles).
 
 ## Cards and effects
 - `ConfigCard` (`labor-config`): strategy tiles (`labor-strategy-{box|mcb|rules}`, `role="radio"`, glide `layoutId="labor-strat-{uid}"`), market `Autocomplete`, period / params as `ChipPick` (ink thumb like `Segmented`, glide `layoutId="labor-chip-{id}"`), rule builder (`MorphSelect`), costs in an expander (fees preset, slippage, funding history/flat/none, capital, risk, max leverage), `labor-start` / `labor-cancel`, `labor-estimate`.

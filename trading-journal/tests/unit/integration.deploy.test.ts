@@ -44,6 +44,8 @@ describe("netlify.toml", () => {
     // the local screenshot reader (tesseract.js) compiles WebAssembly: that, and only that, is allowed beyond 'self'
     expect(directive("script-src")).toEqual(["'self'", "'wasm-unsafe-eval'"]);
     expect(directive("connect-src")).toEqual(expect.arrayContaining(["'self'", "https://fapi.binance.com", "wss://fstream.binance.com", "https://*.supabase.co", "wss://*.supabase.co"]));
+    // the Labor's last-resort SPOT candles (labelled "Spot, nicht Futures"): exactly this one extra market-data host
+    expect(directive("connect-src")).toContain("https://data-api.binance.vision");
     expect(directive("img-src")).toEqual(expect.arrayContaining(["'self'", "data:", "blob:", "https://*.supabase.co"]));
     expect(directive("worker-src")).toEqual(["'self'", "blob:"]);
     expect(directive("frame-ancestors")).toEqual(["'none'"]);

@@ -15,17 +15,25 @@ import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
-import { useLabor, type LabConfig, type RunSummary } from "./laborStore";
+import { useLabor, type DataSource, type LabConfig, type RunSummary } from "./laborStore";
+import { assumptionSource, sourceBadge, sourceNote } from "./sourceStrings";
 import { LABOR } from "./strings";
 import { numText, pctText, rText } from "./ui";
 
 /* ------------------------------------------------------------------ assumptions */
 
-export function assumptionLines(r: LabResult, cfg: LabConfig, funding: "history" | "flat" | "none" | null): string[] {
+/**
+ * `source`: where the candles REALLY came from (absent = Binance-Futures). The first line names it, and a source that is not
+ * Binance-Futures gets its own line right under it – "von Binance-Futures" is only written when it was so.
+ */
+export function assumptionLines(r: LabResult, cfg: LabConfig, funding: "history" | "flat" | "none" | null, source?: DataSource | null): string[] {
   const tf = r.interval === "1d" ? "1D" : r.interval;
   const fee = feePreset(cfg.exchange);
+  const id = source?.id ?? "binance";
+  const other = sourceNote(id, source?.failed ?? []);
   const lines = [
-    `${n0(r.bars)} geschlossene ${tf}-Kerzen ${r.symbol} von Binance-Futures, ${fmtDate(new Date(r.from))} bis ${fmtDate(new Date(r.to))}${r.gaps.gaps ? `, ${r.gaps.gaps} Datenlücke${r.gaps.gaps === 1 ? "" : "n"} (${r.gaps.missing} Kerzen fehlen)` : ""}.`,
+    `${n0(r.bars)} geschlossene ${tf}-Kerzen ${r.symbol} von ${assumptionSource(id)}, ${fmtDate(new Date(r.from))} bis ${fmtDate(new Date(r.to))}${r.gaps.gaps ? `, ${r.gaps.gaps} Datenlücke${r.gaps.gaps === 1 ? "" : "n"} (${r.gaps.missing} Kerzen fehlen)` : ""}.`,
+    ...(other ? [other] : []),
     "Kein Blick in die Zukunft: Entscheidung zum Kerzenschluss, Ausführung zur nächsten Eröffnung.",
     "Liegen Stop und Ziel in derselben Kerze, zählt der Stop. Ein Gap über den Stop füllt zur Eröffnung.",
     `Gebühren ${fee.label}: ${String(fee.makerBps).replace(".", ",")} bp Maker (Ziele als Limit), ${String(fee.takerBps).replace(".", ",")} bp Taker (Einstieg, Stop, Zeit-Stop).`,
@@ -50,6 +58,7 @@ export function principleLines(cfg: LabConfig): string[] {
   const fee = feePreset(cfg.exchange);
   return [
     "Echte Kerzen von Binance-Futures, nur geschlossene. Einmal geladen liegen sie im Cache.",
+    "Antwortet Binance-Futures nicht, nutzt das Labor eine Ausweichquelle (EU-Proxy, Bybit, Spot) und nennt sie im Ergebnis.",
     "Kein Blick in die Zukunft: Entscheidung zum Kerzenschluss, Ausführung zur nächsten Eröffnung.",
     "Liegen Stop und Ziel in derselben Kerze, zählt der Stop.",
     `Gebühren ${fee.label} ${String(fee.makerBps).replace(".", ",")} / ${String(fee.takerBps).replace(".", ",")} bp, Slippage ${slippageText(cfg.slippage)}, Funding ${LABOR.fundingModes[cfg.funding]}.`,
@@ -62,7 +71,8 @@ export function AssumptionsCard({ className }: { className?: string }) {
   const runCfg = useLabor((s) => s.runCfg);
   const cfg = useLabor((s) => s.cfg);
   const funding = useLabor((s) => s.fundingUsed);
-  const lines = result && runCfg ? assumptionLines(result, runCfg, funding) : principleLines(cfg);
+  const source = useLabor((s) => s.dataSource);
+  const lines = result && runCfg ? assumptionLines(result, runCfg, funding, source) : principleLines(cfg);
   return (
     <Card title={LABOR.assumptions} note={result ? undefined : "So rechnet das Labor."} className={className} data-testid="labor-assumptions">
       <ul className="grid gap-2">
@@ -81,12 +91,17 @@ export function AssumptionsCard({ className }: { className?: string }) {
 
 export function ReferenceCard({ className }: { className?: string }) {
   const result = useLabor((s) => s.result);
+  const dataSource = useLabor((s) => s.dataSource);
   const settings = useJournal((s) => s.settings);
   const saveSettings = useJournal((s) => s.saveSettings);
   const pushToast = useUi((s) => s.pushToast);
   const btnRef = useRef<HTMLButtonElement>(null);
   if (!result) return null;
-  const ref = toBacktestReference(result.stats, referenceLabel({ strategy: result.strategy, interval: result.interval, symbol: result.symbol, n: result.stats.n }));
+  // a reference from another market (Bybit, spot) says so in its label – the Übersicht compares real trades with it
+  const badge = sourceBadge(dataSource?.id);
+  const base = referenceLabel({ strategy: result.strategy, interval: result.interval, symbol: result.symbol, n: result.stats.n });
+  const tail = badge ? ` · Quelle ${badge}` : "";
+  const ref = toBacktestReference(result.stats, tail ? `${base.length + tail.length > 60 ? `${base.slice(0, 60 - tail.length - 1)}…` : base}${tail}` : base);
   const cur = settings.backtest;
   const same = !!ref && cur.label === ref.label && cur.winRate === ref.winRate && cur.expectancy === ref.expectancy;
   const adopt = async () => {
@@ -191,6 +206,7 @@ function RunCardFace({ run, best }: { run: RunSummary; best: boolean }) {
           <span className="truncate text-[13.5px] font-semibold">{run.name || STRATEGY_TITLE[run.strategy]}</span>
           <span className="truncate font-mono text-[10.5px] text-faint">
             {run.symbol} · {run.interval === "1d" ? "1D" : run.interval} · {LABOR.periods[run.period]}
+            {sourceBadge(run.src) ? ` · ${sourceBadge(run.src)}` : ""}
           </span>
         </div>
         {best ? (

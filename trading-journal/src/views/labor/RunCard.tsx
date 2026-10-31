@@ -9,7 +9,7 @@
  * Reduced motion: everything at its end state at once.
  */
 import { animate, AnimatePresence, motion, useMotionValue } from "motion/react";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { LabResult } from "@/domain/backtest/index";
 import { spawnMarkerRipple } from "@/chart/overlays";
 import { cn } from "@/lib/cn";
@@ -18,9 +18,12 @@ import { DotMatrixText, EquityDraw, EQUITY_DRAW, equityPoints, FX_TONE, NumberCa
 import { TextRoll } from "@/motion/TextRoll";
 import { ease, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { SourceStand } from "@/ui/SourceStand";
-import { useLabor } from "./laborStore";
+import { HISTORY_SOURCES } from "./historySource";
+import { retryLab, useLabor } from "./laborStore";
+import { sourceNote, statusText } from "./sourceStrings";
 import { LABOR } from "./strings";
 import { Kpi, moneyText, numText, pctText, pfText, rText } from "./ui";
 
@@ -33,7 +36,13 @@ export function RunCard({ className }: { className?: string }) {
   const result = useLabor((s) => s.result);
   const runSeq = useLabor((s) => s.runSeq);
   const error = useLabor((s) => s.error);
+  const errorDetail = useLabor((s) => s.errorDetail);
+  const dataSource = useLabor((s) => s.dataSource);
   const busy = status === "loading" || status === "running";
+  const src = HISTORY_SOURCES[dataSource?.id ?? "binance"];
+  const note = dataSource ? sourceNote(dataSource.id, dataSource.failed) : null;
+  // "Erneut versuchen" only where a second try can change something (not for a typo, an idea with errors or a period without candles)
+  const retryable = error !== LABOR.errors.invalidIdea && error !== LABOR.errors.symbol && error !== LABOR.errors.noData;
   return (
     <Card
       title={LABOR.runTitle}
@@ -49,27 +58,54 @@ export function RunCard({ className }: { className?: string }) {
           ) : result ? (
             <Stage key={`r-${runSeq}`} result={result} runSeq={runSeq} />
           ) : (
-            <Idle key="idle" text={status === "error" || status === "cancelled" ? (error ?? LABOR.errors.failed) : LABOR.idleHint} tone={status === "error" ? "error" : "idle"} />
+            <Idle key="idle" text={status === "error" || status === "cancelled" ? (error ?? LABOR.errors.failed) : LABOR.idleHint} tone={status === "error" ? "error" : "idle"} detail={status === "error" ? errorDetail : null} retry={status === "error" && retryable} />
           )}
         </AnimatePresence>
       </div>
       {result && !busy && <Kpis result={result} runSeq={runSeq} />}
       {result && !busy && <Race result={result} runSeq={runSeq} />}
-      {/* source and period of the candles behind these numbers (a run reads closed Binance USDⓈ-M candles only) */}
-      {result && !busy && <SourceStand source="Binance USDⓈ-M, geschlossene Kerzen" parts={[{ label: "Zeitraum von", at: result.from, long: true }, { label: "bis", at: result.to, long: true }]} className="mt-3" testId="labor-stand" />}
-      {status === "error" && result && <p role="alert" className="mt-3 text-[12.5px] text-(--color-danger-text)">{error}</p>}
+      {/* the source that REALLY served the candles behind these numbers and the period (Binance-Futures unless the line says otherwise) */}
+      {result && !busy && <SourceStand source={src.stand} parts={[{ label: "Zeitraum von", at: result.from, long: true }, { label: "bis", at: result.to, long: true }]} className="mt-3" testId="labor-stand" />}
+      {result && !busy && note && (
+        <p className="mt-1.5 text-[12px] leading-relaxed text-warn" data-testid="labor-source-note">
+          {note}
+        </p>
+      )}
+      {status === "error" && result && (
+        <div className="mt-3 grid justify-items-start gap-2">
+          <p role="alert" className="text-[12.5px] text-(--color-danger-text)">{error}</p>
+          {errorDetail && <p className="text-[11.5px] leading-snug text-faint" data-testid="labor-error-detail">{errorDetail}</p>}
+          {retryable && (
+            <Button size="sm" onClick={retryLab} data-testid="labor-retry">
+              {LABOR.retry}
+            </Button>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
 
-function Idle({ text, tone }: { text: string; tone: "idle" | "error" }) {
+function Idle({ text, tone, detail, retry }: { text: string; tone: "idle" | "error"; detail?: string | null; retry?: boolean }) {
+  const err = tone === "error";
   return (
-    <motion.div className="absolute inset-0 grid place-items-center p-6 text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: tween.exit }} transition={tween.fade}>
+    <motion.div className={cn("absolute inset-0 grid place-items-center overflow-y-auto text-center", err && retry ? "p-4" : "p-6")} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: tween.exit }} transition={tween.fade}>
       <div className="grid justify-items-center gap-3">
-        <DotMatrix text={tone === "error" ? "!" : "--"} tone={tone === "error" ? "signal" : "mute"} size={4} gap={2} glow={false} />
-        <p role={tone === "error" ? "alert" : undefined} className={cn("max-w-[42ch] text-[13px]", tone === "error" ? "text-(--color-danger-text)" : "text-mute")}>
+        {/* with a retry button the stage has no room for the glyph (a fixed-height stage: no layout shift) */}
+        {!(err && retry) && <DotMatrix text={err ? "!" : "--"} tone={err ? "signal" : "mute"} size={4} gap={2} glow={false} />}
+        <p role={err ? "alert" : undefined} className={cn("max-w-[42ch] text-[13px]", err ? "text-(--color-danger-text)" : "text-mute")}>
           {text}
         </p>
+        {err && detail && (
+          <p className="max-w-[46ch] text-[11.5px] leading-snug text-faint" data-testid="labor-error-detail">
+            {detail}
+          </p>
+        )}
+        {err && retry && (
+          <Button onClick={retryLab} data-testid="labor-retry">
+            {LABOR.retry}
+          </Button>
+        )}
       </div>
     </motion.div>
   );
@@ -81,22 +117,48 @@ function Busy() {
   const load = useLabor((s) => s.load);
   const pct = Math.max(0, Math.min(99, Math.floor(progress * 100)));
   const label = phase === "load" ? (load.total ? LABOR.loading(load.done, load.total) : LABOR.phases.load) : LABOR.phases[phase];
+  const status = useLabor((s) => s.loadStatus);
+  const note = phase === "load" && status ? statusText(status) : "";
   return (
     <motion.div className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: tween.exit }} transition={tween.fade} data-testid="labor-busy">
       <RadarSweep active variant="band" tone="signal" className="absolute inset-0" />
       <div className="absolute inset-0 grid place-items-center">
         {/* a progressbar, never a live region (the toast island is the only one) */}
-        <div className="grid justify-items-center gap-3" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-valuetext={`${pct} %, ${label}`} aria-label="Backtest läuft">
+        <div className="grid justify-items-center gap-3" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-valuetext={`${pct} %, ${label}${note ? `. ${note}` : ""}`} aria-label="Backtest läuft">
           <DotMatrixText text={`${pct}%`} width={4} preset="snake" presetPosition="before" cycles={Infinity} presetTone="signal" size={5} gap={2} decorative />
           <span className="font-mono text-[12px] text-mute" aria-hidden="true">
             <TextRoll text={label} mode="morph" />
           </span>
+          {/* what the loader is doing (which source, which attempt, how long it has been waiting): the page never sits silent on "0 %" */}
+          <LoadNote />
           <span aria-hidden="true" className="h-[3px] w-48 overflow-hidden rounded-full bg-white/[0.06]">
             <motion.span className="block h-full origin-left rounded-full bg-fg" animate={{ scaleX: progress }} transition={tween.bar} />
           </span>
         </div>
       </div>
     </motion.div>
+  );
+}
+
+/** One calm line under the loader: the status of the current request and, once it takes a while, the seconds it has been waiting. Space is reserved. */
+function LoadNote() {
+  const status = useLabor((s) => s.loadStatus);
+  const phase = useLabor((s) => s.phase);
+  const [now, setNow] = useState(() => Date.now());
+  const at = status?.at;
+  useEffect(() => {
+    if (at == null) return;
+    const id = setInterval(() => {
+      if (typeof document === "undefined" || !document.hidden) setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(id);
+  }, [at]);
+  const secs = at == null ? 0 : Math.max(0, Math.floor((now - at) / 1000));
+  const text = phase === "load" && status ? `${statusText(status)}${status.step === "request" && secs >= 2 ? ` ${secs} s` : ""}` : "";
+  return (
+    <span className="num block min-h-[2.7em] max-w-[34ch] text-center text-[11.5px] leading-snug text-faint" aria-hidden="true" data-testid="labor-load-note">
+      {text}
+    </span>
   );
 }
 

@@ -30,6 +30,7 @@
 #   /api/v1/shot-extract                                                                     (F29, optional Premium-KI: Screenshot-Import, Bilder ≤ 6 MB Request)
 #   /api/v1/sec/{facts,filings}                                                              (F68 / F69, SEC EDGAR: Env SEC_USER_AGENT nötig, sonst „Einrichtung nötig“; same-origin, keine CSP-Änderung)
 #   /api/v1/stocks/{bars,quote,symbols,news}                                                 (F67/F68, public data: Yahoo chart + RSS, Nasdaq Trader; no key, only tickers go out)
+#   /api/v1/klines                                                                           (F16 Labor: relay of PUBLIC Binance candles, spot / futures, host allow-list, 8-s upstream limit, cache; last rung of the Labor's fallback chain; no key)
 # Scheduled functions (the cron lives in their code, `config.schedule`; they run on PUBLISHED deploys only):
 #   exchange-sync-cron   */30 * * * *   Bitunix read-only sync (SYNC_CRON_ENABLED=false switches it off)
 #   backup-nightly       @daily         nightly server backup of the journal docs (P09)
@@ -125,7 +126,8 @@
   status = 200
 
 # Security headers. The CSP allows exactly what the browser talks to:
-#   connect-src  same origin (/api/v1 functions, /api/binance proxy), Binance / Bybit / OKX public market data, and the
+#   connect-src  same origin (/api/v1 functions, /api/binance proxy), Binance / Bybit / OKX public market data (also
+#                data-api.binance.vision: the Labor's last-resort SPOT candles, labelled "Spot, nicht Futures"), and the
 #                Supabase project (REST, Auth, Storage over https, Realtime over wss). The project ref is not fixed in
 #                this repo, so the host is the wildcard *.supabase.co – after the setup it may be narrowed to
 #                https://<ref>.supabase.co wss://<ref>.supabase.co (SETUP.md, step 7).
@@ -139,7 +141,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://fapi.binance.com wss://fstream.binance.com https://api.bybit.com wss://stream.bybit.com https://www.okx.com https://*.supabase.co wss://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; manifest-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://fapi.binance.com https://data-api.binance.vision wss://fstream.binance.com https://api.bybit.com wss://stream.bybit.com https://www.okx.com https://*.supabase.co wss://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; manifest-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=63072000; includeSubDomains"

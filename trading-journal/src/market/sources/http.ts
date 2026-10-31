@@ -54,6 +54,15 @@ export function toRestError(err: unknown): RestError {
   return new RestError(kind, err instanceof Error ? err.message : String(err));
 }
 
+/** Optional per-call extras of a REST read: a way to cancel it and its own time limit (ms, covers the whole answer). */
+export interface RequestExtras {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+/** The `io` of a client call: the client's defaults plus the call's own `signal` / `timeoutMs`. */
+export const withExtras = <T extends FetchJsonOptions>(io: T, p: RequestExtras): T => ({ ...io, ...(p.signal ? { signal: p.signal } : {}), ...(p.timeoutMs ? { timeoutMs: p.timeoutMs } : {}) });
+
 export interface FetchJsonOptions {
   fetch?: FetchLike;
   signal?: AbortSignal;
@@ -62,31 +71,48 @@ export interface FetchJsonOptions {
 
 const defaultFetch: FetchLike = (input, init) => fetch(input, init);
 
-/** GET `url`, parse JSON, validate with `schema`. Throws `RestError`. */
+/**
+ * GET `url`, parse JSON, validate with `schema`. Throws `RestError`.
+ *
+ * The timeout covers the WHOLE answer – connect, headers AND the body. (It used to be cleared as soon as the headers
+ * arrived, so a body that stalled on a weak connection hung for ever: the Labor sat on "0 von 2" with nothing to cancel.)
+ * A signal that is already aborted never starts a request; an abort of `signal` reaches the request under way.
+ */
 export async function fetchJson<S extends ZodTypeAny>(url: string, schema: S, opts: FetchJsonOptions = {}): Promise<ZodOutput<S>> {
   const f = opts.fetch ?? defaultFetch;
   const ctrl = typeof AbortController !== "undefined" ? new AbortController() : undefined;
   const timer = ctrl && opts.timeoutMs ? setTimeout(() => ctrl.abort(), opts.timeoutMs) : undefined;
-  if (ctrl && opts.signal) opts.signal.addEventListener("abort", () => ctrl.abort(), { once: true });
-  let res: Response;
+  const onAbort = (): void => ctrl?.abort();
+  if (ctrl && opts.signal) {
+    if (opts.signal.aborted) ctrl.abort();
+    else opts.signal.addEventListener("abort", onAbort, { once: true });
+  }
   try {
-    res = await f(url, { method: "GET", signal: ctrl?.signal, cache: "no-store" } as RequestInit);
-  } catch (err) {
+    // an aborted signal never starts a request (the time limit has not run out: it is the caller's abort)
+    if (ctrl?.signal.aborted) throw new RestError("timeout", "Abgebrochen");
+    let res: Response;
+    try {
+      res = await f(url, { method: "GET", signal: ctrl?.signal, cache: "no-store" } as RequestInit);
+    } catch (err) {
+      throw toRestError(err);
+    }
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch (err) {
+      // our own timeout (or the caller's abort) cut the body off: that is a timeout, not "no JSON"
+      if (ctrl?.signal.aborted) throw toRestError(err);
+      if (!res.ok) throw new RestError(classifyStatus(res.status), `HTTP ${res.status}`, res.status);
+      throw new RestError("http_5xx", "Antwort ist kein JSON", res.status);
+    }
+    if (!res.ok) throw new RestError(classifyStatus(res.status, body), `HTTP ${res.status}`, res.status, body);
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) throw new RestError("http_5xx", `Antwort unerwartet: ${parsed.error.issues[0]?.message ?? "schema"}`, res.status, body);
+    return parsed.data as ZodOutput<S>;
+  } finally {
     if (timer) clearTimeout(timer);
-    throw toRestError(err);
+    opts.signal?.removeEventListener("abort", onAbort);
   }
-  if (timer) clearTimeout(timer);
-  let body: unknown;
-  try {
-    body = await res.json();
-  } catch {
-    if (!res.ok) throw new RestError(classifyStatus(res.status), `HTTP ${res.status}`, res.status);
-    throw new RestError("http_5xx", "Antwort ist kein JSON", res.status);
-  }
-  if (!res.ok) throw new RestError(classifyStatus(res.status, body), `HTTP ${res.status}`, res.status, body);
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) throw new RestError("http_5xx", `Antwort unerwartet: ${parsed.error.issues[0]?.message ?? "schema"}`, res.status, body);
-  return parsed.data as ZodOutput<S>;
 }
 
 export function qs(params: Record<string, string | number | undefined>): string {

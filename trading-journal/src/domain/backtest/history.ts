@@ -55,6 +55,8 @@ export interface LoadKlinesOptions {
   prefix?: string;
   onProgress?: (p: LoadProgress) => void;
   signal?: AbortSignal;
+  /** bars per page the source gives at most (default `KLINE_PAGE`; Binance spot and Bybit: 1000). A shorter page is the end of the data. */
+  pageSize?: number;
 }
 
 export interface Loaded<T> {
@@ -90,9 +92,10 @@ function parseCached(raw: unknown): { bars: Bar[]; origin: number | null } {
 export const lastClosedOpen = (now: number, ivMs: number): number => Math.floor(now / ivMs) * ivMs - ivMs;
 
 /** Pages needed for a span of bars. */
-const pagesFor = (fromMs: number, toMs: number, ivMs: number): number => (toMs < fromMs ? 0 : Math.ceil((Math.floor((toMs - fromMs) / ivMs) + 1) / KLINE_PAGE));
+const pagesFor = (fromMs: number, toMs: number, ivMs: number, pageSize: number = KLINE_PAGE): number => (toMs < fromMs ? 0 : Math.ceil((Math.floor((toMs - fromMs) / ivMs) + 1) / pageSize));
 
 export async function loadKlines(o: LoadKlinesOptions): Promise<Loaded<Bar>> {
+  const pageSize = o.pageSize ?? KLINE_PAGE;
   const iv = HIST_MS[o.interval];
   const key = `${o.prefix ?? "bt"}:${o.symbol}:${o.interval}`;
   const from = Math.floor(o.from / iv) * iv;
@@ -116,7 +119,7 @@ export async function loadKlines(o: LoadKlinesOptions): Promise<Loaded<Bar>> {
     if (wantFrom < first * 1000) segs.push([wantFrom, first * 1000 - iv]);
     if (end > last * 1000) segs.push([last * 1000 + iv, end]);
   }
-  const total = segs.reduce((s, [a, b]) => s + pagesFor(a, b, iv), 0);
+  const total = segs.reduce((s, [a, b]) => s + pagesFor(a, b, iv, pageSize), 0);
   let done = 0;
   o.onProgress?.({ done, total });
   const fresh: Bar[] = [];
@@ -125,7 +128,7 @@ export async function loadKlines(o: LoadKlinesOptions): Promise<Loaded<Bar>> {
     let firstOfSeg = true;
     while (start <= b) {
       if (o.signal?.aborted) throw abortError();
-      const page = await o.fetchPage({ symbol: o.symbol, interval: o.interval, startTime: start, limit: KLINE_PAGE });
+      const page = await o.fetchPage({ symbol: o.symbol, interval: o.interval, startTime: start, limit: pageSize });
       done++;
       o.onProgress?.({ done, total: Math.max(total, done) });
       const rows = page.filter((x) => x.t * 1000 <= b);
@@ -138,7 +141,7 @@ export async function loadKlines(o: LoadKlinesOptions): Promise<Loaded<Bar>> {
       fresh.push(...rows);
       const nextStart = rows[rows.length - 1]!.t * 1000 + iv;
       // a short page is the end of what the exchange has
-      if (nextStart <= start || page.length < KLINE_PAGE) break;
+      if (nextStart <= start || page.length < pageSize) break;
       start = nextStart;
     }
   }
@@ -224,9 +227,9 @@ export async function loadFunding(o: LoadFundingOptions): Promise<Loaded<Funding
   return { data: all.filter((p) => p.t >= o.from && p.t <= end), fetched, origin };
 }
 
-/** Pages a load of `interval` over [from, to] costs at most (for the budget hint before a run). */
-export function estimatePages(interval: HistInterval, from: number, to: number): number {
-  return pagesFor(from, to, HIST_MS[HIST_SOURCE[interval]]);
+/** Pages a load of `interval` over [from, to] costs at most (for the budget hint before a run); `pageSize` of the source (default Binance futures). */
+export function estimatePages(interval: HistInterval, from: number, to: number, pageSize: number = KLINE_PAGE): number {
+  return pagesFor(from, to, HIST_MS[HIST_SOURCE[interval]], pageSize);
 }
 
 /** The exchange intervals a set of lab intervals is loaded from (derived `30m` / `2h` come from their source), unique, in order. */

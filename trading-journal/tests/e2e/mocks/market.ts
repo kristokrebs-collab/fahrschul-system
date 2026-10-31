@@ -301,6 +301,8 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
 
   await page.route("**/api/binance/**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>SPA</title>" }));
   await page.route("https://www.okx.com/**", (route) => route.abort("failed"));
+  // Binance SPOT (the Labor's last-resort candle source): refused unless a spec serves it itself – a spec never reaches the real host
+  await page.route("https://data-api.binance.vision/**", (route) => route.abort("failed"));
 
   const fixtures: Record<string, unknown> = {};
   for (const step of [...file.ws.steps, ...(file.ws.reconnectSteps ?? [])]) if (step.fixture && !fixtures[step.fixture]) fixtures[step.fixture] = shiftTimes(readJson(step.fixture), delta0);

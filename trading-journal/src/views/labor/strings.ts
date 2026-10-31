@@ -43,6 +43,7 @@ export const LABOR = {
   start: "Backtest starten",
   again: "Neu rechnen",
   cancel: "Abbrechen",
+  retry: "Erneut versuchen",
   estimate: (pages: number, cached: boolean) => (pages === 0 ? "Alle Kerzen liegen im Cache." : `${pages} Abruf${pages === 1 ? "" : "e"} bei Binance${cached ? " (Rest aus dem Cache)" : ""}.`),
   loading: (done: number, total: number) => `Lade Kerzen ${done} von ${Math.max(done, total)} …`,
   phases: {
@@ -59,6 +60,8 @@ export const LABOR = {
   cancelled: "Abgebrochen.",
   errors: {
     blocked: "Binance ist gerade nicht erreichbar (Netzwerk oder Region). Später noch einmal versuchen.",
+    blockedAll: "Binance ist gerade nicht erreichbar, auch die Ausweichquellen antworten nicht. Prüfe deine Verbindung und versuche es noch einmal.",
+    offline: "Keine Internetverbindung. Verbinde dich und versuche es noch einmal.",
     blockedFile: "Binance ist nicht erreichbar. In der Datei-Version gibt es keinen Proxy.",
     rate: "Abruf-Budget erschöpft. Gleich noch einmal versuchen.",
     symbol: "Diesen Markt kennt Binance nicht.",

@@ -199,7 +199,11 @@ What keeps every feed refreshing on a Galaxy Tab in Samsung Internet (tests: `ma
 **Routes (CORS-safe).** Every Binance REST path the app uses is proxied by `netlify.toml` (`/api/binance/fapi/v1/{time,
 klines, premiumIndex, ticker/24hr, openInterest, fundingRate}`, `/api/binance/futures/data/*`); the CSP `connect-src`
 allows `fapi.binance.com`, `wss://fstream.binance.com`, Bybit, OKX and `'self'` (the proxy) – plus `*.supabase.co` (https +
-wss) for the cloud since P14; nothing else of the market layer needs a new host.
+wss) for the cloud since P14; nothing else of the market layer needs a new host. One exception, for the Backtest-Labor only:
+`data-api.binance.vision` (Binance SPOT candles, `sources/binanceSpot.ts`) is the last rung of the Labor's fallback chain
+(`src/views/labor/historySource.ts`) – spot is not futures, and the Labor says so in its result. `fetchJson` (`sources/http.ts`)
+keeps its time limit until the response BODY is read (it used to stop at the headers) and takes a per-call `signal` / `timeoutMs`
+(`RequestExtras`: `binanceRest().klines / fundingRate`, `bybitRest().klines`, `spotRest().klines`).
 
 **Daily candles of several consumers (P14).** Two subsystems fetch 1D klines for symbols other than the live one, each
 through its own budget and cache: `multiDaily.ts` (P05 correlation: one page of 99, at most one fetch per symbol and UTC

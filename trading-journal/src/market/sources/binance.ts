@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { AggTrade, BookDepth, BookTop, Candle, FundingPoint, MarkPrice, OpenInterest, OpenInterestPoint, RatioPoint, Source, Stamped, TakerPoint, Ticker24h } from "../types";
 import type { FetchInterval, KlineInterval, Period } from "../period";
 import { FETCH_INTERVAL_MS } from "../period";
-import { fetchJson, qs, type FetchLike } from "./http";
+import { fetchJson, qs, type FetchLike, type RequestExtras, withExtras } from "./http";
 
 export const BINANCE_REST = "https://fapi.binance.com";
 export const BINANCE_WS = "wss://fstream.binance.com/stream?streams=";
@@ -143,6 +143,8 @@ export function binanceRest(opts: BinanceRestOptions = {}) {
   const now = opts.now ?? (() => Date.now());
   const source: Source = opts.source ?? "binance";
   const io = { fetch: opts.fetch, timeoutMs: opts.timeoutMs ?? 15_000 };
+  /** per-call cancel / time limit (the Labor's loader sets both on every page) on top of the client's defaults */
+  const ioOf = (p: RequestExtras) => withExtras(io, p);
   const url = (path: string, params: Record<string, string | number | undefined>) => `${base}${path}${qs(params)}`;
 
   return {
@@ -150,8 +152,8 @@ export function binanceRest(opts: BinanceRestOptions = {}) {
     async serverTime(): Promise<number> {
       return (await fetchJson(url("/fapi/v1/time", {}), serverTimeSchema, io)).serverTime;
     },
-    async klines(symbol: string, interval: FetchInterval, p: { limit?: number; startTime?: number; endTime?: number } = {}): Promise<Stamped<Candle[]>> {
-      const rows = await fetchJson(url("/fapi/v1/klines", { symbol, interval, limit: p.limit ?? 499, startTime: p.startTime, endTime: p.endTime }), klinesSchema, io);
+    async klines(symbol: string, interval: FetchInterval, p: RequestExtras & { limit?: number; startTime?: number; endTime?: number } = {}): Promise<Stamped<Candle[]>> {
+      const rows = await fetchJson(url("/fapi/v1/klines", { symbol, interval, limit: p.limit ?? 499, startTime: p.startTime, endTime: p.endTime }), klinesSchema, ioOf(p));
       const t = now();
       const data = rows.map((r) => mapKline(r, t));
       const last = data[data.length - 1];
@@ -199,8 +201,8 @@ export function binanceRest(opts: BinanceRestOptions = {}) {
       const data = mapTaker(rows);
       return stamp(data, data[data.length - 1]?.time ?? now(), now(), source);
     },
-    async fundingRate(symbol: string, p: { limit?: number; startTime?: number; endTime?: number } = {}): Promise<Stamped<FundingPoint[]>> {
-      const rows = await fetchJson(url("/fapi/v1/fundingRate", { symbol, limit: p.limit ?? 200, startTime: p.startTime, endTime: p.endTime }), fundingSchema, io);
+    async fundingRate(symbol: string, p: RequestExtras & { limit?: number; startTime?: number; endTime?: number } = {}): Promise<Stamped<FundingPoint[]>> {
+      const rows = await fetchJson(url("/fapi/v1/fundingRate", { symbol, limit: p.limit ?? 200, startTime: p.startTime, endTime: p.endTime }), fundingSchema, ioOf(p));
       const data = mapFunding(rows);
       return stamp(data, data[data.length - 1]?.time ?? now(), now(), source);
     },

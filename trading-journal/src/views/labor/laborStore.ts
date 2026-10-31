@@ -35,7 +35,9 @@ import { cleanChecklist, MAX_CHANGES, MAX_REV, PLAYBOOK_ID_RE } from "@/domain/p
 import type { SignalCfg } from "@/domain/signals";
 import { storageKey } from "@/store/storage";
 import { isFileProtocol, IS_FILE_BUILD } from "@/edition";
-import { loadErrorKind, loadLabData } from "./historySource";
+import { failuresOf, forgetRoutes, HISTORY_SOURCES, loadErrorKind, loadLabData, type HistorySource, type LoadStatus, type StageFailure } from "./historySource";
+import { toRestError } from "@/market/sources/http";
+import { failureDetail } from "./sourceStrings";
 import { LABOR, type LaborPeriod } from "./strings";
 import { __resetVersions, useVersions } from "./versionsStore";
 
@@ -123,6 +125,7 @@ export interface CustomDraft {
 export const DRAFTS_MAX = 24;
 
 const FUNDING_MISSING = "Die Funding-Historie konnte nicht geladen werden. Der Baustein „Funding-Extrem“ braucht sie – ohne sie würde die Idee nie handeln. Versuche es noch einmal oder entferne den Baustein.";
+const FUNDING_MISSING_OTHER = "Binance-Futures war nicht erreichbar, die Kerzen kamen aus einer Ausweichquelle – und die hat keine Funding-Historie. Der Baustein „Funding-Extrem“ braucht sie, ohne sie würde die Idee nie handeln. Versuche es später noch einmal oder entferne den Baustein.";
 
 /**
  * An idea handed over by "Diese Idee testen" (F12): the draft with its mapped / not-mapped lists and the set-up it replaced
@@ -152,6 +155,14 @@ export interface RunSummary {
   verdict: RobustVerdict;
   /** equity in % of the start capital, ≤ 48 points */
   curve: number[];
+  /** where the candles came from when it was NOT Binance-Futures ("bybit" | "spot" …); absent = Binance-Futures (also old runs) */
+  src?: HistorySource;
+}
+
+/** The source that served the SHOWN result and the sources asked before it that did not deliver. */
+export interface DataSource {
+  id: HistorySource;
+  failed: readonly StageFailure[];
 }
 
 interface LaborState {
@@ -160,8 +171,14 @@ interface LaborState {
   phase: LabPhase | "load";
   progress: number;
   load: { done: number; total: number };
+  /** what the loader is doing right now (which source, which attempt); null outside a load */
+  loadStatus: LoadStatus | null;
   error: string | null;
+  /** the reason per source after a failed load ("Binance-Futures: keine Antwort in 12 s · …"); null otherwise */
+  errorDetail: string | null;
   result: LabResult | null;
+  /** the source of the shown result (the assumptions and the source line read it); null before a run */
+  dataSource: DataSource | null;
   /** execution bars of the result (index space of its trades) – memory only */
   bars: readonly Bar[];
   /** bumped per finished run (effect replay key) */
@@ -296,8 +313,11 @@ export const useLabor = create<LaborState>()((set, get) => ({
   phase: "load",
   progress: 0,
   load: { done: 0, total: 0 },
+  loadStatus: null,
   error: null,
+  errorDetail: null,
   result: null,
+  dataSource: null,
   bars: [],
   runSeq: 0,
   runs: (readJson<RunSummary[]>(RUNS_KEY) ?? []).filter((r) => r && typeof r.id === "string").slice(0, RUNS_MAX),
@@ -475,21 +495,25 @@ export function shownRunInput(): LabJobInput | null {
   return shownInput;
 }
 
+/** The signal set-up of the last start: "Erneut versuchen" repeats the run with it. */
+let lastSignal: SignalCfg | null = null;
+
 /** Starts a run (aborting a running one). */
 export async function startLab(signal: SignalCfg, now = Date.now()): Promise<void> {
   ctl?.abort();
   const mine = new AbortController();
   ctl = mine;
+  lastSignal = signal;
   const cfg = useLabor.getState().cfg;
   if (cfg.strategy === "custom" && validateCustom(cfg.custom, { funding: cfg.funding === "history" }).some((i) => i.level === "error")) {
-    useLabor.setState({ status: "error", error: LABOR.errors.invalidIdea, progress: 0 });
+    useLabor.setState({ status: "error", error: LABOR.errors.invalidIdea, errorDetail: null, progress: 0 });
     if (ctl === mine) ctl = null;
     return;
   }
   const plan = planOf(cfg, signal);
   const fromMs = now - PERIOD_DAYS[cfg.period] * 86_400_000;
   let stage: "load" | "run" = "load";
-  useLabor.setState({ status: "loading", phase: "load", progress: 0, load: { done: 0, total: 0 }, error: null, replayId: null });
+  useLabor.setState({ status: "loading", phase: "load", progress: 0, load: { done: 0, total: 0 }, loadStatus: null, error: null, errorDetail: null, replayId: null });
   try {
     const loaded = await loadLabData({
       symbol: cfg.symbol,
@@ -498,20 +522,27 @@ export async function startLab(signal: SignalCfg, now = Date.now()): Promise<voi
       to: now,
       funding: cfg.funding === "history",
       signal: mine.signal,
+      // the Labor run (and only it) may fall back to Bybit / Binance spot – and then says so in the result
+      fallback: true,
       onProgress: (done, total) => {
         if (ctl === mine) useLabor.setState({ load: { done, total }, progress: total ? Math.min(1, done / total) * 0.15 : 0 });
       },
+      onStatus: (loadStatus) => {
+        if (ctl === mine) useLabor.setState({ loadStatus });
+      },
     });
+    const dataSource: DataSource = { id: loaded.source ?? "binance", failed: loaded.failed ?? [] };
     if (ctl !== mine) return;
     const exec = loaded.data[plan.intervals[0]!] ?? [];
     if (exec.length < 120) {
-      useLabor.setState({ status: "error", error: LABOR.errors.noData });
+      useLabor.setState({ status: "error", error: LABOR.errors.noData, errorDetail: null, loadStatus: null });
       return;
     }
     const fundingUsed: LaborState["fundingUsed"] = cfg.funding === "none" ? "none" : cfg.funding === "history" && loaded.funding ? "history" : "flat";
     // the block „Funding-Extrem“ reads the real history only: without it the idea would silently never trade
     if (cfg.strategy === "custom" && fundingUsed !== "history" && activeLeaves(cfg.custom).some((l) => l.block === "funding")) {
-      useLabor.setState({ status: "error", error: FUNDING_MISSING, progress: 0 });
+      const other = !HISTORY_SOURCES[dataSource.id].futures;
+      useLabor.setState({ status: "error", error: other ? FUNDING_MISSING_OTHER : FUNDING_MISSING, errorDetail: null, loadStatus: null, progress: 0 });
       return;
     }
     const fee = feePreset(cfg.exchange);
@@ -541,22 +572,37 @@ export async function startLab(signal: SignalCfg, now = Date.now()): Promise<voi
       },
     });
     if (ctl !== mine) return;
-    const summary = summarize(result, cfg.period);
+    const summary = summarize(result, cfg.period, dataSource.id);
     const runs = [summary, ...useLabor.getState().runs.filter((r) => r.id !== summary.id)].slice(0, RUNS_MAX);
     writeJson(RUNS_KEY, runs);
     shownInput = input;
-    useLabor.setState((s) => ({ status: "done", phase: "done", progress: 1, result, bars: exec, runSeq: s.runSeq + 1, runs, fundingUsed, runCfg: cfg }));
+    useLabor.setState((s) => ({ status: "done", phase: "done", progress: 1, loadStatus: null, result, bars: exec, runSeq: s.runSeq + 1, runs, fundingUsed, runCfg: cfg, dataSource }));
   } catch (e) {
     if (ctl !== mine) return;
     if (isLabAbort(e) || (e instanceof Error && e.name === "AbortError")) {
-      useLabor.setState({ status: "cancelled", error: LABOR.cancelled, progress: 0 });
+      useLabor.setState({ status: "cancelled", error: LABOR.cancelled, errorDetail: null, loadStatus: null, progress: 0 });
       return;
     }
     // a failure of the computation itself is never blamed on the network
     const kind = stage === "run" ? "failed" : loadErrorKind(e);
     if (stage === "run") console.error("Labor: Lauf fehlgeschlagen", e);
-    const msg = kind === "blocked" ? (IS_FILE_BUILD || isFileProtocol() ? LABOR.errors.blockedFile : LABOR.errors.blocked) : kind === "rate" ? LABOR.errors.rate : kind === "symbol" ? LABOR.errors.symbol : LABOR.errors.failed;
-    useLabor.setState({ status: "error", error: msg, progress: 0 });
+    const failures = stage === "run" ? [] : failuresOf(e);
+    const offline = stage === "load" && toRestError(e).kind === "offline";
+    const file = IS_FILE_BUILD || isFileProtocol();
+    const msg = offline
+      ? LABOR.errors.offline
+      : kind === "blocked"
+        ? file
+          ? LABOR.errors.blockedFile
+          : failures.length > 1
+            ? LABOR.errors.blockedAll
+            : LABOR.errors.blocked
+        : kind === "rate"
+          ? LABOR.errors.rate
+          : kind === "symbol"
+            ? LABOR.errors.symbol
+            : LABOR.errors.failed;
+    useLabor.setState({ status: "error", error: msg, errorDetail: kind === "blocked" || kind === "rate" ? failureDetail(failures) : null, loadStatus: null, progress: 0 });
   } finally {
     if (ctl === mine) ctl = null;
   }
@@ -566,12 +612,19 @@ export function cancelLab(): void {
   ctl?.abort();
 }
 
-function summarize(r: LabResult, period: LaborPeriod): RunSummary {
+/** "Erneut versuchen" after a failed load: forgets which sources hung and runs the last set-up again. */
+export function retryLab(): void {
+  forgetRoutes();
+  if (lastSignal) void startLab(lastSignal);
+}
+
+function summarize(r: LabResult, period: LaborPeriod, source: HistorySource = "binance"): RunSummary {
   const cap = r.equity[0]?.equity ?? 1;
   const step = Math.max(1, Math.ceil(r.equity.length / 48));
   const curve = r.equity.filter((_, i) => i % step === 0 || i === r.equity.length - 1).map((p: EquityPoint) => (cap > 0 ? (p.equity / cap - 1) * 100 : 0));
   return {
-    id: `${r.strategy}${r.configKey ? `#${r.configKey}` : ""}:${r.symbol}:${r.interval}:${period}:${r.specs.map((s) => s.value).join("|")}`,
+    // candles of another market (Bybit, spot) are a different run: it never replaces the Binance-Futures one in the comparison
+    id: `${r.strategy}${r.configKey ? `#${r.configKey}` : ""}:${r.symbol}:${r.interval}:${period}:${r.specs.map((s) => s.value).join("|")}${HISTORY_SOURCES[source].futures ? "" : `@${HISTORY_SOURCES[source].market}`}`,
     at: Date.now(),
     strategy: r.strategy,
     name: r.name,
@@ -587,6 +640,7 @@ function summarize(r: LabResult, period: LaborPeriod): RunSummary {
     pf: r.stats.pf === Infinity ? null : r.stats.pf,
     verdict: r.robust.verdict,
     curve,
+    ...(HISTORY_SOURCES[source].futures ? {} : { src: source }),
   };
 }
 
@@ -596,5 +650,6 @@ export function __resetLabor(): void {
   ctl?.abort();
   ctl = null;
   shownInput = null;
-  useLabor.setState({ cfg: DEFAULT_LAB, drafts: [], status: "idle", phase: "load", progress: 0, load: { done: 0, total: 0 }, error: null, result: null, bars: [], runSeq: 0, runs: [], replayId: null, fundingUsed: null, runCfg: null, idea: null });
+  lastSignal = null;
+  useLabor.setState({ cfg: DEFAULT_LAB, drafts: [], status: "idle", phase: "load", progress: 0, load: { done: 0, total: 0 }, loadStatus: null, error: null, errorDetail: null, dataSource: null, result: null, bars: [], runSeq: 0, runs: [], replayId: null, fundingUsed: null, runCfg: null, idea: null });
 }

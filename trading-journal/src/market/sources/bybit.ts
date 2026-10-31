@@ -6,7 +6,7 @@
 import { z } from "zod";
 import type { BookTop, Candle, FundingPoint, MarkPrice, OpenInterest, OpenInterestPoint, RatioPoint, Stamped, Ticker24h } from "../types";
 import { BYBIT_KLINE_INTERVAL, FETCH_INTERVAL_MS, toBybitPeriod, type FetchInterval, type Period } from "../period";
-import { fetchJson, qs, type FetchLike } from "./http";
+import { fetchJson, qs, withExtras, type FetchLike, type RequestExtras } from "./http";
 
 export const BYBIT_REST = "https://api.bybit.com";
 
@@ -81,8 +81,8 @@ export function bybitRest(opts: BybitOptions = {}) {
       const r = await fetchJson(url("/v5/market/time", {}), bybitTimeSchema, io);
       return r.result.timeSecond * 1000;
     },
-    async klines(symbol: string, interval: FetchInterval, p: { limit?: number; start?: number; end?: number } = {}): Promise<Stamped<Candle[]>> {
-      const r = await fetchJson(url("/v5/market/kline", { category: "linear", symbol, interval: BYBIT_KLINE_INTERVAL[interval], limit: p.limit ?? 200, start: p.start, end: p.end }), bybitKlineSchema, io);
+    async klines(symbol: string, interval: FetchInterval, p: RequestExtras & { limit?: number; start?: number; end?: number } = {}): Promise<Stamped<Candle[]>> {
+      const r = await fetchJson(url("/v5/market/kline", { category: "linear", symbol, interval: BYBIT_KLINE_INTERVAL[interval], limit: p.limit ?? 200, start: p.start, end: p.end }), bybitKlineSchema, withExtras(io, p));
       const t = now();
       const data = mapBybitKlines(r.result.list, interval, t);
       const last = data[data.length - 1];

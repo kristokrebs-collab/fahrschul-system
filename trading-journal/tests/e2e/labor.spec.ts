@@ -8,7 +8,8 @@
  * the overfitting verdict, the heat map, the assumptions (fees, slippage, funding, no look-ahead), the comparison card;
  * "Als Backtest-Referenz übernehmen" (hold) writes `settings.backtest` with the meaning `BacktestCompare` reads; a second
  * run is served from the IndexedDB cache (no new kline requests); cancel; the rule builder; an unreachable Binance gives
- * the honest German hint; no horizontal scroll at 390 px; no console errors.
+ * the honest German hint; no horizontal scroll at 390 px; no console errors. (A Binance that HANGS, the fallback sources and
+ * "Erneut versuchen": `labor-robust.spec.ts`.)
  *
  * Runs on the routed page `/#labor` of the production build (P14; `PW_LABOR_URL` overrides it, e.g. the dev harness
  * `/dev/labor.html` under `npm run dev`). `P07_SHOTS=<dir>` writes review screenshots.
@@ -41,7 +42,13 @@ async function open(page: Page, info: TestInfo, opts: { extra?: Record<string, u
   const errors = collectErrors(page);
   const klines: URL[] = [];
   await seed(page, { boxes: true, extra: { "tj2-labor": { strategy: "box", symbol: "BTCUSDT", period: "6m", boxTf: "4h" }, ...(opts.extra ?? {}) }, onRequest: (u) => u.pathname === "/fapi/v1/klines" && u.searchParams.has("startTime") && klines.push(u) });
-  if (opts.block) await page.route("https://fapi.binance.com/fapi/v1/klines**", (r) => r.abort("failed"));
+  if (opts.block) {
+    await page.route("https://fapi.binance.com/fapi/v1/klines**", (r) => r.abort("failed"));
+    // … and no way around it either (Bybit, Binance spot, the app's own relay): the run has no candles at all
+    await page.route("https://api.bybit.com/v5/market/kline**", (r) => r.abort("failed"));
+    await page.route("https://data-api.binance.vision/**", (r) => r.abort("failed"));
+    await page.route("**/api/v1/klines**", (r) => r.abort("failed"));
+  }
   await openRoute(page, LABOR_URL, "Labor");
   return { errors, klines };
 }
