@@ -8,7 +8,7 @@ import { Typewriter } from "@/motion/pulse/Typewriter";
 import { Quiet, useRichFx } from "@/motion/rich";
 import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { EMPTY_ART_H, EMPTY_ART_W, pickArt, type EmptyArtKind } from "@/primitives/emptyArt";
+import { EMPTY_ART_FLOW_H, EMPTY_ART_H, EMPTY_ART_W, pickArt, type EmptyArtKind } from "@/primitives/emptyArt";
 import { EMPTY_GLYPH_FRAMES } from "@/primitives/emptyGlyph";
 
 /** Rich pages: the ∅ gives way to a small running picture (lazy chunk with its own CSS). */
@@ -88,13 +88,17 @@ export function EmptyState({ title, text, action, line = EMPTY_LINE, chart, art,
       {chart && <ChartPlaceholder className="pointer-events-none absolute inset-x-6 bottom-1.5 hidden [[data-rich]_&]:grid" lineClassName="h-4" />}
       <div className="grid justify-items-center gap-2">
         {rich ? (
-          <div className="mb-1.5 text-mute" style={{ width: EMPTY_ART_W, height: EMPTY_ART_H }}>
+          // takes the flow height of the dot glyph (33 px), the 64 × 40 picture is centred in it and overhangs – so a card whose
+          // height was reserved for the glyph does not grow when the page turns rich
+          <div className="relative mb-1.5 text-mute" style={{ width: EMPTY_ART_W, height: EMPTY_ART_FLOW_H }}>
             {/* the box is reserved from the first paint: the chunk arrives into it, nothing moves */}
-            <Quiet>
-              <Suspense fallback={null}>
-                <EmptyArt kind={art ?? pickArt(typeof title === "string" ? title : "")} />
-              </Suspense>
-            </Quiet>
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2" style={{ height: EMPTY_ART_H }} data-empty-art-box="">
+              <Quiet>
+                <Suspense fallback={null}>
+                  <EmptyArt kind={art ?? pickArt(typeof title === "string" ? title : "")} />
+                </Suspense>
+              </Quiet>
+            </div>
           </div>
         ) : (
           <DotMatrix frames={EMPTY_GLYPH_FRAMES} fps={12} size={3} gap={2} tone="fg" className="mb-1.5" />

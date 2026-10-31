@@ -150,7 +150,9 @@ describe("empty state", () => {
 
   it("shows a running picture of its own kind on a rich page (the box is there at once, the art arrives into it)", async () => {
     const { container } = render(rich(<EmptyState title="Noch nichts" art="orbit" line={false} action={<button type="button">Los</button>} />));
-    expect(container.querySelector("[style*='width: 64px'][style*='height: 40px']")).not.toBeNull();
+    // in the flow it is as high as the dot glyph (33 px), the 64 × 40 picture overhangs inside it
+    expect(container.querySelector("[style*='width: 64px'][style*='height: 33px']")).not.toBeNull();
+    expect(container.querySelector("[data-empty-art-box][style*='height: 40px']")).not.toBeNull();
     const art = await screen.findByTestId("empty-art");
     expect(art).toHaveAttribute("data-kind", "orbit");
     expect(art).toHaveAttribute("aria-hidden", "true");
