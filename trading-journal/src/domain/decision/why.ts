@@ -17,6 +17,7 @@ import { n0, n1, n2 } from "@/lib/format";
 import type { KnifeFilter } from "../signals/knife";
 import type { Side, SignalCfg } from "../signals/config";
 import type { GradedPart } from "../signals/parts";
+import { netWhy, TRADER_NET_SOURCE, type TraderNetView } from "../signals/traderNet";
 import type { TfCheck, Verdict } from "../signals/verdict";
 
 export type RowStatus = "met" | "unmet" | "unknown" | "conflict";
@@ -134,6 +135,12 @@ export interface WhyInput {
   plan?: EntryPlan | null;
   maxLateR?: number;
   feed?: FeedState;
+  /**
+   * The net position of the big Binance accounts (long side only): ONE explained row under the optional confirmations.
+   * It never counts as a contradiction and never changes the decision or the score – the Top-Trader-Kombi already scores
+   * the same positions. Missing / without data → no row.
+   */
+  traderNet?: TraderNetView | null;
 }
 
 const SIDE_WORD: Readonly<Record<Side, string>> = { long: "Long", short: "Short" };
@@ -223,6 +230,9 @@ export function explainDecision(inp: WhyInput): WhyExplanation {
     if (r.status === "unknown") markMissing(r.id, p.label, "Keine Daten für diesen Teil.");
     else optional.push(r);
   }
+  // the net sign of the big accounts: shown and explained, never scored (see `WhyInput.traderNet`)
+  const net = long && inp.traderNet ? netWhy(inp.traderNet) : null;
+  if (net) optional.push(row("trader-net", `${TRADER_NET_SOURCE}: netto`, net.status, net.reason));
 
   // ---- contradictions
   if (inp.other?.valid) contradictions.push(row("other", `${SIDE_WORD[long ? "short" : "long"]} ist auch gültig`, "conflict", `Die Gegenrichtung zeigt ebenfalls einen gültigen Einstieg (${inp.other.label}).`));

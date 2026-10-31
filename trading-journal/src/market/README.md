@@ -237,6 +237,19 @@ period (`topPositionRatio | topAccountRatio | globalAccountRatio`) on the route 
 direct or the proxy, never Bybit/OKX), charged to the futures-data budget as a bulk call; no Binance route →
 `RestError("unsupported")`. For back-dated top-trader readings (Binance keeps ~30 days) and extra periods.
 
+### Live "Top-Trader netto" for the Long signal (`traderNet.ts`)
+
+```ts
+import { useTraderNet, deriveLiveTraderNet } from "@/market";
+const net = useTraderNet();   // { view: TraderNetView | null, status: "live" | "stale" | "loading" | "none", detail?, stepMs, source }
+```
+
+The `topPositionRatio` feed of the chosen period (the same 500-point series the Top-Trader card reads) joined with `kline_1h`
+(point spacing ≥ 1 h) or `kline_15m` (shorter) for the price line; pure model in `@/domain/signals/traderNet`. No extra
+request. Only Binance data counts (direct or proxy); Bybit/OKX, a blocked region, offline and "not yet loaded" give
+`view: null` with a German reason in `detail`. Re-renders only when the series publishes, a new candle opens, a health
+field changes or once a minute (the "seit 3 Tagen" age) – never per price tick.
+
 ## Rendering status (Plan 4.4)
 
 Use `useStatusLabel(feed)` / `provider.statusLabel(feed)`:

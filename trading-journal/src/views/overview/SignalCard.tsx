@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 
 import { DATA_SOURCE_NOTE, DEFAULT_SIGNAL_CFG, LOADING_TEXT, OFFLINE_TEXT, SIGNAL_TITLE, signalInfo, type Side } from "@/domain/signals";
 import { cn } from "@/lib/cn";
 import { themePaint } from "@/lib/themePaint";
-import { SIGNAL_HOLD_MS, useSignalCheck, type LiveSignals } from "@/market";
+import { SIGNAL_HOLD_MS, useSignalCheck, useTraderNet, type LiveSignals } from "@/market";
 import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { TactileHighlight } from "@/motion/pulse/TactileHighlight";
 import { StatusPill } from "@/motion/StatusPill";
@@ -20,6 +20,7 @@ import { BiasBar } from "./BiasBar";
 import { PartsSection, Reasons, RungTile, VerdictRow, ZoneGauge } from "./signalParts";
 import { entryLevels, freshEntry, ladderText, partViews, rungViews, statusPill, verdictStateLine, type EntryLevels, type RungView } from "./signalView";
 import { useForceRefresh } from "./useMarket";
+import { TraderNetSection } from "./TraderNetSection";
 import { WhySection } from "./WhySection";
 
 export const SIGNAL_CARD_ID = "signal-card";
@@ -203,6 +204,8 @@ function SignalSkeleton({ rungs, message }: { rungs: number; message: string }) 
       </div>
       {/* "Warum handeln oder auslassen?" (collapsed: label, verdict line) + the source note: one block, like the evaluated card's end */}
       <div className="grid gap-5" aria-hidden="true">
+        {/* "Top-Trader (Binance) · netto" (Long view): label row, headline, detail (two lines on a phone) */}
+        <Skeleton className={cn(SK, "h-[87px] sm:h-[70px]")} />
         <Skeleton className={cn(SK, "h-[72px]")} />
         <Skeleton className="h-[30px] w-3/4 rounded-md sm:h-[15px]" />
       </div>
@@ -221,6 +224,7 @@ function SignalSkeleton({ rungs, message }: { rungs: number; message: string }) 
  */
 export function SignalCard() {
   const check = useSignalCheck();
+  const traderNet = useTraderNet();
   const snap = check.snapshot;
   const [side, setSide] = useState<Side | null>(null);
   const [info, setInfo] = useState(false);
@@ -302,7 +306,8 @@ export function SignalCard() {
               <ZoneGauge c={snap.zone} side={cur} />
               <Reasons v={v} />
             </div>
-            <WhySection snap={snap} side={cur} feed={check.state} />
+            {cur === "long" && <TraderNetSection net={traderNet} />}
+            <WhySection snap={snap} side={cur} feed={check.state} traderNet={cur === "long" ? traderNet.view : null} />
             {check.state === "stale" && check.message && <p className="text-[11.5px] text-warn">{check.message}</p>}
             <p className="text-[11px] leading-snug text-faint">{DATA_SOURCE_NOTE}</p>
           </div>

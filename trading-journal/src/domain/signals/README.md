@@ -372,3 +372,25 @@ tests `tests/unit/signals.tvCheck.test.ts`.
 
 MCB rule and TradingView calibration unchanged (`signals.tvCalibration.test.ts`); `midline` and `hidden` stay on.
 
+## Top-Trader netto (Binance) – `traderNet.ts` (2026-10, round 9)
+
+The Long signal on the Übersicht carries a calm plaque "Top-Trader (Binance)" (`src/views/overview/TraderNetSection.tsx`) and, opened,
+a small canvas chart (`TraderNetChart.tsx`, lazy chunk): the net position of the biggest Binance accounts as an area around
+zero, the price as a thin line, a mark at the last sign change. Pure part here, live part in `src/market/traderNet.ts`
+(`useTraderNet`). **Data:** the `topLongShortPositionRatio` series of the chosen period that the app already loads (500 points on
+the first load, ≈ 21 days at 1 h) + the candles of the same exchange for the price line. No extra request, no server
+function. It is an exchange statistic of ONE exchange – never called "Wale", never "Glassnode", not on-chain – and does not
+predict the price (the help line under the chart says so).
+
+| piece | rule |
+|---|---|
+| `netOf(point)` | `long % − short %` in percentage points (−100 … +100); `2 · long − 100` when the short share is missing / does not add up |
+| dead band | `TRADER_NET_NEUTRAL_PP` = 1 pp: inside it the side is `neutral` ("ausgeglichen") and a dip into it does not end a run |
+| `buildTraderNet(points, bars, now, barMs)` | sorts, drops bad / duplicate points, `status`: `none` (no points) · `short` (< `TRADER_NET_MIN_POINTS` = 12, "zu wenig Verlauf", no curve) · `ok`; `side`; `flip` = the LAST sign change that stuck: the zero crossing (linearly interpolated), `from` / `to`, age, price at the crossing (covering candle's open) and the change to the newest close; `null` + `holdMs` when the loaded history has none; `changes` = side changes over the history |
+| prices | `priceAt(bars, t, barMs)`: open of the covering candle, `null` outside the covered range – a gap stays a gap (the line breaks) |
+| texts | `netHeadline` ("netto Short, seit 2 Tagen umgeschlagen" / "netto Long, im geladenen Verlauf (19 Std.) unverändert" / "ausgeglichen (−0,4 Pkt.)"), `netDetail`, `sinceText` / `durationText` (rounded down), `netWhy` |
+| verdict | **unchanged.** `explainDecision({ traderNet })` adds ONE row "Top-Trader (Binance): netto" to the *optional* group for the Long side (`met` = netto Long, `unmet` = netto Short / ausgeglichen) with the sentence – never a contradiction, never a missing-data row, no effect on `decision`, the score or `verdict.ts` / `bias.ts` (tested: everything but the optional group is identical with and without). The Top-Trader-Kombi (`parts.ts`, `pos` item > 64 %) already scores the same positions; adding the sign (`net > 0` ⇔ long > 50 %) as a weight would count them twice. |
+
+Tests: `tests/unit/signals.traderNet.test.ts`, `tests/unit/views.overview.traderNet.test.tsx`, `tests/e2e/trader-net.spec.ts`
+(mock script `flip-short` in `tests/e2e/mocks/synth.ts`). Not checked against real Binance values (fapi answers 451 from the sandbox).
+

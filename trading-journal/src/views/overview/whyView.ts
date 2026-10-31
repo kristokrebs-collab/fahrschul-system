@@ -3,7 +3,7 @@
  * the engine's `Signals` map to the explanation's inputs. Pure.
  */
 import type { FeedState, WhyInput } from "@/domain/decision";
-import type { Side, Signals, SignalCfg } from "@/domain/signals";
+import type { Side, Signals, SignalCfg, TraderNetView } from "@/domain/signals";
 
 /** A candle as far as the adapter reads it. */
 export interface TriggerBar {
@@ -33,6 +33,8 @@ export interface WhyOptions {
   /** close of the signal candle (see `triggerClose`) */
   trigger: number | null;
   price: number | null;
+  /** the net position of the big Binance accounts (optional; shown as one explained row, never scored) */
+  traderNet?: TraderNetView | null;
 }
 
 export function whyInput(snap: Signals & { cfg: SignalCfg }, side: Side, o: WhyOptions): WhyInput {
@@ -52,5 +54,6 @@ export function whyInput(snap: Signals & { cfg: SignalCfg }, side: Side, o: WhyO
     plan: { trigger: o.trigger, stop: plannedStop(v) },
     maxLateR: o.maxLateR,
     feed: o.feed,
+    traderNet: o.traderNet ?? null,
   };
 }

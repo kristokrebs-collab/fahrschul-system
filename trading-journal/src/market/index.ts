@@ -163,6 +163,7 @@ export {
   type LiveTraderSeries,
   type TraderSeriesStatus,
 } from "./traders";
+export { deriveLiveTraderNet, stepOf as traderNetStep, traderNetHealthSignature, useTraderNet, type LiveTraderNet, type TraderNetFeedStatus } from "./traderNet";
 export * from "./signals";
 export { parseWsMessage, wsStreamKind, buildStreamUrl, binanceRest, BINANCE_REST, BINANCE_WS, type WsEvent, type BinanceRest } from "./sources/binance";
 export { bybitRest, BYBIT_REST, type BybitRest } from "./sources/bybit";

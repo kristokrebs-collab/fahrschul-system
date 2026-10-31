@@ -7,7 +7,7 @@
 import { useMemo, useState } from "react";
 import { explainDecision, lateMaxROf, withLateMaxR, type Decision, type RowStatus, type WhyRow } from "@/domain/decision";
 import { signalBarOpen, usePriceSnapshot, getSignalCandles, type LiveSignals } from "@/market";
-import type { Side } from "@/domain/signals";
+import type { Side, TraderNetView } from "@/domain/signals";
 import { cn } from "@/lib/cn";
 import { n1 } from "@/lib/format";
 import { Badge, type BadgeTone } from "@/primitives/Badge";
@@ -62,7 +62,7 @@ function Group({ title, rows, empty, testId }: { title: string; rows: readonly W
   );
 }
 
-export function WhySection({ snap, side, feed }: { snap: LiveSignals; side: Side; feed: "loading" | "ok" | "stale" | "offline" }) {
+export function WhySection({ snap, side, feed, traderNet = null }: { snap: LiveSignals; side: Side; feed: "loading" | "ok" | "stale" | "offline"; traderNet?: TraderNetView | null }) {
   const [open, setOpen] = useState(false);
   const { price } = usePriceSnapshot(1000);
   const maxLateR = useJournal((s) => lateMaxROf(s.settings.signals));
@@ -74,7 +74,7 @@ export function WhySection({ snap, side, feed }: { snap: LiveSignals; side: Side
     if (!base) return null;
     return triggerClose(getSignalCandles(base, { bars: 60 }), signalBarOpen(snap, side));
   }, [snap, side]);
-  const why = useMemo(() => explainDecision(whyInput(snap, side, { feed, lageOn, maxLateR, trigger, price })), [snap, side, feed, lageOn, maxLateR, trigger, price]);
+  const why = useMemo(() => explainDecision(whyInput(snap, side, { feed, lageOn, maxLateR, trigger, price, traderNet })), [snap, side, feed, lageOn, maxLateR, trigger, price, traderNet]);
   const pill = PILL[why.decision];
   const presets = LATE_PRESETS.includes(maxLateR) ? LATE_PRESETS : [...LATE_PRESETS, maxLateR].sort((a, b) => a - b);
 

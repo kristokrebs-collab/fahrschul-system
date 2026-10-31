@@ -13,7 +13,8 @@
  *   accounts) is −3,7 pp and fell 2,7 pp over the last hour (retail red by both rules) — with the setup's Discount the
  *   Top-Trader-Kombi holds 4 of 4 on the long side. `whale-short` mirrors it (34,0 % / 34,6 % long = > 64 % short,
  *   delta +3,7 pp, rising = retail green) for the mirrored market. `flat`: gentle swings around 55 / 53 / 54 % (delta
- *   ≈ −1 pp: retail red for a long, nothing else met).
+ *   ≈ −1 pp: retail red for a long, nothing else met). `flip-short`: like `flat`, but the top-trader POSITION series is net
+ *   short (43 % long) for the newest 60 periods and net long (55 %) before – one sign change, for "Top-Trader netto".
  */
 export const SYNTH_INTERVAL_MS: Record<string, number> = {
   "1m": 60_000,
@@ -156,7 +157,10 @@ export function synthKlines(interval: string, q: RangeQuery, anchor: number, now
 }
 
 export type RatioKind = "top-position" | "top-account" | "global";
-export type RatioScript = "whale-long" | "whale-short" | "flat";
+export type RatioScript = "whale-long" | "whale-short" | "flat" | "flip-short";
+
+/** `flip-short`: the top-trader POSITION series has been net short for the newest `FLIP_PERIODS` points and net long before. */
+export const FLIP_PERIODS = 60;
 
 /** Newest snapshots the scripts shape (1 h of 5-min points); older ones swing gently like `flat`. */
 const SCRIPT_POINTS = 12;
@@ -170,12 +174,13 @@ const SCRIPT_POINTS = 12;
  * (100 − x): top traders > 64 % short, delta +3,7 pp and rising 4,7 pp over 1 h (Retail grün).
  */
 export function ratioLongPct(kind: RatioKind, i: number, script: RatioScript): number {
-  if (script !== "flat" && i < SCRIPT_POINTS) {
+  if ((script === "whale-long" || script === "whale-short") && i < SCRIPT_POINTS) {
     const long = kind === "top-position" ? 66 - 0.1 * i : kind === "top-account" ? 65.4 - 0.1 * i : 69.1 - 0.3 * i;
     return script === "whale-long" ? long : 100 - long;
   }
   // older points / `flat`: top accounts 53 %, all accounts 54 % → delta ≈ −1 pp (below 0 = retail red for a long only)
-  const base = kind === "global" ? 54 : kind === "top-account" ? 53 : 55;
+  // `flip-short`: the position series sits at 43 % long (net −14 ± 4 pp) for the newest FLIP_PERIODS points, 55 % before
+  const base = kind === "global" ? 54 : kind === "top-account" ? 53 : script === "flip-short" && i < FLIP_PERIODS ? 43 : 55;
   return base + 1.5 * Math.sin(i * 0.9) + 0.5 * Math.sin(i * 2.3);
 }
 

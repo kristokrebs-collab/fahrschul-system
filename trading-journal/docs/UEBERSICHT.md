@@ -129,7 +129,7 @@ _Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 9 Funktionen
 
 ### Trade prüfen & Chart
 
-_Einstieg prüfen, Chancen finden, den Chart lesen._ · 15 Funktionen
+_Einstieg prüfen, Chancen finden, den Chart lesen._ · 16 Funktionen
 
 **Einstieg prüfen**
 
@@ -148,6 +148,7 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 15 Funktionen
 | Deine Watchlist nach Setups absuchen | Chancen-Scanner | Markt › Watchlist-Scanner | teilweise |
 | Prüfen, was nach ähnlichen Lagen geschah | Ähnliche Situationen | Markt › Ähnliche Situationen | fertig |
 | Sehen, wie die Top-Trader positioniert sind | Top-Trader-Positionierung | Übersicht › Top Trader · Binance | fertig |
+| Sehen, ob die größten Konten netto Long oder Short sind – und seit wann | Top-Trader netto (Binance) | Übersicht › Einstiegs-Check › Top-Trader (Binance) | teilweise |
 | Prüfen, ob eine Seite des Marktes überfüllt ist | Squeeze-Beobachtung | Markt › Squeeze-Beobachtung | teilweise |
 | Termine sehen, die für den Handel zählen | Ereigniskalender | Markt › Termine | teilweise |
 
