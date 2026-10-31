@@ -7,8 +7,12 @@ import { navigate } from "@/store/router";
  */
 export function ToTrades() {
   return (
-    <Button size="sm" className="mt-2" onClick={() => navigate("trades")} data-testid="coach-to-trades">
-      Zu den Trades
-    </Button>
+    // in a span: as a direct child of the empty state's action slot the button would be clipped (`overflow-hidden` for the
+    // one-off sheen) – and with it its 44 px tap area
+    <span className="mt-2 inline-flex">
+      <Button size="sm" onClick={() => navigate("trades")} data-testid="coach-to-trades">
+        Zu den Trades
+      </Button>
+    </span>
   );
 }

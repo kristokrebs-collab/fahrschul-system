@@ -62,11 +62,11 @@ function Headline({ segments, side }: { segments: readonly NetTitleSegment[]; si
 function KpiTile({ k }: { k: Kpi }) {
   return (
     <div className="grid min-w-0 content-start gap-1 border-l border-line px-3 first:border-l-0 first:pl-0" data-testid={`trader-net-kpi-${k.id}`}>
-      <span className="min-h-[2.6em] text-[11px] leading-[1.3] text-mute sm:min-h-0">{k.label}</span>
+      <span className="min-h-[3.9em] text-[11px] leading-[1.3] text-mute sm:min-h-0">{k.label}</span>
       <span className={cn("block whitespace-nowrap font-mono text-[15px] font-medium leading-tight tabular-nums sm:text-[18px]", TONE_TEXT[k.tone])} data-testid={`trader-net-kpi-${k.id}-value`}>
         <TextRoll text={k.value} mode="roll" />
       </span>
-      <span className="min-h-[2.6em] text-[11px] leading-[1.3] text-mute sm:min-h-[1.3em]">{k.sub}</span>
+      <span className="min-h-[3.9em] text-[11px] leading-[1.3] text-mute sm:min-h-[1.3em]">{k.sub}</span>
     </div>
   );
 }
