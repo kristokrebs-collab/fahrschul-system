@@ -65,7 +65,8 @@ test.describe("data reliability", () => {
     await seed(page, { onRequest: req.onRequest });
     await page.goto("/#settings");
     await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
-    const live = page.getByText("Live-Daten", { exact: true }).first();
+    // the card sits in a `Fold` (its closed title is a second, hidden "Live-Daten" text) – the heading is the card itself
+    const live = page.getByRole("heading", { level: 2, name: "Live-Daten", exact: true });
     await live.scrollIntoViewIfNeeded();
     const card = page.locator("section, div").filter({ has: page.getByText("Gesamtstatus", { exact: true }) }).last();
     await expect(card).toContainText("Online", { timeout: 20_000 });
