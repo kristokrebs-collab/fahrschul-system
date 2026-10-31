@@ -38,6 +38,8 @@ test("reduced motion: every page and overlay renders, nothing stays invisible", 
       for (const el of Array.from(document.querySelectorAll<HTMLElement>("main h1, main h2, main h3, main table, main article, main button"))) {
         // the kept-alive Übersicht that just left: aria-hidden, collapsed after its exit, parked once idle — not shown
         if (el.closest('[data-page-role]:not([data-page-role="current"])')) continue;
+        // the round × of a search field is there on purpose at opacity 0 until the field holds text
+        if (el.classList.contains("fx-clear")) continue;
         const cs = getComputedStyle(el);
         if (el.offsetParent === null && cs.position !== "fixed") continue; // display:none / detached: fine
         if (cs.opacity === "0" || cs.visibility === "hidden") out.push(`${el.tagName}: ${el.textContent?.slice(0, 30)}`);

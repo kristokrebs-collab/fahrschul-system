@@ -28,7 +28,8 @@ test.describe("Labor · Eigene Idee", () => {
   test("zwei Bedingungen bauen, laufen lassen, Diagnose lesen", async ({ page }, info) => {
     const { errors, klines } = await open(page, info);
     // "Eigene Idee" is the first choice and selected; the three templates follow
-    const tiles = page.getByRole("radiogroup", { name: "Strategie" }).getByRole("radio");
+    // inside the config card: the Forward-Test section further down has its own „Strategie“ group (3 templates) that mounts later
+    const tiles = page.getByTestId("labor-config").getByRole("radiogroup", { name: "Strategie" }).getByRole("radio");
     await expect(tiles.first()).toHaveAttribute("data-testid", "labor-strategy-custom");
     await expect(tiles.first()).toHaveAttribute("aria-checked", "true");
     await expect(tiles).toHaveCount(4);
