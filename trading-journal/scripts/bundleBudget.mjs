@@ -29,10 +29,12 @@ import { gzipSync } from "node:zlib";
  * (840 → 800); `index` moves to ~10 % above the new measure.
  * Runde 9: `index` 560 → 575 – the short trade form (editor stays in the main chunk), the sidebar and the four-group menu
  * add ~12 KiB gz together; the first-load total (780 / 800 KiB) is the limit that matters and stays.
+ * Runde 10: `initialCss` 46 → 52 – the richer motion (keyframes, hover states, tokens) is CSS; the JS limits do not move (new
+ * motion code goes into lazy chunks).
  */
 export const BUDGETS = {
   initialJs: 800,
-  initialCss: 46,
+  initialCss: 52,
   chunk: 120,
   named: { index: 575, react: 72, motion: 58, recharts: 114, lwc: 62 },
 };
