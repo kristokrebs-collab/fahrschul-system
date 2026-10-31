@@ -1,0 +1,60 @@
+/* motion-exception: flame – ambient, transform only. The streak flame (`FlameGlyph`, rich Wachstum page). Transform only; paused by the idle gate; still under reduced motion. */
+.flame {
+  display: block;
+  overflow: visible;
+}
+.flame__body {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  transform-box: view-box;
+  transform-origin: 12px 28px;
+  animation: flame-body 1.9s ease-in-out infinite alternate;
+}
+.flame__core {
+  fill: var(--color-fg);
+  transform-box: view-box;
+  transform-origin: 12px 28px;
+  animation: flame-core 1.3s ease-in-out infinite alternate;
+}
+.flame--record .flame__body {
+  stroke: var(--color-signal);
+}
+.flame--record .flame__core {
+  fill: var(--color-signal);
+}
+.flame[data-idle] .flame__body,
+.flame[data-idle] .flame__core {
+  animation-play-state: paused;
+}
+@keyframes flame-body {
+  0% {
+    transform: scale(1, 1) skewX(0deg);
+  }
+  35% {
+    transform: scale(1.03, 1.07) skewX(-2deg);
+  }
+  70% {
+    transform: scale(0.98, 1.02) skewX(1.5deg);
+  }
+  100% {
+    transform: scale(1.02, 1.05) skewX(-1deg);
+  }
+}
+@keyframes flame-core {
+  from {
+    transform: scale(1, 1);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(0.92, 1.14);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flame__body,
+  .flame__core {
+    animation: none;
+  }
+}

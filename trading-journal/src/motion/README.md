@@ -609,3 +609,30 @@ Every element above sets `style={{ borderRadius }}` (`radius.card 16`, `radius.d
 Every page layer except the Übersicht and the Cockpit carries `data-rich` (`PageHost.tsx`). New, richer effects (playful
 hover, tilt, stagger, decorative loops) are scoped to it – CSS as `[data-rich] .x`, components by living inside such a page –
 so the Startseite and the Cockpit stay exactly as they were. Chrome around the pages (sidebar, dock, header) is not scoped.
+
+### Seiten, Karten, Kacheln, Leerzustände (Runde 10, Agent 7)
+
+`rich.ts` is the first-load part (tiny): `RichContext` (provided by `PageHost` for exactly the pages that carry `data-rich` – a
+context crosses portals, the attribute does not), `useRich()` / `useRichFx()` (rich AND motion allowed), `isRichPage`, `waveDelay` /
+`gridCell` / `useGridCols` (diagonal wave of a tile grid, capped at `WAVE_MAX` = 8 steps of `stagger.reveal`), `Quiet` (a silent error boundary around the lazy decorations: a chunk that cannot load leaves no decoration, never a broken page) and `core.css`
+(`.rich-depth`, `.rich-float`). Everything bigger is a lazy chunk with its own CSS: `rich/PageAura` (+ `rich.css`), `rich/EmptyArt`
+(+ `art.css`). No token was added; timings are `spring.enter/tilt/smooth/layout`, `tween.reveal/fade/burst` and `stagger.reveal`;
+the ambient loops (aura drift 26 / 34 s, flame 1.3 / 1.9 s, float 5.4 s, empty-state cycles 6.5 – 9 s) are CSS keyframes of the
+effect itself – declared exceptions below.
+
+| Piece | Where | What it does | Guard |
+|---|---|---|---|
+| `PageHeader` rich | `views/setups/PageHeader.tsx` | each title word is pulled up out of a clip line (`y 40 → 0`, `spring.enter`, blur 3 px → none; the `h1` text stays the plain title); `PageAura` behind it | `useRichFx()`: not on the Cockpit, not under reduced motion |
+| `rich/PageAura` | lazy | two light spots drifting very slowly (CSS), a pointer spotlight (MotionValues, rect read on enter / after scroll, no render per move; mouse only), an optional ghost word (`ghost` prop; `::before` text of `data-ghost`, 7 % ink outline, ≥ 1100 px only, as tall as the header via `cqh`) | `useIdleGate`: paused off screen / hidden tab |
+| `Reveal wave={gridCell(i, cols)}` | `motion/Reveal.tsx` | diagonal instead of row-by-row delay for tiles (Funktionen tiles, Branchen-Ampel) | additive prop |
+| `Card` rich | `primitives/Card.tsx` | frosted veil (opacity on hover) + a hairline of light on the top edge; `tilt` (opt-in, mouse): `rotateX/Y ±3°` on `spring.tilt` with a brighter glare that follows the pointer, perspective only while hovered (`transform: none` at rest), CSS transition switched to `translate` only; `highlight`: one `BorderBeam` lap when first seen and on a mouse enter (≥ 8 s apart) | `useRich() && fine pointer && !reduced`; never `tilt` a card with a fixed ghost inside or a morph source |
+| `useHoverTilt(deg, enabled)` | `primitives/hoverTilt.ts` | the same tilt for tiles that are not a `Card` (Funktionen tile, streak badge) | mouse only |
+| `EmptyState art` | `primitives/EmptyState.tsx`, `rich/EmptyArt` | ∅ → a running picture (`draw`, `orbit`, `burst`), box reserved from the first paint (64 × 40) | rich page, `!reduced`; the CTA stays |
+| `.rich-depth` | `views/analyse/ui.tsx` `SectionTitle` | scroll-driven (`animation-timeline: view()`, compositor, no script): title and lead float up 14 px and lose 2 px of blur in the first 26 % of the way in; at rest by the time a jump lands, and the element that carries `data-section` is never transformed | `@supports`, `prefers-reduced-motion`, not under `data-safe-fx` |
+| `Float` | `rich/Float.tsx` | a pill bobs 2 px (`.rich-float`) | `useIdleGate` |
+| `FlameGlyph` | `views/wachstum` | flame of a running streak (SVG, transform flicker) | `useIdleGate`, rich page |
+
+Declared exceptions (ambient, finite cost, paused by `useIdleGate` while off screen / hidden): `// motion-exception: rich-aura`
+(`rich.css`), `rich-art` (`art.css`, the line draw is a stroke offset – a paint, no layout), `rich-float` (`core.css`), `flame`
+(`flame.css`). `useIdleGate(ref, watch?)` toggles `data-idle` from the shared `observeInView` and `visibilitychange`; the loop's
+CSS says `[data-idle] … { animation-play-state: paused }`.

@@ -16,6 +16,7 @@ import { Card } from "@/primitives/Card";
 import { Collapse, Expander } from "@/primitives/Expander";
 import { TestIdeaButton } from "@/views/labor/TestIdeaButton";
 import { EmptyState } from "@/primitives/EmptyState";
+import { ToTrades } from "./ToTrades";
 import { EvidenceTrades, SampleLine, VerdictBadge } from "./ui";
 
 const TOP = 3;
@@ -114,7 +115,7 @@ export function EdgesCard({ edges, closed, cur, className }: { edges: EdgeReport
   return (
     <Card title="Leaks & Edges" note={`${edges.tested} Muster getestet · FDR-korrigiert · Intervalle 80 %`} className={className} data-testid="coach-edges">
       {tooFew ? (
-        <EmptyState title="Noch zu wenige Trades" text={`Leaks und Edges brauchen mindestens ${2 * edges.minN} abgeschlossene Trades (je Muster ${edges.minN}). Bisher: ${edges.n}.`} line={false} />
+        <EmptyState title="Noch zu wenige Trades" text={`Leaks und Edges brauchen mindestens ${2 * edges.minN} abgeschlossene Trades (je Muster ${edges.minN}). Bisher: ${edges.n}.`} line={false} action={<ToTrades />} />
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
           <Column title="Deine Edges" items={edges.edges} closed={closed} cur={cur} minN={edges.minN} kind="edge" empty="Noch keine Edge, die dem Zufall standhält. Mehr Trades mit Grundlage helfen." />

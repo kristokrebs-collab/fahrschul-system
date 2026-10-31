@@ -96,6 +96,7 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
   return (
     <div className={cn("grid grid-cols-1 gap-5", className)}>
       <PageHeader
+        ghost="Playbook"
         title={SETUPS_TITLE}
         lead={SETUPS_LEAD}
         leadFill={SETUPS_LEAD_FILL}

@@ -94,7 +94,7 @@ export function AktienView({ className }: { className?: string }) {
 
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="aktien-view">
-      <PageHeader className="lg:col-span-12" title={AKTIEN.title} lead={AKTIEN.lead} leadFill={AKTIEN_LEAD_FILL} />
+      <PageHeader ghost="Märkte" className="lg:col-span-12" title={AKTIEN.title} lead={AKTIEN.lead} leadFill={AKTIEN_LEAD_FILL} />
       <SectionNav items={NAV} className="lg:col-span-12" />
       <SeeAlso at="aktien.page" className="lg:col-span-12" />
       <Section id="aktien-scanner" title={T.scanner.title} sub={T.scanner.sub}>

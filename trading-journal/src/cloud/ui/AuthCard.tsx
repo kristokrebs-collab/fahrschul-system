@@ -31,7 +31,7 @@ const BENEFIT_ICONS: Record<string, string> = {
 export function AuthCard({ className }: { className?: string }) {
   const phase = useCloudSession((s) => s.phase);
   return (
-    <Card title={AUTH_CARD.title} className={className}>
+    <Card title={AUTH_CARD.title} highlight={phase === "signedOut"} className={className}>
       {phase === "signedIn" ? <SignedIn /> : phase === "loading" || phase === "idle" ? <Loading /> : <SignedOut />}
     </Card>
   );

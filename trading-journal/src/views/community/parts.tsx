@@ -59,9 +59,9 @@ export function FeatureTiles({ className }: { className?: string }) {
   return (
     <RevealGroup className={cn("grid gap-3 sm:grid-cols-3", className)}>
       {COMMUNITY.features.map((f) => (
-        <RevealItem key={f.key} className="flex gap-3 rounded-2xl border border-line bg-ink-900 p-4">
+        <RevealItem key={f.key} className="group/ft flex gap-3 rounded-2xl border border-line bg-ink-900 p-4 [[data-rich]_&]:transition-[translate,border-color] [[data-rich]_&]:duration-300 [[data-rich]_&]:hover:-translate-y-0.5 [[data-rich]_&]:hover:border-line-2">
           <motion.span
-            className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-2 bg-ink-950 text-fg"
+            className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-2 bg-ink-950 text-fg [[data-rich]_&]:transition-[rotate,scale] [[data-rich]_&]:duration-300 [[data-rich]_&]:group-hover/ft:-rotate-6 [[data-rich]_&]:group-hover/ft:scale-110"
             initial={reduced ? false : { scale: 0.6, rotate: -8 }}
             whileInView={{ scale: 1, rotate: 0, transitionEnd: { transform: "none" } }}
             viewport={{ once: true }}

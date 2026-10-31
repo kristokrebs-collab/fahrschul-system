@@ -80,7 +80,7 @@ export function CheckInCard({ today }: { today: TodayState }) {
   // "Heute überspringen" is an outcome, not a check-in: said so, never shown as a good day
   const skipped = !has && checkinStatusOf(today.note) === "skipped";
   return (
-    <Card title="Check-in" note={has ? "Heute eingecheckt" : skipped ? DAILY.skippedNote : undefined} data-testid="growth-checkin" data-has={has ? "1" : "0"} data-skipped={skipped ? "1" : "0"}>
+    <Card tilt={1.5} highlight={!has} title="Check-in" note={has ? "Heute eingecheckt" : skipped ? DAILY.skippedNote : undefined} data-testid="growth-checkin" data-has={has ? "1" : "0"} data-skipped={skipped ? "1" : "0"}>
       {/* row rule (P1-08): the free height of the taller neighbour goes above the review footer, which sits at the bottom */}
       <div className="flex flex-1 flex-col gap-4">
         <div className="flex items-center gap-4">

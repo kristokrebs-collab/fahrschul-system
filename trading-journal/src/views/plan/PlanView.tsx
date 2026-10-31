@@ -180,7 +180,7 @@ export function PlanView({ className }: { className?: string }) {
   const vm = usePlanModel();
   return (
     <div className={cn("grid grid-cols-1 gap-5", className)} data-testid="plan-view" data-live={vm.live ? "true" : "false"}>
-      <PageHeader title="Handelsplan" lead="Vom Einstiegssignal bis zum Ticket – in fünf Schritten, mit deinen Limits. Die App rechnet und kopiert; sie sendet nie eine Order." leadFill={PLAN_LEAD_FILL} />
+      <PageHeader ghost="Schritte" title="Handelsplan" lead="Vom Einstiegssignal bis zum Ticket – in fünf Schritten, mit deinen Limits. Die App rechnet und kopiert; sie sendet nie eine Order." leadFill={PLAN_LEAD_FILL} />
       <LinkLine />
       <Progress steps={vm.model.steps} progress={vm.model.progress} />
       <SeeAlso at="plan.page" />

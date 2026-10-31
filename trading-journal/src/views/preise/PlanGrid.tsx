@@ -10,6 +10,7 @@ import { openPortal, setSeats, startCheckout, useBilling, useBillingMode, useEff
 import { Mark, PriceDigits } from "@/billing/ui/parts";
 import type { PlanId } from "@/billing/types";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
+import { Float } from "@/motion/rich/Float";
 import { useFirstInView } from "@/motion/inView";
 import { CardSpread } from "@/motion/pulse/CardSpread";
 import { NotchedFrame } from "@/motion/pulse/NotchedFrame";
@@ -195,14 +196,18 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
                 {cat.name}
               </h3>
               {cat.recommended && (
-                <Badge tone="loss" className="border-signal/30 bg-signal/15 text-(--color-danger-text)">
-                  {PREISE.recommended}
-                </Badge>
+                <Float>
+                  <Badge tone="loss" className="border-signal/30 bg-signal/15 text-(--color-danger-text)">
+                    {PREISE.recommended}
+                  </Badge>
+                </Float>
               )}
               {isCurrent && (
-                <Badge tone="win" dot>
-                  {PREISE.current}
-                </Badge>
+                <Float delay={2.2}>
+                  <Badge tone="win" dot>
+                    {PREISE.current}
+                  </Badge>
+                </Float>
               )}
             </div>
             <p className="text-[13px] leading-snug text-mute">{cat.tagline}</p>

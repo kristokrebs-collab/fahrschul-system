@@ -78,6 +78,7 @@ export function CoachView({ className }: { className?: string }) {
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="coach-view" data-n={view.closed.length}>
       <PageHeader
+        ghost="Muster"
         className="lg:col-span-12"
         title={COACH_TITLE}
         lead={COACH_LEAD}

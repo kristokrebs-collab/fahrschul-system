@@ -2,6 +2,7 @@ import { motion, type HTMLMotionProps, type Transition, type Variants } from "mo
 import { createContext, useContext, useRef, type ReactNode } from "react";
 import { useIntroGate } from "@/intro/introStore";
 import { canObserveInView, useRevealSeen } from "@/motion/inView";
+import { waveDelay } from "@/motion/rich";
 import { isSafeFx } from "@/motion/safeFx";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -58,6 +59,11 @@ export interface RevealProps extends Omit<HTMLMotionProps<"div">, RevealOwned> {
   index?: number;
   /** Extra delay in seconds before the stagger. */
   delay?: number;
+  /**
+   * Tile of a grid: enters in a diagonal wave instead of by `index` – tiles with the same `col + row` come together
+   * (`waveDelay`, `@/motion/rich`). Pass the cell of the tile (`gridCell(i, cols)`).
+   */
+  wave?: { col: number; row: number };
   as?: RevealTag;
   /** Skip the entrance and rest at the final pose (e.g. the intro already carried this element into place). */
   settled?: boolean;
@@ -75,7 +81,7 @@ export interface RevealProps extends Omit<HTMLMotionProps<"div">, RevealOwned> {
 export const DEFER_CLASS = "[content-visibility:auto] -my-3 py-3";
 
 /** One element that blur-fades in when it scrolls into view (once). */
-export function Reveal({ index = 0, delay = 0, as = "div", settled = false, defer, children, ...inherited }: RevealProps) {
+export function Reveal({ index = 0, delay = 0, wave, as = "div", settled = false, defer, children, ...inherited }: RevealProps) {
   const rest = defer == null ? inherited : { ...inherited, className: cn(DEFER_CLASS, INTRINSIC_CLASS, inherited.className), style: { ...reserveStyle(defer), ...inherited.style }, "data-defer": "" };
   const enabled = useRevealEnabled();
   const gate = useIntroGate();
@@ -101,7 +107,7 @@ export function Reveal({ index = 0, delay = 0, as = "div", settled = false, defe
   // a blur over a card revealed while the page scrolls is the heaviest compositor work on the tablet: safe effects fade only
   const [from, to] = isSafeFx() ? [REVEAL_FROM_SAFE, REVEAL_TO_SAFE] : [REVEAL_FROM, REVEAL_TO];
   return (
-    <Tag ref={ref} initial={from} animate={gate && inView ? to : from} transition={revealTransition(revealDelay(index, delay))} {...rest}>
+    <Tag ref={ref} initial={from} animate={gate && inView ? to : from} transition={revealTransition(wave ? waveDelay(wave.col, wave.row, delay) : revealDelay(index, delay))} {...rest}>
       {children}
     </Tag>
   );

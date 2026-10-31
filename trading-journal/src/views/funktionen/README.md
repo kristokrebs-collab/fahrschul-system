@@ -87,3 +87,7 @@ führt die Demo als `produktdemo` (Suche, Finder, Assistent finden sie). Nichts 
 Zwölf Kacheln statt zehn: „Aktien beobachten & bewerten“ (Scanner, Watchlist, News, Kongress, Zahlen-Analyst, DCF, Kaufthese) und „Trade planen“ (Handelsplan in fünf Schritten, Verwaltung planen,
 Ausführbarkeit, Zeitmaschine) haben jetzt eine eigene Gruppe, weil beide eine eigene Seite sind und vorher über zwei Gruppen verteilt waren. Die Gruppen stehen in der Reihenfolge des Tages; die beiden
 Alarm-Funktionen (Alarme, E-Mail-Alarm) stehen zusammen unter „Heute vorbereiten“. Die Seite selbst ist unverändert (Logik und Texte kommen aus dem Register, `FUNKTIONEN` in `strings.ts`).
+
+## Runde 10 (Agent 7)
+
+Kacheln kommen in einer Diagonalwelle (`Reveal wave={gridCell(i, cols)}`, `useGridCols(2, 3)` passend zu `md:grid-cols-2 xl:grid-cols-3`), neigen sich mit der Maus ganz leicht (`useHoverTilt`, nur Maus, nur reiche Seite) und das Symbol hebt sich beim Hover. Treffer der Suche (`ResultItem`): neue Zeilen blenden ein, bleibende gleiten an ihren neuen Platz (`layout="position"`), wegfallende sind sofort weg – die Liste zeigt immer genau die Treffer. Geisterwort „Finden“ hinter der Kopfzeile (ab 1100 px). Test-IDs und Anker unveraendert (`funktionsfinder.spec`, `funktionen-anker.spec`, `funktionen.spec`).

@@ -10,6 +10,7 @@ import { openCancel, setBillingInterval, useBilling, useBillingMode, useEffectiv
 import type { BillingInterval } from "@/billing/types";
 import { ClosedNotice } from "@/billing/ui/parts";
 import { SpotlightSweep } from "@/motion/fx/SpotlightSweep";
+import { Float } from "@/motion/rich/Float";
 import { Reveal } from "@/motion/Reveal";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -127,14 +128,17 @@ export function PreiseView({ className }: PreiseViewProps) {
   return (
     <div className={cn("grid grid-cols-1 gap-5", className)} data-testid="preise-view" data-mode={mode}>
       <PageHeader
+        ghost="Wahl"
         title={PREISE.title}
         lead={PREISE.lead}
         leadFill={PREISE_LEAD_FILL}
         action={
           signedIn && mode === "open" ? (
-            <span className="rounded-full border border-line-2 bg-white/[0.03] px-3 py-1 text-[12.5px] text-mute" data-testid="current-plan">
-              {PREISE.current}: <strong className="font-semibold text-fg">{PLAN_CATALOG[plan.plan].name}</strong>
-            </span>
+            <Float>
+              <span className="rounded-full border border-line-2 bg-white/[0.03] px-3 py-1 text-[12.5px] text-mute" data-testid="current-plan">
+                {PREISE.current}: <strong className="font-semibold text-fg">{PLAN_CATALOG[plan.plan].name}</strong>
+              </span>
+            </Float>
           ) : undefined
         }
       />

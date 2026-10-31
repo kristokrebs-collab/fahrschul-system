@@ -3,7 +3,11 @@
  * finished (a green dot) or some are partial (an amber dot, said in words next to it). A tap opens the group's list.
  * Static: the only motion is the border on hover and the staggered fade-in the page gives each tile.
  */
+import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
+import { useRichFx } from "@/motion/rich";
+import { useMediaQuery } from "@/motion/useMediaQuery";
+import { useHoverTilt } from "@/primitives/hoverTilt";
 import { Icon } from "@/primitives/icons";
 import { groupStats } from "@/app/featureQuery";
 import type { FeatureEntry, FeatureGroup } from "@/app/features";
@@ -20,7 +24,11 @@ export interface GroupTileProps {
 
 export function GroupTile({ group, items, onOpen, onIntent, className }: GroupTileProps) {
   const { total, partial } = groupStats(items);
-  return (
+  // rich page + mouse: a very light tilt toward the pointer (transform only while it is on the tile)
+  const rich = useRichFx();
+  const mouse = useMediaQuery("(hover: hover) and (pointer: fine)", false);
+  const tilt = useHoverTilt(2.5, rich && mouse);
+  const tile = (
     <button
       type="button"
       onClick={() => onOpen(group.id)}
@@ -37,7 +45,10 @@ export function GroupTile({ group, items, onOpen, onIntent, className }: GroupTi
       )}
     >
       <span className="flex items-start justify-between gap-3">
-        <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors duration-200 group-hover/tile:text-fg [&>svg]:size-5">
+        <span
+          aria-hidden="true"
+          className="grid size-11 shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-[color,translate,scale] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/tile:text-fg [[data-rich]_&]:group-hover/tile:-translate-y-[3px] [[data-rich]_&]:group-hover/tile:scale-[1.06] [&>svg]:size-5"
+        >
           <Icon name={group.icon} />
         </span>
         <span className="flex items-center gap-2 pt-1 font-mono text-[11.5px] text-mute">
@@ -58,5 +69,11 @@ export function GroupTile({ group, items, onOpen, onIntent, className }: GroupTi
         <span className="text-[13px] leading-snug text-mute">{group.lead}</span>
       </span>
     </button>
+  );
+  if (!rich || !mouse) return tile;
+  return (
+    <motion.div className="h-full" style={tilt.style} onPointerEnter={tilt.onPointerEnter} onPointerMove={tilt.onPointerMove} onPointerLeave={tilt.onPointerLeave}>
+      {tile}
+    </motion.div>
   );
 }

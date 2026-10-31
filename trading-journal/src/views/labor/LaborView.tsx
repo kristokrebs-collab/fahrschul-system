@@ -99,7 +99,7 @@ export function LaborView({ className }: { className?: string }) {
   ];
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="labor-view" data-status={status}>
-      <PageHeader className="lg:col-span-12" title={LABOR.title} lead={LABOR.lead} leadFill={LABOR_LEAD_FILL} />
+      <PageHeader ghost="Testen" className="lg:col-span-12" title={LABOR.title} lead={LABOR.lead} leadFill={LABOR_LEAD_FILL} />
       <SectionNav items={nav} className="lg:col-span-12" />
       <Section id={ids.setup} section="setup" title={T.setup.title} sub={T.setup.sub}>
         {hasIdea && (

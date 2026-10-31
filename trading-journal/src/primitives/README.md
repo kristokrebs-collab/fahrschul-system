@@ -129,3 +129,9 @@ always with the old dark value as the fallback, so dark stays byte-identical:
 merges; P13 converted the shell and the primitives). `base.css`: `color-scheme: only dark` by default, `only light`
 under `html[data-theme="light"]` (themes.css); the page film (glow, dot grid, noise, date-picker icon, selection) reads
 `--page-*` / `--selection-bg` with the dark values as fallbacks.
+
+## Runde 10: reiche Seiten (Agent 7)
+
+- `Card` – auf Seiten mit `data-rich` (Kontext `useRich()`, nur Maus, nicht bei Reduced Motion): weicher Frost-Schleier beim Hover (Deckkraft) mit Lichtkante oben. Optional `tilt` (Grad, `true` = 3): sehr leichter 3D-Tilt zum Zeiger mit hellerem Glanz (`spring.tilt`; Perspektive nur solange der Zeiger auf der Karte ist, in Ruhe `transform: none`; die CSS-Transition der Karte beschraenkt sich dann auf `translate`) – nie auf einer Karte mit einem `position: fixed`-Geist (Chart-Marker, Tabellen-Geist) oder einer Morph-Quelle. Optional `highlight`: eine `BorderBeam`-Runde beim ersten Sehen und bei Maus-Eintritt (frueher nicht als alle 8 s) – fuer die eine hervorgehobene Karte einer Seite (Coach-Hero, Check-in solange offen).
+- `EmptyState` – auf reichen Seiten statt des ∅ ein laufendes Bild (`art`: `draw`, `orbit`, `burst`; Standard aus dem Titel), lazy (`@/motion/rich/EmptyArt`), die Box (64 × 40 px) steht ab dem ersten Bild; Aktion und Text unveraendert. `emptyArt.ts`: `EmptyArtKind`, `pickArt`, Masse.
+- `hoverTilt.ts` – `useHoverTilt(deg, enabled)`: derselbe Tilt fuer Kacheln, die keine `Card` sind (Funktionen-Kachel, Serien-Kachel).

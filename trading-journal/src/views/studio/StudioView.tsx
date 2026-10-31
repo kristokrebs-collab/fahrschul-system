@@ -69,7 +69,7 @@ export function StudioView({ className }: { className?: string }) {
   const showCompare = cmpActive || selected.length >= 2 || strategies.length >= 2;
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="studio-view">
-      <PageHeader className="lg:col-span-12" title={STUDIO.title} lead={STUDIO.lead} leadFill={STUDIO_LEAD_FILL} />
+      <PageHeader ghost="Regeln" className="lg:col-span-12" title={STUDIO.title} lead={STUDIO.lead} leadFill={STUDIO_LEAD_FILL} />
       <Section id={ids.write} title={T.write.title} sub={T.write.sub}>
         <Cell index={0} span="lg:col-span-4">
           <StrategyList strategies={strategies} />

@@ -903,3 +903,7 @@ der Suche und des Assistenten (`revealCard` / `revealSection`) sowie der Sprung 
 Die Wahl wird je Browser gemerkt (`tj2-folds`). Eingeklappt: Markt – Squeeze, Preis- & RSI-Struktur, Ähnliche Situationen, Alarme & Zustellprotokoll, Ereignisphasen,
 Box-Einstellungen; Einstellungen – Live-Daten, Hyblock-Connector, Datenarchiv, Version & Speicher; Berichte – Transaktionsbuch. Die Übersicht und das Cockpit sind unberührt.
 
+
+## Reiche Seiten (Runde 10, Karten / Kacheln / Leerzustände)
+
+Auf jeder Seite ausser Übersicht und Cockpit (`[data-rich]`, `RichContext`) ist die Bewegung dichter – dieselbe Sprache, nur mehr davon. Karten: weicher Frost-Schleier beim Hover, wenige Karten mit sehr leichtem Tilt und mitlaufendem Glanz (`Card tilt`), die eine hervorgehobene Karte einer Seite mit einer Randlicht-Runde (`Card highlight`). Kacheln kommen in einer Diagonalwelle. Kopfzeile: Titelwörter werden aus einer Zeile hochgezogen, dahinter zwei sehr langsame Lichtflecke, bei Maus ein Spotlight, ab 1100 px ein Geisterwort (7 % Tinte, kein Seitentitel). Abschnittstitel steigen beim Hereinscrollen um 14 px auf und verlieren 2 px Tiefenunschärfe (nur Scroll-Zeitleiste). Leerzustände zeigen statt des ∅ ein kleines laufendes Bild (Linie zeichnet sich, Orbit, Punkte finden zu einem Ring) – immer mit der Aktion darunter. Alles nur `transform` / `opacity` (ein Strich-Versatz), pausiert ausserhalb des Bildschirms und bei verdecktem Tab, bei Reduced Motion fertig. Einzelheiten und Schutzbedingungen: `src/motion/README.md` („Seiten, Karten, Kacheln, Leerzustände“).

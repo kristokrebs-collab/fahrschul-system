@@ -145,7 +145,7 @@ export function ScoreParts({ score, className }: { score: TradingScore; classNam
 
 export function HeroCard({ lesson, tips, score, className }: { lesson: WeeklyLesson; tips: readonly string[]; score: TradingScore; className?: string }) {
   return (
-    <Card className={className} data-testid="coach-hero" innerClassName="!p-0">
+    <Card highlight className={className} data-testid="coach-hero" innerClassName="!p-0">
       <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-10">
         <div className="grid min-w-0 content-start gap-5">
           <ScoreHero score={score} />

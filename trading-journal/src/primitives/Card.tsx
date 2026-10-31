@@ -1,11 +1,14 @@
 import { AnimatePresence, animate, frame, motion, useMotionValue, useSpring, type AnimationPlaybackControls, type HTMLMotionProps } from "motion/react";
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { observeInView } from "@/motion/inView";
 import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
+import { useRich } from "@/motion/rich";
 import { isScrolling } from "@/motion/scrollGate";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { BorderBeam } from "@/primitives/BorderBeam";
 import { nearestAngle, primeGlowRect, registerGlow } from "@/primitives/glowField";
 import { useHoverRect } from "@/primitives/hoverRect";
 import { Label } from "@/primitives/Label";
@@ -30,6 +33,14 @@ export interface CardProps extends Omit<HTMLMotionProps<"div">, "children" | "ti
   /** Proximity border arc that points at a nearby pointer (default true). */
   edgeGlow?: boolean;
   /**
+   * Rich pages, mouse only: a very light 3D tilt toward the pointer (degrees, `true` = 3) with a brighter glare that
+   * follows it. Opt-in, because a tilted card is a transformed ancestor while hovered – never on a card with a
+   * `position: fixed` ghost inside (chart marker, table ghost) or a morph source.
+   */
+  tilt?: boolean | number;
+  /** Rich pages: the edge light runs one lap when the card is first seen and again (at most every 8 s) when a mouse enters – for the one highlighted card of a page. */
+  highlight?: boolean;
+  /**
    * Classes of the card SURFACE (the inner `motion.div`), not of the outer wrapper: grid placement such as
    * `lg:col-span-*` does nothing here – put it on the cell that wraps the card.
    */
@@ -40,6 +51,12 @@ export interface CardProps extends Omit<HTMLMotionProps<"div">, "children" | "ti
 /** Half-width of the proximity arc in degrees. */
 const ARC_SPREAD = 26;
 const FINE_POINTER = "(hover: hover) and (pointer: fine)";
+/** Rich tilt (`tilt`): default degrees, perspective (px) and the pause between two beam laps. */
+const TILT_DEG = 3;
+const TILT_PERSPECTIVE = 900;
+const BEAM_GAP_MS = 8000;
+/** The glare of a tilting card: the spotlight blob, brighter (veil ink, so it turns to ink on paper). */
+const GLARE = "rgb(var(--veil-rgb, 255 255 255) / 0.085)";
 
 /**
  * Spotlight card (Bundle `Xw`/`kt`, Plan 2.5 "Card") – compositor-only at 120 Hz:
@@ -64,6 +81,8 @@ export function Card({
   gradientTo = "var(--card-ring-to, #2c2c2c)",
   gradientColor = "var(--card-spot, rgba(255,255,255,0.045))",
   edgeGlow = true,
+  tilt,
+  highlight,
   className,
   innerClassName,
   onPointerEnter,
@@ -74,6 +93,9 @@ export function Card({
   const reduced = useReducedFx();
   const finePointer = useMediaQuery(FINE_POINTER, false);
   const fx = finePointer && !reduced;
+  const richPage = useRich();
+  const rich = richPage && fx;
+  const tiltDeg = rich && tilt ? (tilt === true ? TILT_DEG : tilt) : 0;
   const surface = useRef<HTMLDivElement>(null);
   const hoverRect = useHoverRect();
   const lastPointer = useRef({ x: 0, y: 0 });
@@ -81,6 +103,13 @@ export function Card({
   // spotlight blob offset (top-left of a 2·gradientSize square centred on the pointer)
   const x = useMotionValue(-gradientSize);
   const y = useMotionValue(-gradientSize);
+  // tilt (rich pages, opt-in): rotation toward the pointer; perspective only while hovered, so a card at rest keeps `transform: none`
+  const rx = useMotionValue(0);
+  const ry = useMotionValue(0);
+  const srx = useSpring(rx, spring.tilt);
+  const sry = useSpring(ry, spring.tilt);
+  const persp = useMotionValue(0);
+  const hovering = useRef(false);
   // proximity arc
   const arcTarget = useMotionValue(0);
   const arcRotate = useSpring(arcTarget, spring.smooth);
@@ -102,6 +131,12 @@ export function Card({
     glide.current = [];
     const nx = clientX - rect.left - gradientSize;
     const ny = clientY - rect.top - gradientSize;
+    if (tiltDeg > 0 && rect.width > 0 && rect.height > 0) {
+      const u = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) - 0.5;
+      const v = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height)) - 0.5;
+      ry.set(u * 2 * tiltDeg);
+      rx.set(-v * 2 * tiltDeg);
+    }
     if (smooth) {
       glide.current = [animate(x, nx, tween.fade), animate(y, ny, tween.fade)];
       return;
@@ -128,8 +163,13 @@ export function Card({
     // a card scrolling under a resting pointer: no rect read now – `onMove` starts tracking on the next real move
     if (!fx || e.pointerType !== "mouse" || isScrolling()) return;
     lastPointer.current = { x: e.clientX, y: e.clientY };
+    if (tiltDeg > 0) {
+      hovering.current = true;
+      persp.set(TILT_PERSPECTIVE);
+    }
     place(e.clientX, e.clientY, track(e.currentTarget));
     showRing(true);
+    if (highlight) lap();
   };
 
   const onMove = (e: PointerEvent<HTMLDivElement>) => {
@@ -147,7 +187,42 @@ export function Card({
     onPointerLeave?.(e);
     hoverRect.leave();
     showRing(false);
+    if (tiltDeg > 0) {
+      hovering.current = false;
+      rx.set(0);
+      ry.set(0);
+    }
   };
+
+  // tilt: the perspective goes once both springs have come to rest (`transform: none` again – no containing block left behind)
+  useEffect(() => {
+    if (tiltDeg <= 0) return;
+    const settle = () => {
+      if (!hovering.current && Math.abs(srx.get()) < 0.02 && Math.abs(sry.get()) < 0.02) persp.set(0);
+    };
+    const offs = [srx.on("change", settle), sry.on("change", settle)];
+    return () => offs.forEach((off) => off());
+  }, [tiltDeg, srx, sry, persp]);
+
+  // highlight: one beam lap when the card is first seen (touch too), and again for a mouse that enters (not more often than every BEAM_GAP_MS)
+  const [lapKey, setLapKey] = useState(0);
+  const lastLap = useRef(0);
+  const lap = () => {
+    const now = performance.now();
+    if (lastLap.current && now - lastLap.current < BEAM_GAP_MS) return;
+    lastLap.current = now;
+    setLapKey((n) => n + 1);
+  };
+  useEffect(() => {
+    const el = surface.current;
+    if (!richPage || reduced || !highlight || !el) return;
+    let done = false;
+    return observeInView(el, (inView) => {
+      if (!inView || done) return;
+      done = true;
+      lap();
+    });
+  }, [richPage, reduced, highlight]);
 
   useEffect(() => {
     const el = surface.current;
@@ -201,22 +276,36 @@ export function Card({
         onPointerEnter={onEnter}
         onPointerMove={onMove}
         onPointerLeave={onLeave}
-        style={{ borderRadius: radius.card }}
+        style={tiltDeg > 0 ? { borderRadius: radius.card, rotateX: srx, rotateY: sry, transformPerspective: persp } : { borderRadius: radius.card }}
         className={cn(
           // `p-px` instead of a CSS border: overflow clips at the padding box, so the ring layers below can light the edge
-          "group relative isolate h-full overflow-hidden rounded-2xl bg-background p-px transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5",
+          "group relative isolate h-full overflow-hidden rounded-2xl bg-background p-px duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5",
+          // a tilting card must not let a CSS transition smear the transform that Motion writes every frame
+          tiltDeg > 0 ? "transition-[translate]" : "transition-transform",
           className,
         )}
       >
         <div aria-hidden="true" className="pointer-events-none absolute inset-px z-0 rounded-[inherit] bg-gradient-to-b from-white/[0.035] via-white/[0.01] to-transparent" />
+        {rich && (
+          // rich pages: a soft frosted veil washes over the card while a mouse is on it (opacity only) + a hairline of light on its top edge
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-px z-0 rounded-[inherit] bg-gradient-to-br from-white/[0.05] via-white/[0.012] to-transparent opacity-0 shadow-[inset_0_1px_0_rgb(var(--veil-rgb,255_255_255)/0.08)] transition-opacity duration-500 group-hover:opacity-100"
+          />
+        )}
         {fx && (
           <motion.span
             aria-hidden="true"
             className="pointer-events-none absolute left-0 top-0 z-0 rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-hover:will-change-transform"
-            style={{ x, y, width: size, height: size, background: `radial-gradient(closest-side, ${gradientColor}, transparent)` }}
+            style={{ x, y, width: size, height: size, background: `radial-gradient(closest-side, ${tiltDeg > 0 ? GLARE : gradientColor}, transparent)` }}
           />
         )}
         <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] border border-line" />
+        {richPage && !reduced && highlight && lapKey > 0 && (
+          <div aria-hidden="true" data-testid="card-beam" className="pointer-events-none absolute inset-0 z-20 rounded-[inherit]">
+            <BorderBeam fire={lapKey} size={120} borderWidth={1} />
+          </div>
+        )}
         {/* the ring is `absolute inset-0`: its exit never moves a sibling, so no app-wide re-render after it */}
         <NoLayoutCascade>
           <AnimatePresence initial={false}>
