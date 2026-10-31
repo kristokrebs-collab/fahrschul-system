@@ -10,7 +10,9 @@ import { fmtDay, type AmpelRow } from "@/domain/industryTrend";
 import { cn } from "@/lib/cn";
 import { ddmmHHmm } from "@/market/format";
 import { INDUSTRY_SOURCE_URL } from "@/market/industry/wire";
+import { gridCell, useRich, waveDelay } from "@/motion/rich";
 import { spring } from "@/motion/tokens";
+import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
@@ -31,15 +33,21 @@ const GRID = "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6";
 /** one size for a tile and its placeholder – the grid is as high before the data as after it */
 const TILE_H = "h-[132px]";
 
-function Tile({ row, reduced }: { row: AmpelRow; reduced: boolean }) {
+function Tile({ row, reduced, wave }: { row: AmpelRow; reduced: boolean; wave?: { col: number; row: number } }) {
   const on = row.state === "kauf";
+  // rich page: the tiles come in a diagonal wave (a tile that is new after a filter waits for its diagonal), a sort glides on `spring.layout`
+  const enter = wave ? { ...spring.enter, delay: waveDelay(wave.col, wave.row) } : spring.layout;
   return (
     <motion.li
       layout={reduced ? false : "position"}
-      transition={spring.layout}
+      transition={wave ? { layout: spring.layout, default: enter } : spring.layout}
       initial={reduced ? false : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn("grid min-w-0 grid-rows-[auto_auto_auto_auto] content-start gap-1 overflow-hidden rounded-xl border p-2.5", TILE_H, on ? "border-win/30 bg-win/[0.05]" : "border-line bg-ink-950/40")}
+      className={cn(
+        "grid min-w-0 grid-rows-[auto_auto_auto_auto] content-start gap-1 overflow-hidden rounded-xl border p-2.5 [[data-rich]_&]:transition-[border-color,translate] [[data-rich]_&]:duration-300 [[data-rich]_&]:hover:-translate-y-0.5",
+        TILE_H,
+        on ? "border-win/30 bg-win/[0.05] [[data-rich]_&]:hover:border-win/60" : "border-line bg-ink-950/40 [[data-rich]_&]:hover:border-line-2",
+      )}
       data-testid="branchen-tile"
       data-code={row.code}
       data-state={row.state}
@@ -99,6 +107,11 @@ function StandLine() {
 
 export function AmpelCard() {
   const reduced = useReducedFx();
+  const rich = useRich();
+  // the grid is 2 / 3 / 6 columns wide (`GRID`): the wave runs along its diagonals
+  const wide = useMediaQuery("(min-width: 1024px)", true);
+  const mid = useMediaQuery("(min-width: 640px)", true);
+  const cols = wide ? 6 : mid ? 3 : 2;
   const phase = useBranchen((s) => s.phase);
   const ampel = useBranchen((s) => s.ampel);
   const stale = useBranchen((s) => s.stale);
@@ -199,8 +212,8 @@ export function AmpelCard() {
           rows.length ? (
             <LayoutGroup id="branchen-tiles">
               <ul className={GRID} aria-label={T.title} data-testid="branchen-grid">
-                {rows.map((r) => (
-                  <Tile key={r.code} row={r} reduced={reduced} />
+                {rows.map((r, i) => (
+                  <Tile key={r.code} row={r} reduced={reduced} wave={rich ? gridCell(i, cols) : undefined} />
                 ))}
               </ul>
             </LayoutGroup>

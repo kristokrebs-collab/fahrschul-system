@@ -77,3 +77,7 @@ Der Knopf „Zeitmaschine“ im Trade-Detail (neben „Was wäre wenn“, gleich
   Hinzufügen/Löschen). `PageHeader` aus `TradesView` bleibt als dünne Hülle exportiert (gleiche Props).
 - Ein Journal ohne Trades zeigt **keine Filterleiste** (es gäbe nichts zu filtern) und den Leerzustand ohne die Zeile „Bereit für den ersten Eintrag.“; darunter „Auch hier“:
   CSV-Import und Backup einspielen. Mit Trades stehen unter der Karte die Anschlüsse Trade-Replay · Was wäre wenn · CSV-Import · Berichte (`FeatureLinks`, Register-Ids).
+
+## Runde 10 (Agent 7)
+
+Geisterwort „Journal“; die leere Liste („Noch keine Trades“, laufende Linie) und „Keine Treffer“ (Orbit) zeigen auf dieser Seite ein laufendes Bild statt des ∅, die Aktionen bleiben.

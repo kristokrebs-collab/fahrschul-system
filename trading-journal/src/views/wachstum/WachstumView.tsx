@@ -100,6 +100,7 @@ export function WachstumView({ className }: { className?: string }) {
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="wachstum-view" data-n={b.p.closed.length}>
       <PageHeader
+        ghost="Routine"
         className="lg:col-span-12"
         title={WACHSTUM.title}
         lead={WACHSTUM.lead}

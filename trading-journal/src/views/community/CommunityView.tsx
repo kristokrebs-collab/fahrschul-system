@@ -54,7 +54,7 @@ export function CommunityView({ className }: CommunityViewProps) {
   const signedIn = phase === "signedIn" && !needsMfa;
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="community-view" data-state={!enabled ? "off" : signedIn ? "in" : "out"}>
-      <PageHeader className="lg:col-span-12" title={COMMUNITY.title} lead={COMMUNITY.lead} leadFill={COMMUNITY_LEAD_FILL} />
+      <PageHeader ghost="Gemeinsam" className="lg:col-span-12" title={COMMUNITY.title} lead={COMMUNITY.lead} leadFill={COMMUNITY_LEAD_FILL} />
       {!enabled ? (
         <NoCloudState />
       ) : !signedIn ? (

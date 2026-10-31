@@ -28,6 +28,7 @@ import { planIncludes } from "@/billing/plans";
 import { useBillingMode, useEffectivePlan } from "@/billing/store";
 import { cn } from "@/lib/cn";
 import { Reveal } from "@/motion/Reveal";
+import { gridCell, useGridCols, useRich } from "@/motion/rich";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { EmptyState } from "@/primitives/EmptyState";
@@ -42,6 +43,7 @@ import { openDemo } from "@/views/demo/demoStore";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { FeatureRow } from "./FeatureRow";
 import { GroupTile } from "./GroupTile";
+import { ResultItem } from "./ResultItem";
 import { FUNKTIONEN } from "./strings";
 
 export const FUNKTIONEN_LEAD_FILL = { storageKey: storageKey("fill-funktionen"), highlight: FUNKTIONEN.highlight } as const;
@@ -60,6 +62,9 @@ export function FunktionenView({ className }: { className?: string }) {
   const [groupId, setGroupId] = useState<FeatureGroupId | null>(null);
   const [now] = useState(() => Date.now());
   const reduced = useReducedFx();
+  const rich = useRich();
+  // the tile grid has 1 / 2 / 3 columns (`md:grid-cols-2 xl:grid-cols-3`): the wave runs along its diagonals
+  const cols = useGridCols(2, 3);
   const settings = useJournal((s) => s.settings);
   const recent = useSearch((s) => s.recent);
   const mode = useBillingMode();
@@ -130,7 +135,7 @@ export function FunktionenView({ className }: { className?: string }) {
 
   return (
     <div className={cn("grid grid-cols-1 gap-5", className)} data-testid="funktionen-view" data-count={FEATURE_COUNT} data-view={view} onKeyDown={onPageKey}>
-      <PageHeader title={FUNKTIONEN.title} lead={FUNKTIONEN.lead} leadFill={FUNKTIONEN_LEAD_FILL} count={FEATURE_COUNT} countUnit={FUNKTIONEN.unit} />
+      <PageHeader ghost="Finden" title={FUNKTIONEN.title} lead={FUNKTIONEN.lead} leadFill={FUNKTIONEN_LEAD_FILL} count={FEATURE_COUNT} countUnit={FUNKTIONEN.unit} />
 
       <Reveal index={0} className="grid min-w-0 gap-2.5" role="search">
         <label htmlFor={inputId} className="text-[15px] font-medium text-fg">
@@ -195,9 +200,9 @@ export function FunktionenView({ className }: { className?: string }) {
           <section aria-label={FUNKTIONEN.results.some(shown.length)} className="grid min-w-0 gap-2.5" data-testid="funktionen-results" data-n={hits.length}>
             <ul className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
               {shown.map((h) => (
-                <li key={h.entry.id} className="min-w-0">
+                <ResultItem key={h.entry.id}>
                   <FeatureRow entry={h.entry} locked={locked(h.entry)} now={now} onOpen={open} onIntent={warm} showGroup weak={weak} />
-                </li>
+                </ResultItem>
               ))}
             </ul>
           </section>
@@ -253,7 +258,7 @@ export function FunktionenView({ className }: { className?: string }) {
             </Reveal>
             <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {grouped.map(({ group, items }, i) => (
-                <Reveal key={group.id} as="li" index={i % 3} className="min-w-0">
+                <Reveal key={group.id} as="li" index={i % 3} wave={rich ? gridCell(i, cols) : undefined} className="min-w-0">
                   <GroupTile
                     group={group}
                     items={items}

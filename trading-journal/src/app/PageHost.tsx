@@ -44,6 +44,7 @@ import { cn } from "@/lib/cn";
 import { useHoldProjectionOnHide, useSettleProjectionOnShow } from "@/motion/activityProjection";
 import { LayoutCascade } from "@/motion/NoLayoutCascade";
 import { consumeNavTempo, contextSpringAt } from "@/motion/physics";
+import { isRichPage, RichContext } from "@/motion/rich";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { detachShell, showPage } from "@/store/router";
@@ -218,7 +219,9 @@ function ShowSettle({ layer }: { layer: RefObject<HTMLElement | null> }) {
 const PageLayer = memo(function PageLayer({ page, role, keepAlive, cascade, renderPage, layerRef }: LayerProps) {
   const content = useMemo(() => {
     const node = renderPage(page);
-    return cascade ? <LayoutCascade>{node}</LayoutCascade> : node;
+    const inner = cascade ? <LayoutCascade>{node}</LayoutCascade> : node;
+    // the same pages that carry `data-rich` also provide the context (it crosses portals; the attribute does not)
+    return isRichPage(page) ? <RichContext.Provider value>{inner}</RichContext.Provider> : inner;
   }, [renderPage, page, cascade]);
   const own = useRef<HTMLDivElement | null>(null);
   // the leaving page ignores pointer input (Apple: no interaction during a transition) – by listeners, not by
@@ -249,7 +252,7 @@ const PageLayer = memo(function PageLayer({ page, role, keepAlive, cascade, rend
       data-page-role={role}
       // Runde 10: the richer motion (playful hover, stagger, tilt …) is scoped to the pages marked here – the Übersicht and
       // the Cockpit keep the exact picture they had (selectors `[data-rich] …`, or a component that is mounted inside)
-      data-rich={page === "overview" || page === "cockpit" ? undefined : ""}
+      data-rich={isRichPage(page) ? "" : undefined}
       // `inert` only while parked (display:none inside – free); on the leaving layer it restyled every element of the page
       // that is fading out in the switch frame (≈ 2 200 on the Übersicht, 20–30 ms) – that layer is aria-hidden, swallows
       // pointer input, releases focus at the switch and is collapsed once its exit has played

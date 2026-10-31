@@ -45,7 +45,7 @@ export function TodayCard({ list, events, plan, cur, now, className }: { list: r
   const focus = plan[0];
   return (
     <div className={cn("relative h-full rounded-2xl", className)}>
-      <Card title="Heute" note={new Date(now).toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })} data-testid="coach-today" innerClassName="grid content-start gap-4">
+      <Card tilt={1.5} title="Heute" note={new Date(now).toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })} data-testid="coach-today" innerClassName="grid content-start gap-4">
         <dl className="grid grid-cols-3 gap-2">
           {[
             ["Trades", `${trades.length}${open ? ` (${open} offen)` : ""}`, "text-fg"],

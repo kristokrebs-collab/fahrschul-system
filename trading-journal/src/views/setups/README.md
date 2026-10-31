@@ -53,3 +53,7 @@ filled parts) from `@/domain/strategy`; `normalizeSettings` keeps them.
 
 `SetupsView` order: header, account/sort switches, `LibraryBar`, grid, `ClassifyCard`, `Grundregeln`, `CompareSheet`.
 Tests: `tests/unit/views.labor.test.tsx` (setups block), `tests/unit/strategy.domain.test.ts`, e2e `tests/e2e/labor.spec.ts` (`Entscheidungsgrundlagen · Strategie`).
+
+## Runde 10 (Agent 7): Kopfzeile reicher Seiten
+
+`PageHeader` hat die Option `ghost` (ein kurzes Wort zum Thema der Seite, nie der Titel): auf Seiten mit `data-rich` und ab 1100 px steht es gross und nur als Umriss (7 % Tinte) hinter der Kopfzeile. Dort ziehen sich ausserdem die Titelwoerter aus einer Zeile hoch, und hinter der Kopfzeile driften zwei sehr langsame Lichtflecke (bei Maus ein Spotlight) – `@/motion/rich/PageAura`, lazy; Details in `src/motion/README.md`. Die Kopfzeile des Cockpits bleibt unveraendert. Woerter: Trades „Journal“, Grundlagen „Playbook“, Einstellungen „Anpassen“, Plan „Schritte“, Studio „Regeln“, Labor „Testen“, Aktien „Märkte“.

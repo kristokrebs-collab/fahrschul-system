@@ -1,13 +1,18 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ChartPlaceholder } from "@/chart/ChartPlaceholder";
 import { useIntroLanded } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
 import { DotMatrix } from "@/motion/DotMatrix";
 import { canObserveInView, observeInView } from "@/motion/inView";
 import { Typewriter } from "@/motion/pulse/Typewriter";
+import { Quiet, useRichFx } from "@/motion/rich";
 import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { EMPTY_ART_H, EMPTY_ART_W, pickArt, type EmptyArtKind } from "@/primitives/emptyArt";
 import { EMPTY_GLYPH_FRAMES } from "@/primitives/emptyGlyph";
+
+/** Rich pages: the ∅ gives way to a small running picture (lazy chunk with its own CSS). */
+const EmptyArt = lazy(() => import("@/motion/rich/EmptyArt"));
 
 export interface EmptyStateProps {
   title: ReactNode;
@@ -17,6 +22,8 @@ export interface EmptyStateProps {
   line?: string | false;
   /** A chart card without data: on the rich pages a calm breathing line sits under the text (hidden elsewhere). */
   chart?: boolean;
+  /** Rich pages: the running picture – a line that draws itself, an orbit, points that gather. Default: one of the three, picked from the title. */
+  art?: EmptyArtKind;
   className?: string;
 }
 
@@ -52,8 +59,9 @@ const CTA_TIMING = { "--cta-shine-duration": `${tween.shimmer.duration}s`, "--ct
  * box reserved from the first paint. Title / text / CTA are rendered once, synchronously. Reduced motion: static
  * dashes, one static glyph frame, no sheen, the line shown at once.
  */
-export function EmptyState({ title, text, action, line = EMPTY_LINE, chart, className }: EmptyStateProps) {
+export function EmptyState({ title, text, action, line = EMPTY_LINE, chart, art, className }: EmptyStateProps) {
   const reduced = useReducedFx();
+  const rich = useRichFx();
   const landed = useIntroLanded();
   const [seen, setSeen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -79,7 +87,18 @@ export function EmptyState({ title, text, action, line = EMPTY_LINE, chart, clas
       {/* a chart without data: a calm breathing line in the bottom padding (absolute – the box keeps its height), rich pages only */}
       {chart && <ChartPlaceholder className="pointer-events-none absolute inset-x-6 bottom-1.5 hidden [[data-rich]_&]:grid" lineClassName="h-4" />}
       <div className="grid justify-items-center gap-2">
-        <DotMatrix frames={EMPTY_GLYPH_FRAMES} fps={12} size={3} gap={2} tone="fg" className="mb-1.5" />
+        {rich ? (
+          <div className="mb-1.5 text-mute" style={{ width: EMPTY_ART_W, height: EMPTY_ART_H }}>
+            {/* the box is reserved from the first paint: the chunk arrives into it, nothing moves */}
+            <Quiet>
+              <Suspense fallback={null}>
+                <EmptyArt kind={art ?? pickArt(typeof title === "string" ? title : "")} />
+              </Suspense>
+            </Quiet>
+          </div>
+        ) : (
+          <DotMatrix frames={EMPTY_GLYPH_FRAMES} fps={12} size={3} gap={2} tone="fg" className="mb-1.5" />
+        )}
         <strong className="text-[14px] font-semibold text-fg">{title}</strong>
         {text && <span className="max-w-[38ch] text-[13px] text-mute">{text}</span>}
         {line &&

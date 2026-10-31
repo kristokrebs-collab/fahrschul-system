@@ -254,7 +254,9 @@ export function SectionNav({ items, label = "Inhalt", className }: { items: read
       style={{ top: SECTION_NAV_TOP }}
       className={cn("sticky z-30 -mx-4 bg-ink-900 px-4 sm:-mx-6 sm:px-6", SECTION_NAV_BOX, className)}
     >
-      <div className="flex items-center gap-3 border-b border-line py-2">
+      <div className="relative flex items-center gap-3 border-b border-line py-2">
+        {/* rich pages: a hairline in the signal red under the strip fills with the way down the page (scroll timeline, no script) */}
+        <span aria-hidden="true" className="rich-progress" />
         <span className="label shrink-0 !text-mute">{label}</span>
         <ul ref={strip} onKeyDown={onKeyDown} onPointerDown={onPress} className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overscroll-x-contain py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {shown.map((it) => {

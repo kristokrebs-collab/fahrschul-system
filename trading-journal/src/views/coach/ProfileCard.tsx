@@ -11,6 +11,7 @@ import { OrbitSpread } from "@/motion/pulse/OrbitSpread";
 import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
 import { PROFILE_MIN_TRADES } from "@/domain/coach";
+import { ToTrades } from "./ToTrades";
 import { TONE_TEXT } from "./ui";
 
 const ORBIT_MAX = 8;
@@ -30,7 +31,7 @@ export function ProfileCard({ profile, className }: { profile: BehaviorProfile; 
   if (!profile.traits.length) {
     return (
       <Card title="Dein Profil" className={className} data-testid="coach-profile">
-        <EmptyState title="Profil im Aufbau" text={`Ab ${PROFILE_MIN_TRADES} abgeschlossenen Trades zeichnet der Coach dein Profil: Stil, Session, Stärken, teuerste Muster. Bisher: ${profile.n}.`} line={false} />
+        <EmptyState title="Profil im Aufbau" text={`Ab ${PROFILE_MIN_TRADES} abgeschlossenen Trades zeichnet der Coach dein Profil: Stil, Session, Stärken, teuerste Muster. Bisher: ${profile.n}.`} line={false} action={<ToTrades />} />
       </Card>
     );
   }

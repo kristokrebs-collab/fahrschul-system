@@ -59,7 +59,7 @@ export function KontoView({ extraCards, nav, className }: KontoViewProps) {
   const signedIn = phase === "signedIn";
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="konto-view">
-      <PageHeader className="lg:col-span-12" title={KONTO.title} lead={KONTO.lead} leadFill={KONTO_LEAD_FILL} />
+      <PageHeader ghost="Sicher" className="lg:col-span-12" title={KONTO.title} lead={KONTO.lead} leadFill={KONTO_LEAD_FILL} />
       {enabled && signedIn && nav}
       {!enabled ? (
         <Cell index={0} span="lg:col-span-12">

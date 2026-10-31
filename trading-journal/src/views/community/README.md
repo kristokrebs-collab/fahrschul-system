@@ -67,3 +67,7 @@ Tests: `tests/unit/views.community.{proof,cases}.test.tsx`, e2e `tests/e2e/commu
   „Deine Links“, die Chartfälle in der Gruppe, beides fand man vorher nur zufällig.
 - Ladezustände in Endgröße: die Rangliste lädt als Podium (183 px) + sieben Zeilen (52 px) in der Abstandsfolge der echten Liste, „Wo du stehst“ als 104-px-Platzhalter (die Karten darunter verschieben sich
   um das Wenigste; die Länge einer echten Rangliste hängt von den Daten ab, der Platzhalter ist eine typische Größe).
+
+## Runde 10 (Agent 7)
+
+Die drei Kacheln der Vorstellung (`FeatureTiles`) heben sich beim Hover 2 px, das Symbol kippt leicht; Geisterwort „Gemeinsam“.

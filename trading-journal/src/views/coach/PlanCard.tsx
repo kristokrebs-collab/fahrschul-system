@@ -17,6 +17,7 @@ import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
 import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
+import { ToTrades } from "./ToTrades";
 import { VerdictBadge } from "./ui";
 
 const RATE = new Set(["journalRate", "planAdherence", "checklistRate", "winRate"]);
@@ -91,7 +92,7 @@ export function PlanCard({ plan, list, events, settings, now, className }: { pla
       data-pinned={pinned ? "1" : "0"}
     >
       {items.length === 0 ? (
-        <EmptyState title="Noch kein Plan" text="Sobald der Coach Muster mit genug Belegen findet, schlägt er hier drei Schritte vor." line={false} />
+        <EmptyState title="Noch kein Plan" text="Sobald der Coach Muster mit genug Belegen findet, schlägt er hier drei Schritte vor." line={false} action={<ToTrades />} />
       ) : (
         <div className="flex flex-1 flex-col gap-4">
           {!pinned && (

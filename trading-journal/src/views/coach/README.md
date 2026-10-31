@@ -112,3 +112,7 @@ since) and the dated **Verlauf** (`signalHistory`). `BasisLine.tsx`: `JournalBas
 how many events, the oldest and newest signal) at the end of Posteingang, Verpasste Chancen and Signalbilanz; both through `SourceStand`, a missing time says „keine Daten“. The balance has a group „Regelstand“. The quality card
 counts the sent log lines by origin (`quality-delivery-sources`). Test-IDs: `detail-protocol` · `detail-prereq` · `detail-rules` · `detail-history` · `coach-basis` · `inbox-basis` · `balance-basis-line` · `missed-basis`.
 Tests: `views.coach.signalprotocol.test.tsx`, `views.coach.signalchain.test.tsx`, `views.coach.missed.test.tsx`, `views.coach.test.tsx`.
+
+## Runde 10 (Agent 7)
+
+Geisterwort „Muster“ hinter der Kopfzeile, Hero-Karte mit einer Randlicht-Runde (`Card highlight`). Leere Karten, die auf mehr Trades warten (Profil, Leaks & Edges, Plan), haben als naechsten Schritt „Zu den Trades“ (`ToTrades.tsx`, `coach-to-trades`; bewusst nicht „Trade eintragen“ – diese Hauptaktion bleibt in Dock und Seitenleiste).

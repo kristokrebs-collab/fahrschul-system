@@ -100,6 +100,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   if (state === "empty") {
     body = (
       <EmptyState
+        art="draw"
         title="Noch keine Trades"
         text="Trag deinen ersten Trade ein – oder lies ihn mit „Screenshot importieren“ aus einem Bild."
         line={false}
@@ -113,6 +114,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   } else if (state === "none") {
     body = (
       <EmptyState
+        art="orbit"
         title="Keine Treffer"
         text="Kein Trade passt zu diesen Filtern."
         line="Filter lockern oder zurücksetzen."
@@ -139,6 +141,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   return (
     <div className={className ?? "grid grid-cols-1 gap-5"}>
       <PageHeader
+        ghost="Journal"
         title="Alle Trades"
         lead={TRADES_LEAD}
         count={all.length}
@@ -213,6 +216,6 @@ const tradeUnit = (n: number) => (n === 1 ? "Trade" : "Trades");
  * The page header of the journal: the shared `PageHeader` (signal dot, word stagger, lead recipe, count pill – the
  * count rolls when trades are added or deleted, label `{n} Trades`), so every page opens the same way.
  */
-export function PageHeader({ title, lead, count, action, leadFill }: { title: string; lead: string; count?: number; action?: ReactNode; leadFill?: { storageKey: string; highlight?: string } }) {
-  return <SharedPageHeader title={title} lead={lead} count={count} countUnit={tradeUnit} action={action} leadFill={leadFill} />;
+export function PageHeader({ title, lead, count, action, leadFill, ghost }: { title: string; lead: string; count?: number; action?: ReactNode; leadFill?: { storageKey: string; highlight?: string }; ghost?: string }) {
+  return <SharedPageHeader title={title} lead={lead} count={count} countUnit={tradeUnit} action={action} leadFill={leadFill} ghost={ghost} />;
 }

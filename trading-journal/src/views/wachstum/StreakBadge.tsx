@@ -12,8 +12,12 @@ import { celebrateStreak } from "@/motion/fx";
 import { PulseDot } from "@/motion/PulseDot";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { spring, stagger } from "@/motion/tokens";
+import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { useRichFx } from "@/motion/rich";
 import { Card } from "@/primitives/Card";
+import { useHoverTilt } from "@/primitives/hoverTilt";
+import { FlameGlyph } from "./FlameGlyph";
 import { useGrowthUi } from "./growthStore";
 
 export interface StreakBadgeProps {
@@ -26,8 +30,11 @@ export interface StreakBadgeProps {
 export function StreakBadge({ streak: s, index = 0, badgeRef }: StreakBadgeProps) {
   const reduced = useReducedFx();
   const live = s.current > 0;
+  const rich = useRichFx();
+  const mouse = useMediaQuery("(hover: hover) and (pointer: fine)", false);
+  const tilt = useHoverTilt(3, rich && mouse);
   const record = live && s.current >= s.best && s.best >= 2;
-  return (
+  const badge = (
     <motion.div
       ref={badgeRef}
       className={cn("relative grid min-w-0 content-start gap-1.5 rounded-2xl border bg-ink-950/50 p-3.5 sm:p-4", live ? "border-line-2" : "border-line")}
@@ -45,12 +52,21 @@ export function StreakBadge({ streak: s, index = 0, badgeRef }: StreakBadgeProps
       <div className="flex items-baseline gap-1.5">
         <RollingDigits value={s.current} className={cn("dot-num text-[38px] leading-none", live ? "text-fg" : "text-faint")} aria-label={`${s.label}: ${s.current} ${s.unit}`} />
         {record && <span className="rounded-full border border-signal/50 px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wider text-signal">Rekord</span>}
+        {/* rich page: a running streak carries a small flickering flame (33 px – inside the 38 px of the count) */}
+        {rich && live && <FlameGlyph record={record} className="ml-auto self-center" />}
       </div>
       <span className="truncate text-[11px] text-mute">
         {s.unit}
         {s.pending ? " · heute offen" : ""}
       </span>
       <span className="num truncate text-[10.5px] text-faint">Bestwert {s.best}</span>
+    </motion.div>
+  );
+  // rich page + mouse: the badge leans very slightly toward the pointer (transform only while it is on the badge)
+  if (!rich || !mouse) return badge;
+  return (
+    <motion.div className="min-w-0" style={tilt.style} onPointerEnter={tilt.onPointerEnter} onPointerMove={tilt.onPointerMove} onPointerLeave={tilt.onPointerLeave}>
+      {badge}
     </motion.div>
   );
 }

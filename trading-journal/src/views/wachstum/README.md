@@ -146,3 +146,7 @@ Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): e
 - Doppelungen in den Texten entfernt: Die Karte „Laufende Serien“ sagt „Aktuelle Länge und Bestwert je Serie.“ (der Abschnitt darüber trägt „Belohnt wird, wie du tradest …“), „Aktive Ziele“ ohne Wochenstand
   „Was du diese Woche erreichen willst.“ (der Abschnitt sagt „Prozessziele zuerst …“).
 - Textlinks und kleine Aktionen (Challenge aufgeben, Gewohnheit archivieren, „Anpassen“ im Check-in) mit derselben Hover-/Fokus-Behandlung (`textLink`, 200 ms Farbe).
+
+## Runde 10 (Agent 7)
+
+Serien-Kacheln: eine laufende Serie traegt eine kleine, flackernde SVG-Flamme (`FlameGlyph`, `flame.css`, nur `transform`, pausiert ausserhalb des Bildschirms und bei verdecktem Tab, bei Reduced Motion still; Rekord = Signalrot) und neigt sich mit der Maus ganz leicht (`useHoverTilt`). Die Karte „Check-in“ laeuft, solange noch nicht eingecheckt ist, einmal mit dem Randlicht (`Card highlight`). Geisterwort „Routine“. Die Erfolgsmomente (Ziel erreicht, Challenge geschafft, Serie waechst) waren schon da (`transitions.tsx`, `StreakBoard`) und bleiben die einzigen.
