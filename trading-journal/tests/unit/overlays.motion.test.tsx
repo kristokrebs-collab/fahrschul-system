@@ -11,6 +11,10 @@ import { EDITOR_MESSAGES, TradeEditor, invalidFieldOf, type TradeRecord } from "
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { SAMPLE, mkTrade, settings } from "./domain.fixtures";
+import { registerFlatForm } from "./editorLayout";
+
+// the older specs test every field's data path: all fields stay on screen (the short form has its own specs)
+registerFlatForm();
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

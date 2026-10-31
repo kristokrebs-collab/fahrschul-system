@@ -9,6 +9,10 @@ import { SignalSummary, StrengthBars } from "@/overlays/SignalSummary";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { SAMPLE, settings } from "./domain.fixtures";
+import { registerFlatForm } from "./editorLayout";
+
+// the older specs test every field's data path: all fields stay on screen (the short form has its own specs)
+registerFlatForm();
 
 /* ------------------------------------------------------------------ market mock */
 
@@ -174,7 +178,7 @@ describe("TradeEditor – Einstiegs-Check, Fehler, s_mtf, unsaved guard", () => 
     live.state = { state: "ok", snapshot: { cfg: DEFAULT_SIGNAL_CFG }, updatedAt: 1, message: null };
     checkTradeAt.mockImplementation(async () => ({ ...SNAP, side: "short" }));
     mount();
-    expect(screen.getByRole("heading", { level: 3, name: /Einstiegs-Check zum Zeitpunkt/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 4, name: /Einstiegs-Check zum Zeitpunkt/ })).toBeInTheDocument();
     expect(screen.getByTestId("signal-summary")).toHaveAttribute("data-strength", "2");
     fireEvent.click(screen.getByRole("radio", { name: "▼ Short" }));
     fillValid();

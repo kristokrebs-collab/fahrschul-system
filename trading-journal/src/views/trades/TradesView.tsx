@@ -10,7 +10,8 @@ import { Button, Card, EmptyState } from "@/primitives";
 import { useEnriched, useJournal } from "@/store/journalStore";
 import { openScreenshotImport } from "@/journal/ocr/store";
 import { storageKey } from "@/store/storage";
-import { useUi, type SortKey } from "@/store/uiStore";
+import { pushToast, useUi, type SortKey } from "@/store/uiStore";
+import { DUPLICATE_LABEL, carryOver, carrySentence, lastTrade } from "@/overlays/duplicateTrade";
 import { PageHeader as SharedPageHeader } from "@/views/setups/PageHeader";
 import { AutoHeight } from "./AutoHeight";
 import { KpiStrip } from "./KpiStrip";
@@ -83,6 +84,14 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   const suggestions = useMemo(() => searchSuggestions(all, settings.setups, EMOTIONS), [all, settings.setups]);
   const onSort = useCallback((k: SortKey) => toggleSort(k), [toggleSort]);
   const newTrade = () => (onNew ? onNew() : openEditor());
+  // „Letzten Trade duplizieren“: a new trade with the setting of the newest trade (never its prices, result, times or notes)
+  const newest = useMemo(() => lastTrade(all), [all]);
+  const duplicateNewest = () => {
+    if (!newest) return;
+    const c = carryOver(newest, settings.setups, settings.currency);
+    openEditor({ draft: c.draft });
+    pushToast({ kind: "info", title: "Neuer Trade vorbereitet", detail: carrySentence(c), duration: 6500 });
+  };
 
   const state: BodyState = all.length === 0 ? "empty" : rows.length === 0 ? "none" : "list";
   const ctaMotion = { initial: reduced ? false : CTA_FROM, animate: CTA_SHOWN } as const;
@@ -135,9 +144,16 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
         count={all.length}
         leadFill={TRADES_LEAD_FILL}
         action={
-          <Button size="sm" onClick={() => openScreenshotImport()} data-testid="trades-shot-import">
-            Screenshot importieren
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {newest && (
+              <Button size="sm" onClick={duplicateNewest} data-testid="trades-duplicate-last">
+                {DUPLICATE_LABEL}
+              </Button>
+            )}
+            <Button size="sm" onClick={() => openScreenshotImport()} data-testid="trades-shot-import">
+              Screenshot importieren
+            </Button>
+          </div>
         }
       />
       <Card>

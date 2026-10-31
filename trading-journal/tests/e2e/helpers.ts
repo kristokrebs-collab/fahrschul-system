@@ -5,10 +5,14 @@
 import { expect, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { MTF_SETUP } from "../../src/domain/edition/mtf";
+import { FIELD_IDS } from "../../src/overlays/tradeFormFields";
 import { mockMarket, type MarketScenario, type MockMarketOptions } from "./mocks/market";
 
 export const fixture: Record<string, unknown> = JSON.parse(readFileSync(new URL("../fixtures/tj2-v0.json", import.meta.url), "utf8"));
 export const fixtureJson = JSON.stringify(fixture);
+
+/** Every field of the trade form in its always-visible core (`seed` default, see `SeedOptions.shortForm`). */
+const FLAT_FORM = JSON.stringify({ v: 1, moved: Object.fromEntries(FIELD_IDS.map((id) => [id, "core"])) });
 
 /** Console noise that is environmental, never an app defect. */
 // `Failed to load resource` is the browser's own line for aborted / blocked requests (offline scenarios), not app output.
@@ -58,6 +62,12 @@ export interface SeedOptions extends MockMarketOptions {
    * cards without opening them first.
    */
   foldsClosed?: boolean;
+  /**
+   * The trade form shows only its six core fields by default (Etappe 1b). By default the seed puts EVERY field of the form
+   * into the core (`tj2-trade-form-layout`), so the specs that fill stop, reason, notes, fills … find them on screen as
+   * before; `shortForm: true` leaves the layout alone – the short form as a new user sees it (`editor-short.spec.ts`).
+   */
+  shortForm?: boolean;
 }
 
 /** The finished tour (`storageKey("onboarding")` of both editions). */
@@ -114,9 +124,10 @@ export async function seed(page: Page, opts: SeedOptions = {}): Promise<void> {
   const given = { ...(opts.firstRun ? {} : ONBOARDING_DONE), ...(opts.reviewPrompt ? {} : REVIEW_PROMPT_OFF), ...(opts.checkinPrompt ? {} : CHECKIN_PROMPT_OFF), ...(opts.foldsClosed ? {} : FOLDS_OPEN), ...(opts.extra ?? {}) };
   const extra = (opts.lage ?? !opts.synth) ? given : lageOff(given, !!opts.empty);
   await page.addInitScript(
-    ({ fx, extra, announce }) => {
+    ({ fx, extra, announce, flat }) => {
       sessionStorage.setItem("tj2-intro", "1");
       localStorage.setItem("__e2e-hooks", "1");
+      if (flat) for (const k of ["tj2-trade-form-layout", "tj2share-trade-form-layout"]) if (localStorage.getItem(k) === null) localStorage.setItem(k, flat);
       if (localStorage.getItem("__e2e-seeded")) return;
       for (const [k, v] of Object.entries(fx)) localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
       for (const [k, v] of Object.entries(extra)) localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
@@ -140,7 +151,7 @@ export async function seed(page: Page, opts: SeedOptions = {}): Promise<void> {
       }
       localStorage.setItem("__e2e-seeded", "1");
     },
-    { fx: opts.empty ? {} : fixture, extra, announce: !opts.reportReady },
+    { fx: opts.empty ? {} : fixture, extra, announce: !opts.reportReady, flat: opts.shortForm ? null : FLAT_FORM },
   );
 }
 

@@ -15,6 +15,12 @@ Bundle `H$` (Plan 6.2). Import from `@/views/trades`.
 | `AutoHeight` | box that springs to its content's height (ResizeObserver, `spring.layout`, `overflow-y: clip`); declared height exception like `Collapse`. Used by the card body and the editor's setup chips. |
 | `tradeCells` (`SideTag`, `ResultBadge`, `PnlCell`, `RCell`, …) | `PnlCell` / `RCell` animate through `MotionNumber gate` (shared observer, no state – cheap). |
 
+## Letzten Trade duplizieren
+
+Im Kopf der Seite (`data-testid="trades-duplicate-last"`, nur mit mindestens einem Trade): öffnet den Editor als neuen Trade mit der Einstellung des neuesten Trades
+(`@/overlays/duplicateTrade`: Konto, Paar, Richtung, Setups, Größe, Hebel, Zeitrahmen, Tags – nie Preise, Ergebnis, Zeiten, Notizen) und sagt in einem Toast
+(6,5 s) in einem Satz, was übernommen wurde. Test: `tests/unit/views.trades.duplicate.test.tsx`.
+
 ## Motion (Plan 6.2)
 
 - Table rows are in `AnimatePresence` in sync mode – never `popLayout` inside a `<table>`.
