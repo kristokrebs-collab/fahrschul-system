@@ -162,6 +162,23 @@ test.describe("Toast: Meilenstein", () => {
     await expect.poll(async () => (await counts()).mini, { timeout: 8000 }).toBeGreaterThan(0);
   });
 
+  test("gestaffelter Abgang: Tippen schließt den Toast, auch die Zeit schließt ihn – danach ruht die Insel (kein hängendes Symbol, keine Leiste)", async ({ page }) => {
+    await open(page, "settings");
+    const island = page.locator("[data-toast-island]");
+    await page.evaluate(() => (window as unknown as UiHook).__tjUi.getState().pushToast({ kind: "success", title: "Eins gespeichert" }));
+    await expect(toast(page).getByText("Eins gespeichert")).toBeVisible();
+    // the symbol, the text and the remaining-time bar are all there while it shows
+    await expect(island.locator("svg").first()).toBeVisible();
+    await toast(page).getByRole("button").first().click();
+    // the pointer must not rest on the next toast: a hovered toast waits (its countdown pauses)
+    await page.mouse.move(2, 2);
+    await expect(island).toHaveAttribute("data-idle", "", { timeout: 6000 });
+    await expect(toast(page).getByText("Eins gespeichert")).toHaveCount(0);
+    await page.evaluate(() => (window as unknown as UiHook).__tjUi.getState().pushToast({ kind: "error", title: "Zwei fehlgeschlagen" }));
+    await expect(toast(page).getByText("Zwei fehlgeschlagen")).toBeVisible();
+    await expect(island).toHaveAttribute("data-idle", "", { timeout: 9000 });
+  });
+
   test("Reduced Motion: auch ein Meilenstein-Toast streut nichts", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await open(page, "settings");

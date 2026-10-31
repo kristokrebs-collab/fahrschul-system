@@ -280,6 +280,12 @@ describe("Chip, Suchfeld, Fold", () => {
     expect(document.activeElement).toBe(input);
   });
 
+  it("`clearable={false}` leaves a search field to its own clear button", () => {
+    render(<Input type="search" clearable={false} aria-label="Eigene Suche" />);
+    expect(screen.queryByRole("button", { name: "Suche leeren", hidden: true })).toBeNull();
+    expect(screen.getByLabelText("Eigene Suche")).not.toHaveAttribute("clearable");
+  });
+
   it("a text Input has no clear button; a given placeholder is kept", () => {
     render(<Input aria-label="Name" placeholder="z. B. BTC" />);
     expect(screen.getByLabelText("Name")).toHaveAttribute("placeholder", "z. B. BTC");

@@ -15,6 +15,8 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   ref?: Ref<HTMLInputElement>;
   /** Classes for the wrapper (layout: width, grid placement); `className` styles the control itself. */
   wrapperClassName?: string;
+  /** `type="search"` only: the round × (default true). `false` for a field that brings its own clear button. */
+  clearable?: boolean;
 }
 
 /**
@@ -56,9 +58,9 @@ function clearInput(el: HTMLInputElement | null): void {
  * (focus stays in the field); elsewhere the browser's own clear button stays. A search field without a placeholder gets a
  * blank one, so the CSS can tell „empty“ from „has text“.
  */
-export function Input({ numeric, invalid, className, wrapperClassName, ref, ...props }: InputProps) {
+export function Input({ numeric, invalid, className, wrapperClassName, clearable = true, ref, ...props }: InputProps) {
   const own = useRef<HTMLInputElement | null>(null);
-  const search = props.type === "search";
+  const search = props.type === "search" && clearable;
   const setRef = useCallback(
     (el: HTMLInputElement | null) => {
       own.current = el;
