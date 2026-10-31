@@ -89,7 +89,7 @@ export function ExposureCard({ ex, cur }: { ex: ExposureReport; cur: string }) {
   if (!ex.legs.length) {
     return (
       <RiskCard title={S.title} data-testid="risk-exposure" data-legs={0}>
-        <EmptyState title={S.empty} text={S.emptyText} line={false} />
+        <EmptyState chart title={S.empty} text={S.emptyText} line={false} />
       </RiskCard>
     );
   }

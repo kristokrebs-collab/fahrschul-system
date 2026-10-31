@@ -20,6 +20,7 @@ import type { StudioRun } from "./runner";
 import { useStudio } from "./studioStore";
 import { STUDIO } from "./strings";
 import { Bar, Disclaimer, dateTimeText, Mini } from "./ui";
+import { Rows } from "@/chart/rows";
 
 const B = STUDIO.backtest;
 
@@ -78,14 +79,14 @@ function Findings({ run }: { run: StudioRun }) {
   return (
     <div className="grid gap-2" data-testid="studio-findings">
       <Mini>{B.findings}</Mini>
-      <ol className="grid gap-2">
+      <Rows as="ol" className="grid gap-2">
         {top.map((f) => (
-          <li key={f.id} className="grid gap-0.5 rounded-xl border border-line bg-ink-950/50 px-3 py-2">
+          <li key={f.id} data-lift className="grid gap-0.5 rounded-xl border border-line bg-ink-950/50 px-3 py-2">
             <span className="text-[13px] font-medium text-fg">{f.title}</span>
             <span className="text-[12.5px] leading-snug text-mute">{f.text}</span>
           </li>
         ))}
-      </ol>
+      </Rows>
       <p className="text-[11.5px] text-faint">{B.findingsNote}</p>
     </div>
   );

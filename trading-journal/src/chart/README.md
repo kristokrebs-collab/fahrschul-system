@@ -324,3 +324,28 @@ win / loss in the foreground ink (`trendColor`). `NothingCandleChart` takes `pri
 primitive **dynamically** with the first line (own chunk, nothing in the first load); a diagnostics hook `__tjTrend`
 (`lines()`, `geometry()`) sits on the host like `__tjBoxes`. The prop is called `priceLines` because `mirror.trendlines` already
 means the RSI lines. Tests: `tests/unit/chart.trendline.test.ts`.
+
+## Runde 10: reichere Diagramme, Zahlen und Listen (`data-rich`)
+
+Alles hier ist auf Seiten mit `data-rich` beschränkt (alle Seiten-Ebenen außer Übersicht und Cockpit, `PageHost.tsx`). Komponenten, die auch auf
+Übersicht / Cockpit stehen (`Stat`, `TradeRows`, `EmptyState`, `Badge`, die Analyse-/Risiko-Karten als Cockpit-Widgets), fragen den DOM **im Effekt**
+(`rich.ts` → `isRich(el)` = `el.closest("[data-rich]")`), nie beim Rendern – das erste Bild ist überall gleich, nur die reichen Seiten bekommen mehr.
+
+| Baustein | Datei | Was er tut |
+|---|---|---|
+| `isRich(el)` | `rich.ts` | Der Kontext-Test. |
+| `CountText` · `parseCount` · `countText` | `CountText.tsx` | Eine fertig formatierte Zahl („+0,42 R“, „−1.232,5 USDT“, „45 %“) zählt beim ersten Sichtbarwerden von 0 hoch und rollt bei Änderung vom alten zum neuen Wert (kurzer grüner / roter Schimmer in Richtung der Änderung). Genau **eine** Zahl im Text, sonst bleibt er wie er ist (Daten, Spannen, „11 / 20“). Der DOM-Text ist in jedem Moment ohne Zählen der Endtext; ein `revealKey` zählt nur einmal je Sitzung; Reduced Motion zählt nie. `Stat` (`views/insights/ui.tsx`) nutzt es für Text-Werte. |
+| `Rows` · `useRowsIn` | `rows.tsx` | Listen/Tabellen: die ersten 12 Zeilen steigen gestaffelt (30 ms) beim ersten Sichtbarwerden auf (`data-rows-arm` → `data-rows-go`, CSS in `styles/rich.css`), der Rest ist sofort da; einmal je Element, nie bei Re-Render oder Sortierwechsel. `<Rows as="tbody">` ersetzt den Behälter 1:1. Zeilen mit `data-lift` heben sich beim Hover um 1 px. |
+| `ChartPlaceholder` · `EmptyState chart` | `ChartPlaceholder.tsx` | Statt leerer Fläche eine ruhige Linie, die atmet (Deckkraft + Höhe, Compositor; pausiert außerhalb des Bildschirms, ohne Bewegung bei Reduced Motion) und der ehrliche Text darunter. `EmptyState chart` zeigt sie nur unter `[data-rich]` (sonst `hidden`). |
+| `data-pill` (`Badge`) | `styles/rich.css` | Statuspillen rasten beim Erscheinen ein (0,88 → 1,04 → 1, 0,34 s). |
+| `data-diag` + `--d` | `styles/rich.css` | Raster-Zellen blenden diagonal ein (Verzögerung `--d` × 70 ms), z. B. das Parameter-Raster im Labor. |
+
+**Monte-Carlo-Fächer der Analyse** (`views/analyse/fanDraw.ts`, `FanCursor.tsx`, `MonteCarloCard rich`): ein Canvas, nie ein DOM-Knoten je Pfad. Die Bänder
+5 · 25 · 50 · 75 · 95 % kommen aus **allen** 2.000 Läufen (`res.bands`), dazu 120 Stichproben-Linien (Alpha 0,15, grün wenn der Lauf über dem Start endet, rot
+darunter, additiv gemischt auf Tinte, normal auf Papier), der Median mit Glühen, Startachse mit Verlauf, gestrichelte Startlinie, runde Rasterwerte. Die Szene
+wird **einmal** in einen Offscreen-Canvas gemalt (Resize / Theme / neues Ergebnis, DPR ≤ 2); das Einzeichnen blittet nur einen wachsenden linken Streifen
+(ease-out, 1,54 s, ein `drawImage` je Frame). Das Fadenkreuz (Zeiger, Touch, ← → / Umschalt / Bild ↑↓ / Pos1 / Ende / Esc) setzt nur Transformationen und Text
+(P95 / Median / P05 nach dem gewählten Trade) – kein Neuzeichnen beim Hover. Die Zeile der Karte sagt „2000 Läufe · … · gezogen aus N Trades“, die Legende im Fächer „120 Linien · 84 im Plus · 36 im Minus“ – die Zahl ist
+ehrlich (`opts.runs`; die Bänder nutzen alle Läufe, solange Läufe × Horizont unter `MC_CELL_CAP` = 4.000.000 Zellen bleiben – mit 2.000 × 250 = 500.000 immer). Eine **Log-Skala**
+gibt es hier bewusst nicht: die Läufe sind Summen ab 0 (R oder Geld), keine Vermögensfaktoren; das Branchen-Trend-Diagramm (Aktien) zeichnet Faktoren und
+steht auf Log.

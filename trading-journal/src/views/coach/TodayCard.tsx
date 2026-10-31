@@ -21,6 +21,7 @@ import { Card } from "@/primitives/Card";
 import { openTrade } from "@/views/insights/ui";
 import { useCoachUi } from "./coachStore";
 import { SeverityDot } from "./ui";
+import { Rows } from "@/chart/rows";
 
 const SIGNAL_HEX = themePaint("#e5202e");
 
@@ -80,7 +81,7 @@ export function TodayCard({ list, events, plan, cur, now, className }: { list: r
         )}
 
         {todays.length > 0 ? (
-          <ul className="grid" aria-label="Muster heute">
+          <Rows className="grid" aria-label="Muster heute">
             {todays.slice(0, 6).map((e, i) => (
               <li key={`${e.key}-${triggerOf(e)}-${i}`} className="border-b border-line/60 last:border-b-0">
                 <button type="button" onClick={() => openTrade(triggerOf(e))} className="grid min-h-11 w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 px-1 py-1.5 text-left">
@@ -92,7 +93,7 @@ export function TodayCard({ list, events, plan, cur, now, className }: { list: r
                 </button>
               </li>
             ))}
-          </ul>
+          </Rows>
         ) : (
           <p className="text-[12.5px] leading-relaxed text-mute">{trades.length ? "Heute sauber – kein Muster erkannt." : "Noch kein Trade heute."}</p>
         )}

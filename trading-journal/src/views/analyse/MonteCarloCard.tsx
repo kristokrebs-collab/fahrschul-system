@@ -11,11 +11,18 @@
  *    straight into the DOM (a MotionValue subscription – zero React renders per scrub).
  * While the worker simulates, `DotMatrixText` waves "SIM" (only shown when it takes longer than a beat).
  * Reduced motion: the finished picture at once.
+ *
+ * `rich` (Runde 10, the Analyse page; the Cockpit widget keeps the picture above): the fan is ONE canvas painted once
+ * (`fanDraw.ts`) – percentile bands 5 / 25 / 50 / 75 / 95 of all 2 000 runs, 120 sample lines with a low alpha coloured
+ * by their end (green above the start, red below), the median with a soft glow, start axis and grid – revealed from the
+ * left with ease-out. A crosshair (pointer, touch or ← → keys on the focused fan) reads P05 / Median / P95 after any trade
+ * from DOM transforms (no redraw). While the simulation runs, a breathing placeholder line stands where the fan will be.
  */
+import { ChartPlaceholder } from "@/chart/ChartPlaceholder";
 import { ink, withAlpha } from "@/chart/ink";
 import { themePaint } from "@/lib/themePaint";
 import { motion, useMotionValue } from "motion/react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ANA_EMPTY,
   breakdownUnit,
@@ -40,6 +47,8 @@ import { EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
 import { useAnalyseUi, type McHorizon, type McMethod } from "./analyseStore";
+import { FAN_PAD, paintFan, sampleSplit } from "./fanDraw";
+import { useFanCursor } from "./FanCursor";
 import { sampleKey, useMonteCarlo } from "./hooks";
 import { AnaCard, SEG_TOUCH, Stat, softTone, unitText } from "./ui";
 
@@ -63,7 +72,7 @@ export function mcSampleOf(
   return { sample: null, unit: preferred, rCount: rs.length };
 }
 const FAN_H = 220;
-const PAD = { l: 4, r: 4, t: 10, b: 10 };
+const PAD = FAN_PAD;
 
 const HORIZONS = [50, 100, 250] as const;
 const METHODS = [
@@ -76,8 +85,11 @@ export interface FanGeometry {
   h: number;
   /** canvas points per kept path */
   pts: { x: number; y: number }[][];
-  /** svg path data per kept path (the scrubbed run) */
+  /** svg path data per kept path (the scrubbed run); empty in the lite form */
   pathD: string[];
+  /** svg path data of ONE kept path, built on demand (the scrubbed run of the rich fan) */
+  path: (k: number) => string;
+  /** band / core / median as svg path data; empty in the lite form (the rich fan paints them on its canvas) */
   band: string;
   core: string;
   median: string;
@@ -87,8 +99,11 @@ export interface FanGeometry {
   hi: number;
 }
 
-/** Pure: the fan's geometry in CSS pixels (shared by the canvas and the SVG overlay). */
-export function fanGeometry(res: MonteCarloResult, w: number, h: number): FanGeometry | null {
+/**
+ * Pure: the fan's geometry in CSS pixels (shared by the canvas and the SVG overlay). `lite` skips the SVG strings of all
+ * paths, bands and the median (thousands of `toFixed` / string joins on every width change) – only `pts` and `path(k)` are filled.
+ */
+export function fanGeometry(res: MonteCarloResult, w: number, h: number, lite = false): FanGeometry | null {
   if (!res.bands.length || w <= 0) return null;
   const n = res.horizon;
   let lo = Infinity;
@@ -113,10 +128,11 @@ export function fanGeometry(res: MonteCarloResult, w: number, h: number): FanGeo
     w,
     h,
     pts,
-    pathD: res.paths.map((p) => line(p)),
-    band: area(band(95), band(5)),
-    core: area(band(75), band(25)),
-    median: line(band(50)),
+    pathD: lite ? [] : res.paths.map((p) => line(p)),
+    path: (k) => (res.paths[k] ? line(res.paths[k]!) : ""),
+    band: lite ? "" : area(band(95), band(5)),
+    core: lite ? "" : area(band(75), band(25)),
+    median: lite ? "" : line(band(50)),
     startY: y(res.bands[0]!.values[0]!),
     lo,
     hi,
@@ -142,7 +158,7 @@ function drawStep(ctx: CanvasRenderingContext2D, pts: FanGeometry["pts"], drawn:
   return busy;
 }
 
-function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "money"; cur: string; start: number }) {
+function Fan({ res, unit, cur, start, rich }: { res: MonteCarloResult; unit: "R" | "money"; cur: string; start: number; rich: boolean }) {
   const reduced = useReducedFx();
   // the canvas reads the palette while it draws: a theme switch repaints it
   const theme = useTheme((s) => `${s.resolved}:${s.accent}`);
@@ -152,11 +168,14 @@ function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "mo
   const readout = useRef<HTMLSpanElement>(null);
   const [w, setW] = useState(0);
   const seen = useSeenOnce(wrap);
-  const geo = useMemo(() => fanGeometry(res, w, FAN_H), [res, w]);
+  const geo = useMemo(() => fanGeometry(res, w, FAN_H, rich), [res, w, rich]);
   // the band shows once the fan of THIS result has been drawn (set from the loop's end – never during render)
   const [drawnFor, setDrawnFor] = useState<MonteCarloResult | null>(null);
   const animated = useRef<MonteCarloResult | null>(null);
   const bandOn = reduced || drawnFor === res;
+  const tickLabel = useCallback((v: number) => unitText(v, unit, cur), [unit, cur]);
+  const cursor = useFanCursor({ wrap, res, geo: rich ? geo : null, unit, cur, ready: bandOn });
+  const split = useMemo(() => sampleSplit(res), [res]);
 
   // width: once and on resize (one read each)
   useLayoutEffect(() => {
@@ -174,6 +193,13 @@ function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "mo
   useLayoutEffect(() => {
     const c = canvas.current;
     if (!c || !geo) return;
+    if (rich) {
+      // one painted scene (bands, sample lines, median, axis), revealed from the left once per result
+      const instant = reduced || animated.current === res;
+      if (!instant && !seen) return;
+      if (!instant) animated.current = res;
+      return paintFan(c, res, geo, { animate: !instant, onDone: () => setDrawnFor(res), tickLabel });
+    }
     const dpr = Math.min(2, typeof devicePixelRatio === "number" ? devicePixelRatio : 1);
     c.width = Math.round(geo.w * dpr);
     c.height = Math.round(geo.h * dpr);
@@ -205,7 +231,7 @@ function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "mo
     });
     loop.wake();
     return () => loop.stop();
-  }, [geo, res, reduced, seen, theme]);
+  }, [geo, res, reduced, seen, theme, rich, tickLabel]);
 
   // the scrubbed run: red path + readout, straight to the DOM
   const runs = res.paths.length;
@@ -231,7 +257,7 @@ function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "mo
   useLayoutEffect(() => {
     const apply = (raw: number) => {
       const k = Math.max(0, Math.min(runs - 1, Math.round(raw)));
-      if (hl.current && geo) hl.current.setAttribute("d", geo.pathD[k] ?? "");
+      if (hl.current && geo) hl.current.setAttribute("d", geo.path(k));
       if (readout.current) readout.current.textContent = `Lauf ${k + 1}: Ende ${unitText((finals[k] ?? start) - start, unit, cur)} · max. Drawdown ${unitText(-(pathDD[k] ?? 0), unit, cur)}`;
     };
     apply(time.get());
@@ -248,9 +274,21 @@ function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "mo
 
   return (
     <div className="grid gap-3">
-      <div ref={wrap} className="relative overflow-hidden rounded-xl border border-line bg-ink-950/60" style={{ height: FAN_H }} data-testid="mc-fan" data-drawn={bandOn ? "true" : "false"}>
+      <div
+        ref={wrap}
+        className={cn("relative overflow-hidden rounded-xl border border-line bg-ink-950/60", rich && "outline-none focus-visible:ring-2 focus-visible:ring-fg/40")}
+        style={rich ? { height: FAN_H, touchAction: "pan-y" } : { height: FAN_H }}
+        data-testid="mc-fan"
+        data-drawn={bandOn ? "true" : "false"}
+        {...(rich ? cursor.props : {})}
+      >
         <canvas ref={canvas} aria-hidden="true" className="absolute inset-0 h-full w-full" />
-        {geo && (
+        {geo && rich && (
+          <svg aria-hidden="true" viewBox={`0 0 ${geo.w} ${geo.h}`} className="pointer-events-none absolute inset-0 h-full w-full transition-opacity duration-500 motion-reduce:transition-none" style={{ opacity: bandOn ? 1 : 0 }}>
+            <path ref={hl} fill="none" stroke={themePaint("#e5202e")} strokeWidth={1.6} strokeLinejoin="round" opacity={0.95} />
+          </svg>
+        )}
+        {geo && !rich && (
           <motion.svg
             aria-hidden="true"
             viewBox={`0 0 ${geo.w} ${geo.h}`}
@@ -266,8 +304,26 @@ function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "mo
             <path ref={hl} fill="none" stroke={themePaint("#e5202e")} strokeWidth={1.6} strokeLinejoin="round" opacity={0.95} />
           </motion.svg>
         )}
+        {rich && cursor.layer}
         {bandOn && !reduced && <SpotlightSweep play={1} playOnView={false} />}
-        <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-ink-950/70 px-1.5 py-0.5 font-mono text-[10px] text-faint">p5–p95 · Median</span>
+        {rich ? (
+          <>
+            <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-ink-950/70 px-1.5 py-0.5 font-mono text-[10px] text-faint">Bänder 5 · 25 · 50 · 75 · 95 %</span>
+            <span className="pointer-events-none absolute bottom-2 right-2 flex items-center gap-2 rounded-md bg-ink-950/70 px-1.5 py-0.5 font-mono text-[10px] text-faint">
+              <span>{res.paths.length} Linien</span>
+              <span className="flex items-center gap-1">
+                <i className="size-1.5 rounded-full bg-win" aria-hidden="true" />
+                {split.win} im Plus
+              </span>
+              <span className="flex items-center gap-1">
+                <i className="size-1.5 rounded-full bg-loss" aria-hidden="true" />
+                {split.loss} im Minus
+              </span>
+            </span>
+          </>
+        ) : (
+          <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-ink-950/70 px-1.5 py-0.5 font-mono text-[10px] text-faint">p5–p95 · Median</span>
+        )}
       </div>
       <span ref={readout} className="num min-h-4 font-mono text-[11.5px] leading-snug text-mute" data-testid="mc-readout" />
       {runs > 1 && (
@@ -315,7 +371,8 @@ function DdRisk({ res, thresholds }: { res: MonteCarloResult; thresholds: { x: n
   );
 }
 
-export function MonteCarloCard({ view, cur }: { view: AccountView; cur: string }) {
+/** `rich`: the Analyse page's fan (see the header); without it – the Cockpit widget – the card keeps its picture. */
+export function MonteCarloCard({ view, cur, rich = false }: { view: AccountView; cur: string; rich?: boolean }) {
   const horizon = useAnalyseUi((s) => s.mcHorizon);
   const method = useAnalyseUi((s) => s.mcMethod);
   const set = useAnalyseUi((s) => s.set);
@@ -335,7 +392,7 @@ export function MonteCarloCard({ view, cur }: { view: AccountView; cur: string }
       title={CARD_TITLES.monteCarlo}
       explain={() => explainMonteCarlo(res, unit, cur)}
       data-testid="ana-mc"
-      note={sample ? `2000 Läufe · ${unit === "R" ? "in R" : `in ${cur}`} · gezogen aus ${sample.length} Trades` : undefined}
+      note={sample ? `${opts.runs} Läufe · ${unit === "R" ? "in R" : `in ${cur}`} · gezogen aus ${sample.length} Trades` : undefined}
     >
       {!sample ? (
         <EmptyState
@@ -351,7 +408,7 @@ export function MonteCarloCard({ view, cur }: { view: AccountView; cur: string }
           </div>
           {res && res.final ? (
             <>
-              <Fan res={res} unit={unit} cur={cur} start={0} />
+              <Fan res={res} unit={unit} cur={cur} start={0} rich={rich} />
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <Stat label="Median" value={unitText(res.final.p50, unit, cur)} tone={softTone(res.final.p50)} sub={`nach ${res.horizon} Trades`} />
                 <Stat label="Schlechte 5 %" value={unitText(res.final.p5, unit, cur)} tone={softTone(res.final.p5)} sub="5. Perzentil" />
@@ -362,7 +419,9 @@ export function MonteCarloCard({ view, cur }: { view: AccountView; cur: string }
               {sample.length < 30 && <p className="text-[12px] text-warn">Aus {sample.length} Trades gezogen – ein grober Ausblick, belastbar ab etwa 30.</p>}
             </>
           ) : (
-            <div className="grid place-items-center rounded-xl border border-line bg-ink-950/60" style={{ height: FAN_H }} />
+            <div className="grid place-items-center rounded-xl border border-line bg-ink-950/60" style={{ height: FAN_H }}>
+              {rich && mc.status !== "error" && <ChartPlaceholder className="px-6" />}
+            </div>
           )}
           {(busy || (!res && mc.status !== "error")) && (
             <motion.div

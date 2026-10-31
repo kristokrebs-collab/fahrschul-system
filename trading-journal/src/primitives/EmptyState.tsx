@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { ChartPlaceholder } from "@/chart/ChartPlaceholder";
 import { useIntroLanded } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
 import { DotMatrix } from "@/motion/DotMatrix";
@@ -14,6 +15,8 @@ export interface EmptyStateProps {
   action?: ReactNode;
   /** Mono status line typed under the text the first time the box is seen (pulse `text-animate`); `false` = none. */
   line?: string | false;
+  /** A chart card without data: on the rich pages a calm breathing line sits under the text (hidden elsewhere). */
+  chart?: boolean;
   className?: string;
 }
 
@@ -49,7 +52,7 @@ const CTA_TIMING = { "--cta-shine-duration": `${tween.shimmer.duration}s`, "--ct
  * box reserved from the first paint. Title / text / CTA are rendered once, synchronously. Reduced motion: static
  * dashes, one static glyph frame, no sheen, the line shown at once.
  */
-export function EmptyState({ title, text, action, line = EMPTY_LINE, className }: EmptyStateProps) {
+export function EmptyState({ title, text, action, line = EMPTY_LINE, chart, className }: EmptyStateProps) {
   const reduced = useReducedFx();
   const landed = useIntroLanded();
   const [seen, setSeen] = useState(false);
@@ -73,6 +76,8 @@ export function EmptyState({ title, text, action, line = EMPTY_LINE, className }
   return (
     <div ref={root} className={cn("relative grid h-full min-h-[180px] place-items-center rounded-xl p-6 text-center", className)}>
       <span ref={ants} aria-hidden="true" className="fx-ants data-[idle]:before:[animation-play-state:paused]" style={ANTS_STYLE} />
+      {/* a chart without data: a calm breathing line in the bottom padding (absolute – the box keeps its height), rich pages only */}
+      {chart && <ChartPlaceholder className="pointer-events-none absolute inset-x-6 bottom-1.5 hidden [[data-rich]_&]:grid" lineClassName="h-4" />}
       <div className="grid justify-items-center gap-2">
         <DotMatrix frames={EMPTY_GLYPH_FRAMES} fps={12} size={3} gap={2} tone="fg" className="mb-1.5" />
         <strong className="text-[14px] font-semibold text-fg">{title}</strong>

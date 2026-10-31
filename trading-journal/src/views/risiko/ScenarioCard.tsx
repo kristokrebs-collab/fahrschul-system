@@ -102,7 +102,7 @@ export function ScenarioCard({ legs, equity, cur }: { legs: readonly ScenarioLeg
   if (!legs.length) {
     return (
       <RiskCard title={S.title} data-testid="risk-scenario">
-        <EmptyState title={S.empty} text={S.emptyText} line={false} />
+        <EmptyState chart title={S.empty} text={S.emptyText} line={false} />
       </RiskCard>
     );
   }

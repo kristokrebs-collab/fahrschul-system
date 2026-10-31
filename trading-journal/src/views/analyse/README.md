@@ -29,6 +29,7 @@ stays in the header row on phones).
   (Sortino, Calmar, SQN, Half-Kelly, Gain-to-Pain, Omega, Ulcer, Tail Ratio, Sharpe per trade). Each tile and the
   "Details +" pill are `MorphCard`s → explainer dialog (formula, sample, interval, minimum sample, verdict); the sample
   rolls (`RollingDigits`).
+- **Monte Carlo, reiche Form** (Runde 10, `MonteCarloCard rich` auf der Analyse-Seite; das Cockpit-Widget behält das alte Bild): ein Canvas aus `fanDraw.ts` (Bänder 5 · 25 · 50 · 75 · 95 % aus allen Läufen, 120 Stichproben-Linien grün / rot nach dem Ende, Median mit Glühen, Startachse, ease-out-Einzeichnen), Fadenkreuz `FanCursor.tsx` (Zeiger, Touch, Tastatur: P95 / Median / P05 nach jedem Trade). Details und Regeln: `src/chart/README.md` › Runde 10.
 - **Monte Carlo** (`MonteCarloCard.tsx`): 2000 seeded paths of the next 50 / 100 / 250 trades (bootstrap or
   reshuffle) from the R multiples (else P&L; from 10 values, below 30 with a "grober Ausblick" hint), computed by `runMonteCarlo` (worker on web builds, idle chunks in the
   single-file builds / without `Worker`). The fan: 120 pale paths drawn staggered into a canvas (incremental rAF loop,

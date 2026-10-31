@@ -8,6 +8,7 @@ import { cn } from "@/lib/cn";
 import { Badge, type BadgeTone } from "@/primitives/Badge";
 import { numText, pctText, pfText, rText } from "@/views/labor/ui";
 import { STUDIO } from "./strings";
+import { Rows } from "@/chart/rows";
 
 const T = STUDIO.compare.table;
 
@@ -55,7 +56,7 @@ export function CompareTable({ result, labels }: { result: CompareResult; labels
               ))}
             </tr>
           </thead>
-          <tbody>
+          <Rows as="tbody">
             {rows.map((r) => {
               const l = label(r);
               return (
@@ -89,7 +90,7 @@ export function CompareTable({ result, labels }: { result: CompareResult; labels
                 </tr>
               );
             })}
-          </tbody>
+          </Rows>
         </table>
       </div>
 

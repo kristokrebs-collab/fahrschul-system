@@ -19,6 +19,7 @@ import { FanChart, HistogramChart, ScatterChart } from "./charts";
 import { copyText } from "./clipboard";
 import { useBranchen } from "./store";
 import { BRANCHEN } from "./strings";
+import { Rows } from "@/chart/rows";
 
 const E = BRANCHEN.ergebnis;
 const dec = (v: number, d = 2): string => v.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -125,7 +126,7 @@ function Kennzahlen_({ r }: { r: MegatestResult }) {
               </th>
             </tr>
           </thead>
-          <tbody>
+          <Rows as="tbody">
             {rows.map((x) => (
               <tr key={x.id} data-testid={`branchen-kz-${x.id}`} className="align-top">
                 <th scope="row" className="rounded-l-xl border-y border-l border-line bg-ink-950/40 px-2 py-2 text-[12.5px] font-medium text-fg">
@@ -140,7 +141,7 @@ function Kennzahlen_({ r }: { r: MegatestResult }) {
                 </td>
               </tr>
             ))}
-          </tbody>
+          </Rows>
         </table>
       </div>
       <p className="num text-[12px] leading-relaxed text-mute" data-testid="branchen-kz-market">
@@ -177,7 +178,7 @@ function TopTable({ r }: { r: MegatestResult }) {
               </th>
             </tr>
           </thead>
-          <tbody>
+          <Rows as="tbody">
             {rows.map((t, i) => (
               <tr key={i} className="border-t border-line" data-testid="branchen-top-row">
                 <td className="num py-1.5 pr-2 text-mute">{paramsText(t.parameter)}</td>
@@ -188,7 +189,7 @@ function TopTable({ r }: { r: MegatestResult }) {
                 </td>
               </tr>
             ))}
-          </tbody>
+          </Rows>
         </table>
       </div>
       <p className="text-[12px] leading-relaxed text-mute">{E.top.note(dec(base), pc(r.anteil_endtest_besser_als_basis, 0))}</p>

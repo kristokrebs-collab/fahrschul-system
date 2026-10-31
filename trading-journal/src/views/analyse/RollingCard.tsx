@@ -151,7 +151,7 @@ export function RollingCard({ view, cur }: { view: AccountView; cur: string }) {
       }
     >
       {!rep.points.length ? (
-        <EmptyState title={ANA_EMPTY.rolling(window).title} text={ANA_EMPTY.rolling(window).text} line={progressLine(view.closed.length, window)} />
+        <EmptyState chart title={ANA_EMPTY.rolling(window).title} text={ANA_EMPTY.rolling(window).text} line={progressLine(view.closed.length, window)} />
       ) : (
         <div className="grid gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

@@ -83,6 +83,7 @@ null React-Renders pro Tick), Loops endlich. Details: `src/motion/README.md`.
 - Reduced Motion: `useReducedFx()` → Endzustand sofort; CSS-Loops laufen eine 0-ms-Iteration; kein Blur.
 - Samsung/`data-safe-fx`: kein Blur, kein Backdrop-Filter, keine Masken auf fixen Ebenen.
 - Ausnahmen nur deklariert (`// motion-exception: …`, z. B. `radar-sweep` nur solange ein Scan läuft).
+- Runde 10, Diagramme · Zahlen · Listen (nur unter `[data-rich]`, also nicht Übersicht und Cockpit; `src/chart/README.md`): Fächer als ein Canvas mit Fadenkreuz (Analyse › Monte Carlo), Text-Zahlen zählen beim ersten Sichtbarwerden hoch und rollen bei Änderung (`CountText`), die ersten 12 Zeilen einer Liste steigen gestaffelt auf und heben sich beim Hover (`Rows`, `data-lift`), Pillen rasten ein (`data-pill`), Raster-Zellen blenden diagonal ein (`data-diag`), ein Diagramm ohne Daten zeigt eine atmende Linie mit ehrlichem Text (`ChartPlaceholder`). Alles `transform` / `opacity`, einmal je Element, Reduced Motion = sofort fertig.
 
 ## Do / Don't
 
