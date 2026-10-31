@@ -3,8 +3,15 @@
  * app – not just a page – and a clear way to the full list ("Alle Funktionen"). The field and the link are part of the first
  * load (a few lines); the answers come from the function register, a lazy chunk that is fetched with the first typed letter
  * (`NavFinderResults`). Enter opens the best hit; the hits are navigation items (↑ ↓) like the page links around them.
+ *
+ * Motion (Runde 10): the field warms up when it takes focus (a soft ring, the magnifier brightens and leans in), and the answers
+ * open under it – the box grows on a spring (`grid-template-rows` 0fr → 1fr, so what is below is pushed smoothly instead of
+ * jumping) while the hits rise one after the other and the selection glides between them. Emptying the field folds the box shut
+ * on the same spring with the last answers still in it.
  */
-import { lazy, Suspense, useId, useState, type KeyboardEvent } from "react";
+import { lazy, Suspense, useEffect, useId, useState, type KeyboardEvent } from "react";
+import { NF_VARS } from "@/app/shellFx";
+import { cn } from "@/lib/cn";
 import { Icon } from "@/primitives/icons";
 
 const Results = lazy(() => import("./NavFinderResults"));
@@ -15,6 +22,9 @@ export const NAV_FINDER_STRINGS = {
   all: "Alle Funktionen",
   allHint: "Alle Funktionen ansehen",
 } as const;
+
+/** How long the folded-shut box keeps the last answers inside (ms): a little longer than its spring needs. */
+const FOLD_MS = 480;
 
 export interface NavFinderProps {
   /** a function was chosen: close the navigation and open it */
@@ -27,6 +37,14 @@ export function NavFinder({ onOpen, onAll }: NavFinderProps) {
   const [q, setQ] = useState("");
   const id = useId();
   const query = q.trim();
+  // the last answers stay in the box while it folds shut (state from props; cleared by the timer below)
+  const [kept, setKept] = useState(query);
+  if (query && query !== kept) setKept(query);
+  useEffect(() => {
+    if (query) return;
+    const t = setTimeout(() => setKept(""), FOLD_MS);
+    return () => clearTimeout(t);
+  }, [query]);
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === "Enter" && query) {
       e.preventDefault();
@@ -43,8 +61,8 @@ export function NavFinder({ onOpen, onAll }: NavFinderProps) {
     }
   };
   return (
-    <div className="grid gap-2" data-testid="nav-finder">
-      <div className="flex items-baseline justify-between gap-3">
+    <div data-testid="nav-finder" style={NF_VARS}>
+      <div className="mb-2 flex items-baseline justify-between gap-3">
         <label htmlFor={id} className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-mute">
           {NAV_FINDER_STRINGS.label}
         </label>
@@ -62,8 +80,8 @@ export function NavFinder({ onOpen, onAll }: NavFinderProps) {
           <span aria-hidden="true">→</span>
         </a>
       </div>
-      <div className="relative">
-        <span aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-mute [&>svg]:size-4">
+      <div className="group/field relative">
+        <span aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-mute transition-[color,translate] duration-300 ease-out group-focus-within/field:translate-x-0.5 group-focus-within/field:text-fg [&>svg]:size-4">
           <Icon name="search" />
         </span>
         <input
@@ -78,14 +96,21 @@ export function NavFinder({ onOpen, onAll }: NavFinderProps) {
           enterKeyHint="search"
           data-cmd-item=""
           data-testid="nav-finder-input"
-          className="h-12 w-full rounded-xl border border-line-2 bg-ink-900 pl-10 pr-3 text-[16px] text-fg outline-none transition-colors duration-200 placeholder:text-mute hover:border-white/30 focus:border-white/50 [&::-webkit-search-cancel-button]:hidden"
+          className="h-12 w-full rounded-xl border border-line-2 bg-ink-900 pl-10 pr-3 text-[16px] text-fg outline-none transition-[border-color,box-shadow] duration-300 placeholder:text-mute hover:border-white/30 focus:border-white/50 focus:shadow-[0_0_0_4px_rgb(255_255_255/0.05)] [&::-webkit-search-cancel-button]:hidden"
         />
       </div>
-      {query && (
-        <Suspense fallback={null}>
-          <Results query={query} onOpen={onOpen} onAll={onAll} />
-        </Suspense>
-      )}
+      {/* the answers open under the field: the row grows on a spring, the content only translates / fades (inside `overflow: hidden`) */}
+      <div className={cn("grid [transition-duration:var(--nf-ms)] [transition-property:grid-template-rows] [transition-timing-function:var(--nf-ease)]", query ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+        <div inert={!query} className="min-h-0 overflow-hidden">
+          <div className="pt-2">
+            {kept && (
+              <Suspense fallback={null}>
+                <Results query={kept} onOpen={onOpen} onAll={onAll} />
+              </Suspense>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

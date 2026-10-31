@@ -917,3 +917,16 @@ heller über der Zeitachse (Überblendung per `opacity`); Reduced Motion = ferti
 ## Reiche Seiten (Runde 10, Karten / Kacheln / Leerzustände)
 
 Auf jeder Seite ausser Übersicht und Cockpit (`[data-rich]`, `RichContext`) ist die Bewegung dichter – dieselbe Sprache, nur mehr davon. Karten: weicher Frost-Schleier beim Hover, wenige Karten mit sehr leichtem Tilt und mitlaufendem Glanz (`Card tilt`), die eine hervorgehobene Karte einer Seite mit einer Randlicht-Runde (`Card highlight`). Kacheln kommen in einer Diagonalwelle. Kopfzeile: Titelwörter werden aus einer Zeile hochgezogen, dahinter zwei sehr langsame Lichtflecke, bei Maus ein Spotlight, ab 1100 px ein Geisterwort (7 % Tinte, kein Seitentitel). Abschnittstitel steigen beim Hereinscrollen um 14 px auf und verlieren 2 px Tiefenunschärfe (nur Scroll-Zeitleiste). Leerzustände zeigen statt des ∅ ein kleines laufendes Bild (Linie zeichnet sich, Orbit, Punkte finden zu einem Ring) – immer mit der Aktion darunter. Alles nur `transform` / `opacity` (ein Strich-Versatz), pausiert ausserhalb des Bildschirms und bei verdecktem Tab, bei Reduced Motion fertig. Einzelheiten und Schutzbedingungen: `src/motion/README.md` („Seiten, Karten, Kacheln, Leerzustände“).
+## Rahmen in Bewegung: Seitenleiste, untere Leiste, Menü, Kopfzeile (Runde 10)
+
+Die Hülle bewegt sich reicher als der Inhalt – ruhig, mit Federn aus `src/motion`, an wenigen Stellen verspielt; Übersicht und Cockpit bleiben im Inhalt unverändert.
+- **Seitenleiste.** Die schmale Leiste (64 px) öffnet sich bei Maus, Tastaturfokus oder Berührung **über** die Seite auf 256 px; die Seite behält ihren Platz. Eine einzige Feder
+  (CSS `linear()`) führt Beschnitt, Kante und Schatten; die Namen blenden von oben nach unten gestaffelt ein. Die Markierung gleitet und streckt sich beim Reisen. Fest ausklappen bleibt die Wahl des Lesers.
+- **Zeichnen.** Die Symbole der Seitenleiste zeichnen sich beim ersten Laden einmal pro Sitzung Strich für Strich von oben nach unten (`stroke-dashoffset`, leichter Lichtakzent); die untere Leiste zeichnet das Symbol beim Wechsel neu.
+- **Untere Leiste und Menü.** „Trade“ in der Mitte lässt ab und zu ein Halo atmen und einen Lichtstreifen laufen (höchstens achtmal je Seitenaufruf, nie bei offenem Editor); Aktion und Form unverändert. „Mehr“ ist am Handy ein Blatt
+  von unten (Ziehen am Kopf schließt), alle Einträge starten innerhalb von 0,6 s; der Burger wird zum Kreuz.
+- **Kopfzeile.** Der Kurs ist ein Zählwerk (`RollingDigits`), das Schild „Lokaler Modus“ pulsiert dreimal sanft (danach höchstens dreimal im Minutentakt), Hell/Dunkel dreht Sonne und Mond, und der Kreis des Themenwechsels wächst ruhiger (620 ms).
+- **Seitenwechsel.** Die Schieberichtung folgt der Reihenfolge, die der Leser sieht (die Gruppen der Seitenleiste), die Länge den überquerten Gruppen (12 – 24 px); Dauer und Feder bleiben.
+- **Finder im Menü.** Das Feld wärmt sich bei Fokus auf, die Treffer öffnen sich auf einer Feder, steigen gestaffelt ein, die Auswahl gleitet.
+- Regeln wie überall: nur `transform` / `opacity` / `clip-path`, `prefers-reduced-motion` = sofort fertig, keine Dauerschleife (Glanz und Puls sind endlich und schlafen bei verdecktem Tab), Tippflächen ≥ 44 px. Einzelheiten: `src/app/README.md`.
+

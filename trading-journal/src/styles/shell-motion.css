@@ -1,0 +1,283 @@
+/* Shell motion (Runde 10): sidebar reveal, stroke draw-in, burger morph, FAB glint, finder hits.
+   Only transform / opacity / clip-path run; the springs are `linear()` curves written by `src/app/shellFx.ts` (`--sb-ms`,
+   `--sb-ease`). Reduced motion needs no rule here: base.css zeroes every transition and animation. */
+
+@layer components {
+  /* The sidebar is laid out at 256 px and clipped to the rail's 64: three things move on ONE spring – the aside's clip, the edge line
+     and the cast shade (the last two are transforms, i.e. the compositor's). No custom property is animated: an inherited one would
+     restyle the whole sidebar on every frame. 192 = 256 − 64. */
+  .sb-aside {
+    clip-path: inset(0 192px 0 0);
+    transition: clip-path 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sb[data-open] .sb-aside {
+    clip-path: inset(0 0 0 0);
+    transition: clip-path var(--sb-ms, 420ms) var(--sb-ease, cubic-bezier(0.22, 1, 0.36, 1));
+  }
+  .sb-edge {
+    translate: 63px 0;
+    transition: translate 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sb[data-open] .sb-edge {
+    translate: 255px 0;
+    transition: translate var(--sb-ms, 420ms) var(--sb-ease, cubic-bezier(0.22, 1, 0.36, 1));
+  }
+  .sb-shade {
+    translate: 64px 0;
+    background: linear-gradient(90deg, var(--sb-shade, rgb(0 0 0 / 0.38)), transparent);
+    opacity: 0;
+    transition:
+      translate 280ms cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 260ms ease-out;
+  }
+  .sb[data-open] .sb-shade {
+    translate: 256px 0;
+    transition:
+      translate var(--sb-ms, 420ms) var(--sb-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+      opacity 260ms ease-out;
+  }
+  .sb[data-peek] .sb-shade {
+    opacity: 1;
+  }
+  /* A row is as wide as it can be hit: the rail's 48 px at rest (its box is its hit area – what a click, a voice command or a test
+     aimed at the centre of the box reaches), the full row the moment the panel opens; the clip above reveals it on the spring.
+     Closing narrows it at once: the words go with it, the plate follows on the spring. The marker and the divider do the same. */
+  .sb-row {
+    width: 3rem;
+  }
+  .sb[data-open] .sb-row {
+    width: 100%;
+  }
+  .sb-mark {
+    width: 3rem;
+  }
+  .sb[data-open] .sb-mark {
+    width: calc(100% - 1rem);
+  }
+  .sb-line {
+    width: 1.5rem;
+  }
+  .sb[data-open] .sb-line {
+    width: 100%;
+  }
+  /* the active row's red dot rides on the marker: right end of the open row, top corner of the rail row */
+  .sb-dot {
+    translate: 4px -13px;
+    transition: translate 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sb[data-open] .sb-dot {
+    translate: 0 0;
+    transition: translate var(--sb-ms, 420ms) var(--sb-ease, cubic-bezier(0.22, 1, 0.36, 1));
+  }
+  /* labels: fade and slide in one after the other, top to bottom (`--i` = row index), out again at once */
+  .sb-lbl {
+    opacity: 0;
+    visibility: hidden;
+    translate: -8px 0;
+    transition:
+      opacity 120ms ease-out,
+      translate 120ms ease-out,
+      visibility 0s linear 120ms;
+  }
+  .sb[data-open] .sb-lbl {
+    opacity: 1;
+    visibility: visible;
+    translate: 0 0;
+    transition:
+      opacity 240ms ease-out calc(var(--i, 0) * 11ms + 80ms),
+      translate var(--sb-ms, 420ms) var(--sb-ease, ease-out) calc(var(--i, 0) * 11ms + 60ms),
+      visibility 0s;
+  }
+  /* a group opening: its rows follow the height one after the other */
+  .sb-rows > li {
+    transition:
+      opacity 200ms ease-out calc(var(--j, 0) * 18ms),
+      translate var(--sb-ms, 420ms) var(--sb-ease, ease-out) calc(var(--j, 0) * 18ms);
+  }
+  [data-fold="closed"] > .sb-rows > li {
+    opacity: 0;
+    translate: 0 -6px;
+    transition-delay: 0s;
+  }
+}
+
+/* ---- Stroke draw-in: icons draw themselves once per session, top to bottom (`--i`), stroke after stroke ---------------------- */
+@keyframes sb-draw {
+  0% {
+    stroke-dashoffset: 1;
+    fill-opacity: 0;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  70% {
+    fill-opacity: 0;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    fill-opacity: 1;
+    opacity: 1;
+  }
+}
+@keyframes sb-glint {
+  from {
+    filter: drop-shadow(0 0 3px color-mix(in srgb, currentColor 75%, transparent));
+  }
+  to {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+}
+[data-draw] .sb-ico :is(path, circle, rect, line, polyline, ellipse) {
+  stroke-dasharray: 1;
+}
+[data-draw="wait"] .sb-ico :is(path, circle, rect, line, polyline, ellipse) {
+  stroke-dashoffset: 1;
+  opacity: 0;
+}
+[data-draw="run"] .sb-ico :is(path, circle, rect, line, polyline, ellipse),
+.sb-ico[data-redraw] :is(path, circle, rect, line, polyline, ellipse) {
+  animation: sb-draw 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 46ms + 120ms);
+}
+[data-draw="run"] .sb-ico svg,
+.sb-ico[data-redraw] svg {
+  animation: sb-glint 900ms ease-out both;
+  animation-delay: calc(var(--i, 0) * 46ms + 120ms);
+}
+[data-draw="run"] .sb-ico :is(path, circle, rect, line, polyline, ellipse):nth-child(2) {
+  animation-delay: calc(var(--i, 0) * 46ms + 210ms);
+}
+[data-draw="run"] .sb-ico :is(path, circle, rect, line, polyline, ellipse):nth-child(3) {
+  animation-delay: calc(var(--i, 0) * 46ms + 300ms);
+}
+[data-draw="run"] .sb-ico :is(path, circle, rect, line, polyline, ellipse):nth-child(n + 4) {
+  animation-delay: calc(var(--i, 0) * 46ms + 390ms);
+}
+/* a redraw (the bottom bar's icon on a tab switch) is quick and has no row delay */
+.sb-ico[data-redraw] {
+  --i: 0;
+}
+.sb-ico[data-redraw] :is(path, circle, rect, line, polyline, ellipse) {
+  stroke-dasharray: 1;
+  animation-duration: 460ms;
+  animation-delay: 40ms;
+}
+.sb-ico[data-redraw] :is(path, circle, rect, line, polyline, ellipse):nth-child(n + 2) {
+  animation-delay: 120ms;
+}
+html[data-safe-fx] .sb-ico svg {
+  animation: none !important;
+}
+
+/* ---- Burger: three bars become the cross (one `open` flag, transform only) -------------------------------------------------- */
+@layer components {
+  .burger {
+    position: relative;
+    display: block;
+    width: 16px;
+    height: 9px;
+  }
+  .burger > i {
+    position: absolute;
+    inset-inline: 0;
+    height: 1px;
+    background: currentColor;
+    transition:
+      translate 420ms cubic-bezier(0.22, 1, 0.36, 1),
+      rotate 420ms cubic-bezier(0.22, 1, 0.36, 1),
+      scale 320ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 180ms ease-out;
+  }
+  .burger > i:nth-child(1) {
+    top: 0;
+  }
+  .burger > i:nth-child(2) {
+    top: 4px;
+  }
+  .burger > i:nth-child(3) {
+    top: 8px;
+    scale: 0.667 1;
+    translate: -2.667px 0;
+  }
+  .burger[data-open] > i:nth-child(1) {
+    translate: 0 4px;
+    rotate: 45deg;
+  }
+  .burger[data-open] > i:nth-child(2) {
+    opacity: 0;
+    scale: 0 1;
+  }
+  .burger[data-open] > i:nth-child(3) {
+    translate: 0 -4px;
+    rotate: -45deg;
+    scale: 1 1;
+  }
+  @media (hover: hover) {
+    .group\/menu:hover .burger:not([data-open]) > i:nth-child(1) {
+      translate: 2px 0;
+    }
+    .group\/menu:hover .burger:not([data-open]) > i:nth-child(3) {
+      translate: 0.333px 0;
+    }
+  }
+}
+
+/* ---- The centre button of the bottom bar: a soft halo and one light pass, now and then (JS restarts them by key) ------------------ */
+@keyframes fab-halo {
+  0%,
+  100% {
+    opacity: 0;
+    scale: 0.94;
+  }
+  45% {
+    opacity: 0.6;
+    scale: 1.22;
+  }
+}
+@keyframes fab-sheen {
+  from {
+    translate: -140% 0;
+  }
+  to {
+    translate: 320% 0;
+  }
+}
+@layer components {
+  .fab-halo {
+    animation: fab-halo 3s ease-in-out 1 both;
+    background: radial-gradient(closest-side, rgb(229 32 46 / 0.55), transparent);
+  }
+  .fab-sheen::after {
+    content: "";
+    position: absolute;
+    inset-block: -20%;
+    left: 0;
+    width: 36%;
+    transform: skewX(-18deg);
+    background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.5), transparent);
+    animation: fab-sheen 1.1s cubic-bezier(0.4, 0, 0.2, 1) 0.5s 1 both;
+  }
+  html[data-safe-fx] .fab-halo {
+    display: none;
+  }
+}
+
+/* ---- Finder hits: the answers rise in one after the other ----------------------------------------------------------------- */
+@keyframes nf-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+@layer components {
+  .nf-hit {
+    animation: nf-in 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--i, 0) * 45ms);
+  }
+}
+
+/* light: the sidebar's cast shade is a grey wash, not black */
+:root[data-theme="light"] .sb {
+  --sb-shade: rgb(15 23 42 / 0.12);
+}

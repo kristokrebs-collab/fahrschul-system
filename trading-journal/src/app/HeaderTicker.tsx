@@ -1,18 +1,19 @@
 /**
  * Live market ticker in the header, visible on every page: a status dot that pings on every trade print, the base
- * asset, the last price gliding on `spring.price` with a green/red flash per significant move, and the live 24 h change
+ * asset, the last price as a rolling odometer (`RollingDigits source`: the digits that change turn on `spring.price`, the
+ * lowest one steps, higher ones roll on a carry) with a green/red flash per significant move, and the live 24 h change
  * (`price / open24h − 1`) that moves with every trade. Everything renders from MotionValues (`priceMv`, `open24hMv`,
- * `tradeCountMv`): zero React renders per tick; the dot re-renders on health changes only. Decorative duplicate of the
- * market panel (`aria-hidden`): a constantly changing number is never announced. Reduced motion: no glide, no ping,
- * the flash becomes an underline.
+ * `tradeCountMv`): zero React renders per tick (the price re-renders only when its decimals change); the dot re-renders
+ * on health changes only. Decorative duplicate of the market panel (`aria-hidden`): a constantly changing number is never
+ * announced. Reduced motion: no roll, no ping, the flash becomes an underline.
  */
-import { motion, useMotionValue, useSpring, useTransform, type MotionValue } from "motion/react";
-import { memo, useEffect, useMemo, useRef } from "react";
+import { motion, useMotionValue, useTransform, type MotionValue } from "motion/react";
+import { memo, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
 import { open24hMv, priceMv, resolveSymbol, tradeCountMv, useStatusTone } from "@/market";
 import { formatNumber } from "@/motion/MotionNumber";
 import { PulseDot } from "@/motion/PulseDot";
-import { spring } from "@/motion/tokens";
+import { RollingDigits } from "@/motion/RollingDigits";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { FLASH_MIN_INTERVAL_MS, useValueFlash } from "@/motion/ValueFlash";
 import { useJournal } from "@/store/journalStore";
@@ -69,23 +70,12 @@ export function priceStep(anchor: number, next: number, minMove = tickerFlashSte
   return { anchor: next, dir: move > 0 ? 1 : -1 };
 }
 
-/** `priceMv` gliding on `spring.price`; jumps on unknown / large gaps and under reduced motion. */
-function usePriceGlide(reduced: boolean): MotionValue<number> {
-  const target = useMotionValue(priceMv.get());
-  const glide = useSpring(target, spring.price);
-  useEffect(() => {
-    const now = priceMv.get();
-    target.jump(now);
-    glide.jump(now);
-    return priceMv.on("change", (v) => {
-      if (reduced || tickerJump(glide.get(), v)) {
-        target.jump(v);
-        glide.jump(v);
-      } else target.set(v);
-    });
-  }, [reduced, target, glide]);
-  return glide;
-}
+/** Display decimals of the live price, `-1` while it is unknown: the one thing about the price that re-renders (a new price class, not a tick). */
+const priceDecimals = () => {
+  const p = priceMv.get();
+  return p > 0 ? tickerDecimals(p) : -1;
+};
+const onPriceChange = (cb: () => void) => priceMv.on("change", cb);
 
 /** Counter of significant moves (`+1` up, `−1` down): one flash per move. */
 function usePriceMoves(): MotionValue<number> {
@@ -107,8 +97,8 @@ function TickerDot() {
   return <PulseDot tone={tone} size={6} rings={0} ping={tradeCountMv} />;
 }
 
-const TickerPrice = memo(function TickerPrice({ glide, reduced }: { glide: MotionValue<number>; reduced: boolean }) {
-  const text = useTransform(glide, tickerPrice);
+const TickerPrice = memo(function TickerPrice({ reduced }: { reduced: boolean }) {
+  const decimals = useSyncExternalStore(onPriceChange, priceDecimals, priceDecimals);
   const moves = usePriceMoves();
   const up = useRef<HTMLSpanElement>(null);
   const down = useRef<HTMLSpanElement>(null);
@@ -118,16 +108,16 @@ const TickerPrice = memo(function TickerPrice({ glide, reduced }: { glide: Motio
     <span className="relative isolate inline-flex">
       <span ref={up} className={cn("pointer-events-none absolute opacity-0", layer, reduced ? "bg-win" : "bg-win/20")} />
       <span ref={down} className={cn("pointer-events-none absolute opacity-0", layer, reduced ? "bg-loss" : "bg-loss/20")} />
-      <motion.span className="tabular-nums text-fg [contain:layout_paint]">{text}</motion.span>
+      <span className="tabular-nums text-fg [contain:layout_paint]">{decimals < 0 ? tickerPrice(0) : <RollingDigits source={priceMv} decimals={decimals} formatLabel={tickerPrice} />}</span>
     </span>
   );
 });
 
-const TickerChange = memo(function TickerChange({ glide, className }: { glide: MotionValue<number>; className?: string }) {
-  const text = useTransform(() => tickerChange(glide.get(), open24hMv.get()));
+const TickerChange = memo(function TickerChange({ className }: { className?: string }) {
+  const text = useTransform(() => tickerChange(priceMv.get(), open24hMv.get()));
   // only the sign flips the tint: a string MotionValue, so the style is written on a flip and never per tick
   const color = useTransform(() => {
-    const c = tickerChangePct(glide.get(), open24hMv.get());
+    const c = tickerChangePct(priceMv.get(), open24hMv.get());
     return c > 0 ? "var(--color-win)" : c < 0 ? "var(--color-loss)" : "var(--color-mute)";
   });
   return (
@@ -144,7 +134,6 @@ export function HeaderTicker({ className }: { className?: string }) {
     const info = resolveSymbol(symbol);
     return info.base ?? info.binance;
   }, [symbol]);
-  const glide = usePriceGlide(reduced);
   return (
     <div
       aria-hidden="true"
@@ -153,8 +142,8 @@ export function HeaderTicker({ className }: { className?: string }) {
     >
       <TickerDot />
       <span className="text-faint max-sm:hidden">{base}</span>
-      <TickerPrice glide={glide} reduced={reduced} />
-      <TickerChange glide={glide} className="max-lg:hidden" />
+      <TickerPrice reduced={reduced} />
+      <TickerChange className="max-lg:hidden" />
     </div>
   );
 }

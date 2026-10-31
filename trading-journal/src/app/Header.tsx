@@ -1,6 +1,7 @@
 import { motion, useScroll, useSpring, useTransform, type Variants } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { EdgeBlur, type BlurBand } from "@/app/BottomFade";
+import { Burger } from "@/app/Burger";
 import { openCommandNav, useCommandNavOpen, COMMAND_NAV_ID } from "@/app/CommandNav";
 import { FullscreenButton } from "@/app/DisplayActions";
 import { AssistantButton } from "@/assistant/AssistantButton";
@@ -187,11 +188,8 @@ function MenuButton() {
       title="Navigation (⌘K / Strg+K)"
       className="tap group/menu relative inline-flex shrink-0 xl:px-3 items-center justify-center gap-2 rounded-xl border border-line-2 bg-ink-850 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg"
     >
-      <span aria-hidden="true" className="flex w-4 flex-col gap-[3px]">
-        <span className="h-px w-full bg-current transition-transform duration-200 ease-out group-hover/menu:translate-x-[2px]" />
-        <span className="h-px w-full bg-current" />
-        <span className="h-px w-2/3 bg-current transition-transform duration-200 ease-out group-hover/menu:translate-x-[3px]" />
-      </span>
+      {/* three bars; while the navigation is open they are the cross (`Burger`, the navigation's close button carries the same mark) */}
+      <Burger open={open} />
       <span aria-hidden="true" className="max-xl:hidden text-[12.5px] font-medium text-fg">
         {MENU_WORD}
       </span>

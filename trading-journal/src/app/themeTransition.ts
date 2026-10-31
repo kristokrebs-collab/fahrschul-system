@@ -10,12 +10,19 @@
  * `data-safe-fx` (no clip-path on fixed layers) the disc is a plain fade; under reduced motion the theme flips at once.
  * Every path is finite and leaves nothing behind (the overlay is removed, the attribute dropped).
  */
-import { ease, tween } from "@/motion/tokens";
+import { tween } from "@/motion/tokens";
 import { prefersReducedMotion } from "@/motion/pulse/engine";
 import { isSafeFx } from "@/motion/safeFx";
 import { setThemeTransition, THEME_META_COLOR, type ResolvedTheme, type ThemeOrigin } from "@/store/themeStore";
 
 export const THEME_SWITCHING_ATTR = "data-theme-switching";
+/**
+ * Runde 10: the circle takes its time. It leaves the pressed switch slowly (the sun / moon of the button turns at the same moment),
+ * gathers speed and lands softly – 620 ms on an ease-in-out with a long tail, instead of 450 ms that covered most of the screen in
+ * the first 150 ms. The same curve drives the fallback disc.
+ */
+export const REVEAL_MS = 620;
+export const REVEAL_EASE = [0.55, 0.05, 0.2, 1] as const;
 /** z above the toast island / intro (95): the disc covers the whole page while the colours swap underneath. */
 export const THEME_WIPE_Z = 96;
 
@@ -48,8 +55,8 @@ export function runThemeTransition(apply: () => void, origin: ThemeOrigin | unde
   const o = origin ?? defaultOrigin(w);
   const r = coverRadius(o.x, o.y, w, h);
   const clip = [`circle(0px at ${o.x}px ${o.y}px)`, `circle(${r}px at ${o.x}px ${o.y}px)`];
-  const duration = tween.reveal.duration * 1000;
-  const easing = bezier(ease.out);
+  const duration = REVEAL_MS;
+  const easing = bezier(REVEAL_EASE);
   const safe = isSafeFx();
   const doc = document as DocVT;
 

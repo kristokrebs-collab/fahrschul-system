@@ -9,6 +9,7 @@ import { pressScale, radius, spring, stagger, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { useCanHover, useMediaQuery } from "@/motion/useMediaQuery";
 import { isSafeFx } from "@/app/pwa";
+import { redrawStrokes, useIdleCycle } from "@/app/shellFx";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { openCommandNav, useCommandNavOpen } from "@/app/CommandNav";
 import { FAB_LABEL, PAGE_ICON, PAGE_LABELS, WIDE_QUERY } from "@/app/navGroups";
@@ -288,6 +289,7 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
 
   const wasActive = useRef(active);
   const take = useRef(takeHop);
+  const icon = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     take.current = takeHop;
   });
@@ -299,7 +301,12 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
     const transition = take.current?.() ?? hopFor(Number.NaN);
     if (reduced) return;
     const c = animate(hop, 0, transition);
-    return () => c.stop();
+    // the icon draws itself once more as it hops (stroke after stroke, 0.5 s; `shell-motion.css`)
+    const redraw = redrawStrokes(icon.current, reduced);
+    return () => {
+      c.stop();
+      redraw();
+    };
   }, [active, reduced, hop]);
 
   const iconDelay = ICON_INTRO_DELAY + Math.min(index, stagger.max) * stagger.cards;
@@ -334,7 +341,7 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
           animate={waiting ? { opacity: 0, scale: 0.5 } : { opacity: 1, scale: 1 }}
           transition={{ scale: { ...spring.pop, delay: iconDelay }, opacity: { ...tween.fade, delay: iconDelay } }}
         >
-          <motion.span className="grid place-items-center" style={{ scale: bump }}>
+          <motion.span ref={icon} className="sb-ico grid place-items-center" style={{ scale: bump }}>
             <Magnetic intensity={0.5} range={60} remeasure className="size-5 items-center justify-center [&_svg]:size-full">
               {children}
             </Magnetic>
@@ -751,6 +758,9 @@ export function Dock() {
   const breathing = fabVisible && !editor.open && canHover && !reduced && phase !== "stage";
   const layoutKey = `${page}|${editor.open ? 1 : 0}`;
   const entrance = dockEntrance(phase, intro, reduced, safeFx);
+  // now and then the centre button breathes out a halo and a light passes over it: a round every 22 s (the first after 6 s), eight at most
+  // per page load, only while the editor and the menu are closed and the tab is seen – the button itself keeps its look and its action
+  const glint = useIdleCycle({ active: !wide && fabVisible && !editor.open && !moreOpen && phase !== "stage", firstMs: 6000, everyMs: 22000, max: 8 }, reduced);
   // from 768 px the sidebar is the navigation; all hooks above have run, so the switch never changes their order
   if (wide) return null;
 
@@ -811,6 +821,7 @@ export function Dock() {
                   <>
                     {/* breathing ring: 3 × fx-ping (= tween.pingFew) each time it mounts, compositor only */}
                     {breathing && <span className="fx-ping bg-signal" style={FAB_PING_STYLE} />}
+                    {glint > 0 && <span key={`h${glint}`} aria-hidden="true" className="fab-halo pointer-events-none absolute -inset-2 rounded-full" />}
                     {fabVisible && (
                       <motion.span
                         layoutId={`new-trade-${fabCycle}`}
@@ -822,6 +833,7 @@ export function Dock() {
                         transition={{ layout: spring.sheet, scale: spring.pop }}
                       />
                     )}
+                    {glint > 0 && fabVisible && <span key={`s${glint}`} aria-hidden="true" className="fab-sheen pointer-events-none absolute inset-0 overflow-hidden rounded-full" />}
                   </>
                 }
               >

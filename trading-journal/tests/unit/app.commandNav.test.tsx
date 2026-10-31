@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { closeCommandNav, CommandNav, COMMAND_NAV_STRINGS, CONFIG, isCommandNavShortcut, openCommandNav, rovingIndex } from "@/app/CommandNav";
+import { closeCommandNav, CommandNav, COMMAND_NAV_STRINGS, CONFIG, isCommandNavShortcut, MENU_BUDGET_MS, openCommandNav, rovingIndex } from "@/app/CommandNav";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { PAGE_HINT } from "@/app/navGroups";
 import { NAV_ORDER, PAGES, useUi } from "@/store/uiStore";
@@ -55,14 +55,24 @@ describe("command navigation: pure helpers", () => {
     expect(rovingIndex("ArrowDown", 0, 0)).toBeNull();
   });
 
-  it("keeps the pack's measured timeline", () => {
+  it("keeps the pack's wipe; the staggered entrance is tight (Runde 10: the last item starts within 0.6 s, it used to be 1.8 s / 2.3 s)", () => {
+    // the wipe from the left is the pack's measured timeline and is unchanged
     expect(CONFIG.wipeMs).toBe(800);
     expect(CONFIG.wipeEase).toEqual([0.76, 0, 0.24, 1]);
-    expect(CONFIG.itemMs).toBe(650);
     expect(CONFIG.itemEase).toEqual([0.22, 1, 0.36, 1]);
-    // the pack's four, then one 60 ms beat per further page (P14: 15 pages, + Funktionen, + Strategie-Studio, + Handelsplan, + Aktien)
-    expect(CONFIG.delays.links).toEqual([620, 720, 820, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380, 1440, 1500, 1560, 1620, 1680, 1740, 1800]);
-    expect(CONFIG.delays.links).toHaveLength(PAGES.length);
+    // each item rises 16 px in 0.46 s (was 24 px in 0.65 s)
+    expect(CONFIG.itemMs).toBe(460);
+    expect(CONFIG.lift).toBe(16);
+    // one 14 ms beat per page, in the order of the groups; nothing starts later than the budget
+    const d = CONFIG.delays;
+    expect(d.links).toHaveLength(PAGES.length);
+    expect(d.links.every((v, i, a) => i === 0 || v - (a[i - 1] ?? 0) === 14)).toBe(true);
+    const starts = [d.brand, d.finder, ...d.links, ...d.actions, d.display, d.views, d.hints, d.price];
+    expect(Math.max(...starts)).toBeLessThanOrEqual(MENU_BUDGET_MS);
+    expect(MENU_BUDGET_MS).toBe(600);
+    // the footer rows (hint line, live price) come last
+    expect(d.price).toBeGreaterThanOrEqual(d.hints);
+    expect(d.hints).toBeGreaterThanOrEqual(Math.max(...d.links));
   });
 });
 
