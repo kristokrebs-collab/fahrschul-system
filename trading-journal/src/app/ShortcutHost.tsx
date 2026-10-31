@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { PAGE_LABELS } from "@/app/Dock";
+import { PAGE_LABELS } from "@/app/navGroups";
 import { Kbd } from "@/app/Kbd";
 import { CHORD_MS, isEditableTarget, isSearchCombo, matchKey, modalOpen, useShortcutSheet, type ChordState } from "@/app/shortcuts";
 import { NoLayoutCascade } from "@/motion/NoLayoutCascade";

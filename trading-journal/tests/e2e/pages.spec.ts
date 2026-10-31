@@ -1,12 +1,12 @@
 /**
  * Every page of the integrated app (P14), on the production build: reached by its hash, shows its own `h1`, never
  * scrolls sideways at 390 px, logs no React / Motion warning; the lazy pages load their chunk behind the skeleton.
- * Navigation: the dock carries five tabs (Übersicht, Trades, Grundlagen, Markt, Einstellungen) and fits 390 px; every
- * other page is reached through the command navigation (⌘K / menu), `g` + letter and deep links
+ * Navigation: below 768 px the bottom bar carries Übersicht, Trades, + Trade, Markt and Mehr and fits 390 px, from 768 px the sidebar
+ * lists all 19 pages in four groups; every page is also reached through the command navigation (⌘K / menu / Mehr), `g` + letter and deep links
  * (`#analyse?dim=…`, `#berichte?p=…`). `P14_SHOTS_DIR` writes a screenshot of every page (1440 / 390).
  */
 import { expect, test, type Page } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, seed } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, navBar, navItem, seed } from "./helpers";
 
 const PROJECTS = ["mobile", "desktop"];
 const SHOTS = process.env.P14_SHOTS_DIR;
@@ -60,20 +60,25 @@ test.describe("pages (P14)", () => {
     });
   }
 
-  test("the dock has five tabs and the FAB, and fits the screen", async ({ page }) => {
+  test("the navigation fits the screen: the bottom bar (Übersicht, Trades, + Trade, Markt, Mehr) on a phone, the sidebar with four groups from 768 px", async ({ page }, info) => {
     await seed(page);
     await page.goto("/");
-    const dock = page.getByRole("toolbar", { name: "Navigation" });
-    await expect(dock).toBeVisible();
-    const tabs = dock.getByRole("button");
-    await expect(tabs).toHaveCount(6);
-    for (const label of ["Übersicht", "Trades", "Entscheidungsgrundlagen", "Markt", "Einstellungen", "Trade eintragen"]) {
-      await expect(dock.getByRole("button", { name: label })).toBeVisible();
+    const bar = navBar(page);
+    await expect(bar).toBeVisible();
+    if (info.project.name === "mobile") {
+      const dock = page.getByRole("toolbar", { name: "Navigation" });
+      await expect(dock.getByRole("button")).toHaveCount(5);
+      for (const label of ["Übersicht", "Trades", "Trade eintragen", "Markt", "Mehr"]) await expect(dock.getByRole("button", { name: label })).toBeVisible();
+      const box = await dock.boundingBox();
+      const vw = page.viewportSize()!.width;
+      expect(box && box.x >= 0 && box.x + box.width <= vw, `dock ${JSON.stringify(box)} inside ${vw}`).toBe(true);
+    } else {
+      await expect(page.getByRole("toolbar", { name: "Navigation" })).toHaveCount(0);
+      await expect(bar.getByTestId("sidebar-group")).toHaveCount(4);
+      await expect(bar.locator("a[data-nav-page]")).toHaveCount(19);
+      await expect(bar.getByRole("button", { name: "Trade eintragen" })).toBeVisible();
     }
-    const box = await dock.boundingBox();
-    const vw = page.viewportSize()!.width;
-    expect(box && box.x >= 0 && box.x + box.width <= vw, `dock ${JSON.stringify(box)} inside ${vw}`).toBe(true);
-    await dock.getByRole("button", { name: "Markt" }).click();
+    await navItem(page, "Markt").click();
     await expect(page).toHaveURL(/#markt$/);
     await expect(pageH1(page, "markt")).toHaveText(/^Markt$/, { timeout: 20_000 });
     await expectNoHorizontalScroll(page);
@@ -82,8 +87,7 @@ test.describe("pages (P14)", () => {
   test("switching pages never makes the document wider than the screen – not for a single frame (round 5)", async ({ page }) => {
     await seed(page);
     await page.goto("/");
-    const dock = page.getByRole("toolbar", { name: "Navigation" });
-    await expect(dock).toBeVisible();
+    await expect(navBar(page)).toBeVisible();
     // the start page with its live cards (needles of the bias bar, the Einstiegs-Check) has to be up: they were what stuck out
     await expect(page.getByText("Netto-P&L").first()).toBeVisible();
     await page.locator('[data-testid="signal-card"][data-state="ok"], [data-testid="signal-card"][data-state="stale"]').first().waitFor({ timeout: 30_000 }).catch(() => undefined);
@@ -101,7 +105,7 @@ test.describe("pages (P14)", () => {
         };
         requestAnimationFrame(step);
       });
-      await dock.getByRole("button", { name: tab }).click();
+      await navItem(page, tab).click();
       await expect(page).toHaveURL(tab === "Übersicht" ? /#overview$|\/$/ : tab === "Markt" ? /#markt$/ : /#trades$/);
       await page.waitForTimeout(1500);
       const widest = await page.evaluate(() => {
@@ -130,7 +134,7 @@ test.describe("pages (P14)", () => {
   test("g + letter opens a page; deep links keep their query", async ({ page }) => {
     await seed(page);
     await page.goto("/");
-    await expect(page.getByRole("toolbar", { name: "Navigation" })).toBeVisible();
+    await expect(navBar(page)).toBeVisible();
     // the chord waits CHORD_MS (1.2 s) for its letter: on a busy first load the second key may arrive later – press again
     await expect(async () => {
       await page.locator("body").press("g");

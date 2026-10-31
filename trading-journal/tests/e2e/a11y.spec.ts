@@ -95,6 +95,8 @@ test.describe("Barrierefreiheit (axe)", () => {
           empty: true,
           firstRun: true,
         });
+      // the tour no longer opens by itself (Etappe 1a): started from its card
+      await page.getByRole("button", { name: "Einführung starten" }).click();
       const tour = page.getByRole("dialog", { name: "Einführung" });
       await tour.waitFor({ timeout: 20_000 });
       await expectAccessible(page, '[role="dialog"]:has([data-testid="onboarding"])', "Einführung – Start");

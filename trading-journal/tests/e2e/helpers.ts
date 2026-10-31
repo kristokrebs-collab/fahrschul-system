@@ -412,12 +412,37 @@ export async function centre(locator: Locator): Promise<{ x: number; y: number }
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
 
+/** The navigation bar of this screen: the bottom bar below 768 px (`Dock`), the sidebar from there (`Seitenleiste`). */
+export const navBar = (page: Page): Locator => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]');
+
+/** A page's entry in it: a button of the bottom bar („Übersicht“, „Trades“, „Markt“) or a link of the sidebar (name + hint). */
+export const navItem = (page: Page, name: string): Locator =>
+  navBar(page)
+    .getByRole("button", { name, exact: true })
+    .or(navBar(page).getByRole("link", { name: new RegExp(`^${name}(\\s|$)`) }));
+
+/**
+ * Goes to a page the way a reader does: its entry in the bar / sidebar when it has one there, else „Mehr“ (the menu with the
+ * four groups) and the page's link in it.
+ */
+export async function openPageViaNav(page: Page, name: string): Promise<void> {
+  const direct = navItem(page, name);
+  if (await direct.first().isVisible()) {
+    await direct.first().click();
+    return;
+  }
+  await navBar(page).getByRole("button", { name: "Mehr", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Navigation" });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("link", { name: new RegExp(`^${name}(\\s|$)`) }).first().click();
+}
+
 /**
  * Opens `Trade eintragen` from the dock and waits until the form takes input: during the open morph the sheet body is
  * `inert` for a frame or two, and a `fill` in that window types into nothing (a click waits until the field is hittable).
  */
 export async function openTradeEditor(page: Page): Promise<Locator> {
-  await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" }).click();
+  await page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" }).click();
   const editor = page.getByRole("dialog", { name: "Trade eintragen" });
   await expect(editor).toBeVisible();
   await editor.locator("#f-entry").click();

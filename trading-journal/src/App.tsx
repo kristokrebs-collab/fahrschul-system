@@ -7,6 +7,7 @@ import { EditorHost } from "@/app/EditorHost";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { Footer } from "@/app/Footer";
 import { Header } from "@/app/Header";
+import { Sidebar } from "@/app/Sidebar";
 import { HostSlot } from "@/app/HostSlot";
 import { useLayerDiagOpen } from "@/app/layerDiag";
 import { LocalModeBanner, useLocalBannerOpen } from "@/app/LocalModeBanner";
@@ -28,6 +29,7 @@ import { Celebrate } from "@/motion/Celebrate";
 import { IntroHost } from "@/intro/IntroHost";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { spring } from "@/motion/tokens";
+import { FirstRunEmpty } from "@/onboarding/FirstRunEmpty";
 import { OnboardingHost } from "@/onboarding/OnboardingHost";
 import { ToastIsland } from "@/primitives/Toast";
 import { GlobalSearchHost } from "@/search/GlobalSearchHost";
@@ -229,17 +231,27 @@ function Shell() {
           past the screen edge for a moment (its full-bleed rows, the needles of the bias bar) – never a wider document */}
       <div className="relative min-h-dvh overflow-x-clip">
         <Header />
-        <main className="mx-auto max-w-[1320px] px-4 pb-10 pt-6 sm:px-6">
-          <LocalModeBanner />
-          <Banners />
-          {/* moves only when the banner enters / leaves (strict dependency: page switches never measure this subtree);
-              scroll memory lives in the router, applied by the page host at the commit that shows a page */}
-          <motion.div layout="position" layoutDependency={bannerOpen} transition={{ layout: spring.layout }} style={{ borderRadius: 0 }}>
-            <Routed />
-          </motion.div>
-        </main>
+        {/* from 768 px: the sidebar (sticky, below the header) beside the page column; below, the page is the whole width */}
+        <div className="flex">
+          <Sidebar />
+          <div className="min-w-0 flex-1">
+            <main className="mx-auto max-w-[1320px] px-4 pb-10 pt-6 sm:px-6">
+              <LocalModeBanner />
+              <Banners />
+              <FirstRunEmpty />
+              {/* moves only when the banner enters / leaves (strict dependency: page switches never measure this subtree);
+                  scroll memory lives in the router, applied by the page host at the commit that shows a page */}
+              <motion.div layout="position" layoutDependency={bannerOpen} transition={{ layout: spring.layout }} style={{ borderRadius: 0 }}>
+                <Routed />
+              </motion.div>
+            </main>
+          </div>
+        </div>
       </div>
-      <Footer />
+      {/* the footer is outside the flex row: it keeps the sidebar's width free (`--sidebar-w`, written by the sidebar; 0 without it) */}
+      <div className="pl-[var(--sidebar-w,0px)]">
+        <Footer />
+      </div>
       <BottomFade />
       <Dock />
       {/* before the overlays: a quick action's close runs before the editor takes focus */}

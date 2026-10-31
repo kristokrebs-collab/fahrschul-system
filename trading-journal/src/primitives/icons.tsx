@@ -25,7 +25,11 @@ export type IconName =
   | "tag"
   | "compass"
   | "pen"
-  | "route";
+  | "route"
+  // navigation (Etappe 1a)
+  | "more"
+  | "chevron-left"
+  | "doc";
 
 type SvgProps = Omit<SVGProps<SVGSVGElement>, "children">;
 
@@ -193,6 +197,28 @@ export function Icon({ name, className, ...props }: { name: IconName } & SvgProp
           <circle cx="6" cy="19" r="2" />
           <circle cx="18" cy="5" r="2" />
           <path d="M8 19h6.5a3.5 3.5 0 0 0 0-7h-5a3.5 3.5 0 0 1 0-7H16" />
+        </svg>
+      );
+    case "more":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" />
+          <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" />
+          <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" />
+          <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" />
+        </svg>
+      );
+    case "chevron-left":
+      return (
+        <svg {...p} strokeWidth="2" strokeLinejoin="round">
+          <path d="m14.5 6-6 6 6 6" />
+        </svg>
+      );
+    case "doc":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M6 3h8l4 4v14H6z" />
+          <path d="M14 3v4h4M9 12h6M9 16h6" />
         </svg>
       );
   }

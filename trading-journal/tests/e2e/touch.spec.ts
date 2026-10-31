@@ -9,10 +9,10 @@
  * - the Disziplin heat map takes a fat-finger tap beside a traded day.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { centre, collectErrors, hasTouch, isMobile, isTouchTablet, screenshot, scrollUntilVisible, seed, settledBox, toast, touchKit } from "./helpers";
+import { centre, collectErrors, hasTouch, isMobile, isTouchTablet, navItem, screenshot, scrollUntilVisible, seed, settledBox, toast, touchKit } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR, type HitBoxMiss } from "./hitbox";
 
-const dock = (page: Page) => page.getByRole("toolbar", { name: "Navigation" });
+const dock = (page: Page) => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]');
 
 async function openEditor(page: Page) {
   const editor = page.getByRole("dialog", { name: "Trade eintragen" });
@@ -143,7 +143,7 @@ test("dock: tapping the active tab again scrolls back to the top", async ({ page
   await page.waitForTimeout(800);
   await page.evaluate(() => window.scrollTo({ top: 2400, behavior: "instant" }));
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
-  const tab = dock(page).getByRole("button", { name: "Übersicht", exact: true });
+  const tab = navItem(page, "Übersicht");
   if (hasTouch(info)) await tab.tap();
   else await tab.click();
   await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 4000 }).toBeLessThan(2);

@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { PAGE_LABELS } from "@/app/Dock";
+import { PAGE_LABELS } from "@/app/navGroups";
 import { groupFeatures, subGroups } from "@/app/featureQuery";
 import { FEATURE_REGISTRY, type FeatureEntry } from "@/app/features";
 

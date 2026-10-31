@@ -15,7 +15,7 @@ import { AnimatePresence, motion, type Transition } from "motion/react";
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { GlyphFullscreen } from "@/app/DisplayActions";
 import type { FeatureChip } from "@/app/featureChips";
-import { PAGE_ICON, PAGE_LABELS } from "@/app/Dock";
+import { NAV_GROUP_ICON, NAV_GROUPS, NAV_GROUP_LABELS, PAGE_HINT, PAGE_ICON, PAGE_LABELS } from "@/app/navGroups";
 import { NavFinder } from "@/app/NavFinder";
 import { preloadPage } from "@/app/pages";
 import { DISPLAY_STRINGS, isIosSafari, isSamsungInternet, promptInstall, toggleFullscreen, useCanInstall, useFullscreen, useFullscreenSupported, useStandalone } from "@/app/pwa";
@@ -40,7 +40,8 @@ import { canDownload } from "@/store/download";
 import { navigate } from "@/store/router";
 import { toggleTheme, useTheme } from "@/store/themeStore";
 import { readJson, storageKey, writeJson } from "@/store/storage";
-import { DOCK_PAGES, PAGES, pushToast, useUi, type Page } from "@/store/uiStore";
+import { LegalLinks } from "@/legal/LegalLinks";
+import { NAV_ORDER, PAGES, pushToast, useUi, type Page } from "@/store/uiStore";
 import { useViews } from "@/store/viewsStore";
 import { create } from "zustand";
 
@@ -82,7 +83,7 @@ export const COMMAND_NAV_STRINGS = {
   syncFailed: "Synchronisieren fehlgeschlagen",
   csv: "CSV-Export",
   backup: "Backup herunterladen",
-  groups: { handeln: "Planen & Handeln", lernen: "Auswerten & Lernen", strategien: "Strategien", mehr: "Mehr" },
+  groups: NAV_GROUP_LABELS,
   isNew: "Neu",
   views: "Gespeicherte Ansichten",
   recentFeatures: "Zuletzt benutzte Funktionen",
@@ -175,18 +176,11 @@ function useRecentFeatures(): FeatureChip[] {
 }
 
 const PAGE_HASH = Object.fromEntries(PAGES.map((p) => [p, `#${p}`])) as Record<Page, string>;
-/** The big links: the five dock tabs, in the dock's order (digits 1–5); every other page follows in a compact grid by task. */
-const PRIMARY = PAGES.slice(0, DOCK_PAGES.length);
 /**
- * The pages below the dock five, grouped by what you are doing. Their order is `PAGES` order (the digit order), and together
- * they hold every page that is not a dock tab exactly once (`tests/unit/app.navOrder.test.ts`).
+ * All 19 pages in four groups by what you are doing (Erfassen, Prüfen, Auswerten, Konto & Rechtliches – `@/app/navGroups`, order
+ * `NAV_GROUP_PAGES`), each with its plain-word hint. The digits 1–9 still jump to the first nine of `PAGES` (the keys never moved).
  */
-export const NAV_GROUPS: readonly { id: keyof typeof COMMAND_NAV_STRINGS.groups; pages: readonly Page[] }[] = [
-  { id: "handeln", pages: ["plan", "aktien", "risiko"] },
-  { id: "lernen", pages: ["analyse", "berichte", "coach", "wachstum"] },
-  { id: "strategien", pages: ["labor", "studio"] },
-  { id: "mehr", pages: ["community", "cockpit", "konto", "preise", "funktionen"] },
-];
+export { NAV_GROUPS };
 /** Pages that came with the last release: a small "Neu" next to the name until the page has been opened once (this browser only). */
 export const NEW_PAGES: readonly Page[] = ["plan", "aktien", "studio"];
 const VISITED_KEY = storageKey("visited-pages");
@@ -205,8 +199,11 @@ export function markPageVisited(page: Page): boolean {
   return writeJson(VISITED_KEY, [...seen, page]);
 }
 
-/** Two-digit index of a page (`01` … `19`) – the digit shortcut of the first nine. */
-const pageNo = (i: number): string => String(i + 1).padStart(2, "0");
+/** The digit of a page (`1` … `9`) – only the first nine of `PAGES` have one. */
+const pageDigit = (p: Page): string | null => {
+  const i = PAGES.indexOf(p);
+  return i >= 0 && i < 9 ? String(i + 1) : null;
+};
 
 function Panel({ reduced }: { reduced: boolean }) {
   const open = useNav((s) => s.open);
@@ -371,7 +368,7 @@ function Panel({ reduced }: { reduced: boolean }) {
               type="button"
               onClick={() => closeCommandNav()}
               aria-label={COMMAND_NAV_STRINGS.close}
-              className="touch-hit grid size-9 shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg [&>svg]:size-4"
+              className="tap grid shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg [&>svg]:size-4"
             >
               <Icon name="x" />
             </button>
@@ -390,48 +387,29 @@ function Panel({ reduced }: { reduced: boolean }) {
                 />
               </Item>
               <nav aria-label={COMMAND_NAV_STRINGS.pages} className="grid gap-7">
-                <ul className="cmdnav-links grid">
-                  {PRIMARY.map((p, i) => (
-                    <li key={p}>
-                      <Item delay={CONFIG.delays.links[i] ?? 900} reduced={reduced}>
-                        <a
-                          href={PAGE_HASH[p]}
-                          data-cmd-item=""
-                          aria-current={page === p ? "page" : undefined}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            go(p);
-                          }}
-                          className="cmdnav-link group/link inline-flex max-w-full items-baseline gap-3 rounded-lg py-1.5 text-fg outline-none max-sm:pointer-coarse:py-2.5 transition-opacity duration-[250ms] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:gap-5"
-                        >
-                          <span aria-hidden="true" className="w-6 shrink-0 font-mono text-[11px] text-faint sm:w-8">
-                            {pageNo(i)}
-                          </span>
-                          <span className="min-w-0 break-words text-[clamp(22px,4.6vw,56px)] font-normal leading-[1.08] tracking-[-0.02em]">{PAGE_LABELS[p]}</span>
-                          <span className={cn("dot-num shrink-0 self-start pt-[0.5em] text-[12px] sm:text-[14px]", counts[p].tone ?? "text-mute")}>
-                            <DotFigure text={counts[p].text} />
-                          </span>
-                          {page === p && <span aria-hidden="true" className="size-1.5 shrink-0 self-center rounded-full bg-signal" />}
-                        </a>
-                      </Item>
-                    </li>
-                  ))}
-                </ul>
-                {/* the other pages by task: a compact grid per group (icon, name, live count, digit) – preloading their chunk on intent */}
+                {/* the 19 pages in four groups, each page with its plain-word hint and live count – preloading its chunk on intent */}
                 {NAV_GROUPS.map((g) => (
-                  <div key={g.id} role="group" aria-label={COMMAND_NAV_STRINGS.groups[g.id]} className="grid gap-2.5" data-testid="cmd-group" data-group={g.id}>
-                    <Item delay={CONFIG.delays.links[PAGES.indexOf(g.pages[0]!)] ?? 960} reduced={reduced}>
-                      <p aria-hidden="true" className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">
-                        {COMMAND_NAV_STRINGS.groups[g.id]}
+                  <div key={g.id} role="group" aria-label={g.label} className="grid gap-2.5" data-testid="cmd-group" data-group={g.id}>
+                    <Item delay={CONFIG.delays.links[NAV_ORDER.indexOf(g.pages[0]!)] ?? 960} reduced={reduced}>
+                      <p className="flex items-baseline gap-3">
+                        <span aria-hidden="true" className="inline-flex items-center gap-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">
+                          <span className="size-3.5 text-mute [&>svg]:size-full">
+                            <Icon name={NAV_GROUP_ICON[g.id]} />
+                          </span>
+                          {g.label}
+                        </span>
+                        <span aria-hidden="true" className="min-w-0 truncate text-[12px] text-faint max-sm:hidden">
+                          {g.hint}
+                        </span>
                       </p>
                     </Item>
-                    <ul className="cmdnav-links grid grid-cols-[repeat(auto-fill,minmax(min(100%,168px),1fr))] gap-2">
+                    <ul className="cmdnav-links grid grid-cols-[repeat(auto-fill,minmax(min(100%,196px),1fr))] gap-2">
                       {g.pages.map((p) => {
-                        const i = PAGES.indexOf(p);
                         const fresh = NEW_PAGES.includes(p) && !visited.includes(p);
+                        const digit = pageDigit(p);
                         return (
                           <li key={p} className="min-w-0">
-                            <Item delay={CONFIG.delays.links[i] ?? 1560} reduced={reduced} className="h-full">
+                            <Item delay={CONFIG.delays.links[NAV_ORDER.indexOf(p)] ?? 1560} reduced={reduced} className="h-full">
                               <a
                                 href={PAGE_HASH[p]}
                                 data-cmd-item=""
@@ -443,9 +421,9 @@ function Panel({ reduced }: { reduced: boolean }) {
                                 onPointerEnter={() => preloadPage(p)}
                                 onFocus={() => preloadPage(p)}
                                 onPointerDown={() => preloadPage(p)}
-                                className="cmdnav-link group/link relative flex h-full min-h-12 items-center gap-3 rounded-xl border border-line-2 bg-ink-900 px-3 py-2.5 text-fg outline-none transition-[opacity,border-color] duration-[250ms] hover:border-white/30 focus-visible:border-white/60"
+                                className="cmdnav-link group/link relative flex h-full min-h-14 items-center gap-3 rounded-xl border border-line-2 bg-ink-900 px-3 py-2.5 text-fg outline-none transition-[opacity,border-color] duration-[250ms] hover:border-white/30 focus-visible:border-white/60"
                               >
-                                <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg border border-line-2 text-mute group-hover/link:text-fg [&>svg]:size-4">
+                                <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg border border-line-2 text-mute group-hover/link:text-fg [&>svg]:size-[18px]">
                                   <Icon name={PAGE_ICON[p]} />
                                 </span>
                                 <span className="grid min-w-0 flex-1">
@@ -457,12 +435,19 @@ function Panel({ reduced }: { reduced: boolean }) {
                                       </span>
                                     )}
                                   </span>
-                                  <span className={cn("dot-num truncate text-[11.5px]", counts[p].tone ?? "text-mute")}>
-                                    <DotFigure text={counts[p].text} />
+                                  <span data-testid="cmd-hint" className="truncate text-[12px] leading-snug text-mute">
+                                    {PAGE_HINT[p]}
                                   </span>
                                 </span>
-                                <span aria-hidden="true" className="shrink-0 self-start font-mono text-[10px] text-faint">
-                                  {pageNo(i)}
+                                <span className="grid shrink-0 justify-items-end gap-0.5 self-start">
+                                  {digit && (
+                                    <span aria-hidden="true" className="font-mono text-[10px] text-faint">
+                                      {digit}
+                                    </span>
+                                  )}
+                                  <span className={cn("dot-num max-w-[11ch] truncate text-[11px]", counts[p].tone ?? "text-mute")}>
+                                    <DotFigure text={counts[p].text} />
+                                  </span>
                                 </span>
                                 {page === p && <span aria-hidden="true" className="absolute right-2 bottom-2 size-1.5 rounded-full bg-signal" />}
                               </a>
@@ -471,6 +456,11 @@ function Panel({ reduced }: { reduced: boolean }) {
                         );
                       })}
                     </ul>
+                    {g.id === "konto" && (
+                      <Item delay={CONFIG.delays.links[NAV_ORDER.length - 1] ?? 1800} reduced={reduced}>
+                        <LegalLinks roomy className="-mx-2.5" />
+                      </Item>
+                    )}
                   </div>
                 ))}
               </nav>

@@ -1,4 +1,4 @@
-import { PAGE_LABELS } from "@/app/Dock";
+import { PAGE_LABELS } from "@/app/navGroups";
 import { Skeleton } from "@/primitives/Skeleton";
 import type { Page } from "@/store/uiStore";
 

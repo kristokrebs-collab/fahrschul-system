@@ -3,7 +3,7 @@
  * feature): the page's own header (`h1` + what it does) and the P10 `UpgradeTeaser` with the way to the plan. Lazy
  * chunk: a trader who never meets a locked page never downloads it.
  */
-import { PAGE_LABELS } from "@/app/Dock";
+import { PAGE_LABELS } from "@/app/navGroups";
 import { FEATURE_INFO } from "@/billing/plans";
 import type { Feature } from "@/billing/types";
 import { UpgradeTeaser } from "@/billing/ui/UpgradeTeaser";

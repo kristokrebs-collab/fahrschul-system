@@ -11,7 +11,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { FEATURE_GROUPS, FEATURE_REGISTRY, PLAN_TIERS, featureById, tierOf, type FeatureAction } from "@/app/features";
-import { PAGE_LABELS } from "@/app/Dock";
+import { PAGE_LABELS } from "@/app/navGroups";
 import { LAZY_PAGES, isLazyPage } from "@/app/pages";
 import { FEATURES } from "@/billing/types";
 import { PAGES } from "@/store/uiStore";

@@ -15,7 +15,7 @@
  * which German keyboards need for `[` `]` – counts as no modifier). A `g` waits `CHORD_MS` for its letter.
  */
 import { create } from "zustand";
-import { PAGE_LABELS } from "@/app/Dock";
+import { PAGE_LABELS } from "@/app/navGroups";
 import { navigate } from "@/store/router";
 import { toggleTheme } from "@/store/themeStore";
 import { NAV_ORDER, PAGE_KEYS, PAGES, useUi, type Page } from "@/store/uiStore";

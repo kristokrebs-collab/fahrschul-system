@@ -14,7 +14,8 @@ export function GlyphFullscreen({ exit = false, className }: { exit?: boolean; c
  * Header button `Vollbild` / `Vollbild beenden` (grey-bar fix): the Fullscreen API hides the browser UI and the system
  * bars. Renders nothing where the API is unavailable (iPhone Safari, sandboxed frames). `aria-pressed` mirrors the state.
  */
-export function FullscreenButton({ className }: { className?: string }) {
+/** `showLabel`: the word next to the icon where there is room (the header, from 1280 px); the name stays in `aria-label`. */
+export function FullscreenButton({ className, showLabel = false }: { className?: string; showLabel?: boolean }) {
   const supported = useFullscreenSupported();
   const on = useFullscreen();
   if (!supported) return null;
@@ -27,11 +28,16 @@ export function FullscreenButton({ className }: { className?: string }) {
       aria-pressed={on}
       title={label}
       className={cn(
-        "touch-hit grid size-9 shrink-0 place-items-center rounded-xl border border-line-2 bg-ink-850 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg aria-pressed:text-fg",
+        "tap inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-line-2 bg-ink-850 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg aria-pressed:text-fg",
         className,
       )}
     >
       <GlyphFullscreen exit={on} className="size-4" />
+      {showLabel && (
+        <span aria-hidden="true" className="max-xl:hidden text-[12.5px] font-medium text-fg">
+          {label}
+        </span>
+      )}
     </button>
   );
 }

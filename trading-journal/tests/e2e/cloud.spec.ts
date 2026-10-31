@@ -212,8 +212,9 @@ test.describe("Konto & Cloud", () => {
     await open(page, "/#konto");
     await expect(page.getByText("Login und Sync sind in dieser Version nicht aktiv.", { exact: false })).toBeVisible();
     await expect(page.locator("[data-cloud-pill]")).toHaveCount(0);
-    // the banner agrees with the card: no claude.ai advice on a standalone build (review F8)
-    await expect(page.getByText("Trades bleiben nur in diesem Browser auf diesem Gerät.", { exact: false })).toBeVisible();
+    // the local-mode badge agrees with the card: no claude.ai advice on a standalone build (review F8)
+    await page.getByTestId("local-badge").click();
+    await expect(page.getByTestId("local-badge-panel").getByText("Trades bleiben nur in diesem Browser auf diesem Gerät.", { exact: false })).toBeVisible();
     await expect(page.getByText("Öffne das Journal über claude.ai", { exact: false })).toHaveCount(0);
     await expectNoHorizontalScroll(page);
     await shot(page, info, "unavailable");

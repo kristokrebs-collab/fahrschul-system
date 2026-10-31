@@ -60,9 +60,10 @@ describe("ShortcutHost", () => {
     press("t");
     expect(useUi.getState().page).toBe("trades");
     await waitFor(() => expect(document.querySelector('[data-layer="Tastenkürzel-Hinweis"]')).toBeNull());
-    press("[");
-    expect(useUi.getState().page).toBe("overview");
+    // `[` / `]` walk the pages in the order of the navigation (Etappe 1a: Erfassen → Prüfen → Auswerten → Konto): Trades → Handelsplan → back
     press("]");
+    expect(useUi.getState().page).toBe("plan");
+    press("[");
     expect(useUi.getState().page).toBe("trades");
   });
 

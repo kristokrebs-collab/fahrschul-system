@@ -140,7 +140,9 @@ test("page end: the last overview card and the footer's back-to-top sit fully ab
   const measure = () =>
     page.evaluate(() => {
       window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" });
-      const dock = document.querySelector('[role="toolbar"][aria-label="Navigation"]')!.getBoundingClientRect();
+      // the bottom bar exists below 768 px only; with the sidebar nothing covers the page bottom
+      const dockEl = document.querySelector('[role="toolbar"][aria-label="Navigation"]');
+      const dock = dockEl ? dockEl.getBoundingClientRect() : { top: window.innerHeight };
       const cells = Array.from(document.querySelectorAll("[data-intro-cell]")).map((c) => c.getBoundingClientRect()).filter((r) => r.height > 0);
       const last = cells.reduce((a, b) => (b.bottom > a.bottom ? b : a));
       const top = document.querySelector('footer button[aria-label="Nach oben"]')!.getBoundingClientRect();

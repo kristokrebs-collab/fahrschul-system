@@ -6,7 +6,7 @@
  * Rows press with `usePressable`; the arrow nudges on hover (CSS transform only).
  */
 import { motion } from "motion/react";
-import { PAGE_ICON, PAGE_LABELS } from "@/app/Dock";
+import { PAGE_ICON, PAGE_LABELS } from "@/app/navGroups";
 import { preloadPage } from "@/app/pages";
 import { cloudEnabled } from "@/cloud/env";
 import { usePressable } from "@/motion/usePressable";

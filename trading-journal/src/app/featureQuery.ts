@@ -14,7 +14,7 @@
  * (`searchStore.recent`, `feature:<id>`). Both are given in; without data the answer is empty, never a guess.
  */
 import { editDistance } from "@/assistant/fuzzy";
-import { PAGE_LABELS } from "@/app/Dock";
+import { PAGE_LABELS } from "@/app/navGroups";
 import { fold, matchFolded, mergeRanges, normalize, type FieldMatch, type Folded, type MatchRange } from "@/search/fuzzy";
 import { FEATURE_GROUPS, FEATURE_REGISTRY, featureById, type FeatureEntry, type FeatureGroup } from "./features";
 

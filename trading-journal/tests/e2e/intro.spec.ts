@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CHECKIN_PROMPT_OFF, collectErrors, fixture, seed } from "./helpers";
+import { CHECKIN_PROMPT_OFF, collectErrors, fixture, navItem, seed } from "./helpers";
 import { mockMarket } from "./mocks/market";
 
 /**
@@ -107,7 +107,7 @@ test.describe("intro", () => {
     await skipSettles(page);
     await page.waitForTimeout(900); // reveals inside the landed cells
     await expectSettled(page);
-    await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trades" }).click();
+    await navItem(page, "Trades").click();
     await expect(page).toHaveURL(/#trades/);
     expect(errors, errors.join("\n")).toEqual([]);
   });

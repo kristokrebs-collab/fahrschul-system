@@ -134,7 +134,7 @@ test.describe("Mensch – Regelwerk – KI", () => {
     await seed(page);
     await page.goto("/#trades");
     await expect(layer(page, "trades").locator("h1").first()).toBeVisible({ timeout: 25_000 });
-    await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" }).click();
+    await page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" }).click();
     const editor = page.getByRole("dialog", { name: "Trade eintragen" });
     await expect(editor).toBeVisible();
     await expect(editor.locator("[inert] #f-entry")).toHaveCount(0);

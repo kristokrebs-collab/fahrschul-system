@@ -466,7 +466,7 @@ _Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 7 Funktionen
 
 ### Konto, Einstellungen & Hilfe
 
-_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 18 Funktionen
+_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 20 Funktionen
 
 **Konto & Tarif**
 
@@ -476,6 +476,7 @@ _Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 18 Funktionen
 | Tarif wählen, Abo verwalten oder kündigen | Abo & Tarife | Preise | fertig |
 | Sehen, welcher Tarif welche Funktion enthält | Tarife im Vergleich | Preise › Alle Funktionen im Vergleich | fertig |
 | Freunde einladen und Gutschrift erhalten | Freunde einladen (Empfehlungscode) | Konto | teilweise |
+| Nachlesen, wo deine Daten liegen | Lokaler Modus erklärt | Übersicht – Kopfzeile → „Lokaler Modus“ antippen (nur im lokalen Modus sichtbar) | fertig |
 
 **Einstellungen**
 
@@ -497,6 +498,7 @@ _Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 18 Funktionen
 | Dein eigenes Dashboard zusammenstellen | Eigenes Dashboard (Cockpit) | Cockpit | fertig |
 | Fragen stellen und die App per Sprache bedienen | Assistent | Übersicht (Fenster: assistant) | teilweise |
 | Mit Tasten schneller navigieren | Tastenkürzel | Einstellungen (Fenster: shortcuts) | fertig |
+| Eine Seite finden, ohne zu suchen | Seitenleiste und Menü | Übersicht – Handy: „Mehr“ unten → Menü · Tablet und Computer: Seitenleiste links (einklappbar) | fertig |
 | Nachlesen, was eine Kennzahl bedeutet | Erklärungen zu Kennzahlen | Übersicht – Karten und Kacheln mit Info-Symbol antippen (Übersicht, Markt, Setups) | teilweise |
 | Die Einführung noch einmal ansehen | Einführung noch einmal ansehen | Einstellungen › Einführung & Hilfe | fertig |
 | Die App in fünf Schritten mit Beispieldaten ausprobieren | Demo mit Beispieldaten | Funktionen › Demo ausprobieren | fertig |

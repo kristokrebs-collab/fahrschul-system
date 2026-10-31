@@ -6,9 +6,9 @@
  * the URL and the history does not grow.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { collectErrors, isMobile, seed } from "./helpers";
+import { collectErrors, isMobile, navItem, seed } from "./helpers";
 
-const dock = (page: Page) => page.getByRole("toolbar", { name: "Navigation" });
+const dock = (page: Page) => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]');
 const fab = (page: Page) => dock(page).getByRole("button", { name: "Trade eintragen" });
 const current = (page: Page, name: string) => page.locator(`[data-page="${name}"][data-page-role="current"]`);
 const depth = (page: Page) => page.evaluate(() => (history.state as { tjBack?: number } | null)?.tjBack ?? 0);
@@ -27,7 +27,7 @@ function firstRow(page: Page, mobile: boolean) {
 async function overviewThenTrades(page: Page) {
   await page.goto("/#overview");
   await expect(page.getByText("Netto-P&L").first()).toBeVisible();
-  await dock(page).getByRole("button", { name: "Trades" }).click();
+  await navItem(page, "Trades").click();
   await expect(page.getByRole("heading", { name: /Alle Trades/ })).toBeVisible();
   await expect(current(page, "trades")).toHaveCount(1);
   await page.waitForTimeout(600); // the page switch has settled

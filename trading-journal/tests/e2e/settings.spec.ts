@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { collectErrors, expectNoHorizontalScroll, fixture, isMobile, screenshot, seed, toast } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, fixture, isMobile, openPageViaNav, screenshot, seed, toast } from "./helpers";
 
 async function gotoSettings(page: import("@playwright/test").Page) {
   await page.goto("/#settings");
@@ -110,7 +110,7 @@ test("the unsaved bar fits the phone width after an in-app navigation (no horizo
   // reached through the page transition (the entered page layer must not keep a transform – containing block)
   await page.goto("/#overview");
   await expect(page.getByTestId("market-panel")).toBeVisible();
-  await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Einstellungen" }).click();
+  await openPageViaNav(page, "Einstellungen");
   await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
   await page.locator("#s-makro").fill("12345");
   const discard = page.getByRole("button", { name: "Verwerfen" });

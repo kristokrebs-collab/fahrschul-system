@@ -144,7 +144,7 @@ test.describe("candle-close states", () => {
     const { anchor, clock } = await open(page);
     const exp = expectedSignals(anchor, clock.now(), LIVE_PRICE, "whale-long");
     expect(exp.long.state).toBe("provisional");
-    await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" }).click();
+    await page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" }).click();
     const editor = page.getByRole("dialog", { name: "Trade eintragen" });
     await expect(editor).toBeVisible();
     const summary = editor.getByTestId("signal-summary");

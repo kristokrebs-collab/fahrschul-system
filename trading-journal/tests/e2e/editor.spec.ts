@@ -8,7 +8,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { collectErrors, isMobile, pinClock, screenshot, seed, stored, toast, utcToday } from "./helpers";
 
-const fab = (page: Page) => page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" });
+const fab = (page: Page) => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" });
 
 interface StoredTrade {
   id: string;

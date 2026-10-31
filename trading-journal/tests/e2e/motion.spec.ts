@@ -4,7 +4,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { existsSync } from "node:fs";
-import { collectErrors, expectInViewport, expectNoHorizontalScroll, isMobile, screenshot, seed } from "./helpers";
+import { collectErrors, expectInViewport, expectNoHorizontalScroll, isMobile, navBar, navItem, openPageViaNav, screenshot, seed } from "./helpers";
 
 test("reduced motion: every page and overlay renders, nothing stays invisible", async ({ page }, info) => {
   const errors = collectErrors(page);
@@ -16,7 +16,7 @@ test("reduced motion: every page and overlay renders, nothing stays invisible", 
   await page.waitForTimeout(800);
   await screenshot(page, info, "reduced-overview");
 
-  const fab = page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" });
+  const fab = page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" });
   await fab.click();
   const editor = page.getByRole("dialog", { name: "Trade eintragen" });
   await expect(editor).toBeVisible();
@@ -61,10 +61,12 @@ test("mobile 390×844: dock reachable, bottom sheet, cards, readable hero, no ho
   await screenshot(page, info, "mobile-overview");
   await screenshot(page, info, "mobile-overview-full", true);
 
-  const dock = page.getByRole("toolbar", { name: "Navigation" });
+  // the bottom bar on a phone, the sidebar from 768 px
+  const dock = navBar(page);
   await expect(dock).toBeVisible();
   const box = await dock.boundingBox();
-  expect(box && box.y + box.height <= 844, "dock inside the viewport").toBe(true);
+  const vh = page.viewportSize()!.height;
+  expect(box && box.y + box.height <= vh, "dock inside the viewport").toBe(true);
 
   await dock.getByRole("button", { name: "Trade eintragen" }).click();
   const editor = page.getByRole("dialog", { name: "Trade eintragen" });
@@ -76,19 +78,21 @@ test("mobile 390×844: dock reachable, bottom sheet, cards, readable hero, no ho
   await page.keyboard.press("Escape");
   await expect(editor).toBeHidden();
 
-  await dock.getByRole("button", { name: "Trades" }).click();
+  await navItem(page, "Trades").click();
   await expect(page.getByRole("heading", { name: /Alle Trades/ })).toBeVisible();
-  await expect(page.getByRole("list", { name: "Trades" })).toBeVisible();
-  await expect(page.locator("table")).toHaveCount(0);
+  if (isMobile(info)) {
+    await expect(page.getByRole("list", { name: "Trades" })).toBeVisible();
+    await expect(page.locator("table")).toHaveCount(0);
+  }
   await expectNoHorizontalScroll(page);
   await screenshot(page, info, "mobile-trades");
 
-  await dock.getByRole("button", { name: "Entscheidungsgrundlagen" }).click();
+  await openPageViaNav(page, "Entscheidungsgrundlagen");
   await expect(page.getByRole("heading", { name: "Entscheidungsgrundlagen" })).toBeVisible();
   await page.waitForTimeout(600);
   await expectNoHorizontalScroll(page);
 
-  await dock.getByRole("button", { name: "Einstellungen" }).click();
+  await openPageViaNav(page, "Einstellungen");
   await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
   await expectNoHorizontalScroll(page);
   await screenshot(page, info, "mobile-settings");
@@ -100,7 +104,7 @@ test("sheets keep header and footer on screen: morph (FAB editor) and slide-in (
   await seed(page);
   await page.goto("/#overview");
   await expect(page.getByText("Netto-P&L").first()).toBeVisible();
-  await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" }).click();
+  await page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" }).click();
   const editor = page.getByRole("dialog", { name: "Trade eintragen" });
   await expect(editor.locator("#f-entry")).toBeVisible();
   await page.waitForTimeout(700);
@@ -128,17 +132,21 @@ test("keyboard: Tab reaches the dock, Enter opens the editor, Escape closes it a
   await seed(page);
   await page.goto("/#overview");
   await expect(page.getByText("Netto-P&L").first()).toBeVisible();
-  const fab = page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" });
-  // Tab through the dock: focus the first dock tab, then Tab along the toolbar to the FAB
-  await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Übersicht" }).focus();
-  const labels: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    labels.push(await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? ""));
-    if (labels[labels.length - 1] === "Trade eintragen") break;
-    await page.keyboard.press("Tab");
+  const fab = page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" });
+  if (isMobile(info)) {
+    // Tab through the bottom bar: focus the first tab, then Tab along the toolbar to the centre button (Übersicht, Trades, + Trade, Markt, Mehr)
+    await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Übersicht" }).focus();
+    const labels: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      labels.push(await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? ""));
+      if (labels[labels.length - 1] === "Trade eintragen") break;
+      await page.keyboard.press("Tab");
+    }
+    expect(labels).toEqual(["Übersicht", "Trades", "Trade eintragen"]);
+  } else {
+    // the sidebar starts with the primary action
+    await fab.focus();
   }
-  // P14: the dock carries five tabs (Markt joined), then the FAB
-  expect(labels).toEqual(["Übersicht", "Trades", "Entscheidungsgrundlagen", "Markt", "Einstellungen", "Trade eintragen"]);
   await expect(fab).toBeFocused();
   await page.keyboard.press("Enter");
   const editor = page.getByRole("dialog", { name: "Trade eintragen" });

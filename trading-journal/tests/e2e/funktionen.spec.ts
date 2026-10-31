@@ -39,6 +39,7 @@ test.describe("Funktionen", () => {
     // always something to start with
     await expect(page.getByTestId("funktionen-picks")).toBeVisible();
     // the dock does not carry it
+    // the bottom bar does not carry it (it is behind „Mehr“); the sidebar lists it under „Konto & Rechtliches“
     await expect(page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Funktionen" })).toHaveCount(0);
     if (info.project.name === "mobile") {
       // a single column: every tile spans the content width

@@ -87,8 +87,10 @@ describe("Dock", () => {
     const names = within(dock)
       .getAllByRole("button")
       .map((b) => b.getAttribute("aria-label"));
-    // P14: five tabs (DOCK_PAGES – Markt joins between Grundlagen and Einstellungen), then the FAB
-    expect(names).toEqual(["Übersicht", "Trades", "Entscheidungsgrundlagen", "Markt", "Einstellungen", "Trade eintragen"]);
+    // Etappe 1a: Übersicht, Trades, the centre button „+ Trade“, Markt, Mehr (the menu with the four groups and the search)
+    expect(names).toEqual(["Übersicht", "Trades", "Trade eintragen", "Markt", "Mehr"]);
+    // every item says its word under the icon
+    expect(Array.from(dock.querySelectorAll("[data-dock-caption]")).map((c) => c.textContent)).toEqual(["Übersicht", "Trades", "Trade", "Markt", "Mehr"]);
     expect(within(dock).getByRole("button", { name: "Übersicht" })).toHaveAttribute("aria-current", "page");
     // tooltips are CSS-only and hidden from assistive tech (the button carries the name)
     expect(within(dock).queryByRole("tooltip")).toBeNull();
@@ -97,9 +99,11 @@ describe("Dock", () => {
     act(() => useUi.setState({ page: "trades" }));
     expect(within(dock).getByRole("button", { name: "Trades" })).toHaveAttribute("aria-current", "page");
     expect(within(dock).getByRole("button", { name: "Übersicht" })).not.toHaveAttribute("aria-current");
-    // a page outside the dock (CommandNav, search, g + letter) marks no tab
+    // a page outside the bar (CommandNav, search, g + letter) marks no tab as the current page – „Mehr“ lights up instead (its disc)
     act(() => useUi.setState({ page: "coach" }));
     expect(within(dock).queryByRole("button", { current: "page" })).toBeNull();
+    expect(within(dock).getByRole("button", { name: "Mehr" }).querySelector('[data-dock-marker="bg"]')).not.toBeNull();
+    expect(within(dock).getByRole("button", { name: "Mehr" })).toHaveAttribute("aria-haspopup", "dialog");
     act(() => useUi.setState({ page: "markt" }));
     expect(within(dock).getByRole("button", { name: "Markt" })).toHaveAttribute("aria-current", "page");
   });
@@ -127,7 +131,7 @@ describe("dock tab markers (compositor FLIP)", () => {
     expect(markerFlip(box(100), box(100.2), 1)).toBeNull();
   });
 
-  it("one disc and one dot, always on the active tab (no shared-layout nodes)", () => {
+  it("one disc, always on the active tab (no shared-layout nodes); the captions replace the red dot", () => {
     useUi.setState({ page: "overview" });
     const { container } = render(
       <MotionRoot>
@@ -137,10 +141,9 @@ describe("dock tab markers (compositor FLIP)", () => {
     const active = () => container.querySelector('[aria-current="page"]');
     expect(container.querySelectorAll('[data-dock-marker="bg"]')).toHaveLength(1);
     expect(active()?.querySelector('[data-dock-marker="bg"]')).not.toBeNull();
-    expect(active()?.querySelector('[data-dock-marker="dot"]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-dock-marker="dot"]')).toHaveLength(0);
     act(() => useUi.setState({ page: "trades" }));
     expect(container.querySelectorAll('[data-dock-marker="bg"]')).toHaveLength(1);
-    expect(container.querySelectorAll('[data-dock-marker="dot"]')).toHaveLength(1);
     expect(active()?.getAttribute("aria-label")).toBe("Trades");
     expect(active()?.querySelector('[data-dock-marker="bg"]')).not.toBeNull();
   });

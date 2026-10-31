@@ -278,7 +278,7 @@ export function Footer() {
         <div className="mx-auto flex max-w-[1320px] items-end justify-between gap-4 px-4 sm:px-6">
           <div className="grid gap-2" style={part(shown, reduced, CONFIG.bar)}>
             <ChartAttribution className="touch-hit-links" />
-            <LegalLinks />
+            <LegalLinks roomy className="-mx-2.5" />
           </div>
           <div style={part(shown, reduced, CONFIG.links)}>
             <button
