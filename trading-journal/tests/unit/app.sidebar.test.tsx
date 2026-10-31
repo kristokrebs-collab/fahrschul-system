@@ -51,7 +51,7 @@ describe("sidebar vs bottom bar", () => {
   });
 
   it("from 768 px: the sidebar with four groups and all 19 pages, no bottom bar", () => {
-    screenOf(1440);
+    screenOf(1700);
     mount();
     expect(screen.queryByRole("toolbar", { name: "Navigation" })).toBeNull();
     const groups = screen.getAllByTestId("sidebar-group");
@@ -69,7 +69,7 @@ describe("sidebar vs bottom bar", () => {
   });
 
   it("a click on a page navigates; the page you are on again does not break", () => {
-    screenOf(1440);
+    screenOf(1700);
     mount();
     fireEvent.click(screen.getByRole("link", { name: /^Trades/ }));
     expect(useUi.getState().page).toBe("trades");
@@ -78,7 +78,7 @@ describe("sidebar vs bottom bar", () => {
   });
 
   it("collapses to the rail, keeps the choice in `tj2-ui`, and the rail names every page by `aria-label`", () => {
-    screenOf(1440);
+    screenOf(1700);
     mount();
     fireEvent.click(screen.getByTestId("sidebar-toggle"));
     expect(useUi.getState().sidebar).toBe("closed");
@@ -92,11 +92,12 @@ describe("sidebar vs bottom bar", () => {
     expect(aside.hasAttribute("data-expanded")).toBe(true);
   });
 
-  it("a group folds and unfolds; the choice is stored; a short screen folds all but the current group and Konto until the reader chooses", () => {
+  it("a group folds and unfolds; the choice is stored; a short screen folds Auswerten and Konto (unless current) until the reader chooses", () => {
     expect(closedGroups(null, false, "pruefen")).toEqual([]);
-    expect(closedGroups(null, true, "pruefen")).toEqual(["erfassen", "auswerten"]);
+    expect(closedGroups(null, true, "pruefen")).toEqual(["auswerten", "konto"]);
+    expect(closedGroups(null, true, "auswerten")).toEqual(["konto"]);
     expect(closedGroups(["konto"], true, "pruefen")).toEqual(["konto"]);
-    screenOf(1440);
+    screenOf(1700);
     mount();
     const toggles = screen.getAllByTestId("sidebar-group-toggle");
     expect(toggles).toHaveLength(4);
@@ -110,7 +111,7 @@ describe("sidebar vs bottom bar", () => {
     expect(useUi.getState().sidebarClosed).toEqual([]);
   });
 
-  it("`auto` is a rail below 1280 px and wide from there; the reader's choice wins", () => {
+  it("`auto` is a rail below 1624 px and wide from there; the reader's choice wins", () => {
     expect(sidebarExpanded("auto", false)).toBe(false);
     expect(sidebarExpanded("auto", true)).toBe(true);
     expect(sidebarExpanded("open", false)).toBe(true);

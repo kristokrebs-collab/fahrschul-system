@@ -403,7 +403,7 @@ function Panel({ reduced }: { reduced: boolean }) {
                         </span>
                       </p>
                     </Item>
-                    <ul className="cmdnav-links grid grid-cols-[repeat(auto-fill,minmax(min(100%,196px),1fr))] gap-2">
+                    <ul className="cmdnav-links grid grid-cols-[repeat(auto-fill,minmax(min(100%,236px),1fr))] gap-2">
                       {g.pages.map((p) => {
                         const fresh = NEW_PAGES.includes(p) && !visited.includes(p);
                         const digit = pageDigit(p);

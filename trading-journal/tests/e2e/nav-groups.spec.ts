@@ -62,23 +62,27 @@ test.describe("Navigation in vier Gruppen", () => {
     await expect(page.getByRole("toolbar", { name: "Navigation" })).toHaveCount(0);
     await expect(side.getByTestId("sidebar-group")).toHaveCount(4);
     await expect(side.getByTestId("sidebar-group").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).resolves.toEqual(["Erfassen", "Prüfen", "Auswerten", "Konto & Rechtliches"]);
-    // 900 px high: the groups of the current page and Konto are open, the others folded – unfold one
-    await side.getByRole("button", { name: /^Auswerten/ }).click();
-    await expect(side.locator("a[data-nav-page]:visible")).not.toHaveCount(0);
-    await side.getByRole("link", { name: /^Analyse/ }).click();
-    await expect(page).toHaveURL(/#analyse$/);
-    await expect(side.getByRole("link", { name: /^Analyse/ })).toHaveAttribute("aria-current", "page");
+    // 1440 px: the narrow rail by default (the pages keep their 1320 px column) – every page is there by name, the primary action on top
+    await expect(side).not.toHaveAttribute("data-expanded", "");
+    for (const name of ["Trades", "Handelsplan", "Übersicht", "Markt", "Analyse", "Einstellungen", "Konto", "Funktionen"]) await expect(side.getByRole("link", { name, exact: true })).toBeAttached();
     await expect(side.getByRole("button", { name: "Trade eintragen" })).toBeVisible();
     await openTradeEditor(page);
     await page.keyboard.press("Escape");
-    // collapse → rail; the choice survives a reload
+    // open it: titles and plain words; 900 px high → Erfassen and Prüfen open, Auswerten and Konto folded, the Trades one tap away
     await side.getByTestId("sidebar-toggle").click();
-    await expect(side).not.toHaveAttribute("data-expanded", "");
-    await expect(side.getByRole("link", { name: "Einstellungen", exact: true })).toBeVisible();
+    await expect(side).toHaveAttribute("data-expanded", "");
+    await expect(side.getByRole("link", { name: /^Trades\s+Deine Einträge/ })).toBeVisible();
+    await expect(side.getByRole("button", { name: /^Auswerten/ })).toHaveAttribute("aria-expanded", "false");
+    await side.getByRole("button", { name: /^Auswerten/ }).click();
+    await side.getByRole("link", { name: /^Analyse/ }).click();
+    await expect(page).toHaveURL(/#analyse$/);
+    await expect(side.getByRole("link", { name: /^Analyse/ })).toHaveAttribute("aria-current", "page");
+    // the choice (open) and the folded groups survive a reload
     await page.reload();
-    await expect(page.locator('[data-layer="Seitenleiste"]')).not.toHaveAttribute("data-expanded", "");
-    await page.locator('[data-layer="Seitenleiste"]').getByTestId("sidebar-toggle").click();
     await expect(page.locator('[data-layer="Seitenleiste"]')).toHaveAttribute("data-expanded", "");
+    await expect(page.locator('[data-layer="Seitenleiste"]').getByRole("button", { name: /^Auswerten/ })).toHaveAttribute("aria-expanded", "true");
+    await page.locator('[data-layer="Seitenleiste"]').getByTestId("sidebar-toggle").click();
+    await expect(page.locator('[data-layer="Seitenleiste"]')).not.toHaveAttribute("data-expanded", "");
     await expectNoHorizontalScroll(page);
     expect(errors, errors.join("\n")).toEqual([]);
   });
@@ -127,8 +131,10 @@ test.describe("Navigation in vier Gruppen", () => {
     });
   }
 
-  test("keine Tippfläche der Navigation unter 44 px und keine überlappt (Kopfleiste, Leiste / Seitenleiste, Menü)", async ({ page }) => {
+  test("keine Tippfläche der Navigation unter 44 px und keine überlappt (Kopfleiste, Leiste / Seitenleiste, Menü)", async ({ page }, info) => {
     await seed(page);
+    // tall enough for the whole rail: a row cut by the end of the scrolling list is not a small target
+    if (!mobile(info.project.name)) await page.setViewportSize({ width: 1440, height: 1500 });
     await page.goto("/#overview");
     await expect(page.getByText("Netto-P&L").first()).toBeVisible();
     await page.waitForTimeout(2000);

@@ -112,7 +112,7 @@ toasts: Toast[]; pushToast({ kind: "success"|"error"|"signal"|"info", title, val
 dismissToast(id)            // auto-dismiss 2800 ms, `signal` 5200 ms (TOAST_MS)
 
 // persisted prefs (localStorage `tj2-ui`, never in a backup):
-theme, hideLocalBanner, sparkline ("readings"|"live"), topTraderBase ("accounts"|"positions"), useProxy,
+theme, hideLocalBanner (no longer read: local mode is a header badge since Etappe 1a), sidebar ("auto"|"open"|"closed"), sidebarClosed (folded sidebar groups or null), sparkline ("readings"|"live"), topTraderBase ("accounts"|"positions"), useProxy,
 chart { interval: "1m"|"30m"|"1h"|"4h", rangeDays, pane: "ratio"|"oi"|"cvd", open }, flags: Record<string, boolean>
 // (30m is resampled from kline_15m by ChartCard; an unknown stored interval falls back to 4h)
 setPref("hideLocalBanner", true); setChart({ pane: "oi" }); setFlag("trLayout", true)

@@ -3,8 +3,8 @@
  * primary action „Trade eintragen“ on top and a collapse button at the foot. Below 768 px the bottom bar (`Dock.tsx`) and the
  * menu behind „Mehr“ carry the same groups; the two never exist together (`useMediaQuery(WIDE_QUERY)`).
  *
- * Wide (≥ 1280 px, or when the reader opened it): 256 px – group titles, page names with their plain-word hint. Narrow rail
- * (768 – 1279 px by default, or when the reader closed it): 64 px – icons, names in a tooltip and as `aria-label`. The choice is kept
+ * Wide (≥ 1624 px, or when the reader opened it): 256 px – group titles, page names with their plain-word hint. Narrow rail
+ * (768 – 1623 px by default, or when the reader closed it): 64 px – icons, names in a tooltip and as `aria-label`. The choice is kept
  * (`uiStore.sidebar`: auto | open | closed, stored in `tj2-ui`). The rail's width never costs a page its room: `auto` collapses
  * exactly where the pages need it.
  *
@@ -30,18 +30,25 @@ import { navigate } from "@/store/router";
 import { NAV_GROUP_IDS, useUi, type NavGroupId, type Page } from "@/store/uiStore";
 
 export const SIDEBAR_WIDTH = { wide: 256, rail: 64 } as const;
-/** From this width `auto` shows the wide sidebar; below it the rail. */
-export const SIDEBAR_AUTO_QUERY = "(min-width: 1280px)";
+/**
+ * From this width `auto` shows the wide sidebar; below it the rail. 1624 = the page column's 1320 px + its 48 px gutters + the 256 px sidebar:
+ * up to there the rail leaves the pages the width they were laid out and reserved for (the Markt page grew 87 px after the first picture
+ * beside the wide sidebar at 1440 px – `layout-shift.spec.ts`); whoever opens the wide sidebar below it chooses that trade-off.
+ */
+export const SIDEBAR_AUTO_QUERY = "(min-width: 1624px)";
 export const SIDEBAR_LABEL = "Hauptnavigation";
 export const SIDEBAR_STRINGS = { collapse: "Seitenleiste einklappen", expand: "Seitenleiste ausklappen", legal: "Rechtliches" } as const;
 
 /** Below this screen height the wide sidebar folds every group but the current one until the reader chooses (19 rows of 44 px do not fit). */
 export const SIDEBAR_SHORT_QUERY = "(max-height: 1299px)";
 
-/** Pure: the folded groups. An explicit choice wins; otherwise a short screen folds all but the current group and „Konto & Rechtliches“ (Einstellungen stay one tap away). */
+/** The groups a short screen folds by default: the long list of evaluation pages and the account group – Erfassen (Trades …) and Prüfen (Übersicht, Markt …) stay open. */
+const FOLD_WHEN_SHORT: readonly NavGroupId[] = ["auswerten", "konto"];
+
+/** Pure: the folded groups. An explicit choice wins; otherwise a short screen folds Auswerten and Konto & Rechtliches unless one of them holds the current page. */
 export function closedGroups(stored: readonly NavGroupId[] | null, short: boolean, current: NavGroupId): readonly NavGroupId[] {
   if (stored) return stored;
-  return short ? NAV_GROUP_IDS.filter((g) => g !== current && g !== "konto") : [];
+  return short ? NAV_GROUP_IDS.filter((g) => g !== current && FOLD_WHEN_SHORT.includes(g)) : [];
 }
 
 /** Pure: is the sidebar wide? `open` / `closed` are the reader's choice; `auto` follows the screen width. */

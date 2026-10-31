@@ -296,9 +296,13 @@ export function BestSetupsCard({ view }: { view: BoxesView }) {
       {view.state === "off" || view.state === "error" ? (
         <p className="text-[13px] text-mute">{view.detail}</p>
       ) : loading && !best.length ? (
-        <div className="flex min-h-[302px] items-center gap-3 py-6 text-[13px] text-mute lg:min-h-[229px]" data-testid="best-loading">
-          <DotMatrix preset="loader" size={3} gap={2} label={S.loading} />
-          <span>{view.detail ?? S.loading}</span>
+        // the reserve follows the card's own width: beside the sidebar (md+) a wide screen gives the card ~ 600 px, where the loaded
+        // setup tile is 13 px taller than at 720 px (its badge row wraps) – a viewport breakpoint alone missed that (layout-shift spec)
+        <div className="@container">
+          <div className="flex min-h-[302px] items-center gap-3 py-6 text-[13px] text-mute lg:min-h-[229px] lg:@max-[700px]:min-h-[242px]" data-testid="best-loading">
+            <DotMatrix preset="loader" size={3} gap={2} label={S.loading} />
+            <span>{view.detail ?? S.loading}</span>
+          </div>
         </div>
       ) : best.length ? (
         <CardSpread variant="deal" play={deal} className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-3" itemClassName="min-w-0" label={S.title}>

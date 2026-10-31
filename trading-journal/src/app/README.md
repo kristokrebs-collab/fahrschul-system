@@ -395,8 +395,8 @@ Die Reihenfolge von `PAGES` bleibt (die Ziffern 1–9 und die `g`-Buchstaben wan
   (10 px, Tooltip-Platte entfällt). „Mehr“ öffnet das Menü und leuchtet (Scheibe) auf jeder Seite, die nicht in der Leiste steht – man sieht, wo man ist. Bewegung und Federn unverändert: Hop nach Druckdauer, Flick, Scrubben, Federn
   `spring.pop` / `spring.layout`, Marker als WAAPI-FLIP, Magnetic, Einflug einmal je Sitzung, Ping-Ring am Mittelknopf, Morph des Editors aus der Scheibe. `toolbar` „Navigation“ bleibt (Tests und Screenreader).
 - **Ab 768 px – die Seitenleiste** (`Sidebar.tsx`, `data-layer="Seitenleiste"`, `sticky` unter der Kopfleiste): oben `Trade eintragen` (dieselbe Taste wie in der Kopfleiste, `NewTradeButton`), darunter die vier Gruppen mit Titel, jede Seite 44 px hoch mit
-  Name und Anfänger-Wort; am Fuß Rechtliches und „Einklappen“. **Breit** (256 px) ab 1280 px, sonst die **schmale Leiste** (64 px: Symbole, Name + Wort im Tooltip, `aria-label`). `uiStore.sidebar` = `auto | open | closed`
-  (`tj2-ui`, bleibt erhalten); `auto` folgt der Breite, damit die Seiten ihren Platz behalten (`--sidebar-w` auf `<html>` hält den Fuß der Seite frei). Die Gruppentitel sind Knöpfe (`aria-expanded`): 19 Zeilen à 44 px passen auf keinen Bildschirm unter 1300 px Höhe, darum faltet `auto` dort alle Gruppen bis auf die der aktuellen Seite und „Konto & Rechtliches“ (damit die Einstellungen einen Tipp entfernt bleiben; `closedGroups`, `uiStore.sidebarClosed`: `null` = nicht gewählt, sonst die gefalteten Gruppen, in `tj2-ui`); wer eine Seite einer gefalteten Gruppe öffnet (Link, Taste, Suche), sieht sie wieder aufgeklappt, die aktuelle Zeile scrollt ins Bild. In der schmalen Leiste fehlen die Titel, dort scrollt die Liste. Ein Marker (`spring.layout`, nur Transform) gleitet von Zeile zu Zeile, die Namen
+  Name und Anfänger-Wort; am Fuß Rechtliches und „Einklappen“. **Breit** (256 px) ab 1624 px (= Seitenspalte 1320 + Ränder 48 + Leiste 256; darunter lässt die schmale Leiste den Seiten die Breite, für die sie gebaut und reserviert sind – die Markt-Seite wuchs neben der breiten Leiste bei 1440 px nach dem ersten Bild um 87 px), sonst die **schmale Leiste** (64 px: Symbole, Name + Wort im Tooltip, `aria-label`). `uiStore.sidebar` = `auto | open | closed`
+  (`tj2-ui`, bleibt erhalten); `auto` folgt der Breite, damit die Seiten ihren Platz behalten (`--sidebar-w` auf `<html>` hält den Fuß der Seite frei). Die Gruppentitel sind Knöpfe (`aria-expanded`): 19 Zeilen à 44 px passen auf keinen Bildschirm unter 1300 px Höhe, darum faltet `auto` dort „Auswerten“ und „Konto & Rechtliches“ (außer eine davon hält die aktuelle Seite), „Erfassen“ (Trades) und „Prüfen“ (Übersicht, Markt) bleiben offen; Auswerten-Seiten und Einstellungen sind dann zwei Tipps entfernt (`closedGroups`, `uiStore.sidebarClosed`: `null` = nicht gewählt, sonst die gefalteten Gruppen, in `tj2-ui`); wer eine Seite einer gefalteten Gruppe öffnet (Link, Taste, Suche), sieht sie wieder aufgeklappt, die aktuelle Zeile scrollt ins Bild. In der schmalen Leiste fehlen die Titel, dort scrollt die Liste. Ein Marker (`spring.layout`, nur Transform) gleitet von Zeile zu Zeile, die Namen
   blenden beim Ausklappen ein (`spring.smooth`); die Breite selbst schaltet in einem Schritt um (kein Umbruch der langen Seite pro Frame). Dock und Seitenleiste sind nie zusammen da (`useMediaQuery(WIDE_QUERY)`).
 - **Kopfleiste** bleibt schlank: ab 768 px ohne eigene `Trade eintragen`-Taste (sie steht in der Seitenleiste), Assistent / Vollbild / Menü zeigen ab 1280 px ihr Wort, darunter Tooltip + `aria-label`; „Lokaler Modus“ ist ein kleines Schild
   (`LocalModeBadge`, Tipp erklärt es) statt des Banners. Das rote „Speichern nicht möglich.“ bleibt ein Banner (es geht um verlorene Daten, nicht um einen Hinweis).
@@ -404,6 +404,49 @@ Die Reihenfolge von `PAGES` bleibt (die Ziffern 1–9 und die `g`-Buchstaben wan
   (`tests/unit/styles.tap.test.ts`). Kopfleisten-Knöpfe, Seitenleistenzeilen, Leistenknöpfe und das Schild nutzen es; Zeilen liegen untereinander (keine überlappenden Tippflächen).
 - **Erster Besuch**: das Einführungs-Fenster öffnet sich nicht mehr von selbst. Ein leeres Journal zeigt – nur beim allerersten Besuch, auf Übersicht und Trades – einen Leerzustand mit genau einer Aktion („Ersten Trade eintragen“,
   `FirstRunEmpty`, merkt sich den Besuch als `seen`). Wer das Fenster früher gesehen hat (`done` / `skipped`) oder schon Trades hat (`seen`), sieht ihn nie. Die Tour bleibt unter Einstellungen → Einführung & Hilfe, in der Suche und im Tastenblatt.
+
+### Messung vorher / nachher (Etappe 1a)
+
+`tests/e2e/nav-baseline.spec.ts` (mobil 390 × 844, Desktop 1440 × 900, `NAV_BASELINE_OUT=<datei>`; `NAV_ONLY_HIT=1` misst nur die Tippflächen der Hülle) – dieselbe Messung auf der alten und der neuen Navigation, gleiche Seed-Daten:
+
+| Messwert | mobil vorher | mobil nachher | Desktop vorher | Desktop nachher |
+|---|---|---|---|---|
+| Seitenlänge, Mittel der fünf Hauptseiten (px) | 12 469 | 12 382 | 6 786 | 6 746 |
+| längste Seite (Markt, px) | 20 982 | 20 871 | 11 342 | 11 299 |
+| Taps bis „Trade eintragen“-Editor, jede der 19 Seiten | 1 | 1 | 1 | 1 |
+| Taps von der Übersicht zu einer Seite, Mittel der 19 | 1,74 | 1,84 | 1,74 | **1,00** |
+| … Höchstwert | 2 | 2 | 2 | **1** |
+| Tippflächen ≥ 44 px, Hülle (Kopfleiste / Leiste bzw. Seitenleiste / Menü) | 100 / 100 / 100 % | 100 / 100 / 100 % | 20 / 100 / 93 % | 100 / 77* / 100 % |
+| Tippflächen ≥ 44 px, die fünf Hauptseiten | 99,4 – 100 % | 99,4 – 100 % | 8 – 73 % | 10 – 76 % |
+
+Die Seiten selbst sind nicht kürzer geworden (Inhalt unverändert, Übersicht und Cockpit unangetastet) – die Länge schwankt nur um die Seitenleisten-Breite (±1 %). Gewonnen hat das **Finden**: am Computer ist jede Seite ein Tipp entfernt (vorher
+zwei für 15 von 19), mobil sind die drei Seiten der Leiste ein Tipp, alles andere zwei („Mehr“, dann die Seite) – **mobil sind zwei Seiten schlechter geworden: Entscheidungsgrundlagen und Einstellungen waren Dock-Tabs (1 Tipp), jetzt 2**
+(Mittel 1,74 → 1,84). Das ist der Preis der Vorgabe „Übersicht, Trades, Markt, Mehr“; die Seiten stehen im Menü in „Erfassen“ und „Konto & Rechtliches“, und `g e` / `g s` / die Suche gehen weiter.
+\* 5 von 22 Zeilen der Seitenleiste meldet die Trefferprüfung als zu klein, wenn der Bildschirm nur 900 px hoch ist: es sind Zeilen am unteren Rand der scrollenden Liste, die der Fuß verdeckt (kein zu kleines Ziel;
+in `nav-groups.spec.ts` mit hohem Fenster geprüft: keine Fläche unter 44 px, keine überlappt). Die Hauptseiten am Computer (Zeiger „fein“) bleiben so dicht wie vorher: `touch-hit` gilt dort nur für grobe Zeiger – nicht Teil dieser Etappe.
+
+### Fresh-eyes-Prüfung (Etappe 1a, Screenshots 320 / 768 / 1440, 60-Sekunden-Test)
+
+| Frage | Antwort eines Fremden | Beleg |
+|---|---|---|
+| Wo trage ich einen Trade ein? | Mobil: der rote Knopf „Trade“ in der Mitte der unteren Leiste, auch das „+“ oben rechts. Computer: „Trade eintragen“ ganz oben in der Seitenleiste. Ein Tipp von jeder der 19 Seiten. | `nav-baseline.spec.ts` (Taps 1 / 1), `shots2/390-markt.png`, `shots3/1440-overview.png` |
+| Wo sehe ich Markt? | Mobil: dritter Knopf der Leiste, mit Wort. Computer: Seitenleiste, Gruppe „Prüfen“. | wie oben |
+| Wo sind die Einstellungen? | Mobil: „Mehr“ → Gruppe „Konto & Rechtliches“, erste Karte (2 Tipps). Computer: Seitenleiste, Gruppe „Konto & Rechtliches“ (auf einem 900 px hohen Fenster erst aufklappen: 2 Tipps; ab 1300 px Höhe sofort sichtbar). | `shots2/390-finder.png` |
+| Wo sind Wal- / Top-Trader-Daten? | Top-Trader: Suchfeld im Menü („Top Trader“ → „Top-Trader-Positionierung“, Übersicht) und Markt-Seite. **Wal-Daten gibt es in der App nicht** (keine On-Chain-Wale); „Wale“ fand vorher nichts – jetzt führt es zu den Top-Trader-Quoten und sagt im Eintrag, dass es Binance-Top-Trader sind. | Finder-Lauf (`Q Wale`), `features.ts` `top-trader` |
+
+| Nr | Schwere | Befund | Beleg | Korrektur |
+|---|---|---|---|---|
+| 1 | stört | 320 px: die Kopfleiste lief über, „Trade eintragen“ stand außerhalb des Bildschirms | `shots2/320-markt.png` (vorher) | Kurs-Anzeige unter 360 px aus, Abstände enger (`Header.tsx`), `nav-groups.spec.ts` „320 px“ |
+| 2 | stört | breite Seitenleiste bei 1440 px: die Markt-Seite wuchs nach dem ersten Bild um 87 px (Grenze 60), weil ihre Platzhalter für 1320 px Spaltenbreite gemessen sind | `layout-shift.spec.ts` markt (desktop) 11 411 → 11 498 px | `auto` zeigt die breite Leiste erst ab 1624 px (Spalte 1320 + Ränder + Leiste), darunter die schmale; Platzhalter der Beste-Setups-Karte folgt nun der Kartenbreite |
+| 3 | stört | breite Seitenleiste auf 900 px Höhe: „Trades“ lag unter dem Rand (19 Zeilen à 44 px passen nirgends) | `touch.spec.ts` Tablet, `back.spec.ts` | Gruppen faltbar; auf kurzen Bildschirmen sind „Auswerten“ und „Konto“ gefaltet, „Erfassen“ und „Prüfen“ offen; aktuelle Zeile scrollt ins Bild |
+| 4 | stört | Menü am Computer: Karten zu schmal, „Handelsplan“ → „H“, Hinweise abgeschnitten | `shots3/1440-menu.png` | Karten mindestens 236 px breit (drei je Reihe) |
+| 5 | stört | Kontrast der Gruppentitel und Hinweise in der Seitenleiste unter 4,5 : 1 (axe, dunkel und hell) | `nav-groups.spec.ts` (Barrierefreiheit) | `text-mute` statt `text-faint` |
+| 6 | stört | Rechtliches-Links (Impressum, Datenschutz, AGB) in Menü, Seitenleiste und Fuß: Tippflächen überlappten oder waren 17 px hoch | Trefferprüfung Menü 93 % → 100 % | eigene 44-px-Zeilen (`LegalLinks roomy`) |
+| 7 | Politur | Schmale Leiste (Standard bei 768 – 1623 px) zeigt nur Symbole; die Namen stehen im Tooltip und im Menü-Knopf der Kopfleiste | `shots3/1440-overview.png` | offen: Entscheidung Auftraggeber – breit als Standard (kostet bei 1440 px die Markt-Platzhalter, siehe 2) oder Platzhalter der Markt-Seite neu messen |
+| 8 | Politur | Das Suchfeld findet Funktionen, nicht Seiten: „Einstellungen“ führt zu „Box-Einstellungen …“, die Seite selbst steht darunter in der Liste | Finder-Lauf | nicht geändert (zwei Suchen wären eine zweite Suche); die Gruppenliste liegt direkt unter dem Feld |
+| 9 | Politur | „Mehr“ wartet auf die gestaffelte Einblendung des Menüs (bis 1,8 s) | Zeitablauf `CONFIG.delays` | unverändert (pulse-motion-Maße); offen |
+
+Nicht geprüft: Safari / iOS (nur Chromium), echte Touch-Geräte (nur Emulation und CDP-Touch), Screenreader (nur axe), die Cloud-Edition `build:e2e-cloud`, die Teilen-Edition.
 
 ## Zusammenhang & Navigation (Feinschliff, Runde 8)
 
