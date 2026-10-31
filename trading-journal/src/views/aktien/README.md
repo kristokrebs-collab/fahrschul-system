@@ -2,7 +2,7 @@
 
 The stock module next to the crypto core (F67 scanner, part of F68 news). Registered as the lazy page `aktien` (`pages.ts`, page key `i`,
 Dock label "Aktien", icon `stocks`); the shell never imports the barrel `index.ts` statically. Sections (each a `SectionTitle` with
-`SectionNav` chips): **Scanner · Watchlist · News · Analyse · Kongress**.
+`SectionNav` chips): **Scanner · Watchlist · News · Analyse · Kongress · Branchen-Trend**.
 
 Every number on this page has a source and a time next to it (`StampLine`: "Quelle: Yahoo Finance (inoffiziell) · Abruf … · letzte Kerze …").
 A source that cannot be reached is an empty state **with its reason** ("Das Symbolverzeichnis konnte nicht geladen werden: …"), never a
@@ -51,6 +51,23 @@ Logic: `src/domain/congress` (delay, labels, windows, member match, list + filte
 **Not done on purpose:** no "folge Pelosi" signal, no orders, no Senate scraping, no alert on a new filing (only the mark at the next visit).
 
 Tests: `tests/unit/views.aktien.kongress.test.tsx` (the card on the whole chain: real Clerk files → real functions → client → UI), `congress.{parse,domain,client}.test.ts`, `functions.congress.test.ts`, e2e `tests/e2e/aktien-kongress.spec.ts` (mobile + desktop, axe dark + light; `tests/e2e/mocks/congress.ts` answers the two functions with the real rows of the fixture PDFs, dates moved relative to today; set `AKTIEN_SHOTS_DIR` for screenshots).
+
+## Branchen-Trend (`branchen/`, section Branchen-Trend, F67)
+
+The trend rule of Zarattini & Antonacci (2024), „A Century of Profitable Industry Trends“, on the 48 US industries of Kenneth French's data library – a look BACK, no forecast, no advice, no order. Its own lazy chunk (`lazy(() => import("./branchen/BranchenCard"))` in `AktienView`), nothing is asked before the section has been on screen once. Logic: `src/domain/industryTrend` (README there: what is verified against the lab script's own output), data: `src/market/industry` + `netlify/functions/industry-daily.mts`.
+
+| module | what |
+|---|---|
+| `BranchenCard.tsx` | the section: four cards below, loads the data once the section is in view. `data-testid="aktien-branchen"`. |
+| `AmpelCard.tsx` | the Ampel of the 48 industries: tiles (green = Kaufsignal, red = Cash – always also a word), day of the last change and trading days since, target weight; sort (Signal · Neuester Wechsel · Gewicht · A–Z), search (umlaut-tolerant), „Nur Kaufsignale“; the stand of the data first („Daten bis 30.09.2026 · Datenbank 202609 · monatlich aktualisiert, kein Echtzeit“). 48 placeholders of the tile's size stand in while loading (the grid is as high before the data as after it); a source that cannot be reached is a sentence with its reason and a retry; a copy from the device is labelled as a copy. Tiles move on `spring.layout` (not under reduced motion). |
+| `ErgebnisCard.tsx` | „Ergebnis eines Laufs prüfen“: pick a `megatest.json` (read in the browser only, ≤ 4 MB, shape checked, the first wrong place named) or „Beispiel laden“ (a REAL run, `public/branchen-trend/beispiel-megatest.json`, 113 KB, fetched on click – not in any bundle). Shows the verdict **as the file's checks give it** (VERWORFEN / ÜBERNOMMEN, the checks as ✓/✗ with their values, a contradiction inside the file is said), the base's and the candidate's figures per period (Entwicklung · Validierung · Endtest · Gesamt) and the market, the scatter „Auswahl gegen Endtest“, the Sharpe distribution, the Monte-Carlo fan (`charts.tsx`, canvas) and the top variants. The command to run the lab script is offered with the honest note that the factor data (market return and RF) are needed and not loaded by the app. The app never runs the 12,000 variants, never picks a „best“ one and never switches the Ampel to a candidate. |
+| `charts.tsx` | `ScatterChart`, `HistogramChart`, `FanChart` on a canvas (colours from the live palette `ink`, redraw on theme change, dpr ≤ 2): percentile bands from all paths + a sample of lines, log scale, drawn in once with an ease-out when the chart comes into view (immediately under reduced motion), crosshair with P05 / median / P95 by pointer and by arrow keys (read out through a live region). The title carries the honest count („10.000 simulierte Pfade“), the picture is the sample. |
+| `PineCard.tsx` | the Pine v5 indicator for an ETF / index chart (copy, save as `.pine`), the notes on what differs, the alert message and its JSON schema, and how a webhook could be attached later (n8n) – with the plain sentence that the script was NOT compiled in TradingView and that there is no receiver for these signals in the app. |
+| `ProtokollCard.tsx` | the paper protocol of signal changes (format of the lab script's `vault/protokoll.jsonl`), local to this device (`tj2-aktien-branchen-protokoll`, ≤ 2000 lines), automatic on/off, export as `.jsonl`, read a `.jsonl` back, clear (asks first). Every line: `modus: "DEMO/PAPIER"`, `gesendet: false`. The Virtuelles Konto (Labor › Forward-Test, F23) is **not** connected – it runs a frozen rule tree of the lab on Binance candles – and the card says so. |
+| `store.ts` · `ampelList.ts` · `strings.ts` · `clipboard.ts` | state (data phase, Ampel, protocol, the loaded result; prefs in `tj2-aktien-branchen`), sort / search, the German copy, copy to clipboard. |
+
+Tests: `tests/unit/views.aktien.branchen.test.tsx` (the whole chain: card ← client ← the function run for real ← a mocked library; the real example says VERWORFEN), `industryTrend.*`, `functions.industry`, `market.industry`, e2e `tests/e2e/aktien-branchen.spec.ts` (mobile + desktop; `tests/e2e/mocks/industry.ts` answers the function with a small deterministic world; set `AKTIEN_SHOTS_DIR` for screenshots).
+**Not done on purpose / open:** no TradingView webhook receiver (needs a service and the user's say-so; the payload and a JSON schema are documented in the card), no Virtuelles-Konto link, no portfolio curve of the base rule (needs the risk-free rate), no real-time prices.
 
 ## Plan link (Handelsplan)
 

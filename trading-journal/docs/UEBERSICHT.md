@@ -164,7 +164,7 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 16 Funktionen
 
 ### Aktien beobachten & bewerten
 
-_Scannen, beobachten, lesen und bewerten – Aktien und Krypto._ · 7 Funktionen
+_Scannen, beobachten, lesen und bewerten – Aktien und Krypto._ · 8 Funktionen
 
 **Finden & beobachten**
 
@@ -174,6 +174,7 @@ _Scannen, beobachten, lesen und bewerten – Aktien und Krypto._ · 7 Funktionen
 | Titel merken und ihren Kurs im Blick behalten | Watchlist (Aktien und Krypto) | Aktien › Watchlist | fertig |
 | Schlagzeilen zu deiner Watchlist lesen | News-Monitor (Watchlist) | Aktien › News | teilweise |
 | Sehen, welche Aktiengeschäfte Mitglieder des US-Kongresses gemeldet haben | Kongress-Tracker | Aktien › Kongress | teilweise |
+| Sehen, welche US-Branchen die Trendregel gerade kauft | Branchen-Trend | Aktien › Branchen-Trend | teilweise |
 
 **Zahlen & Bewertung**
 

@@ -11,6 +11,7 @@ export const AKTIEN = {
     news: { title: "News", sub: "Schlagzeilen zu den Aktien deiner Watchlist. Ein Hinweis, was zuerst gelesen werden will – kein Handelssignal." },
     analyse: { title: "Analyse", sub: "Zahlen, Bewertung und Kaufthese." },
     kongress: { title: "Kongress", sub: "Aktiengeschäfte von Kongressmitgliedern laut öffentlicher Meldung – Wochen später, als Spannen, kein Handelssignal." },
+    branchen: { title: "Branchen-Trend", sub: "Ampel der 48 US-Branchen nach Zarattini & Antonacci (2024) – Rückblick-Regel auf Tagesdaten, keine Prognose – und die Prüfung eines Labor-Laufs." },
   },
   scanner: {
     title: "Scanner",

@@ -122,7 +122,7 @@ describe("Aktien page", () => {
     wrap();
     expect(screen.getByRole("heading", { level: 1, name: "Aktien" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Inhalt dieser Seite" });
-    expect(within(nav).getAllByRole("button").map((l) => l.textContent)).toEqual(["Scanner", "Watchlist", "News", "Analyse", "DCF-Rechner", "Kaufthese", "Kongress"]);
+    expect(within(nav).getAllByRole("button").map((l) => l.textContent)).toEqual(["Scanner", "Watchlist", "News", "Analyse", "DCF-Rechner", "Kaufthese", "Kongress", "Branchen-Trend"]);
     expect(screen.getByTestId("aktien-results-idle")).toBeInTheDocument();
     expect(screen.getByTestId("aktien-watch-empty")).toBeInTheDocument();
     expect(screen.getByTestId("aktien-news-empty")).toBeInTheDocument();
@@ -134,6 +134,8 @@ describe("Aktien page", () => {
     const kongress = await screen.findByTestId("aktien-kongress", undefined, { timeout: 15_000 });
     expect(kongress).toHaveTextContent("Kongress-Tracker");
     expect(kongress).not.toHaveTextContent("Kommt gleich");
+    // Branchen-Trend is its own lazy chunk and arrives with its honest points on screen
+    expect(await within(await screen.findByTestId("aktien-branchen", undefined, { timeout: 15_000 })).findByTestId("branchen-honest")).toHaveTextContent("Rückblick, keine Prognose");
     // the caveats are on screen from the first paint; the Clerk is asked only once the section has been on screen (no observer fires here)
     expect(within(kongress).getByTestId("kongress-caveats")).toHaveTextContent("bis zu 45 Tage");
     expect(within(kongress).getByTestId("kongress-senate")).toHaveTextContent("Senat: nur von Hand");

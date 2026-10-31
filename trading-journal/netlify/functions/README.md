@@ -198,6 +198,18 @@ Logik in `_lib/congress/`: `load.ts` (Abruf mit eigenem User-Agent und 7-s-Zeitl
 
 Tests: `tests/unit/functions.congress.test.ts` (**echte Dateien des Clerk** aus `tests/fixtures/congress/`, abgerufen 2026-10-26, hinter gemocktem `fetch`: Index, Zeilen, Zwischenspeicher, stale, User-Agent ohne Nutzerdaten, alle typisierten Fehler, Gate, Limits, Fenster des Clerk), `tests/unit/congress.parse.test.ts` (Leser auf den echten PDFs, Verweigerungen). **Live geprüft** (Sandbox-Netz, Proxy): Index und 4 Meldungen über die echten Funktionen in 0,6 s / 0,5 s; 110 Meldungen 2026 und 38 aus 2023/2025 gelesen – alle elektronischen ohne eine nicht lesbare Zeile, die eingescannten Papierformulare als `scan`. **Nicht geprüft:** ein Lauf auf einem veröffentlichten Netlify-Deploy (Zeitlimit der Funktion, Kaltstart, Region) und mit echtem `rate_hit`.
 
+## Functions (Branchen-Trend – Ken French data library, public data)
+
+Eine Funktion für Aktien › Branchen-Trend. **Öffentliche Daten, kein Schlüssel, nichts Persönliches rein oder raus**: Die Anfrage hat keine Parameter; der Server holt eine feste Adresse (`48_Industry_Portfolios_daily_CSV.zip` der Datenbibliothek von Kenneth R. French, ca. 4 MB, eine CSV mit 21 MB darin), liest nur die erste Tabelle (wertgewichtete Tagesrenditen von 48 US-Branchen ab 1926) und schickt sie klein: ein gzip-Block (Tage als Int32, Renditen als Int16 in Basispunkten, `-32768` = kein Wert) in base64. Die Datei wird etwa monatlich aktualisiert und liegt ein bis zwei Monate zurück – es ist kein Echtzeit-Dienst.
+
+Logik in `_lib/industry/load.ts` (Abruf mit eigenem User-Agent und 8-s-Zeitlimit, Größengrenze 12 MB, ZIP über `_lib/congress/zip.ts` ohne neue Abhängigkeit, Zwischenspeicher je Instanz 6 h mit geteiltem Abruf, bei Ausfall die letzte Kopie bis 90 Tage als `stale`, typisierte Fehler). Das Reine (Antwortvertrag) liegt alias-frei in `src/market/industry/wire.ts`. Gate und Rate-Limit wie bei den Aktien-Funktionen (`stockGuard`: Tarif-Funktion `boxScanner`, solange Zahlungen nicht eingerichtet sind offen; 20 / 10 min je Nutzer oder pseudonymisierter IP).
+
+| file | route | notes |
+|---|---|---|
+| `industry-daily.mts` | GET `/api/v1/industry/daily` | `{ source: "ken-french", fetchedAt, fileTime, cached, stale?, database ("202609"), names[48], days, firstDay, lastDay, encoding, bytes, data }`. Gemessen auf der echten Datei: Entpacken 70 ms, Lesen 270 ms, Packen 80 ms; 26.338 Tage → 2,6 MB roh, 2,36 MB base64 (Grenze der Plattform für eine Antwort: 6 MB). `private, max-age=3600` (bei `stale` 0). Fehler: `industry_timeout` 504, `industry_upstream` 502, `industry_format` 502 (Aufbau der Datei hat sich geändert – es werden keine Zahlen geraten), `rate_limited` 429. |
+
+Tests: `tests/unit/functions.industry.test.ts` (ZIP im Aufbau der Bibliothek hinter gemocktem `fetch`: Lesen, Packen und genaues Auspacken, Zwischenspeicher, stale, User-Agent ohne Nutzerdaten, alle typisierten Fehler, Limits), `tests/unit/market.industry.test.ts` (Client und Entpacker). **Live geprüft** (Sandbox-Netz, 2026-10-31): die echte Datei (Stand 202609, letzter Tag 30.09.2026) durch Lesen, Packen, Auspacken und Ampel – dieselben 48 Zustände wie das Python-Skript. **Nicht geprüft:** ein Lauf auf einem veröffentlichten Netlify-Deploy (Zeitlimit der Funktion, Kaltstart, Speicher, Region) und mit echtem `rate_hit`.
+
 ## Functions (F67 / F68 Aktien – public data)
 
 Four read-only functions for US stocks. **Public data, no key, nothing personal in or out**: the only things that travel are
