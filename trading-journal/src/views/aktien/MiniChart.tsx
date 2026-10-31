@@ -2,9 +2,12 @@
  * The chart preview of a hit: the candles the rule read, as a small static SVG – wick and body per candle, the rule's
  * levels as dashed lines with their price, and a thin line where the rule matched. No library, no animation, no data beyond
  * what the hit already carries (`Hit.preview`), so opening it costs nothing and it can never show something else than what the
- * rule saw.
+ * rule saw. Runde 10: when it opens (it is on the rich Aktien page) one wipe uncovers it from the left (ease-out, 0.7 s,
+ * `clip-path` through WAAPI, once per mount); reduced motion shows it at once.
  */
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import { isRich } from "@/chart/rich";
+import { useReducedFx } from "@/motion/useReducedFx";
 import type { Level, Mark, ScanCandle } from "@/domain/scanner";
 import { clockText, priceText } from "@/domain/scanner";
 
@@ -25,6 +28,14 @@ const PAD = { l: 6, r: 74, t: 10, b: 18 };
 const dateText = (ms: number): string => new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(ms));
 
 export function MiniChart({ candles, levels, marks, timeZone, daily, label }: Props) {
+  const svg = useRef<SVGSVGElement>(null);
+  const reduced = useReducedFx();
+  useLayoutEffect(() => {
+    const el = svg.current;
+    if (!el || reduced || typeof el.animate !== "function" || !isRich(el)) return;
+    const run = el.animate([{ clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 -12% 0 0)" }], { duration: 700, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
+    return () => run.cancel();
+  }, [reduced]);
   const geo = useMemo(() => {
     const n = candles.length;
     if (!n) return null;
@@ -60,7 +71,7 @@ export function MiniChart({ candles, levels, marks, timeZone, daily, label }: Pr
   const first = candles[0]!;
   const last = candles[candles.length - 1]!;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} className="block h-auto w-full max-w-[420px] overflow-visible" data-testid="aktien-minichart" preserveAspectRatio="xMidYMid meet">
+    <svg ref={svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} className="block h-auto w-full max-w-[420px] overflow-visible" data-testid="aktien-minichart" preserveAspectRatio="xMidYMid meet">
       {levels.map((l) => (
         <g key={l.label}>
           <line x1={x0} x2={x1} y1={y(l.price)} y2={y(l.price)} stroke="currentColor" className="text-signal" strokeWidth={1} strokeDasharray="4 3" opacity={0.8} />

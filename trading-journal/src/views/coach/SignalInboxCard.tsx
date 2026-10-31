@@ -26,6 +26,7 @@ import { SignalDetail } from "./SignalDetail";
 import { useOutcomeState } from "./signalOutcomes";
 import { Chip, ideaInputOf, OutcomeBadge, stamp, useOutcomes } from "./signalUi";
 import { SampleLine } from "./ui";
+import { Rows } from "@/chart/rows";
 
 export const INBOX_STRINGS = {
   title: "Signal-Posteingang",
@@ -271,11 +272,11 @@ export function SignalInboxCard({ list, now, className }: { list: readonly Enric
               {INBOX_STRINGS.nothingMatches}
             </p>
           ) : (
-            <ul className="grid gap-2" aria-label="Eingegangene Signale">
+            <Rows className="grid gap-2" aria-label="Eingegangene Signale">
               {shown.map((r) => (
                 <InboxRowView key={r.event.id} row={r} list={list} now={now} />
               ))}
-            </ul>
+            </Rows>
           )}
           {rows.length > SHOWN && (
             <button type="button" onClick={() => setAll((v) => !v)} className="touch-hit w-fit text-[12px] text-mute underline decoration-line-2 underline-offset-4 hover:text-fg">

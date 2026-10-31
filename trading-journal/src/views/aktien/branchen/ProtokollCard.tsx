@@ -18,6 +18,7 @@ import { readFileText } from "@/views/labor/readFile";
 import { CardNote, CheckChip } from "../ui";
 import { useBranchen } from "./store";
 import { BRANCHEN } from "./strings";
+import { Rows } from "@/chart/rows";
 
 const P = BRANCHEN.protokoll;
 const SHOWN = 8;
@@ -82,9 +83,9 @@ export function ProtokollCard() {
             {P.last}
           </h3>
           {newest.length ? (
-            <ul className="grid gap-1.5" data-testid="branchen-log-list">
+            <Rows className="grid gap-1.5" data-testid="branchen-log-list">
               {newest.map((e) => (
-                <li key={`${e.datum}${e.branche}${e.signal}${e.strategie}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-ink-950/40 px-3 py-2 text-[12.5px]" data-testid="branchen-log-row" data-signal={e.signal}>
+                <li key={`${e.datum}${e.branche}${e.signal}${e.strategie}`} data-lift className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-ink-950/40 px-3 py-2 text-[12.5px]" data-testid="branchen-log-row" data-signal={e.signal}>
                   <span className="num font-mono text-fg">{fmtDay(e.datum)}</span>
                   <span className="min-w-0 flex-1 basis-40 truncate text-fg">
                     {industryName(e.branche)} <span className="num text-faint">{e.branche}</span>
@@ -97,7 +98,7 @@ export function ProtokollCard() {
                   </span>
                 </li>
               ))}
-            </ul>
+            </Rows>
           ) : (
             <p className="text-[13px] text-mute" data-testid="branchen-log-empty">
               {autoLog ? P.empty : P.emptyOff}

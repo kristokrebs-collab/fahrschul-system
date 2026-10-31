@@ -19,6 +19,7 @@ import { Badge } from "@/primitives/Badge";
 import { Card } from "@/primitives/Card";
 import { AnswerBars, KV } from "@/views/coach/ui";
 import { openTrade } from "@/views/insights/ui";
+import { Rows } from "@/chart/rows";
 
 const money = (v: number | null | undefined, cur: string) => (v == null || !Number.isFinite(v) ? "–" : `${signed(v, 0)} ${cur}`);
 const dec = (v: number | null | undefined, d = 1) => (v == null || !Number.isFinite(v) ? "–" : v.toFixed(d).replace(".", ","));
@@ -281,7 +282,7 @@ export function PsychCard({ report, className }: { report: Report; className?: s
   return (
     <Card title="Psychologie" note="Muster aus deinen Trades – keine Diagnose, nur Belege." className={className} data-testid="report-psych" innerClassName="grid content-start gap-4">
       {s.behaviors.length ? (
-        <ul className="grid" aria-label="Muster im Zeitraum">
+        <Rows className="grid" aria-label="Muster im Zeitraum">
           {s.behaviors.map((b) => (
             <li key={b.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line/60 py-1.5 text-[12.5px] last:border-b-0">
               <span className="min-w-0 truncate text-fg">
@@ -292,7 +293,7 @@ export function PsychCard({ report, className }: { report: Report; className?: s
               </span>
             </li>
           ))}
-        </ul>
+        </Rows>
       ) : (
         <Empty text="Keine auffälligen Muster in diesem Zeitraum." />
       )}
@@ -313,7 +314,7 @@ export function MistakesCard({ report, className }: { report: Report; className?
   return (
     <Card title="Fehler" note="Was die Fehler gegenüber sauberen Trades gekostet haben." className={className} data-testid="report-mistakes" innerClassName="grid content-start gap-3">
       {m.rows.length ? (
-        <ul className="grid" aria-label="Fehler im Zeitraum">
+        <Rows className="grid" aria-label="Fehler im Zeitraum">
           {m.rows.map((x) => (
             <li key={x.tag} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line/60 py-1.5 text-[12.5px] last:border-b-0">
               <span className="flex min-w-0 items-center gap-1.5 text-fg">
@@ -324,7 +325,7 @@ export function MistakesCard({ report, className }: { report: Report; className?
               <span className={cn("num font-mono", x.excess < 0 ? "text-loss" : "text-mute")}>{money(x.excess, cur)}</span>
             </li>
           ))}
-        </ul>
+        </Rows>
       ) : (
         <Empty text="Keine Fehler markiert oder erkannt." />
       )}
@@ -371,7 +372,7 @@ export function GoalsCard({ report, className }: { report: Report; className?: s
         ))}
       </dl>
       {g.rows.length ? (
-        <ul className="grid" aria-label="Ziele">
+        <Rows className="grid" aria-label="Ziele">
           {g.rows.map((x) => (
             <li key={x.title} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-line/60 py-2 last:border-b-0">
               <span className="grid min-w-0 gap-0.5">
@@ -383,7 +384,7 @@ export function GoalsCard({ report, className }: { report: Report; className?: s
               {x.met == null ? <Badge tone="mute">keine Daten</Badge> : x.met ? <Badge tone="win" dot>gehalten</Badge> : <Badge tone="loss">verfehlt</Badge>}
             </li>
           ))}
-        </ul>
+        </Rows>
       ) : (
         <>
           <Empty text={GOAL_HINT} />

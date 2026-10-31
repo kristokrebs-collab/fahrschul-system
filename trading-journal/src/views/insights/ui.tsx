@@ -2,6 +2,8 @@ import { motion } from "motion/react";
 import { useId, useState, type ReactNode } from "react";
 import type { Explanation } from "@/domain/explain";
 import type { EnrichedTrade } from "@/domain/types";
+import { CountText } from "@/chart/CountText";
+import { Rows } from "@/chart/rows";
 import { cn } from "@/lib/cn";
 import { tradeTime } from "@/lib/dates";
 import { colorClass, date as fmtDate, signed, time as fmtTime } from "@/lib/format";
@@ -81,12 +83,19 @@ export function InsightCard({ title, label, explain, action, note, children, inn
 /** Small segmented-control classes: taller hit targets on coarse pointers. */
 export const SEG_TOUCH = "pointer-coarse:[&>button]:min-h-11 pointer-coarse:[&>button]:min-w-11 pointer-coarse:[&>button]:justify-center";
 
+const STAT_VALUE = "num truncate font-mono text-[15px] font-medium leading-tight [[data-rich]_&]:transition-colors [[data-rich]_&]:duration-500";
+
 /** Compact label/value tile. */
 export function Stat({ label, value, sub, tone, className }: { label: ReactNode; value: ReactNode; sub?: ReactNode; tone?: string; className?: string }) {
   return (
     <div className={cn("grid min-w-0 content-start gap-1 rounded-xl border border-line bg-ink-950/50 px-3 py-2.5", className)}>
       <span className="break-words text-[10.5px] font-semibold uppercase tracking-[0.1em] text-mute">{label}</span>
-      <span className={cn("num truncate font-mono text-[15px] font-medium leading-tight", tone)}>{value}</span>
+      {/* text figures count up / roll on the rich pages only (`CountText` asks the DOM, so the Übersicht keeps its picture) */}
+      {typeof value === "string" ? (
+        <CountText text={value} revealKey={typeof label === "string" ? `stat:${label}|${value}` : undefined} className={cn(STAT_VALUE, tone)} />
+      ) : (
+        <span className={cn(STAT_VALUE, tone)}>{value}</span>
+      )}
       {sub != null && <span className="num truncate text-[11px] text-faint">{sub}</span>}
     </div>
   );
@@ -99,9 +108,9 @@ export function TradeRows({ trades, group, extra, className, timeOnly = false }:
   const hover = useHoverStore<string>();
   const press = usePressable({ scale: PRESS });
   return (
-    <ul className={cn("grid", className)}>
+    <Rows className={cn("grid", className)}>
       {trades.map((t, i) => (
-        <li key={t.id} className={cn("relative", i > 0 && "border-t border-line")} {...hover.bind(t.id)}>
+        <li key={t.id} data-lift className={cn("relative", i > 0 && "border-t border-line")} {...hover.bind(t.id)}>
           <HoverPillFor store={hover} id={t.id} group={group} className="inset-y-0.5" />
           <motion.button
             type="button"
@@ -123,7 +132,7 @@ export function TradeRows({ trades, group, extra, className, timeOnly = false }:
           </motion.button>
         </li>
       ))}
-    </ul>
+    </Rows>
   );
 }
 

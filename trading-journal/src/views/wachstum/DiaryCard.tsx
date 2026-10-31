@@ -19,6 +19,7 @@ import { EmptyState } from "@/primitives/EmptyState";
 import { useUi } from "@/store/uiStore";
 import { WACHSTUM } from "./strings";
 import { MoodGlyph } from "./ui";
+import { Rows } from "@/chart/rows";
 
 export const DIARY_ROWS = 10;
 
@@ -59,9 +60,9 @@ function Entry({ d }: { d: DiaryDay }) {
           </p>
         ))}
       {d.trades.length > 0 && (
-        <ul className="grid gap-1.5">
+        <Rows className="grid gap-1.5">
           {d.trades.map((t) => (
-            <li key={t.id}>
+            <li key={t.id} data-lift>
               <button type="button" onClick={() => openDetail(t.id, "insights")} className="grid w-full gap-0.5 rounded-xl border border-line px-3 py-2 text-left transition-colors hover:border-white/30">
                 <span className="flex items-center justify-between gap-2 text-[12px]">
                   <span className="font-medium">
@@ -74,7 +75,7 @@ function Entry({ d }: { d: DiaryDay }) {
               </button>
             </li>
           ))}
-        </ul>
+        </Rows>
       )}
       {d.patterns.length > 0 && <p className="text-[11.5px] text-signal">Muster: {d.patterns.join(", ")}</p>}
     </div>

@@ -4,7 +4,7 @@
  * the button. The table shows what happened in each neighbour – it names no best cell, because picking the best of nine
  * is exactly how an idea gets fitted to the past.
  */
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type CSSProperties } from "react";
 import { gridAxes, type GridAxisChoice, type GridCell, type GridResult } from "@/domain/lab/extras/paramGrid";
 import { cn } from "@/lib/cn";
 import { MorphSelect } from "@/motion/pulse/MorphSelect";
@@ -82,6 +82,8 @@ function Table({ g }: { g: GridResult }) {
                     data-yi={yi}
                     data-base={isBase ? "true" : "false"}
                     data-n={s?.n ?? 0}
+                    data-diag=""
+                    style={{ "--d": xi + yi } as CSSProperties}
                     className={cn("rounded-lg border px-2.5 py-2 align-top", isBase ? "border-white/50 bg-white/[0.05]" : "border-line bg-ink-950/40", few && "opacity-70")}
                   >
                     {s ? (

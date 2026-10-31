@@ -165,7 +165,7 @@ export function DistributionCard({ view, cur }: { view: AccountView; cur: string
       }
     >
       {rep.n < 5 ? (
-        <EmptyState title="Noch zu wenig Trades" text="Die Verteilung braucht mindestens 5 abgeschlossene Trades." line={progressLine(rep.n, 5)} />
+        <EmptyState chart title="Noch zu wenig Trades" text="Die Verteilung braucht mindestens 5 abgeschlossene Trades." line={progressLine(rep.n, 5)} />
       ) : (
         <div className="grid gap-4">
           <Histogram key={unit} rep={rep} cur={cur} />

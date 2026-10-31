@@ -106,7 +106,7 @@ export function MonthBenefitCard({ page, className }: { page: ReportPage; classN
   const title = report.period.to > now && report.period.from <= now ? BENEFIT_STRINGS.title : `Was hat dir das Journal im ${report.period.label} gebracht?`;
   return (
     <Card title={title} note={BENEFIT_STRINGS.note} className={className} data-testid="benefit-card" data-empty={b.empty} innerClassName="grid content-start gap-4">
-      {b.empty ? <EmptyState title={BENEFIT_STRINGS.emptyTitle} text={BENEFIT_STRINGS.emptyText} line={false} /> : <Figures b={b} />}
+      {b.empty ? <EmptyState chart title={BENEFIT_STRINGS.emptyTitle} text={BENEFIT_STRINGS.emptyText} line={false} /> : <Figures b={b} />}
       <div className={cn("grid gap-1.5 border-t border-line pt-3 text-[11.5px] leading-relaxed text-faint")} data-testid="benefit-limits-text">
         {BENEFIT_LIMITS.map((t) => (
           <p key={t}>{t}</p>

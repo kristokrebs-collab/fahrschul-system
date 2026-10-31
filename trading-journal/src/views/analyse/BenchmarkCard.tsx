@@ -139,7 +139,7 @@ export function BenchmarkCard({ view }: { view: AccountView }) {
     <AnaCard title={CARD_TITLES.benchmark} explain={() => explainBenchmark(rep, adaptive, symbol)} data-testid="ana-bench" note={rep ? `Konto gegen ${ANA_EMPTY.benchmarkSymbol(symbol)} · Tageskerzen des Live-Markts` : undefined}>
       <div className="grid gap-4">
         {!view.closed.length ? (
-          <EmptyState title="Noch keine Trades" text="Sobald du Trades abschließt, siehst du hier, ob du den Markt schlägst." line={EMPTY_LINE_CLOSED} />
+          <EmptyState chart title="Noch keine Trades" text="Sobald du Trades abschließt, siehst du hier, ob du den Markt schlägst." line={EMPTY_LINE_CLOSED} />
         ) : rep ? (
           <>
             <Race rep={rep} symbol={symbol} />
@@ -150,7 +150,7 @@ export function BenchmarkCard({ view }: { view: AccountView }) {
             <SourceStand source={stamp ? SOURCE_LABEL[stamp.source] : null} parts={[{ label: "Tageskerzen abgerufen", at: stamp?.at ?? null }]} testId="bench-stand" />
           </>
         ) : (
-          <EmptyState title={ANA_EMPTY.benchmark.title} text={ANA_EMPTY.benchmark.text} line={false} />
+          <EmptyState chart title={ANA_EMPTY.benchmark.title} text={ANA_EMPTY.benchmark.text} line={false} />
         )}
         <div className="grid gap-2 rounded-xl border border-line bg-ink-950/50 px-3 py-2.5" data-testid="bench-adaptive">
           <span className="label">Du gegen dich selbst · 90 Tage</span>

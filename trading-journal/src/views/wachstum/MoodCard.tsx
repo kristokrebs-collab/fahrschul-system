@@ -87,7 +87,7 @@ export function MoodCard({ factors, cur, className }: { factors: readonly PsychF
       ) : (
         // the whole card waits for check-ins → the empty state with the honest progress line („3 / 8 Tage“)
         <div className="flex flex-1 flex-col" data-testid="mood-empty">
-          <EmptyState title={WACHSTUM.psyche.noFactorTitle} text={WACHSTUM.psyche.noFactor} line={progressLine(covered, MIN_FACTOR_N, "Tage")} className="flex-1" />
+          <EmptyState chart title={WACHSTUM.psyche.noFactorTitle} text={WACHSTUM.psyche.noFactor} line={progressLine(covered, MIN_FACTOR_N, "Tage")} className="flex-1" />
         </div>
       )}
     </Card>

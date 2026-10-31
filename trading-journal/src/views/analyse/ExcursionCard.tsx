@@ -69,7 +69,7 @@ export function ExcursionCard({ view, cur }: { view: AccountView; cur: string })
   return (
     <AnaCard title={CARD_TITLES.excursion} explain={() => explainExcursion(rep, cur)} data-testid="ana-excursion" note={`${rep.n} von ${rep.total} Trades gemessen`}>
       {!enough ? (
-        <EmptyState title={ANA_EMPTY.excursion.title} text={`${ANA_EMPTY.excursion.text} Bisher ${rep.n} von mindestens ${EXCURSION_MIN_N}.`} line={progressLine(rep.n, EXCURSION_MIN_N, "Trades gemessen")} />
+        <EmptyState chart title={ANA_EMPTY.excursion.title} text={`${ANA_EMPTY.excursion.text} Bisher ${rep.n} von mindestens ${EXCURSION_MIN_N}.`} line={progressLine(rep.n, EXCURSION_MIN_N, "Trades gemessen")} />
       ) : (
         <div className="grid gap-4">
           <Scatter rep={rep} />

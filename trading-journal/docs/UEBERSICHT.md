@@ -208,7 +208,7 @@ _Vom Einstieg über Stop und Größe bis zum Ticket – und durchgespielt._ · 8
 
 ### Risiko & Disziplin
 
-_Limits, Exposure und Regeln, bevor es teuer wird._ · 12 Funktionen
+_Limits, Exposure und Regeln, bevor es teuer wird._ · 13 Funktionen
 
 **Offenes Risiko**
 
@@ -234,6 +234,7 @@ _Limits, Exposure und Regeln, bevor es teuer wird._ · 12 Funktionen
 |---|---|---|---|
 | Prüfen, wie lang Verlustserien bei deiner Trefferquote werden können | Verlustserien | Risiko › Serien | fertig |
 | Durchspielen, wie schlimm eine Pechsträhne werden kann | Monte Carlo & Verlustserien | Analyse › Monte Carlo | fertig |
+| Im Fächer nach jedem Trade ablesen, wie weit es gehen kann | Fächer ablesen (Fadenkreuz) | Analyse › Monte Carlo | fertig |
 | Das Risiko eines großen Kontoverlusts abschätzen | Risk of Ruin | Analyse › Risk of Ruin | fertig |
 | Sehen, welche Strategie wie viel Risiko trägt | Risiko je Strategie | Risiko › Risiko je Strategie | fertig |
 

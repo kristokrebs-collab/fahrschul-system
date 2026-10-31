@@ -11,6 +11,7 @@ import { pct0, signed } from "@/lib/format";
 import { Badge } from "@/primitives/Badge";
 import { Card } from "@/primitives/Card";
 import { useBerichteUi } from "./berichteStore";
+import { Rows } from "@/chart/rows";
 
 const SHOW = 8;
 /** "neu" only for unopened reports that ended recently – a long history is not a pile of news. */
@@ -29,11 +30,11 @@ export function ArchiveCard({ archive, kind, current, cur, now, className }: { a
       {archive.length === 0 ? (
         <p className="text-[12.5px] leading-relaxed text-mute">Noch kein abgeschlossener Zeitraum mit Trades. Berichte entstehen automatisch, sobald ein Zeitraum vorbei ist.</p>
       ) : (
-        <ul className="grid" aria-label={`Archiv · ${KIND_REPORT[kind]}e`}>
+        <Rows className="grid" aria-label={`Archiv · ${KIND_REPORT[kind]}e`}>
           {rows.map((a) => {
             const active = a.period.key === current;
             return (
-              <li key={a.period.key} className="border-b border-line/60 last:border-b-0">
+              <li key={a.period.key} data-lift className="border-b border-line/60 last:border-b-0">
                 <button
                   type="button"
                   onClick={() => setPeriod(a.period.key)}
@@ -62,7 +63,7 @@ export function ArchiveCard({ archive, kind, current, cur, now, className }: { a
               </li>
             );
           })}
-        </ul>
+        </Rows>
       )}
       {archive.length > SHOW && (
         <button type="button" onClick={() => setAll((v) => !v)} className={cn(textLink, "mt-2 justify-self-start text-[12px] pointer-coarse:min-h-11")} aria-expanded={all}>

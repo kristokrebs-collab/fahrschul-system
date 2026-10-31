@@ -10,13 +10,14 @@ import { Card } from "@/primitives/Card";
 import { GlyphCheck } from "@/primitives/icons";
 import { useStudio } from "./studioStore";
 import { STUDIO } from "./strings";
+import { Rows } from "@/chart/rows";
 
 const L = STUDIO.list;
 
 function Row({ s, open, picked }: { s: StoredStrategy; open: boolean; picked: boolean }) {
   const top = s.versions[s.versions.length - 1];
   return (
-    <li className={cn("flex items-stretch gap-1 rounded-xl border transition-colors", open ? "border-white/30 bg-white/[0.05]" : "border-line bg-ink-950/40 hover:border-line-2")} data-testid={`studio-item-${s.id}`} data-open={open || undefined}>
+    <li data-lift className={cn("flex items-stretch gap-1 rounded-xl border transition-colors", open ? "border-white/30 bg-white/[0.05]" : "border-line bg-ink-950/40 hover:border-line-2")} data-testid={`studio-item-${s.id}`} data-open={open || undefined}>
       <button
         type="button"
         role="checkbox"
@@ -56,11 +57,11 @@ export function StrategyList({ strategies, className }: { strategies: StoredStra
             {L.empty}
           </p>
         ) : (
-          <ul className="grid gap-1.5" aria-label={L.title}>
+          <Rows className="grid gap-1.5" aria-label={L.title}>
             {strategies.map((s) => (
               <Row key={s.id} s={s} open={s.id === openId} picked={selected.includes(s.id)} />
             ))}
-          </ul>
+          </Rows>
         )}
         {strategies.length > 1 && (
           <div className="flex flex-wrap gap-2">

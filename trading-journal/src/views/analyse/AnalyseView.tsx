@@ -168,7 +168,7 @@ export function AnalyseView({ className }: { className?: string }) {
               }
             >
               <Cell index={0} span="lg:col-span-8" size={SIZE.monteCarlo} late defer>
-                <MonteCarloCard view={view} cur={cur} />
+                <MonteCarloCard view={view} cur={cur} rich />
               </Cell>
               <Cell index={1} span="lg:col-span-4" size={SIZE.ruin} defer>
                 <RiskOfRuinCard view={view} settings={settings} rep={rep} />

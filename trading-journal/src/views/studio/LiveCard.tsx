@@ -18,6 +18,7 @@ import { useStudio } from "./studioStore";
 import { STUDIO } from "./strings";
 import { Disclaimer } from "./ui";
 import type { StoredStrategy } from "@/domain/strategytext";
+import { Rows } from "@/chart/rows";
 
 const L = STUDIO.live;
 
@@ -75,15 +76,15 @@ export function LiveCard({ strategies, className }: { strategies: StoredStrategy
           {list.length === 0 ? (
             <p className="text-[12.5px] text-mute">{L.noAccounts}</p>
           ) : (
-            <ul className="grid gap-1.5">
+            <Rows className="grid gap-1.5">
               {list.map(({ link, account }) => (
-                <li key={link.accountId} className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-ink-950/50 px-3 py-2 text-[12.5px]" data-testid="studio-live-account">
+                <li key={link.accountId} data-lift className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-ink-950/50 px-3 py-2 text-[12.5px]" data-testid="studio-live-account">
                   <span className="min-w-0 flex-1 truncate text-fg">{account ? account.name : L.gone}</span>
                   {link.versionNo != null && <span className="font-mono text-[11px] text-faint">v{link.versionNo}</span>}
                   {account && <Badge tone={account.status === "running" ? "win" : "mute"}>{L.statusWord[account.status] ?? account.status}</Badge>}
                 </li>
               ))}
-            </ul>
+            </Rows>
           )}
           {list.length > 0 && (
             <Button size="sm" className="justify-self-start" onClick={() => navigate("labor")}>

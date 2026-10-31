@@ -99,7 +99,7 @@ export function SignalBalanceCard({ list, now, className }: { list: readonly Enr
   return (
     <Card title={BALANCE_STRINGS.title} note={BALANCE_STRINGS.note} className={className} data-testid="balance-card" data-signals={bal.signals} innerClassName="grid content-start gap-4">
       {bal.signals === 0 ? (
-        <EmptyState title={BALANCE_STRINGS.emptyTitle} text={BALANCE_STRINGS.emptyText} line={false} />
+        <EmptyState chart title={BALANCE_STRINGS.emptyTitle} text={BALANCE_STRINGS.emptyText} line={false} />
       ) : (
         <>
           <OutcomeControl events={events} />
