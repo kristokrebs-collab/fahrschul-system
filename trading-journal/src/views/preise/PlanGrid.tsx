@@ -21,6 +21,7 @@ import { ValueFlash } from "@/motion/ValueFlash";
 import { Badge } from "@/primitives/Badge";
 import { BorderBeam } from "@/primitives/BorderBeam";
 import { Button } from "@/primitives/Button";
+import { Stepper } from "@/primitives/Stepper";
 import { PREISE } from "./strings";
 
 const ORDER: readonly PlanId[] = ["free", "pro", "premium", "team"];
@@ -98,29 +99,7 @@ function SeatStepper() {
   return (
     <div className="flex items-center gap-3" role="group" aria-label={PREISE.seats}>
       <span className="text-[12.5px] text-mute">{PREISE.seats}</span>
-      <div className="flex items-center rounded-full border border-line-2 bg-ink-950">
-        <button
-          type="button"
-          aria-label={PREISE.seatsLess}
-          disabled={seats <= min}
-          onClick={() => setSeats(seats - 1)}
-          className="touch-hit grid size-8 place-items-center rounded-full text-mute hover:text-fg disabled:opacity-40"
-        >
-          −
-        </button>
-        <output aria-live="off" className="num w-8 text-center font-mono text-[14px]" data-testid="team-seats">
-          {seats}
-        </output>
-        <button
-          type="button"
-          aria-label={PREISE.seatsMore}
-          disabled={seats >= max}
-          onClick={() => setSeats(seats + 1)}
-          className="touch-hit grid size-8 place-items-center rounded-full text-mute hover:text-fg disabled:opacity-40"
-        >
-          +
-        </button>
-      </div>
+      <Stepper value={seats} min={min} max={max} onChange={setSeats} decreaseLabel={PREISE.seatsLess} increaseLabel={PREISE.seatsMore} testId="team-seats" />
     </div>
   );
 }
@@ -247,7 +226,7 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
 
           <div className="mt-auto pr-12" style={{ minHeight: NOTCH - 8 }}>
             {cta ? (
-              <Button variant={cta.variant} disabled={!!busy} onClick={cta.run} className="w-full" data-testid={cta.testId}>
+              <Button variant={cta.variant} fx={false} disabled={!!busy} onClick={cta.run} className="w-full" data-testid={cta.testId}>
                 {busy === "checkout" && cta.variant === "primary" ? "Weiter zu Stripe …" : cta.label}
               </Button>
             ) : note ? (

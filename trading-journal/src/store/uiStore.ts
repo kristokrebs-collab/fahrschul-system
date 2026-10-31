@@ -112,13 +112,15 @@ export interface ToastInput {
   duration?: number;
   /** One button beside the island („Rückgängig“): runs, then the toast leaves. */
   action?: { label: string; onClick: () => void };
+  /** A real milestone (a first, a goal reached) – the island bursts a small confetti once. Never for routine saves or copies. */
+  milestone?: boolean;
 }
 export interface Toast extends ToastInput {
   id: number;
 }
 
-/** `win`: saved winning trade · `streak`: win streak (bigger burst) · `record`: new equity high (+ one red record dot). */
-export type CelebrateKind = "win" | "streak" | "record";
+/** `win`: saved winning trade · `streak`: win streak (bigger burst) · `record`: new equity high (+ one red record dot) · `mini`: a small puff for a toast milestone. */
+export type CelebrateKind = "win" | "streak" | "record" | "mini";
 /** `win`: mostly win-green dots · `fg`: mostly white dots. */
 export type CelebrateTone = "win" | "fg";
 export interface CelebrateInput {

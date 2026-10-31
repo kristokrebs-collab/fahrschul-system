@@ -7,6 +7,7 @@ import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
+import { CopyButton } from "@/primitives/CopyButton";
 import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
 import { Skeleton } from "@/primitives/Skeleton";
@@ -27,7 +28,7 @@ function ShareRow({ s, index }: { s: ShareInfo; index: number }) {
   const [now] = useState(() => Date.now());
   const expired = !!s.expiresAt && Date.parse(s.expiresAt) <= now;
   const dead = s.revoked || expired;
-  const copy = async () => pushToast((await copyText(shareUrl(s.token))) ? { kind: "success", title: S.linkCopied } : { kind: "error", title: S.copyFailed });
+  const copy = () => copyText(shareUrl(s.token));
   return (
     <motion.li
       layout="position"
@@ -49,9 +50,7 @@ function ShareRow({ s, index }: { s: ShareInfo; index: number }) {
       </span>
       {!dead && (
         <span className="flex gap-1.5">
-          <Button size="sm" onClick={copy} aria-label={`${SHARE.copy}: ${s.title}`}>
-            <Glyph name="copy" className="size-3.5" />
-          </Button>
+          <CopyButton iconOnly onCopy={copy} onResult={(ok) => pushToast(ok ? { kind: "success", title: S.linkCopied } : { kind: "error", title: S.copyFailed })} aria-label={`${SHARE.copy}: ${s.title}`} />
           <Button size="sm" onClick={() => void revokeShareLink(s.id)} data-testid="share-revoke">
             {SHARE.revoke}
           </Button>

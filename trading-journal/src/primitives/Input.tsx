@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, Ref, TextareaHTMLAttributes } from "react";
+import { useCallback, useRef, type InputHTMLAttributes, type Ref, type TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
 
 export const inputClass =
@@ -41,21 +41,50 @@ function Rings({ invalid }: { invalid?: boolean }) {
   );
 }
 
+/** Sets a React-controlled input's value from outside and lets React's `onChange` see it (the native setter + an `input` event). */
+function clearInput(el: HTMLInputElement | null): void {
+  if (!el) return;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, "");
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.focus();
+}
+
 /**
  * Bundle `ze` input. NEW: wrapped in a `grid` box (`[data-input]`) that carries the pre-rendered focus glow and the
  * invalid pulse ring (`shakeField` / `Field invalidKey`), so focus feedback is compositor-only.
+ * `type="search"`: inside `[data-rich]` pages a round „×“ pops in (spring scale) as soon as there is text and clears it
+ * (focus stays in the field); elsewhere the browser's own clear button stays. A search field without a placeholder gets a
+ * blank one, so the CSS can tell „empty“ from „has text“.
  */
 export function Input({ numeric, invalid, className, wrapperClassName, ref, ...props }: InputProps) {
+  const own = useRef<HTMLInputElement | null>(null);
+  const search = props.type === "search";
+  const setRef = useCallback(
+    (el: HTMLInputElement | null) => {
+      own.current = el;
+      if (typeof ref === "function") ref(el);
+      else if (ref) ref.current = el;
+    },
+    [ref],
+  );
   return (
     <span data-input="" className={cn("relative grid w-full min-w-0", wrapperClassName)}>
       <input
-        ref={ref}
+        ref={setRef}
         inputMode={numeric ? "decimal" : props.inputMode}
         aria-invalid={invalid || undefined}
         // coarse pointers: ≥ 44 px tall (a 38 px field is hard to hit on a tablet)
         className={cn(inputClass, controlClass, "pointer-coarse:min-h-11", numeric && "font-mono", invalid && invalidClass, className)}
         {...props}
+        placeholder={props.placeholder ?? (search ? " " : undefined)}
       />
+      {search && (
+        <button type="button" tabIndex={-1} aria-label="Suche leeren" className="fx-clear touch-hit" onClick={() => clearInput(own.current)}>
+          <svg viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+            <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" />
+          </svg>
+        </button>
+      )}
       <Rings invalid={invalid} />
     </span>
   );

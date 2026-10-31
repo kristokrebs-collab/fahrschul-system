@@ -12,6 +12,8 @@ import { storageKey } from "@/store/storage";
  *
  * Closed: one row (title, one line of what is inside, a chevron), ≥ 56 px, the whole row is the target. Open: the card, and a quiet
  * "Zuklappen" row above it. No height animation (nothing springs, nothing is measured); the chevron turns by `transform` only.
+ * `[data-rich]` pages (`controls.css`): after a tap the content glides in (opacity + 8 px, `fx-fold-in`) and the chevron turns on
+ * an overshoot curve; a fold that starts open, or opens through `revealCard`, just appears.
  */
 export const FOLDS_KEY = storageKey("folds");
 /** `"*"` among the ids opens every fold (the e2e seed uses it, so specs that are not about folds see the whole page). */
@@ -57,9 +59,12 @@ export interface FoldProps {
 
 export function Fold({ id, title, hint, children, className }: FoldProps) {
   const [open, setOpen] = useState(() => isFoldOpen(id));
+  // set by the first tap on the summary (never by a fold that starts open or by a jump to its content): only then the content glides in
+  const [touched, setTouched] = useState(false);
   return (
     <details
       data-fold={id}
+      data-touched={touched ? "" : undefined}
       open={open}
       onToggle={(e) => {
         const now = e.currentTarget.open;
@@ -71,6 +76,7 @@ export function Fold({ id, title, hint, children, className }: FoldProps) {
       className={cn("group/fold min-w-0", className)}
     >
       <summary
+        onClick={() => setTouched(true)}
         className={cn(
           "touch-hit flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl border border-line bg-ink-950/40 px-4 py-2.5 text-left transition-colors duration-200 hover:bg-white/[0.04] focus-visible:outline-none! focus-visible:shadow-(--ring-glow-btn) [&::-webkit-details-marker]:hidden",
           // open: a quiet line above the card instead of a second heading

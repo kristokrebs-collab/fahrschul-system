@@ -28,6 +28,11 @@ export interface ToastIslandProps {
   /** Override the store (tests, storybook, the app's ui store adapter). */
   toasts?: IslandToast[];
   onDismiss?: (id: number) => void;
+  /**
+   * A toast flagged `milestone` has grown into view: called once with its symbol disc, so the app can burst a small confetti
+   * from it (`celebrateFrom`, kind `mini`). Never called under reduced motion and never for routine toasts.
+   */
+  onMilestone?: (disc: HTMLElement | null) => void;
   className?: string;
 }
 
@@ -72,7 +77,7 @@ export const TOAST_Z = 95;
  * Reduced motion: no roll, glow or bar; instant transitions. At rest the region is a 0×0 box (no empty full-viewport
  * fixed layer between toasts); Samsung-Internet-safe effects (`html[data-safe-fx]`) drop the blurred win glow.
  */
-export function ToastIsland({ toasts, onDismiss, className }: ToastIslandProps) {
+export function ToastIsland({ toasts, onDismiss, onMilestone, className }: ToastIslandProps) {
   const storeToasts = useToastStore((s) => s.toasts);
   const storeDismiss = useToastStore((s) => s.dismiss);
   const list = toasts ?? storeToasts;
@@ -116,6 +121,7 @@ export function ToastIsland({ toasts, onDismiss, className }: ToastIslandProps) 
               note={note}
               queued={list.length - 1}
               reduced={reduced}
+              onMilestone={onMilestone}
               onDismiss={(info) => {
                 setFling(info ? { id: note.id, info } : null);
                 dismiss(note.id);
@@ -132,12 +138,27 @@ interface IslandCardProps {
   note: IslandToast;
   queued: number;
   reduced: boolean;
+  onMilestone?: (disc: HTMLElement | null) => void;
   /** Release info when swiped away, null for a tap or the timeout. */
   onDismiss: (info: SwipeDismissInfo | null) => void;
 }
 
-function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
+/** The island needs this long (s) to grow around its content before a milestone puff leaves the symbol (≈ `spring.toast` settled). */
+const MILESTONE_AT = 0.3;
+
+function IslandCard({ note, queued, reduced, onMilestone, onDismiss }: IslandCardProps) {
   const wrapper = useRef<HTMLDivElement>(null);
+  const disc = useRef<HTMLSpanElement>(null);
+  const milestone = useRef(onMilestone);
+  useEffect(() => {
+    milestone.current = onMilestone;
+  }, [onMilestone]);
+  // a real milestone (the caller flags it; never a routine toast): one small puff from the check once the island has grown
+  useEffect(() => {
+    if (!note.milestone || reduced || note.kind !== "ok") return;
+    const t = setTimeout(() => milestone.current?.(disc.current), MILESTONE_AT * 1000);
+    return () => clearTimeout(t);
+  }, [note.milestone, note.kind, reduced]);
   const dismissRef = useRef(onDismiss);
   const hold = useRef<{ reasons: Set<string>; pause: () => void; resume: () => void } | null>(null);
   const ms = note.duration ?? toastDuration(note.kind);
@@ -259,7 +280,8 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
   };
   const islandVariants: Variants = {
     exit: (c: Fling | null | undefined) =>
-      flung(c) ? { opacity: 0, transition: exitTransition } : { width: 44, opacity: 0, y: rise(16), scale: 0.7, transition: exitTransition },
+      // staggered exit: the text and the symbol fade first (below), the island closes around them a beat later
+      flung(c) ? { opacity: 0, transition: exitTransition } : { width: 44, opacity: 0, y: rise(16), scale: 0.7, transition: reduced ? instant : { ...tween.toastExit, delay: 0.05 } },
   };
 
   return (
@@ -300,7 +322,16 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
         exit="exit"
         transition={reduced ? instant : spring.toast}
       >
-        <span className={cn("grid size-8 shrink-0 place-items-center rounded-full", KIND_DISC[note.kind])} aria-hidden="true">
+        <motion.span
+          ref={disc}
+          className={cn("grid size-8 shrink-0 place-items-center rounded-full", KIND_DISC[note.kind])}
+          aria-hidden="true"
+          // staggered in: the symbol pops a beat after the island starts to grow, then the text, then the value and the action
+          initial={reduced ? false : { scale: 0.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={reduced ? undefined : { scale: 0.6, opacity: 0, transition: tween.exit }}
+          transition={reduced ? instant : { ...spring.pop, delay: 0.05 }}
+        >
           {note.kind === "ok" ? (
             <GlyphCheck className="size-3.5" strokeWidth="2.2" drawn transition={reduced ? instant : tween.checkToast} />
           ) : note.kind === "error" ? (
@@ -308,8 +339,14 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
           ) : (
             <GlyphInfo className="size-3.5" />
           )}
-        </span>
-        <motion.span className="flex items-center gap-3 whitespace-nowrap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={reduced ? instant : tween.toastText}>
+        </motion.span>
+        <motion.span
+          className="flex items-center gap-3 whitespace-nowrap"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={reduced ? undefined : { opacity: 0, transition: tween.exit }}
+          transition={reduced ? instant : tween.toastText}
+        >
           <span className="grid">
             <span className="text-[13px] font-medium text-fg">{note.title}</span>
             {note.detail && <span className="text-[11px] text-mute">{note.detail}</span>}

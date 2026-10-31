@@ -11,6 +11,7 @@ import { fmtDay, paramsText, verdictOf, MAX_RESULT_BYTES, type Kennzahlen, type 
 import { cn } from "@/lib/cn";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
+import { CopyButton } from "@/primitives/CopyButton";
 import { Card } from "@/primitives/Card";
 import { useUi } from "@/store/uiStore";
 import { readFileText } from "@/views/labor/readFile";
@@ -239,10 +240,7 @@ export function ErgebnisCard() {
     }
   };
 
-  const copyCommand = async (): Promise<void> => {
-    const ok = await copyText(E.command, cmd.current);
-    pushToast(ok ? { kind: "success", title: E.commandCopied } : { kind: "error", title: E.commandCopyFail });
-  };
+  const copyCommand = (): Promise<boolean> => copyText(E.command, cmd.current);
 
   return (
     <Card title={E.title} className="h-full" data-testid="branchen-ergebnis">
@@ -281,9 +279,14 @@ export function ErgebnisCard() {
             <code ref={cmd} className="num min-w-0 flex-1 basis-72 break-all rounded-lg border border-line bg-ink-950/70 px-3 py-2 font-mono text-[12px] leading-relaxed text-fg" data-testid="branchen-command-text">
               {E.command}
             </code>
-            <Button variant="ghost" size="sm" onClick={() => void copyCommand()} data-testid="branchen-command-copy">
-              {E.commandCopy}
-            </Button>
+            <CopyButton
+              variant="ghost"
+              size="sm"
+              label={E.commandCopy}
+              onCopy={copyCommand}
+              onResult={(ok) => pushToast(ok ? { kind: "success", title: E.commandCopied } : { kind: "error", title: E.commandCopyFail })}
+              data-testid="branchen-command-copy"
+            />
           </div>
           <ul className="grid gap-1.5">
             {E.commandNotes.map((n) => (

@@ -8,6 +8,7 @@ import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
+import { CopyButton } from "@/primitives/CopyButton";
 import { Collapse } from "@/primitives/Expander";
 import type { GroupDetail, InviteInfo, MemberInfo } from "@/social/contract";
 import { fmtPct, fmtR } from "@/social/format";
@@ -98,7 +99,7 @@ function MemberRow({ m, group, index }: { m: MemberInfo; group: GroupDetail; ind
 }
 
 function InviteRow({ inv, groupId }: { inv: InviteInfo; groupId: string }) {
-  const copy = async () => pushToast((await copyText(inviteUrl(inv.code))) ? { kind: "success", title: S.linkCopied } : { kind: "error", title: S.copyFailed });
+  const copy = () => copyText(inviteUrl(inv.code));
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-ink-950/40 px-3 py-2" data-testid="invite-row">
       <span className="grid">
@@ -108,9 +109,7 @@ function InviteRow({ inv, groupId }: { inv: InviteInfo; groupId: string }) {
         </span>
       </span>
       <span className="flex gap-1.5">
-        <Button size="sm" onClick={copy} aria-label={`${GROUPS.inviteCopy} ${inv.code}`}>
-          <Glyph name="copy" className="size-3.5" />
-        </Button>
+        <CopyButton iconOnly onCopy={copy} onResult={(ok) => pushToast(ok ? { kind: "success", title: S.linkCopied } : { kind: "error", title: S.copyFailed })} aria-label={`${GROUPS.inviteCopy} ${inv.code}`} />
         <Button size="sm" onClick={() => void revokeInvite(groupId, inv.code)}>
           {GROUPS.revoke}
         </Button>

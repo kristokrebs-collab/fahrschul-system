@@ -104,7 +104,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
         text="Trag deinen ersten Trade ein – oder lies ihn mit „Screenshot importieren“ aus einem Bild."
         line={false}
         action={
-          <Button variant="primary" size="sm" className="mt-2" onClick={newTrade} {...ctaMotion}>
+          <Button variant="primary" size="sm" fx={false} className="mt-2" onClick={newTrade} {...ctaMotion}>
             Trade eintragen
           </Button>
         }

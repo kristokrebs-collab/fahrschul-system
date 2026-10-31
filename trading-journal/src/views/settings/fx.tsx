@@ -141,7 +141,7 @@ export interface SaveButtonProps extends Omit<ButtonProps, "children" | "variant
 export function SaveButton({ phase, className, disabled, ...rest }: SaveButtonProps) {
   const reduced = useReducedFx();
   return (
-    <Button {...rest} variant="primary" disabled={disabled || phase === "busy"} aria-busy={phase === "busy" || undefined} className={cn("min-w-[9.5rem]", className)}>
+    <Button {...rest} variant="primary" fx={false} disabled={disabled || phase === "busy"} aria-busy={phase === "busy" || undefined} className={cn("min-w-[9.5rem]", className)}>
       <motion.span
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] bg-win"

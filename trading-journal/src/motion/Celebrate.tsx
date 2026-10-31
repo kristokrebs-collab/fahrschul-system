@@ -31,9 +31,9 @@ export function mulberry32(seed: number): () => number {
 }
 
 export const MAX_PARTICLES = 40;
-const COUNT: Record<CelebrateKind, number> = { win: 28, streak: 36, record: 40 };
+const COUNT: Record<CelebrateKind, number> = { win: 28, streak: 36, record: 40, mini: 12 };
 /** Half-angle of the upward cone (degrees). */
-const SPREAD: Record<CelebrateKind, number> = { win: 55, streak: 62, record: 70 };
+const SPREAD: Record<CelebrateKind, number> = { win: 55, streak: 62, record: 70, mini: 48 };
 // Physics constants of the sampled trajectories (not motion tokens): px/s² gravity, 1/s linear air drag.
 const GRAVITY = 800;
 const DRAG = 1;
@@ -64,22 +64,24 @@ const r1 = (v: number) => Math.round(v * 10) / 10;
 
 /**
  * Particles of one burst. Speeds 250–600 px/s in an upward cone (`−90° ± spread`), life ≈ `tween.burst` (±15 %),
- * scale-in over the first 10 %, fade over the last 40 %. `record` adds one larger red dot that shoots straight up.
+ * scale-in over the first 10 %, fade over the last 40 %. `record` adds one larger red dot that shoots straight up. `mini` (a toast
+ * milestone) is a small puff: 12 dots, 55 % of the speed, a shorter life.
  */
 export function burstParticles({ x, y, tone, kind, seed }: Pick<Celebration, "x" | "y" | "tone" | "kind" | "seed">): Particle[] {
   const rand = mulberry32(seed);
   const count = Math.min(MAX_PARTICLES, COUNT[kind]);
   const greenShare = tone === "win" ? 0.6 : 0.2;
+  const mini = kind === "mini";
   const spread = (SPREAD[kind] * Math.PI) / 180;
   const out: Particle[] = [];
   for (let i = 0; i < count; i++) {
     const record = kind === "record" && i === 0;
     const angle = -Math.PI / 2 + (record ? (rand() - 0.5) * 0.14 : (rand() * 2 - 1) * spread);
-    const speed = record ? 560 : 250 + rand() * 350;
+    const speed = (record ? 560 : 250 + rand() * 350) * (mini ? 0.55 : 1);
     const vx = Math.cos(angle) * speed;
     const vy = Math.sin(angle) * speed;
-    const duration = tween.burst.duration * (record ? 1.15 : 0.85 + rand() * 0.3);
-    const size = record ? 8 : Math.round(3 + rand() * 3);
+    const duration = tween.burst.duration * (record ? 1.15 : 0.85 + rand() * 0.3) * (mini ? 0.75 : 1);
+    const size = record ? 8 : Math.round(3 + rand() * (mini ? 2 : 3));
     const color = record ? PARTICLE_COLORS.signal : rand() < greenShare ? PARTICLE_COLORS.win : PARTICLE_COLORS.white;
     const transform: string[] = [];
     const opacity: number[] = [];

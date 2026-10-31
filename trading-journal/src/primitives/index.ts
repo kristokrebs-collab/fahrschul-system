@@ -1,7 +1,10 @@
 export { Card, type CardProps } from "@/primitives/Card";
 export { registerGlow, primeGlowRect, GLOW_PROXIMITY, GLOW_INACTIVE_ZONE, MAX_ACTIVE_GLOWS, type GlowListener, type GlowRect } from "@/primitives/glowField";
 export { useHoverRect, HoverRectTracker } from "@/primitives/hoverRect";
-export { Button, buttonBase, buttonVariant, buttonSize, rippleColor, type ButtonProps, type ButtonVariant, type ButtonSize } from "@/primitives/Button";
+export { Button, buttonBase, buttonVariant, buttonSize, rippleColor, type ButtonProps, type ButtonVariant, type ButtonSize, type ButtonStatus } from "@/primitives/Button";
+export { useActionStatus, type ActionStatus } from "@/primitives/useActionStatus";
+export { Stepper, type StepperProps } from "@/primitives/Stepper";
+export { CopyButton, copyToClipboard, type CopyButtonProps } from "@/primitives/CopyButton";
 export { spawnRipple, rippleGeometry, MAX_RIPPLES, type RippleGeometry } from "@/primitives/ripple";
 export { Input, Textarea, inputClass, type InputProps, type TextareaProps } from "@/primitives/Input";
 export { Field, type FieldProps } from "@/primitives/Field";
