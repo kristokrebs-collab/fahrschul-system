@@ -37,6 +37,13 @@
 :root[data-theme="light"] .rich-aura__a {
   background: radial-gradient(closest-side, color-mix(in oklab, var(--color-signal) 4%, transparent), transparent);
 }
+/* on paper the veil ink is dark: a grey cloud would read as a smudge, so the neutral spots are fainter there */
+:root[data-theme="light"] .rich-aura__b {
+  background: radial-gradient(closest-side, rgb(var(--veil-rgb, 255 255 255) / 0.025), transparent);
+}
+:root[data-theme="light"] .rich-aura__spot {
+  background: radial-gradient(closest-side, rgb(var(--veil-rgb, 255 255 255) / 0.04), transparent);
+}
 .rich-aura__spot {
   position: absolute;
   left: 0;

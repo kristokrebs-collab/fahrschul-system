@@ -87,3 +87,7 @@ Works for stocks and for crypto pairs (a hit of the crypto scan links `symbol=BT
 Tests: `tests/unit/views.aktien.test.tsx` (scan counts and sentences, rank switch, preview, thresholds, watchlist writes, news merge / new / read,
 slots, the plan link rule, the reasons shown), `tests/unit/views.aktien.analystPlan.test.tsx` (the analyst's plan link), `tests/unit/assistant.stocks.test.ts`, e2e `tests/e2e/aktien.spec.ts` (mobile + desktop, network
 mocked with `page.route`; "Plan erstellen →" end to end into the Handelsplan; set `AKTIEN_SHOTS_DIR` for screenshots).
+
+## Runde 10 (Agent 7)
+
+Die Branchen-Ampel kommt in einer Diagonalwelle (`Tile wave`, Spalten 2 / 3 / 6 wie `GRID`); Sortieren und Filtern gleiten weiter auf `spring.layout`. Hover: die Kachel hebt sich 2 px und der Rand wird heller (nur reiche Seite). Geisterwort „Märkte“.

@@ -25,3 +25,7 @@ dev server; e2e `tests/e2e/preise.spec.ts` (`PW_PREISE_URL=/#preise`, `PW_KONTO_
 
 - Seitenraster `gap-5` wie alle Seiten (vorher `gap-6`), der Lead ist sprachlich geklärt („Starte kostenlos und wechsle erst, wenn du mehr aus deinem Journal holen willst – jederzeit kündbar.“).
 - Angemeldet (Abo-Modus offen): „Siehe auch“ unter den Tarifen – Konto und Abo verwalten · Freunde einladen (Preise ↔ Konto).
+
+## Runde 10 (Agent 7)
+
+Die Pillen „Empfohlen“, „Aktueller Tarif“ und „Dein Tarif“ schweben 2 px (`Float`, pausiert ausserhalb des Bildschirms). Geisterwort „Wahl“. Hero, Deal, Prisma, Randlicht und Zaehler waren schon da und bleiben.
