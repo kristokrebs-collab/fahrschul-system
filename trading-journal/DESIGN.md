@@ -904,3 +904,12 @@ der Suche und des Assistenten (`revealCard` / `revealSection`) sowie der Sprung 
 Die Wahl wird je Browser gemerkt (`tj2-folds`). Eingeklappt: Markt – Squeeze, Preis- & RSI-Struktur, Ähnliche Situationen, Alarme & Zustellprotokoll, Ereignisphasen,
 Box-Einstellungen; Einstellungen – Live-Daten, Hyblock-Connector, Datenarchiv, Version & Speicher; Berichte – Transaktionsbuch. Die Übersicht und das Cockpit sind unberührt.
 
+## Große Fläche mit Preislinie: „Top-Trader: Netto Long/Short“ (Markt, Runde 10)
+
+Auf ausdrücklichen Wunsch steht auf Markt (Einordnung, erste Karte) ein zweites großes Canvas neben dem Box-Chart. Es ist die ruhige Schwester: kein Doto, kein Glühen,
+keine Boxen – eine Fläche um die Nulllinie (Gewinn-/Verlustton mit weichem Verlauf, nie Signalrot), die Preislinie dünn auf eigener Skala rechts, die Zeitachse unten, ein
+Pfeil mit Etikett am letzten Umschlag. Die Überschrift ist ein Satz in Plex Sans (`clamp(16px, 4.4vw, 21px)`), der den Umschlag mit Daten sagt (nur aus dem geladenen Verlauf);
+darunter eine Kennzahlenzeile in Plex Mono (Netto, Zeit und Preis seit dem Umschlag). Bewegung: einmal Einzeichnen von links (`tween.draw`), einmal ein Ring am Umschlag,
+heller über der Zeitachse (Überblendung per `opacity`); Reduced Motion = fertig. Platz fest (256 / 336 px) und als `PendingCard` in Endgröße vorgemerkt. Muster aus 21st.dev
+(„Balance Chart“: Flächenlinie nach Trend gefärbt, Zeitraum-Schalter bis „Alles“) nur als Idee; Code und Werte sind eigene.
+

@@ -252,7 +252,8 @@ The `topPositionRatio` feed of the chosen period (the same 500-point series the 
 (point spacing ≥ 1 h) or `kline_15m` (shorter) for the price line; pure model in `@/domain/signals/traderNet`. No extra
 request. Only Binance data counts (direct or proxy); Bybit/OKX, a blocked region, offline and "not yet loaded" give
 `view: null` with a German reason in `detail`. Re-renders only when the series publishes, a new candle opens, a health
-field changes or once a minute (the "seit 3 Tagen" age) – never per price tick.
+field changes or once a minute (the "seit 3 Tagen" age) – never per price tick. Two readers, one hook: the plaque in the Long
+signal (Übersicht) and the big card "Top-Trader: Netto Long/Short" on Markt › Einordnung (`src/views/markt/TraderNetCard.tsx`).
 
 ## Rendering status (Plan 4.4)
 
