@@ -123,7 +123,7 @@ export function TimeMachineSlotImpl({ symbol, side, entry, stop, target, interva
           </p>
           <Button
             size="md"
-            variant="ghost"
+            variant="secondary"
             onClick={() => {
               ctl.current?.abort();
               setLoad({ key, v: { status: "idle" } });

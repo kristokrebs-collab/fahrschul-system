@@ -68,7 +68,7 @@ export function CorrelationCard({ symbols, view, cm, clusters }: { symbols: read
   const action = loading ? (
     <DotMatrixText text="1D" preset="wave" cycles={Infinity} size={3} gap={1} tone="mute" label={S.loading} />
   ) : view.failed.length ? (
-    <Button size="sm" variant="ghost" onClick={() => void retryDaily()}>
+    <Button size="sm" variant="secondary" onClick={() => void retryDaily()}>
       {S.retry}
     </Button>
   ) : undefined;

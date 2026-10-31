@@ -12,6 +12,7 @@ import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { ImportDialog } from "@/overlays/ImportDialog";
 import { revealInvalid } from "@/primitives/fieldFx";
+import { Fold } from "@/primitives/Fold";
 import { Card } from "@/primitives/Card";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
@@ -303,9 +304,11 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
             <TriggerCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
           </LateCard>
 
-          <LateCard size={SIZE.live} className="lg:col-span-2">
-            <LiveDataCard health={health} statusLabels={statusLabels} onRefresh={onRefresh} onReconnect={onReconnect} onClearCache={onClearCache} />
-          </LateCard>
+          <Fold id="settings-live" title="Live-Daten" hint="Binance ohne Key, jeder Status ehrlich gelabelt" className="lg:col-span-2">
+            <LateCard size={SIZE.live}>
+              <LiveDataCard health={health} statusLabels={statusLabels} onRefresh={onRefresh} onReconnect={onReconnect} onClearCache={onClearCache} />
+            </LateCard>
+          </Fold>
 
           <LateCard size={SIZE.signal} className="lg:col-span-2">
             <SignalCheckCard draft={draft} onChange={set} onPatch={patch} changed={changed} invalid={invalidField} />
@@ -316,9 +319,11 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
             <LageCard />
           </LateCard>
 
-          <LateCard size={SIZE.hyblock} className="lg:col-span-2">
-            <HyblockCard draft={draft} onChange={set} onTest={onTestHyblock} />
-          </LateCard>
+          <Fold id="settings-hyblock" title="Hyblock-Connector" hint="Endpunkte und Feldnamen der Hyblock-API, mit „Testen“" className="lg:col-span-2">
+            <LateCard size={SIZE.hyblock}>
+              <HyblockCard draft={draft} onChange={set} onTest={onTestHyblock} />
+            </LateCard>
+          </Fold>
         </SettingsGroup>
 
         {/* the tags stand tall on the left, the rules and the limits are stacked on the right: no card is half empty next to a gap */}
@@ -341,7 +346,7 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
           </LateCard>
 
           {/* F26: the local data archive – a setting about this device's storage (on / off, size, deletion), so it lives here */}
-          <div className="min-w-0 lg:col-span-2">
+          <Fold id="settings-archive" title="Datenarchiv" hint="Sammelt öffentliche Marktzahlen auf diesem Gerät, solange die App offen ist" className="lg:col-span-2">
             <Suspense
               fallback={
                 // the card's own height with the switch off (measured: 728 px at 1280, 1 228 px at 390, minus its head), so nothing below it jumps
@@ -353,11 +358,13 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
             >
               <ArchiveCard />
             </Suspense>
-          </div>
+          </Fold>
 
-          <LateCard size={SIZE.storage} className="lg:col-span-2">
-            <StorageCard />
-          </LateCard>
+          <Fold id="settings-storage" title="Version & Speicher" hint="Welche Ausgabe du nutzt und wo deine Daten liegen" className="lg:col-span-2">
+            <LateCard size={SIZE.storage}>
+              <StorageCard />
+            </LateCard>
+          </Fold>
         </SettingsGroup>
 
         {/* P13: theme (Hell / Dunkel / System, accents) and the guided tour – a pair of similar height */}
@@ -617,7 +624,7 @@ function UnsavedBar({
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
           <motion.span className={cn("inline-flex", saved && "pointer-events-none")} aria-hidden={saved || undefined} initial={false} animate={{ opacity: saved ? 0 : 1 }} transition={fade}>
-            <HoldButton variant="ghost" size="sm" holdLabel={S.discardHold} title={S.discardTitle} onConfirm={onDiscard} disabled={phase !== "idle"}>
+            <HoldButton variant="secondary" size="sm" holdLabel={S.discardHold} title={S.discardTitle} onConfirm={onDiscard} disabled={phase !== "idle"}>
               {S.discard}
             </HoldButton>
           </motion.span>

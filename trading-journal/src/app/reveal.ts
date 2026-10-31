@@ -78,12 +78,20 @@ export function keepAligned(el: HTMLElement): void {
   events.forEach((e) => window.addEventListener(e, stop, { passive: true, once: true }));
 }
 
+/** A jump into a folded card (`Fold`, `data-fold`) opens the fold first – at any depth – so the target has a place to scroll to. */
+export function openFoldsAround(el: Element): void {
+  for (let d = el.closest<HTMLDetailsElement>("details[data-fold]"); d; d = d.parentElement?.closest<HTMLDetailsElement>("details[data-fold]") ?? null) {
+    if (!d.open) d.open = true;
+  }
+}
+
 /**
  * The start of a section (`data-section`, the title row of a long page): scrolls it under the header – and under the section
  * navigation (`scroll-padding-top`, base.css) – and lets the title answer once with a short lift and fade. Opacity and
  * transform only; with reduced motion it just jumps there.
  */
 export function revealSection(el: HTMLElement): void {
+  openFoldsAround(el);
   const reduced = prefersReducedMotion();
   el.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
   keepAligned(el);
@@ -97,6 +105,7 @@ const SWEEP_MAX_VIEWPORTS = 1.5;
 /** Scrolls `el` under the header and runs one signal sweep across its card (decorative, removed after). */
 export function revealCard(el: HTMLElement): void {
   if (el.hasAttribute("data-section")) return revealSection(el);
+  openFoldsAround(el);
   const reduced = prefersReducedMotion();
   el.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
   keepAligned(el);

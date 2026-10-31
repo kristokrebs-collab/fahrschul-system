@@ -36,3 +36,5 @@ export { Tooltip, TooltipBox, TooltipRow, tooltipClass, type TooltipProps } from
 export { FormulaBlock, FormulaRows, type FormulaRow } from "@/primitives/FormulaBlock";
 export { VerdictPanel, Explainer, verdictTone, type VerdictPanelProps, type VerdictTone, type ExplainerData } from "@/primitives/VerdictPanel";
 export { HeroBackdrop } from "@/primitives/HeroBackdrop";
+export { Fold, isFoldOpen, FOLDS_KEY, FOLD_ALL, type FoldProps } from "@/primitives/Fold";
+export { chipClass, type ChipSize, type ChipTone } from "@/primitives/chip";

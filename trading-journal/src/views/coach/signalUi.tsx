@@ -3,6 +3,7 @@
  * filter chips, the outcome badge, the shared outcome control („Wird automatisch ausgewertet.“, status line, „Neu berechnen“)
  * and the translation of an archived event into an input of „Diese Idee testen“.
  */
+import { chipClass } from "@/primitives/chip";
 import { useEffect } from "react";
 import type { BoxSetupLike } from "@/domain/lab/idea";
 import type { IdeaInput } from "@/domain/lab/idea";
@@ -32,7 +33,7 @@ export function Chip({ on, onClick, children, testId }: { on: boolean; onClick: 
       aria-pressed={on}
       onClick={onClick}
       data-testid={testId}
-      className={cn("touch-hit inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] transition-colors pointer-coarse:min-h-11", on ? "border-fg/40 bg-white/[0.08] text-fg" : "border-line-2 text-mute hover:text-fg")}
+      className={chipClass(on, { size: "sm" })}
     >
       {children}
     </button>
@@ -124,7 +125,7 @@ export function OutcomeControl({ events, className }: { events: readonly SignalE
   return (
     <div className={cn("grid gap-1.5", className)} data-testid="outcome-control" data-status={o.status} data-auto={o.auto.phase}>
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="ghost" onClick={o.run} disabled={loading} data-testid="outcome-run">
+        <Button size="sm" variant="secondary" onClick={o.run} disabled={loading} data-testid="outcome-run">
           {loading ? OUTCOME_STRINGS.busy : OUTCOME_STRINGS.button}
         </Button>
         <span className="num font-mono text-[11px] text-faint" aria-live="polite">

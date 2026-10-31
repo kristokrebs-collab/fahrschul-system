@@ -71,7 +71,7 @@ export function ScannerCard() {
   const action = (
     <span className="flex items-center gap-2">
       <RadarSweep active={scanning} size={28} label={scanning ? S.scanning : undefined} />
-      <Button size="sm" variant="ghost" disabled={scanning || off} onClick={() => void scanNow()} data-testid="scan-now">
+      <Button size="sm" variant="secondary" disabled={scanning || off} onClick={() => void scanNow()} data-testid="scan-now">
         {S.scan}
       </Button>
     </span>

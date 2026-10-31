@@ -67,7 +67,7 @@ export function CaseView(props: CaseProps) {
   const win = useMemo(() => caseWindow(trade, interval, now), [trade, interval, now]);
   const load = useCandles({ pair: trade.pair, interval, ...win }, TRAIN.otherPair);
   const skip = (
-    <Button variant="ghost" size="sm" onClick={() => onDone(null)} className="pointer-coarse:min-h-11">
+    <Button variant="secondary" size="sm" onClick={() => onDone(null)} className="pointer-coarse:min-h-11">
       {TRAIN.skip}
     </Button>
   );
@@ -383,7 +383,7 @@ function Revealed({ round, trade, bars, setup, setups, items, intervalMs, decisi
         <Textarea value={note} onChange={(e) => setNote(e.target.value)} aria-label="Reflexion" placeholder={TRAIN.reflectNote} rows={2} maxLength={1000} disabled={saved} />
         <div className="flex flex-wrap items-center justify-end gap-2">
           {!saved && (
-            <Button variant="ghost" size="sm" onClick={() => void save()} disabled={!verdict || saving} data-testid="training-reflect-save" className="pointer-coarse:min-h-11">
+            <Button variant="secondary" size="sm" onClick={() => void save()} disabled={!verdict || saving} data-testid="training-reflect-save" className="pointer-coarse:min-h-11">
               {TRAIN.reflectSave}
             </Button>
           )}

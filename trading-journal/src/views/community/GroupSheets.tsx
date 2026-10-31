@@ -50,7 +50,7 @@ export function CreateGroupSheet() {
       footer={
         <>
           <span className="flex-1" />
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button variant="ghost" onClick={onClose}>Abbrechen</Button>
           <Button variant="primary" onClick={submit} disabled={busy === "createGroup"} data-testid="group-create-submit">
             {GROUPS.createAction}
           </Button>
@@ -129,7 +129,7 @@ export function JoinSheet() {
       footer={
         <>
           <span className="flex-1" />
-          <Button onClick={close}>Abbrechen</Button>
+          <Button variant="ghost" onClick={close}>Abbrechen</Button>
           <Button variant="primary" onClick={join} disabled={!preview || preview.member || busy === "join"} data-testid="join-submit">
             {GROUPS.joinAction}
           </Button>

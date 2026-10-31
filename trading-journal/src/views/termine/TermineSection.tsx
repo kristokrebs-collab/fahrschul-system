@@ -3,6 +3,7 @@
  * (the strategy filter). One lazy chunk, loaded when the Markt page is open – the first load never imports it. The cards are
  * found by their `data-testid` (`briefing-card`, `termine-card`, `phasen-card`) for the page's „Inhalt“ strip.
  */
+import { Fold } from "@/primitives/Fold";
 import { Reveal } from "@/motion/Reveal";
 import { BriefingCard } from "./BriefingCard";
 import { PhasenCard } from "./PhasenCard";
@@ -19,7 +20,9 @@ export default function TermineSection() {
         <TermineCard />
       </Reveal>
       <Reveal index={2} className="min-w-0 lg:col-span-12">
-        <PhasenCard />
+        <Fold id="markt-phasen" title="Ereignisphasen" hint="Wie deine Trades rund um Termine liefen, verglichen mit allen anderen">
+          <PhasenCard />
+        </Fold>
       </Reveal>
     </div>
   );

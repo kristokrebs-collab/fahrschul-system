@@ -184,7 +184,7 @@ function BackupsSection() {
                   </Button>
                 </span>
               ) : (
-                <HoldConfirm size="sm" variant="ghost" disabled={busy} onAsk={() => setAsk(b.day)} onConfirm={() => void restore(b.day)}>
+                <HoldConfirm size="sm" variant="secondary" disabled={busy} onAsk={() => setAsk(b.day)} onConfirm={() => void restore(b.day)}>
                   {DATA_CARD.restore}
                 </HoldConfirm>
               )}

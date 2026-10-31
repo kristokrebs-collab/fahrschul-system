@@ -115,7 +115,7 @@ function Words({ parse }: { parse: StrategyParse | null }) {
                   <p className="text-[12.5px] text-fg">{a.text}</p>
                   <div className="flex flex-wrap gap-x-2 gap-y-4" role="group" aria-label={a.text}>
                     {a.options.map((o) => (
-                      <Button key={o.id} size="sm" variant={a.chosen === o.id ? "primary" : "ghost"} aria-pressed={a.chosen === o.id} onClick={() => patch({ answers: { ...answers, [a.id]: o.id } })}>
+                      <Button key={o.id} size="sm" variant={a.chosen === o.id ? "primary" : "secondary"} aria-pressed={a.chosen === o.id} onClick={() => patch({ answers: { ...answers, [a.id]: o.id } })}>
                         {o.label}
                       </Button>
                     ))}

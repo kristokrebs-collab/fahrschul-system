@@ -3,6 +3,7 @@
  * facet chips (strategy tags, markets, timeframes – only those the library uses), "Mit Trades", and the entry to the
  * comparison sheet. It only HIDES cards (like the existing account switch): stats, sort and the grid stay as they are.
  */
+import { chipClass } from "@/primitives/chip";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 import { isFilterActive, type LibraryFilter } from "@/domain/strategy";
@@ -91,7 +92,7 @@ function Chip({ on, onClick, children, mono }: { on: boolean; onClick: () => voi
       onClick={onClick}
       whileTap={reduced ? undefined : { scale: 0.94 }}
       transition={spring.press}
-      className={cn("min-h-8 rounded-full border px-3 text-[12px] transition-colors duration-200 pointer-coarse:min-h-11", mono && "font-mono text-[11.5px]", on ? "border-transparent bg-fg font-medium text-ink-900" : "border-line-2 text-mute hover:border-white/30 hover:text-fg")}
+      className={chipClass(on, { className: cn("py-1 font-normal", mono && "font-mono text-[11.5px]") })}
     >
       {children}
     </motion.button>

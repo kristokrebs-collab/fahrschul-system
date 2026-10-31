@@ -145,7 +145,7 @@ function Setup({ surface, capture }: { surface: BiasSurface; capture: MirrorPane
         >
           {BIAS.setup.begin}
         </Button>
-        <Button onClick={() => useBiasUi.getState().leave()}>{BIAS.setup.cancel}</Button>
+        <Button variant="ghost" onClick={() => useBiasUi.getState().leave()}>{BIAS.setup.cancel}</Button>
       </div>
     </div>
   );

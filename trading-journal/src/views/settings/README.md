@@ -111,3 +111,7 @@ Zusammenfassung (`useFeedSelect` mit Gleichheitsprüfung – eine laufende Kerze
   geschlossen), Tastatur und Touch (≥ 44 px) gehen, bewegt sich nur das Chevron (150 ms, transform, aus bei reduzierter Bewegung). Die Datenarchiv-Karte ist dadurch bei 390 px
   441 px kürzer (1 669 → 1 228), bei 1280 px 104 px (832 → 728).
 - Der lazy Datenarchiv-Platzhalter ist ein `Skeleton` in der Höhe der Karte (1 228 / 728 px abzüglich Kopf), nichts darunter springt beim Nachladen.
+
+## Etappe 1c (kürzere Seite)
+- Vier Karten stehen eingeklappt in einer Zeile (`Fold`): Live-Daten, Hyblock-Connector, Datenarchiv, Version & Speicher. Die Karten bleiben im DOM, der Funktionsfinder und ein ungültiges Feld öffnen sie. Höhe bei 390 px: 16 894 → 11 829 px.
+

@@ -117,12 +117,12 @@ export function OnboardingTour() {
       headerExtra={<DotMatrixText text={`${step + 1}:${STEP_COUNT}`} size={3} gap={1.5} tone="mute" label={`Schritt ${step + 1} von ${STEP_COUNT}`} />}
       footer={
         <div className="flex w-full flex-wrap items-center justify-between gap-2.5">
-          <Button variant="ghost" size="sm" onClick={skipOnboarding} data-testid="tour-skip">
+          <Button variant="secondary" size="sm" onClick={skipOnboarding} data-testid="tour-skip">
             {TOUR.skip}
           </Button>
           <div className="flex items-center gap-2.5">
             {step > 0 && (
-              <Button variant="ghost" onClick={() => go(step - 1)} data-testid="tour-back">
+              <Button variant="secondary" onClick={() => go(step - 1)} data-testid="tour-back">
                 {TOUR.back}
               </Button>
             )}

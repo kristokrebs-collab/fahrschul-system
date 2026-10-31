@@ -8,6 +8,7 @@
  * (smooth glide + tick flash, zero renders per tick), the R multiple flashes on change (`ValueFlash`), and a position
  * above the leverage rule or the capital shakes the result block (`useShake`) the moment it tips over.
  */
+import { chipClass } from "@/primitives/chip";
 import { SeeAlso } from "@/app/FeatureLinks";
 import { AnimatePresence, motion } from "motion/react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -106,10 +107,7 @@ function Chip({ active, onClick, children, sub, testId }: { active: boolean; onC
       onClick={onClick}
       data-testid={testId}
       aria-pressed={active}
-      className={cn(
-        "touch-hit inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] transition-[background-color,border-color,color] duration-200",
-        active ? "border-white/40 bg-white/[0.09] text-fg" : "border-line-2 text-mute hover:border-white/25 hover:text-fg",
-      )}
+      className={chipClass(active, { size: "sm" })}
     >
       <span>{children}</span>
       {sub && <span className="num font-mono text-[10.5px] text-faint">{sub}</span>}
@@ -203,7 +201,7 @@ export function CalculatorCard({ base }: { base: RiskBase }) {
       note={S.note}
       data-testid="risk-calc"
       action={
-        <Button size="sm" variant="ghost" onClick={resetCalc}>
+        <Button size="sm" variant="secondary" onClick={resetCalc}>
           {S.reset}
         </Button>
       }
@@ -249,7 +247,7 @@ export function CalculatorCard({ base }: { base: RiskBase }) {
             <div className="flex gap-1.5">
               <Input id={fieldIds.entry} numeric value={calc.entry} onChange={(e) => set({ entry: e.target.value })} wrapperClassName="min-w-0 flex-1" />
               {isLive && (
-                <Button size="sm" variant="ghost" onClick={takeLive} title={S.liveTitle} aria-label={S.liveTitle} className="shrink-0 !px-2.5">
+                <Button size="sm" variant="secondary" onClick={takeLive} title={S.liveTitle} aria-label={S.liveTitle} className="shrink-0 !px-2.5">
                   {S.live}
                 </Button>
               )}

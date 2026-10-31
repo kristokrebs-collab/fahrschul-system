@@ -5,6 +5,7 @@
  * a lazy chunk – the scroll waits for it, ≤ 4 s). Cloud rows only where this build has a cloud (else an honest line).
  * Rows press with `usePressable`; the arrow nudges on hover (CSS transform only).
  */
+import { openFoldsAround } from "@/app/reveal";
 import { motion } from "motion/react";
 import { PAGE_ICON, PAGE_LABELS } from "@/app/Dock";
 import { preloadPage } from "@/app/pages";
@@ -40,6 +41,7 @@ export function openSettingsOn(page: Page, heading?: string): void {
     const layer = document.querySelector(`[data-page="${page}"][data-page-role="current"]`);
     const h = layer ? Array.from(layer.querySelectorAll<HTMLElement>("h2, h3")).find((x) => (x.textContent ?? "").trim().startsWith(heading)) : undefined;
     if (h) {
+      openFoldsAround(h);
       h.scrollIntoView({ block: "start", behavior: "smooth" });
       return;
     }

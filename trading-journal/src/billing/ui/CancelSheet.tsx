@@ -63,7 +63,7 @@ export function CancelSheet() {
   const footer =
     step === "reason" ? (
       <>
-        <Button onClick={close}>Abbrechen</Button>
+        <Button variant="ghost" onClick={close}>Abbrechen</Button>
         <span className="flex-1" />
         <Button variant="primary" onClick={() => go(hasOffer ? "offer" : "confirm")}>
           {CANCEL.next}

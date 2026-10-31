@@ -157,7 +157,7 @@ export function NewsCard({ focus, onFocus }: { focus: string | null; onFocus: (s
       className="h-full"
       data-testid="aktien-news"
       action={
-        <Button size="sm" variant="ghost" onClick={() => void useNewsFeed.getState().load(stocks, true)} disabled={loading || stocks.length === 0} data-testid="aktien-news-refresh">
+        <Button size="sm" variant="secondary" onClick={() => void useNewsFeed.getState().load(stocks, true)} disabled={loading || stocks.length === 0} data-testid="aktien-news-refresh">
           {loading ? "Lädt …" : N.refresh}
         </Button>
       }
@@ -206,7 +206,7 @@ export function NewsCard({ focus, onFocus }: { focus: string | null; onFocus: (s
                 className={SEG_TOUCH}
               />
               {focus && (
-                <Button size="sm" variant="ghost" onClick={() => onFocus(null)} data-testid="aktien-news-unfocus">
+                <Button size="sm" variant="secondary" onClick={() => onFocus(null)} data-testid="aktien-news-unfocus">
                   Nur {focus} ✕
                 </Button>
               )}
@@ -252,7 +252,7 @@ export function NewsCard({ focus, onFocus }: { focus: string | null; onFocus: (s
             )}
             {stories.length > shown && (
               <div>
-                <Button size="sm" variant="ghost" onClick={() => setShown((n) => n + PAGE)} data-testid="aktien-news-more">
+                <Button size="sm" variant="secondary" onClick={() => setShown((n) => n + PAGE)} data-testid="aktien-news-more">
                   Weitere {Math.min(PAGE, stories.length - shown)} anzeigen
                 </Button>
               </div>

@@ -242,7 +242,7 @@ export function TvCompareCard({ className }: { className?: string }) {
               e.target.value = "";
             }}
           />
-          <Button variant={text == null ? "primary" : "ghost"} size="sm" onClick={() => input.current?.click()} data-testid="labor-tv-pick">
+          <Button variant={text == null ? "primary" : "secondary"} size="sm" onClick={() => input.current?.click()} data-testid="labor-tv-pick">
             {text == null ? TV.pick : TV.another}
           </Button>
           {name && (

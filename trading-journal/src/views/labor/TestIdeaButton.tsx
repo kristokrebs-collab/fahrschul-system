@@ -12,7 +12,7 @@ import { navigate } from "@/store/router";
 
 export const TEST_IDEA = { label: "Diese Idee testen", busy: "Übersetze …", failed: "Das Labor konnte nicht geladen werden. Versuch es noch einmal." } as const;
 
-export function TestIdeaButton({ input, onOpen, variant = "ghost", size = "md", className, testId = "test-idea", label = TEST_IDEA.label }: { input: IdeaInput; onOpen?: () => void; variant?: ButtonVariant; size?: "sm" | "md"; className?: string; testId?: string; label?: string }) {
+export function TestIdeaButton({ input, onOpen, variant = "secondary", size = "md", className, testId = "test-idea", label = TEST_IDEA.label }: { input: IdeaInput; onOpen?: () => void; variant?: ButtonVariant; size?: "sm" | "md"; className?: string; testId?: string; label?: string }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const run = async () => {

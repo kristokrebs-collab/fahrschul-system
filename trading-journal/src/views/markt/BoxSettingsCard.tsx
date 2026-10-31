@@ -135,7 +135,7 @@ export const BoxSettingsCard = memo(function BoxSettingsCard() {
             <span className="label">
               {S.watchlist} · {cur.watchlist.length}/{WATCHLIST_MAX}
             </span>
-            <Button size="sm" variant="ghost" className="pointer-coarse:min-h-11" onClick={() => apply({ watchlist: [...DEFAULT_WATCHLIST] })}>
+            <Button size="sm" variant="secondary" className="pointer-coarse:min-h-11" onClick={() => apply({ watchlist: [...DEFAULT_WATCHLIST] })}>
               {S.reset}
             </Button>
           </div>

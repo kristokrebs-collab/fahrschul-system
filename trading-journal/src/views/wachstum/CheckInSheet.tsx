@@ -11,6 +11,7 @@
  *    "Heute überspringen" and "Erledigt" – the outcome is written to the synced day entry, so no other device asks again.
  * A check-in for a day before today is marked "nachgetragen"; it never counts as known when the day's trades began.
  */
+import { chipClass } from "@/primitives/chip";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { checkinConfigOf, dayKeyIn, deviceTimeZone, effectiveTimeZone } from "@/domain/checkin";
@@ -49,10 +50,7 @@ function Chip({ on, onClick, children, tone }: { on: boolean; onClick: () => voi
       onClick={onClick}
       whileTap={reduced ? undefined : { scale: 0.92 }}
       transition={spring.press}
-      className={cn(
-        "rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors duration-200 pointer-coarse:min-h-11",
-        on ? (tone === "neg" ? "border-signal/60 bg-signal/15 text-fg" : tone === "pos" ? "border-win/50 bg-win/10 text-fg" : "border-white/50 bg-white/[0.1] text-fg") : "border-line-2 text-mute hover:border-white/40 hover:text-fg",
-      )}
+      className={chipClass(on, { tone: tone === "neg" ? "loss" : tone === "pos" ? "win" : "neutral" })}
     >
       {children}
     </motion.button>
@@ -160,10 +158,10 @@ export function CheckInSheet() {
       footer={
         daily ? (
           <>
-            <Button variant="ghost" onClick={later} disabled={busy} data-testid="checkin-later">
+            <Button variant="secondary" onClick={later} disabled={busy} data-testid="checkin-later">
               {DAILY.later}
             </Button>
-            <Button variant="ghost" onClick={() => void skip()} disabled={busy} data-testid="checkin-skip">
+            <Button variant="secondary" onClick={() => void skip()} disabled={busy} data-testid="checkin-skip">
               {DAILY.skip}
             </Button>
             <span className="flex-1" />
@@ -174,7 +172,7 @@ export function CheckInSheet() {
         ) : (
           <>
             {(checkinOf(note) || moodOf(note) != null) && (
-              <Button variant="ghost" onClick={() => void save(true)} disabled={busy} data-testid="checkin-clear">
+              <Button variant="secondary" onClick={() => void save(true)} disabled={busy} data-testid="checkin-clear">
                 {C.clear}
               </Button>
             )}

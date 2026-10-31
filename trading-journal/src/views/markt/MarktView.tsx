@@ -7,6 +7,7 @@
  * the cells blur-fade in one after another (`Reveal`, ends at `transform: none` – the chart's morph-free, so no
  * containing-block trap). Registered by the integrator (P14) as page `markt` (see `README.md`).
  */
+import { Fold } from "@/primitives/Fold";
 import { Gate } from "@/billing/entitlements";
 import { UpgradeTeaser } from "@/billing/ui/UpgradeTeaser";
 import { lazy, Suspense, useId, type ReactNode } from "react";
@@ -206,19 +207,25 @@ export function MarktView({ className }: { className?: string }) {
           <section aria-labelledby={ids.context} className="contents">
             <SectionTitle id={ids.context} section="context" title="Einordnung" sub="Squeeze, Preis- und RSI-Struktur und ähnliche Situationen – Beobachtungen aus Kerzen und Archiv, keine Signale." className="lg:col-span-12" />
             <Cell index={3} span="lg:col-span-12">
-              <Suspense fallback={<PendingCard title="Squeeze-Beobachtung" testId="markt-squeeze-loading" height={{ base: 800, lg: 470 }} />}>
-                <SqueezeCard view={view} />
-              </Suspense>
+              <Fold id="markt-squeeze" title="Squeeze-Beobachtung" hint="Funding, Open Interest und Positionierung vor und nach einem Ausbruch">
+                <Suspense fallback={<PendingCard title="Squeeze-Beobachtung" testId="markt-squeeze-loading" height={{ base: 800, lg: 470 }} />}>
+                  <SqueezeCard view={view} />
+                </Suspense>
+              </Fold>
             </Cell>
             <Cell index={3} span="lg:col-span-12">
-              <Suspense fallback={<PendingCard title={TREND.title} testId="markt-trend-loading" height={{ base: 2680, lg: 1260 }} />}>
-                <TrendStructureCard />
-              </Suspense>
+              <Fold id="markt-trend" title={TREND.title} hint="Trendlinien auf Preis und RSI, nur aus geschlossenen Kerzen">
+                <Suspense fallback={<PendingCard title={TREND.title} testId="markt-trend-loading" height={{ base: 2680, lg: 1260 }} />}>
+                  <TrendStructureCard />
+                </Suspense>
+              </Fold>
             </Cell>
             <Cell index={4} span="lg:col-span-12">
-              <Suspense fallback={<PendingCard title="Ähnliche Situationen" testId="markt-similar-loading" height={{ base: 2150, lg: 1260 }} />}>
-                <SimilarCard />
-              </Suspense>
+              <Fold id="markt-similar" title="Ähnliche Situationen" hint="Wo frühere Kerzen ähnlich aussahen und was danach geschah – keine Prognose">
+                <Suspense fallback={<PendingCard title="Ähnliche Situationen" testId="markt-similar-loading" height={{ base: 2150, lg: 1260 }} />}>
+                  <SimilarCard />
+                </Suspense>
+              </Fold>
             </Cell>
           </section>
           <section aria-labelledby={ids.levels} className="contents">
@@ -230,7 +237,9 @@ export function MarktView({ className }: { className?: string }) {
               <PlanCard />
             </Cell>
             <Cell index={8} span="lg:col-span-12">
-              <AlertsCard />
+              <Fold id="markt-alarme" title="Alarme & Zustellprotokoll" hint="Meldungen zu deinen Schlüsselmarken und das Zustellprotokoll">
+                <AlertsCard />
+              </Fold>
             </Cell>
           </section>
           <section aria-labelledby={ids.calendar} className="contents">
@@ -255,7 +264,9 @@ export function MarktView({ className }: { className?: string }) {
               </Gate>
             </Cell>
             <Cell index={5} span="lg:col-span-12">
-              <BoxSettingsCard />
+              <Fold id="markt-box-settings" title="Box-Einstellungen" hint="Box-zu-Box, Alarme und die Watchlist des Scanners">
+                <BoxSettingsCard />
+              </Fold>
             </Cell>
           </section>
         </>

@@ -269,7 +269,7 @@ export function SetupEditor(props: SetupEditorProps) {
                 {error}
               </span>
             )}
-            <Button onClick={cancel}>{SETUP_EDITOR_STRINGS.cancel}</Button>
+            <Button variant="ghost" onClick={cancel}>{SETUP_EDITOR_STRINGS.cancel}</Button>
             <Button variant="primary" onClick={save} disabled={busy}>
               {SETUP_EDITOR_STRINGS.save}
             </Button>

@@ -107,6 +107,8 @@
   --ring-glow-input: 0 0 0 3px rgb(0 0 0 / 0.06), 0 0 24px rgb(0 0 0 / 0.04);
   --ring-glow-invalid: 0 0 0 3px rgb(204 30 41 / 0.14), 0 0 22px rgb(204 30 41 / 0.1);
   --ring-pulse-invalid: 0 0 0 3px rgb(204 30 41 / 0.22), 0 0 26px rgb(204 30 41 / 0.16);
+  --ring-glow-btn: 0 0 0 2px rgb(242 242 240), 0 0 0 4px rgb(11 11 11 / 0.72), 0 0 22px rgb(11 11 11 / 0.1);
+  --ring-glow-btn-danger: 0 0 0 2px rgb(242 242 240), 0 0 0 4px rgb(204 30 41 / 0.8), 0 0 22px rgb(204 30 41 / 0.14);
 
   --conv-1: #c9c9c6;
   --conv-2: #a0a0a0;
@@ -259,6 +261,8 @@
   --cal-win: #58e598;
   --cal-loss: #ff959b;
   --color-primary-btn-to: #d6d6d6;
+  --ring-glow-btn: 0 0 0 2px rgb(4 4 4), 0 0 0 4px rgb(255 255 255 / 0.7), 0 0 22px rgb(255 255 255 / 0.12);
+  --ring-glow-btn-danger: 0 0 0 2px rgb(4 4 4), 0 0 0 4px rgb(255 77 79 / 0.75), 0 0 22px rgb(255 77 79 / 0.16);
   --background: #111;
   --foreground: #f2f2f2;
   --card: #111;

@@ -124,7 +124,7 @@ export function RulesPanel({ market, mode, setups, params, interval, onChange, o
         </div>
       </fieldset>
       <div>
-        <Button size="sm" variant="ghost" onClick={onReset} disabled={disabled || !changed} data-testid="aktien-rules-reset">
+        <Button size="sm" variant="secondary" onClick={onReset} disabled={disabled || !changed} data-testid="aktien-rules-reset">
           {AKTIEN.scanner.reset}
         </Button>
       </div>

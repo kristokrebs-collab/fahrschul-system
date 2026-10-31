@@ -4,11 +4,11 @@
  * `settings.checkin.fields` is on; every value starts unset (a ghost thumb / no chip) and stays absent from the record
  * until the trader sets it – nothing is pre-filled, nothing "defaults to fine".
  */
+import { chipClass } from "@/primitives/chip";
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { activeQuestions, type CheckinConfig } from "@/domain/checkin";
 import { AVAILABLE_CHOICES, CHECKIN_SESSIONS, FOCUS_LABELS, SLEEP_QUALITY_LABELS, type CheckIn, type Level5 } from "@/domain/psych";
-import { cn } from "@/lib/cn";
 import { StaggerItem } from "@/motion/Stagger";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -27,10 +27,7 @@ function ChoiceChip({ on, onClick, children }: { on: boolean; onClick: () => voi
       onClick={onClick}
       whileTap={reduced ? undefined : { scale: 0.92 }}
       transition={spring.press}
-      className={cn(
-        "rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors duration-200 pointer-coarse:min-h-11",
-        on ? "border-white/50 bg-white/[0.1] text-fg" : "border-line-2 text-mute hover:border-white/40 hover:text-fg",
-      )}
+      className={chipClass(on)}
     >
       {children}
     </motion.button>

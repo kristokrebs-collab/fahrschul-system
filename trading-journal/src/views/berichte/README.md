@@ -83,3 +83,7 @@ Letzter Abschnitt der Seite (lazy, eigener Chunk, `data-testid="ledger-card"`, C
   beendete Woche mit Trades). Sonst gibt es keine leere 5er-Spalte neben dem Wochenreview (es nimmt die ganze Zeile) und keinen „Experiment“-Chip, der nach drei Sekunden wieder verschwindet.
 - Unter den Karten „Siehe auch“: Kennzahlen · Aufschlüsselung · Gebühren und Funding (Analyse); in „Zielerreichung“ ohne Ziele führen „Plan im Coach“ und „Ziel anlegen“ weiter.
 - Textlinks („Neuester“, „Laufend“, „Alle anzeigen“) nutzen das gemeinsame `textLink` (`src/lib/textLink.ts`).
+
+## Etappe 1c (kürzere Seite)
+- Das Transaktionsbuch (`ledger-card`) steht eingeklappt in einer Zeile (`Fold`, `berichte-ledger`); die „Inhalt“-Leiste und der Funktionsfinder öffnen es beim Ansprung. Höhe bei 390 px: 14 156 → 6 425 px.
+

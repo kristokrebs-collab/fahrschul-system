@@ -54,7 +54,7 @@ export interface HoldButtonProps extends Omit<HTMLMotionProps<"button">, Control
 
 const SHAKE_X = [0, -4, 4, -3, 3, 0];
 
-const FILL: Record<ButtonVariant, string> = { danger: "bg-signal/35", ghost: "bg-white/[0.12]", primary: "bg-ink-950/20" };
+const FILL: Record<ButtonVariant, string> = { danger: "bg-signal/35", secondary: "bg-white/[0.12]", ghost: "bg-white/[0.12]", primary: "bg-ink-950/20" };
 
 /**
  * Hold-to-confirm for destructive actions (21st.dev / motion.dev "Hold to Confirm"). Press and hold: a fill sweeps

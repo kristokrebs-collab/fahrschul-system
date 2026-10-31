@@ -41,7 +41,7 @@ export function RunBar({ slice, onRun, onCancel, label, id, disabled, disabledRe
             {X.cancel}
           </Button>
         ) : (
-          <Button size="sm" variant={done ? "ghost" : "primary"} onClick={onRun} disabled={disabled} aria-describedby={disabled && disabledReason ? reasonId : undefined} data-testid={`${id}-run`}>
+          <Button size="sm" variant={done ? "secondary" : "primary"} onClick={onRun} disabled={disabled} aria-describedby={disabled && disabledReason ? reasonId : undefined} data-testid={`${id}-run`}>
             {done ? X.again : label}
           </Button>
         )}

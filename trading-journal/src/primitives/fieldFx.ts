@@ -1,4 +1,5 @@
 import { animate } from "motion/react";
+import { openFoldsAround } from "@/app/reveal";
 import { useCallback, useRef, type RefObject } from "react";
 import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -83,6 +84,7 @@ function scrollParent(el: Element): HTMLElement | null {
 export function revealInvalid(target: string | HTMLElement | null | undefined, { reduced = false }: { reduced?: boolean } = {}): void {
   const el = typeof target === "string" ? document.getElementById(target) : target;
   if (!el) return;
+  openFoldsAround(el); // a field in a folded card (`Fold`) has to be there before it can be focused and shown
   el.focus({ preventScroll: true });
   const shake = () => shakeField(el, { reduced });
   if (typeof el.scrollIntoView !== "function") {

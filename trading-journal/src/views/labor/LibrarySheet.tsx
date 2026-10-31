@@ -139,7 +139,7 @@ function Card({ card, onLoad, fundingOk, busy }: { card: StrategyCard; onLoad: (
         <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-mute">{LIB.load}</span>
         <div className="flex flex-wrap gap-1.5">
           {LEVELS.map((lv) => (
-            <Button key={lv} size="sm" variant={lv === "standard" ? "primary" : "ghost"} disabled={busy} title={LEVEL_NOTE[lv]} onClick={() => onLoad(card, lv)} data-testid={`labor-lib-load-${card.id}-${lv}`}>
+            <Button key={lv} size="sm" variant={lv === "standard" ? "primary" : "secondary"} disabled={busy} title={LEVEL_NOTE[lv]} onClick={() => onLoad(card, lv)} data-testid={`labor-lib-load-${card.id}-${lv}`}>
               {LEVEL_LABEL[lv]}
             </Button>
           ))}

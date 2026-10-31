@@ -224,7 +224,7 @@ export function KeyLevelEditor({ level, symbol, tf, price, onSave, onCancel, cla
       </fieldset>
 
       <div className="flex flex-wrap justify-end gap-x-2 gap-y-3.5">
-        <Button variant="ghost" onClick={onCancel}>
+        <Button variant="secondary" onClick={onCancel}>
           {E.cancel}
         </Button>
         <Button type="submit" variant="primary" disabled={!sym} data-testid="keylevel-save">

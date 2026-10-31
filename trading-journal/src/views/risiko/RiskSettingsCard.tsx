@@ -227,7 +227,7 @@ function TierEditor({ tiers, onCommit }: { tiers: readonly MaintTier[]; onCommit
       <div className="mt-1.5 flex flex-wrap gap-2">
         <Button
           size="sm"
-          variant="ghost"
+          variant="secondary"
           disabled={rows.length >= TIERS_MAX}
           onClick={() => {
             const prevCap = rows.length > 1 ? parseInput(rows[rows.length - 2]!.upTo) : 0;
@@ -241,7 +241,7 @@ function TierEditor({ tiers, onCommit }: { tiers: readonly MaintTier[]; onCommit
         </Button>
         <Button
           size="sm"
-          variant="ghost"
+          variant="secondary"
           onClick={() => {
             const next = fmt(DEFAULT_TIERS);
             setRows(next);

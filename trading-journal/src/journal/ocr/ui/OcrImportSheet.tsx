@@ -400,7 +400,7 @@ export default function OcrImportSheet() {
       footer={
         <>
           <span className="flex-1" />
-          <Button onClick={busy ? cancelReading : close} data-testid="ocr-cancel">
+          <Button variant="ghost" onClick={busy ? cancelReading : close} data-testid="ocr-cancel">
             {busy ? S.cancel : phase === "preview" || phase === "error" ? S.close : S.cancel}
           </Button>
           {(phase === "pick" || phase === "error") && (

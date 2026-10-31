@@ -87,6 +87,9 @@
   --ring-glow-input: 0 0 0 3px rgb(255 255 255 / 0.07), 0 0 24px rgb(255 255 255 / 0.05);
   --ring-glow-invalid: 0 0 0 3px rgb(255 77 79 / 0.16), 0 0 22px rgb(255 77 79 / 0.12);
   --ring-pulse-invalid: 0 0 0 3px rgb(255 77 79 / 0.24), 0 0 26px rgb(255 77 79 / 0.2);
+  /* keyboard focus of every Button: a gap in the page ink, a clear 2px ring, a soft glow (no transition: it shows at once) */
+  --ring-glow-btn: 0 0 0 2px rgb(4 4 4), 0 0 0 4px rgb(255 255 255 / 0.7), 0 0 22px rgb(255 255 255 / 0.12);
+  --ring-glow-btn-danger: 0 0 0 2px rgb(4 4 4), 0 0 0 4px rgb(255 77 79 / 0.75), 0 0 22px rgb(255 77 79 / 0.16);
 
   --palette-1: #6f9dc9;
   --palette-2: #46a6a0;

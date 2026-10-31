@@ -73,7 +73,7 @@ export function ClassifyCard({ className }: { className?: string }) {
             <p className="text-[13.5px] text-fg/90">{CLASSIFY_STRINGS.lead(untagged, suggestions.length)}</p>
             {!suggestions.length && <p className="text-[12px] text-faint">{CLASSIFY_STRINGS.hint}</p>}
           </div>
-          <Button variant={suggestions.length ? "primary" : "ghost"} disabled={!suggestions.length} onClick={() => setOpen(true)} data-testid="setup-classify-open">
+          <Button variant={suggestions.length ? "primary" : "secondary"} disabled={!suggestions.length} onClick={() => setOpen(true)} data-testid="setup-classify-open">
             {CLASSIFY_STRINGS.open}
           </Button>
         </div>

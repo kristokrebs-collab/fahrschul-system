@@ -61,7 +61,7 @@ function Running({ p }: { p: ChallengeProgress }) {
             <Button size="sm" variant="danger" onClick={() => void drop()}>
               Ja
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setAsk(false)}>
+            <Button size="sm" variant="secondary" onClick={() => setAsk(false)}>
               Nein
             </Button>
           </span>
