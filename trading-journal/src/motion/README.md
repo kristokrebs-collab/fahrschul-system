@@ -603,3 +603,9 @@ growing `clip-path` circle (View Transitions) – a declared exception to "only 
 
 Every element above sets `style={{ borderRadius }}` (`radius.card 16`, `radius.dialog/sheet 28`, `radius.pill 9999`, `radius.hover 12`, `radius.thumb 8`).
 `position:fixed` panels carry `layoutRoot`; scrolling ancestors of `layout` elements carry `layoutScroll` (sheet/dialog body, table wrapper).
+
+## Runde 10: `data-rich`
+
+Every page layer except the Übersicht and the Cockpit carries `data-rich` (`PageHost.tsx`). New, richer effects (playful
+hover, tilt, stagger, decorative loops) are scoped to it – CSS as `[data-rich] .x`, components by living inside such a page –
+so the Startseite and the Cockpit stay exactly as they were. Chrome around the pages (sidebar, dock, header) is not scoped.

@@ -247,6 +247,9 @@ const PageLayer = memo(function PageLayer({ page, role, keepAlive, cascade, rend
       ref={setRef}
       data-page={page}
       data-page-role={role}
+      // Runde 10: the richer motion (playful hover, stagger, tilt …) is scoped to the pages marked here – the Übersicht and
+      // the Cockpit keep the exact picture they had (selectors `[data-rich] …`, or a component that is mounted inside)
+      data-rich={page === "overview" || page === "cockpit" ? undefined : ""}
       // `inert` only while parked (display:none inside – free); on the leaving layer it restyled every element of the page
       // that is fading out in the switch frame (≈ 2 200 on the Übersicht, 20–30 ms) – that layer is aria-hidden, swallows
       // pointer input, releases focus at the switch and is collapsed once its exit has played
