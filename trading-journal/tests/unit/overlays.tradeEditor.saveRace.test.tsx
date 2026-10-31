@@ -11,6 +11,10 @@ import { TradeEditor, type TradeRecord } from "@/overlays/TradeEditor";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { SAMPLE, settings } from "./domain.fixtures";
+import { registerFlatForm } from "./editorLayout";
+
+// the older specs test every field's data path: all fields stay on screen (the short form has its own specs)
+registerFlatForm();
 
 const SNAP: SignalSnapshot = {
   at: "2026-10-07T10:00:00.000Z",

@@ -419,13 +419,15 @@ _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
 
 ### Trades eintragen & Daten
 
-_Trades hineinbekommen, ordnen, sichern und prüfen._ · 14 Funktionen
+_Trades hineinbekommen, ordnen, sichern und prüfen._ · 16 Funktionen
 
 **Eintragen & importieren**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Einen Trade von Hand eintragen | Trade eintragen | Übersicht › Trade eintragen | fertig |
+| Festlegen, welche Felder du beim Eintragen immer siehst | Trade-Formular anpassen | Übersicht › Trade eintragen › Felder anpassen | fertig |
+| Einen neuen Trade mit den Einstellungen des letzten starten | Letzten Trade duplizieren | Trades › Alle Trades | fertig |
 | Trades aus einem Screenshot deiner Börsen-Historie eintragen | Screenshot importieren | Trades (Fenster: shotImport) | fertig |
 | Einen Trade aus einem Screenshot übernehmen | Aus Screenshot übernehmen (KI, optional) | Übersicht › Trade eintragen | fertig |
 | Trades aus einer CSV-Datei einlesen | CSV-Import | Einstellungen › Daten | fertig |

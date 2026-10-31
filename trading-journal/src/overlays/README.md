@@ -113,6 +113,34 @@ interface TradeEditorProps {
   a value that does not fit beside its label wraps right-aligned. Older snapshots (no `state` / `parts`) look as before.
   `StrengthBars` of a provisional snapshot draws the strength on the close outlined in the soft tone.
 
+### Kurzes Formular (Etappe 1b) – `tradeFormLayout.ts`, `TradeFormParts.tsx`, `duplicateTrade.ts`, `keyboardInset.ts`
+
+Vorher: 12 Abschnitte, 41 Feldblöcke, 85 Bedienelemente, Formular 6.713 px hoch bei 390 px Breite (Einstieg 1.446 px, Größe 1.705 px unter dem Anfang).
+Jetzt: sichtbar nur die **sechs Kernfelder** – `Paar`, `Richtung`, `Datum & Uhrzeit`, `Einstieg`, `Ausstieg`, `Größe` (genau das, was `validateRecord` für einen
+geschlossenen Trade verlangt: Datum, Einstieg, Ausstieg, Größe; Paar und Richtung haben immer einen Wert). `Stop-Loss` ist **nicht** Pflicht (der Code
+verlangt ihn nicht) und liegt in `Ziele und Ausstieg`. Darunter die Live-Vorschau `P&L` / `R-Multiple` und sechs Akkordeons:
+`Details` (Konto, Timeframe, Status) · `Ziele und Ausstieg` (Stop-Loss, Take-Profit, Hebel, Gebühren, P&L manuell + die Kacheln Kursbewegung / Risiko / CRV +
+Risiko-Vorschau) · `Ausführung` (der ganze Block) · `Setup und Einstiegs-Check` (Einstiegs-Check, Entscheidungsgrundlage, Begründung, Checkliste) ·
+`Disziplin und Psyche` (Überzeugung, Plan befolgt?, Gefühl, Psyche, Fehler) · `Notizen und Bewertung` (Tags, Bewertung, Learnings & Notizen, Chart-Link, Screenshots).
+
+- **29 verschiebbare Einheiten** (`FIELD_IDS`): 14 einzelne Felder, 15 Blöcke mit eigenem Innenleben (Einstiegs-Check, Ausführung mit Fills/TP-Leiter/Stop-Verlauf, Setup-Chips,
+  Checkliste, Psyche, Fehler-Chips, Screenshots …). Innerhalb eines Blocks wird nicht weiter zerlegt.
+- **Nichts geht verloren**: Der Inhalt eines geschlossenen Bereichs bleibt eingehängt (`inert` + `visibility:hidden`, Höhe 0), also laufen Einstiegs-Check, `s_mtf`-Auto-Haken,
+  Validierung und Speichern unverändert; Datenformat und Speicherpfad sind nicht angefasst, keine Migration. Kopf eines Bereichs: Button ≥ 44 px (`aria-expanded`, `aria-controls`),
+  Hinweis mit den enthaltenen Feldern, Plakette `n ausgefüllt` (der Standard-Hebel 4x zählt nicht). Ein Bereich ohne Feld verschwindet.
+- **`Felder anpassen`** (Knopf oben im Formular, auch beim Bearbeiten): Liste aller 29 Einheiten mit einem nativen `select` (Kern oder einer der sechs Bereiche) – ohne Ziehen, mit
+  Tastatur und Screenreader bedienbar. Gespeichert **pro Gerät** in `localStorage` (`storageKey("trade-form-layout")`, `{ v: 1, moved: { stop: "core" } }`, nur Abweichungen von der Voreinstellung,
+  alles in `try/catch`, lenient gelesen). **Nicht in `settings`**: Telefon und Desktop brauchen verschiedene Anordnungen, und die Anordnung soll nicht durch Backup/Cloud-Merge wandern.
+  `Zurücksetzen` löscht den Schlüssel. Die Reihenfolge innerhalb einer Zone ist fest (Katalogreihenfolge).
+- **Fehler führen zum Feld**: `reject()` → `jumpTo(field, domId)`: liegt das Feld im Kern oder in einem offenen Bereich, wird es sofort fokussiert (wie vorher); sonst öffnet sich der Bereich
+  ohne Höhenanimation, zwei Frames später folgen `revealInvalid` (Fokus ohne Seitensprung, Scroll nur im Sheet-Körper, Wackeln). Meldungen des Ausführungs-Blocks öffnen `Ausführung`
+  (`journalProblemTarget`). Ein Entwurf (`openEditor({ draft })`, z. B. Screenshot-Import) öffnet die Bereiche, in denen er Werte gesetzt hat.
+- **`Letzten Trade duplizieren`** (nur bei einem neuen Trade und wenn das Journal einen Trade hat; zusätzlich `trades-duplicate-last` im Kopf der Trade-Liste, öffnet den Editor mit `draft`
+  und einem Toast): `carryOver(trade)` übernimmt Konto, Paar, Richtung, Setups, Größe, Hebel, Zeitrahmen, Tags – nie Preise, Ergebnis, Zeiten, Notizen, Checkliste, Gefühl. Ein Satz sagt, was
+  übernommen wurde (`carrySentence`). „Letzter Trade“ = neuestes `date`, bei Gleichstand `createdAt`.
+- **Speichern-Leiste**: bleibt die Fußleiste des Sheets (unten fest, Safe-Area-Padding). `useKeyboardInset` schreibt, solange der Editor offen ist, `--kb-inset` (Lücke ≥ 120 px unter der
+  Visual Viewport = Bildschirmtastatur) auf `<html>`; das Panel trägt `mb-[var(--kb-inset,0px)]`, die Leiste sitzt dann über der Tastatur. Ohne Tastatur ist der Wert 0 (Layout wie vorher).
+
 ## `TradeDetail` (`TradeDetail.tsx`) – bundle `q$`, Plan 6.2 / 2.5
 
 ```ts

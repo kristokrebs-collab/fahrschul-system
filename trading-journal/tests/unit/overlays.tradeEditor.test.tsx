@@ -6,6 +6,10 @@ import { SAVE_BUSY_DELAY_MS, TradeEditor, defaultForm, livePriceInput, resetForN
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { SAMPLE, settings } from "./domain.fixtures";
+import { registerFlatForm } from "./editorLayout";
+
+// the older specs test every field's data path: all fields stay on screen (the short form has its own specs)
+registerFlatForm();
 
 const saveTrade = vi.fn<(t: TradeRecord) => Promise<void>>(async () => {});
 const deleteTrade = vi.fn<(id: string) => Promise<void>>(async () => {});
@@ -66,8 +70,9 @@ describe("TradeEditor – sheet", () => {
   it("renders `Trade eintragen` with every section and field label", () => {
     mount();
     expect(screen.getByRole("dialog", { name: "Trade eintragen" })).toBeInTheDocument();
-    for (const s of ["Eckdaten", "Preise & Größe", "Entscheidungsgrundlage", "Checkliste", "Überzeugung & Disziplin", "Review"]) {
-      expect(screen.getByRole("heading", { level: 3, name: new RegExp(s) })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: /Kernfelder/ })).toBeInTheDocument();
+    for (const s of ["Entscheidungsgrundlage", "Checkliste"]) {
+      expect(screen.getByRole("heading", { level: 4, name: new RegExp(s) })).toBeInTheDocument();
     }
     for (const l of ["Datum & Uhrzeit", "Paar", "Timeframe", "Einstieg", "Stop-Loss", "Take-Profit", "Ausstieg", "Größe (USDT)", "Hebel", "Gebühren (USDT)", "P&L manuell", "Begründung", "Learnings & Notizen", "Chart-Link (TradingView)"]) {
       expect(screen.getByLabelText(l)).toBeInTheDocument();

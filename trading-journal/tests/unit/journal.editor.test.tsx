@@ -12,6 +12,10 @@ import { TradeEditor, formFromDraft, draftExtras, type TradeRecord } from "@/ove
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { SAMPLE, settings } from "./domain.fixtures";
+import { registerFlatForm } from "./editorLayout";
+
+// the older specs test every field's data path: all fields stay on screen (the short form has its own specs)
+registerFlatForm();
 
 const saveTrade = vi.fn<(t: TradeRecord) => Promise<void>>(async () => {});
 
@@ -49,7 +53,7 @@ describe("TradeEditor – Journal v3", () => {
 
   it("shows the new sections", () => {
     mount();
-    for (const s of ["Ausführung", "Tags & Bewertung", "Psyche", "Screenshots"]) expect(screen.getByRole("heading", { level: 3, name: new RegExp(`^${s}`) })).toBeInTheDocument();
+    for (const s of ["Ausführung", "Psyche", "Screenshots"]) expect(screen.getByRole("heading", { level: 4, name: new RegExp(`^${s}`) })).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Bewertung" })).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Stress" })).toBeInTheDocument();
     expect(screen.getByTestId("shots-drop")).toBeInTheDocument();

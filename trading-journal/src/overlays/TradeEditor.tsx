@@ -28,7 +28,7 @@ import { pushToast, useUi, type AccFilter, type TradeDraft } from "@/store/uiSto
 import { ExecutionSection } from "@/journal/editor/ExecutionSection";
 import { PsychSection } from "@/journal/editor/PsychSection";
 import { VoiceNote } from "@/journal/editor/LazyVoiceNote";
-import { dropEmptyJournalKeys, fillFix, journalDefaults, journalFromTrade, journalKey, journalRecord, journalReset, openRemainderMessage, statusAfterFills, validateJournal, type JournalForm } from "@/journal/editor/form";
+import { JOURNAL_MESSAGES, dropEmptyJournalKeys, fillFix, journalDefaults, journalFromTrade, journalKey, journalRecord, journalReset, openRemainderMessage, statusAfterFills, validateJournal, type JournalForm } from "@/journal/editor/form";
 import { ShotsField } from "@/journal/screenshots/ShotsField";
 import { RatingDots } from "@/journal/ui/RatingDots";
 import { TagInput, tagSuggestions } from "@/journal/ui/TagInput";
@@ -42,6 +42,10 @@ import { boxSnapOf, resolveTradeBoxes, type BoxSnapshot } from "@/market/boxes/s
 import { deleteTradeWithShots, releaseCloudShots, removedCloudPaths } from "@/journal/screenshots/release";
 import { normalizeWatchSymbol } from "@/domain/boxes/config";
 import { useEntitlement } from "@/billing/entitlements";
+import { carryOver, carrySentence, lastTrade } from "./duplicateTrade";
+import { useKeyboardInset } from "./keyboardInset";
+import { BlockHead, CUSTOMIZE_COPY, CoreSection, FieldCustomizer, FormGroup, FormToolbar, ZoneGrid } from "./TradeFormParts";
+import { GROUPS, fieldDef, fieldsIn, filledByZone, filledFields, groupHint, groupOf, isDefaultLayout, moveField, readLayout, defaultLayout, writeLayout, type FieldId, type FormLayout, type GroupId, type ZoneId } from "./tradeFormLayout";
 
 /** Phone footer of a new trade: the `size="sm"` metrics (12 px, tighter padding) so three buttons share one row. */
 const FOOT_SM = "max-sm:px-2.5 max-sm:text-xs";
@@ -299,6 +303,32 @@ export function resetForNext(d: TradeFormStrings, t: TradeFormTyped): { d: Trade
   };
 }
 
+/**
+ * The optional fields that carry the trader's own value (feeds the `n ausgefüllt` badges and decides which groups a
+ * draft opens). A NEW trade's default leverage (`4` on scalp) is not the trader's value; a stored trade's leverage is.
+ */
+export function filledOf(d: TradeFormStrings, t: TradeFormTyped, settings: Pick<Settings, "pair">, isNew: boolean): FieldId[] {
+  const levDefault = isNew ? defaultForm(settings, t.account).d.leverage : null;
+  return filledFields({ d: { ...d, leverage: levDefault != null && d.leverage === levDefault ? "" : d.leverage }, t });
+}
+
+/** The groups (not the core) that hold at least one of `filled`. */
+export function groupsWithValues(layout: FormLayout, filled: readonly FieldId[]): GroupId[] {
+  const out: GroupId[] = [];
+  for (const id of filled) {
+    const g = groupOf(layout, id);
+    if (g && fieldDef(id).optional && !out.includes(g)) out.push(g);
+  }
+  return out;
+}
+
+/** Where a validation message of the v3 part points: the execution block (and its exit-time field where the message is about it). */
+export function journalProblemTarget(problem: string): { field: FieldId; dom: string } | null {
+  if (problem === JOURNAL_MESSAGES.exitBeforeEntry) return { field: "execution", dom: "f-exit-date" };
+  if ((Object.values(JOURNAL_MESSAGES) as string[]).includes(problem) || problem.includes("noch offen –")) return { field: "execution", dom: "fb-execution" };
+  return null;
+}
+
 /** Comparable form state: unchecked boxes, chip order and whitespace-only differences are not "changes". */
 function formKey(d: TradeFormStrings, t: TradeFormTyped) {
   const checks = Object.keys(t.checks)
@@ -507,6 +537,17 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const [manualMtf, setManualMtf] = useState(false);
   const [autoMtf, setAutoMtf] = useState<MtfAuto | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  /** Where the fields are shown (core / accordion group), per device – see `tradeFormLayout.ts`. */
+  const [layout, setLayout] = useState<FormLayout>(readLayout);
+  const [openGroups, setOpenGroups] = useState<readonly GroupId[]>([]);
+  /** `Felder anpassen` is open (the form stays mounted, hidden). */
+  const [customizing, setCustomizing] = useState(false);
+  /** The sentence under `Letzten Trade duplizieren`, and the one after `Zurücksetzen`. */
+  const [dupNote, setDupNote] = useState("");
+  const [resetNote, setResetNote] = useState("");
+  /** A jump to a field in a closed group: the group opens without animation first, then the field is focused. */
+  const [reveal, setReveal] = useState<{ dom: string; nonce: number } | null>(null);
+  const [snapGroup, setSnapGroup] = useState<GroupId | null>(null);
   const entryRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const alertRef = useRef<HTMLSpanElement>(null);
@@ -537,7 +578,15 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     setD(init.d);
     setT(init.t);
     setBaseline(init);
-  }, [session, trade, draft, settings, acc]);
+    setCustomizing(false);
+    setDupNote("");
+    setResetNote("");
+    setReveal(null);
+    setSnapGroup(null);
+    // a pre-filled draft (screenshot import, box setup …) opens the groups that hold its values, so nothing it filled is
+    // hidden from the trader's check; a blank form and a stored trade start compact (the badges say what is inside)
+    setOpenGroups(draft ? groupsWithValues(layout, filledOf(init.d, init.t, settings, true)) : []);
+  }, [session, trade, draft, settings, acc, layout]);
 
   const rec = useMemo(() => toRecord(d, t), [d, t]);
   const x = useMemo(() => deriveTrade(rec), [rec]);
@@ -596,6 +645,66 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     if (k === invalid) setInvalid(null);
   };
   const patchT = useCallback((patch: Partial<TradeFormTyped>) => setT((o) => ({ ...o, ...patch })), []);
+
+  // ---- short form: layout, groups, duplicate (Etappe 1b)
+  useKeyboardInset(editor.open);
+  const filled = useMemo(() => filledOf(d, t, settings, !trade), [d, t, settings, trade]);
+  const filledPer = useMemo(() => filledByZone(layout, filled), [layout, filled]);
+  const last = useMemo(() => lastTrade(trades), [trades]);
+  const changeLayout = useCallback((next: FormLayout) => {
+    setLayout(next);
+    writeLayout(next);
+    setResetNote("");
+  }, []);
+  const toggleGroup = (g: GroupId) => setOpenGroups((o) => (o.includes(g) ? o.filter((x) => x !== g) : [...o, g]));
+  /** Brings a field into view: leaves the customiser, opens its group (without animation) and focuses the control. */
+  const jumpTo = useCallback(
+    (field: FieldId, dom: string) => {
+      const g = groupOf(layout, field);
+      if (!customizing && (g == null || openGroups.includes(g))) {
+        // already on screen (core or an open group): focus it right away, exactly as the flat form did
+        revealInvalid(dom, { reduced });
+        return;
+      }
+      setCustomizing(false);
+      if (g && !openGroups.includes(g)) {
+        setOpenGroups((o) => (o.includes(g) ? o : [...o, g]));
+        setSnapGroup(g);
+      }
+      setReveal((r) => ({ dom, nonce: (r?.nonce ?? 0) + 1 }));
+    },
+    [layout, openGroups, customizing, reduced],
+  );
+  useEffect(() => {
+    if (!reveal) return;
+    // two frames: the group is open at its final height before the field is measured and scrolled to
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        revealInvalid(reveal.dom, { reduced });
+        setSnapGroup(null);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [reveal, reduced]);
+  /** `Letzten Trade duplizieren`: the setting of the last trade into the open form; says what was taken over. */
+  const duplicateLast = () => {
+    if (!last) return;
+    const c = carryOver(last, settings.setups, settings.currency);
+    const p = c.draft;
+    setD((o) => ({
+      ...o,
+      pair: p.pair ?? o.pair,
+      timeframe: p.timeframe ?? o.timeframe,
+      size: p.size != null ? toInputString(p.size) : o.size,
+      leverage: p.leverage != null ? toInputString(p.leverage) : o.leverage,
+    }));
+    setT((o) => ({ ...o, account: p.account ?? o.account, side: p.side ?? o.side, setups: p.setups ? [...p.setups] : o.setups, j: { ...o.j, tags: p.tags ? [...p.tags] : o.j.tags } }));
+    setDupNote(carrySentence(c));
+  };
   const toggleCheck = (id: string) => {
     if (id.startsWith(`${MTF_SETUP_ID}:`)) {
       // from here on the user owns the s_mtf items: the current (auto) state becomes the manual one
@@ -629,7 +738,9 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         setErr(problem);
         setInvalid(field);
         shakeField(alertRef.current, { reduced, self: true });
-        if (field) revealInvalid(`f-${field}`, { reduced });
+        // the field may sit in a closed group: open it, then focus the control (no page jump – only the sheet body scrolls)
+        const target = field ? { field: field as FieldId, dom: `f-${field}` } : journalProblemTarget(problem);
+        if (target) jumpTo(target.field, target.dom);
       };
       const problem = validateRecord(rec, d.chart, t.j);
       if (problem) {
@@ -744,7 +855,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         if (busyShown) setSaving(false);
       }
     },
-    [rec, d, t, checking, trade, draft, trades, closeEditor, reduced],
+    [rec, d, t, checking, trade, draft, trades, closeEditor, reduced, jumpTo],
   );
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -897,12 +1008,269 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     ["Geplantes CRV", x.rr == null ? "–" : `1 : ${n2(x.rr)}`],
   ];
 
+  // ---- every movable unit of the form as a node; WHERE it is shown is decided by `layout` (core / accordion group)
+  const blocks: Record<FieldId, ReactNode> = {
+    pair: (
+      <Field label="Paar" htmlFor="f-pair">
+        <Input id="f-pair" value={d.pair} onChange={setStr("pair")} autoComplete="off" />
+      </Field>
+    ),
+    side: (
+      <Field label="Richtung">
+        <Segmented<Side>
+          aria-label="Richtung"
+          value={t.side}
+          onChange={(side) => patchT({ side })}
+          tones={{ long: "!border-win/40 !bg-win/15", short: "!border-loss/40 !bg-loss/15" }}
+          options={[
+            { v: "long", label: "▲ Long" },
+            { v: "short", label: "▼ Short" },
+          ]}
+        />
+      </Field>
+    ),
+    date: (
+      <Field label="Datum & Uhrzeit" htmlFor="f-date">
+        <Input id="f-date" type="datetime-local" value={d.date} onChange={setStr("date")} {...fieldInvalid("date")} />
+      </Field>
+    ),
+    account: (
+      <Field label="Konto">
+        <Segmented<AccountId>
+          aria-label="Konto"
+          value={account}
+          onChange={(account) => patchT({ account })}
+          options={[
+            { v: "makro", label: "Makro" },
+            { v: "scalp", label: "Scalp" },
+          ]}
+        />
+      </Field>
+    ),
+    timeframe: (
+      <Field label="Timeframe" htmlFor="f-tf">
+        <MorphSelect id="f-tf" value={d.timeframe} options={tfOptions} onChange={(timeframe) => setD((o) => ({ ...o, timeframe }))} />
+      </Field>
+    ),
+    status: (
+      <Field label="Status">
+        <Segmented<TradeStatus>
+          aria-label="Status"
+          value={t.status}
+          onChange={(status) => {
+            autoOpened.current = false; // the trader's own choice wins over the fills (F4)
+            patchT({ status });
+          }}
+          options={[
+            { v: "closed", label: "Geschlossen" },
+            { v: "open", label: "Noch offen" },
+          ]}
+        />
+      </Field>
+    ),
+    entry: priceField("entry", "Einstieg"),
+    stop: priceField("stop", "Stop-Loss"),
+    target: priceField("target", "Take-Profit"),
+    exit: priceField("exit", "Ausstieg"),
+    size: (
+      <Field label={`Größe (${cur})`} htmlFor="f-size" help={fix ? "Aus den Fills" : "Positionswert inkl. Hebel"}>
+        <Input id="f-size" numeric autoComplete="off" value={fromFills("size") ?? d.size} onChange={setStr("size")} disabled={fix != null} {...fieldInvalid("size")} />
+      </Field>
+    ),
+    leverage: (
+      <Field label="Hebel" htmlFor="f-lev" suffix="x" help={leverageOver ? <span className="font-medium text-warn">{LEVERAGE_WARNING[account]}</span> : LEVERAGE_HELP[account]}>
+        <Input id="f-lev" numeric autoComplete="off" value={d.leverage} onChange={setStr("leverage")} placeholder="z. B. 4" className={cn(leverageOver && "border-warn/60")} />
+      </Field>
+    ),
+    fees: (
+      <Field label={`Gebühren (${cur})`} htmlFor="f-fees">
+        <Input id="f-fees" numeric autoComplete="off" value={d.fees} onChange={setStr("fees")} placeholder="0" />
+      </Field>
+    ),
+    pnlManual: (
+      <Field label="P&L manuell" htmlFor="f-pnl" help="Leer = wird berechnet" suffix={cur}>
+        <Input id="f-pnl" numeric autoComplete="off" value={d.pnlManual} onChange={setStr("pnlManual")} placeholder="automatisch" />
+      </Field>
+    ),
+    signal: (
+      <div>
+        <BlockHead title={SIGNAL_SECTION_TITLE} sub={signalSectionSub({ checking, stored })} />
+        <SignalSection date={d.date} side={t.side} checking={checking} stored={stored} changed={timingChanged && !checkReq} onCheck={recheck} onAuto={onAuto} />
+      </div>
+    ),
+    execution: (
+      <div id="fb-execution" tabIndex={-1} className="outline-none">
+        <BlockHead title="Ausführung" sub="Fills, Teil-Exits, Funding, Margin – alles optional" />
+        <ExecutionSection j={t.j} onChange={patchJ} side={t.side} status={t.status} date={d.date} entry={rec.entry} stop={rec.stop} currency={cur} />
+      </div>
+    ),
+    setups: (
+      <div className="grid gap-3.5">
+        <BlockHead title="Entscheidungsgrundlage" sub="Warum bist du eingestiegen?" />
+        {/* a new chip order (Konto switch) never FLIPs the transparent chips through each other (ED-01): the group
+              fades out, re-orders, the chips cascade back in; the row height follows on a spring */}
+        <AutoHeight className="-my-1.5 py-1.5">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div key={chipOrder} className="flex flex-wrap gap-2" variants={CHIP_GROUP} initial={reduced ? false : "hidden"} animate="shown" exit={reduced ? undefined : "exit"}>
+              {sortedSetups.map((s) => (
+                <SetupToggle key={s.id} setup={s} account={account} selected={t.setups.includes(s.id)} onToggle={() => patchT({ setups: t.setups.includes(s.id) ? t.setups.filter((id) => id !== s.id) : [...t.setups, s.id] })} />
+              ))}
+              <motion.button
+                type="button"
+                onClick={() => (onNewSetup ? onNewSetup() : openSetupEditor({ fromTrade: true }))}
+                variants={CHIP}
+                whileTap={{ scale: 0.96 }}
+                transition={spring.press}
+                className="rounded-full border border-dashed border-line-2 px-3 py-1.5 text-[12.5px] text-mute transition-colors hover:border-white/40 hover:text-fg pointer-coarse:min-h-11"
+              >
+                + Neue Grundlage
+              </motion.button>
+            </motion.div>
+          </AnimatePresence>
+        </AutoHeight>
+        {editor.open && (
+          <Suspense fallback={null}>
+            <ClassifyChipSlot
+              draft={{ side: t.side, pair: d.pair, timeframe: d.timeframe, account, date: d.date, boxSnap: v3.boxSnap ?? draft?.boxSnap, signal: trade?.signal ?? draft?.signal }}
+              picked={t.setups}
+              onApply={(id) => patchT({ setups: [id] })}
+            />
+          </Suspense>
+        )}
+      </div>
+    ),
+    reason: (
+      <Field label="Begründung" htmlFor="f-reason">
+        <Textarea id="f-reason" rows={3} className="leading-relaxed" value={d.reason} onChange={setStr("reason")} placeholder={ED.COPY.reasonPlaceholder} />
+        <VoiceNote value={d.reason} onChange={(reason) => setD((x) => ({ ...x, reason }))} label="Begründung" testId="voice-reason" />
+      </Field>
+    ),
+    checklist: (
+      <div className="grid gap-3.5">
+        <BlockHead title="Checkliste" sub={items.length ? <CountRoll checked={checked} total={items.length} /> : undefined} />
+        <ChecklistBar ratio={items.length ? checked / items.length : 0} complete={items.length > 0 && checked === items.length} />
+        <div className="grid gap-2 md:grid-cols-2">
+          {items.map((it) => {
+            const setupName = it.id.startsWith("g:") ? "Grundregel" : settings.setups.find((s) => it.id.startsWith(s.id + ":"))?.name;
+            const auto = autoApplies && it.id.startsWith(`${MTF_SETUP_ID}:`);
+            return (
+              <CheckboxRow key={it.id} checked={Boolean(checks[it.id])} sub={auto ? `${setupName} · automatisch` : setupName} onToggle={() => toggleCheck(it.id)}>
+                {it.text}
+              </CheckboxRow>
+            );
+          })}
+        </div>
+      </div>
+    ),
+    conviction: (
+      <Field label="Wie sicher warst du beim Einstieg?">
+        <ConvictionRadio value={t.conviction} onChange={(conviction) => patchT({ conviction })} />
+      </Field>
+    ),
+    followedPlan: (
+      <Field label="Plan befolgt?">
+        <Segmented<"yes" | "no">
+          aria-label="Plan befolgt?"
+          value={t.followedPlan == null ? null : t.followedPlan ? "yes" : "no"}
+          onChange={(v) => patchT({ followedPlan: (t.followedPlan === true && v === "yes") || (t.followedPlan === false && v === "no") ? null : v === "yes" })}
+          options={[
+            { v: "yes", label: "Ja" },
+            { v: "no", label: "Nein" },
+          ]}
+        />
+      </Field>
+    ),
+    emotion: (
+      <Field label="Gefühl beim Einstieg">
+        <EmotionChips value={t.emotion} onChange={(emotion) => patchT({ emotion })} />
+      </Field>
+    ),
+    tags: (
+      <Field label="Tags">
+        <TagInput value={t.j.tags} onChange={(tags) => patchJ({ tags })} suggestions={journalTags} />
+      </Field>
+    ),
+    rating: (
+      <Field label="Bewertung">
+        <RatingDots value={t.j.rating} onChange={(rating) => patchJ({ rating })} />
+      </Field>
+    ),
+    psych: (
+      <div>
+        <BlockHead title="Psyche" sub="Stress, Zuversicht, Verhalten" />
+        <PsychSection j={t.j} onChange={patchJ} />
+      </div>
+    ),
+    mistakes: (
+      <div>
+        <BlockHead title={MISTAKES_COPY.title} sub={MISTAKES_COPY.sub} />
+        <MistakeChips options={tags} value={t.mistakes} onChange={(mistakes) => patchT({ mistakes })} />
+      </div>
+    ),
+    notes: (
+      <Field label="Learnings & Notizen" htmlFor="f-notes">
+        <Textarea id="f-notes" rows={3} className="leading-relaxed" value={d.notes} onChange={setStr("notes")} placeholder="Was lief gut, was mache ich nächstes Mal anders?" />
+        <VoiceNote value={d.notes} onChange={(notes) => setD((x) => ({ ...x, notes }))} label="Learnings und Notizen" testId="voice-notes" />
+      </Field>
+    ),
+    chart: (
+      <Field label="Chart-Link (TradingView)" htmlFor="f-chart">
+        <Input id="f-chart" type="url" value={d.chart} onChange={setStr("chart")} placeholder="https://www.tradingview.com/x/…" autoComplete="off" {...fieldInvalid("chart")} />
+      </Field>
+    ),
+    shots: (
+      <div>
+        <BlockHead title="Screenshots" sub="Ziehen, einfügen oder wählen" />
+        <ShotsField value={t.j.screenshots} onChange={updateShots} />
+      </div>
+    ),
+  };
+  const render = (id: FieldId) => blocks[id];
+
+  // The live strip is output, not a field: P&L and R-Multiple stay under the core; the three risk tiles and the risk preview
+  // ride with `Ziele und Ausstieg` (or under the core when that group has no field left).
+  const riskInTargets = fieldsIn(layout, "targets").length > 0;
+  const stripTop = riskInTargets ? strip.slice(0, 2) : strip;
+  const stripRisk = riskInTargets ? strip.slice(2) : [];
+  const tiles = (items: [string, ReactNode][], label: string, cols: string) => (
+    <div className={cn("grid gap-2", cols)} aria-label={label} role="group">
+      {items.map(([name, value]) => (
+        <div key={name} className="rounded-xl border border-line bg-ink-950/50 px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">{name}</div>
+          <div className="num mt-0.5 font-mono text-[14px] font-medium">{value}</div>
+        </div>
+      ))}
+    </div>
+  );
+  const riskPreview =
+    riskLive && editor.open ? (
+      <Suspense fallback={null}>
+        <RiskPreviewSlot
+          id={trade?.id}
+          account={account}
+          side={t.side}
+          status={t.status}
+          entry={rec.entry}
+          stop={rec.stop}
+          target={rec.target}
+          size={rec.size}
+          qty={v3.qty ?? null}
+          leverage={rec.leverage}
+          marginMode={v3.marginMode}
+          margin={v3.margin ?? null}
+        />
+      </Suspense>
+    ) : null;
+  const coreFields = fieldsIn(layout, "core");
+
   return (
     <Sheet
       open={editor.open}
       onClose={closeEditor}
       title={trade ? "Trade bearbeiten" : "Trade eintragen"}
       size="lg"
+      // the save bar rides on top of the on-screen keyboard (`--kb-inset`, 0 without one)
+      className="mb-[var(--kb-inset,0px)]"
       layoutId={editor.fromFab && !trade ? `new-trade-${fabCycle}` : undefined}
       handoff={editor.fromDetail ? DETAIL_HANDOFF : undefined}
       footer={footer}
@@ -910,225 +1278,55 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
       onDismissAttempt={() => setConfirmDiscard(true)}
     >
       <form id="trade-form" ref={formRef} onSubmit={onSubmit} noValidate>
-        <Section title="Eckdaten">
-          <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
-            <Field label="Konto" className="col-span-2">
-              <Segmented<AccountId>
-                aria-label="Konto"
-                value={account}
-                onChange={(account) => patchT({ account })}
-                options={[
-                  { v: "makro", label: "Makro" },
-                  { v: "scalp", label: "Scalp" },
-                ]}
-              />
-            </Field>
-            <Field label="Richtung" className="col-span-2">
-              <Segmented<Side>
-                aria-label="Richtung"
-                value={t.side}
-                onChange={(side) => patchT({ side })}
-                tones={{ long: "!border-win/40 !bg-win/15", short: "!border-loss/40 !bg-loss/15" }}
-                options={[
-                  { v: "long", label: "▲ Long" },
-                  { v: "short", label: "▼ Short" },
-                ]}
-              />
-            </Field>
-            <Field label="Datum & Uhrzeit" htmlFor="f-date" className="col-span-2">
-              <Input id="f-date" type="datetime-local" value={d.date} onChange={setStr("date")} {...fieldInvalid("date")} />
-            </Field>
-            <Field label="Paar" htmlFor="f-pair">
-              <Input id="f-pair" value={d.pair} onChange={setStr("pair")} autoComplete="off" />
-            </Field>
-            <Field label="Timeframe" htmlFor="f-tf">
-              <MorphSelect id="f-tf" value={d.timeframe} options={tfOptions} onChange={(timeframe) => setD((o) => ({ ...o, timeframe }))} />
-            </Field>
-            <Field label="Status" className="col-span-2">
-              <Segmented<TradeStatus>
-                aria-label="Status"
-                value={t.status}
-                onChange={(status) => {
-                  autoOpened.current = false; // the trader's own choice wins over the fills (F4)
-                  patchT({ status });
-                }}
-                options={[
-                  { v: "closed", label: "Geschlossen" },
-                  { v: "open", label: "Noch offen" },
-                ]}
-              />
-            </Field>
-          </div>
-        </Section>
+        {/* while `Felder anpassen` is open the form stays mounted (state, live check, validation) but hidden */}
+        <div hidden={customizing}>
+          <FormToolbar canDuplicate={!trade && last != null} onDuplicate={duplicateLast} note={dupNote} onCustomize={() => setCustomizing(true)} />
 
-        <Section title={SIGNAL_SECTION_TITLE} sub={signalSectionSub({ checking, stored })}>
-          <SignalSection date={d.date} side={t.side} checking={checking} stored={stored} changed={timingChanged && !checkReq} onCheck={recheck} onAuto={onAuto} />
-        </Section>
+          <CoreSection>
+            {coreFields.length > 0 && <ZoneGrid fields={coreFields} render={render} />}
+            {tiles(stripTop, "Live-Vorschau", stripTop.length > 3 ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2")}
+            {!riskInTargets && riskPreview}
+          </CoreSection>
 
-        <Section title="Preise & Größe" sub="Komma oder Punkt, beides geht">
-          <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
-            {priceField("entry", "Einstieg")}
-            {priceField("stop", "Stop-Loss")}
-            {priceField("target", "Take-Profit")}
-            {priceField("exit", "Ausstieg")}
-            <Field label={`Größe (${cur})`} htmlFor="f-size" help={fix ? "Aus den Fills" : "Positionswert inkl. Hebel"}>
-              <Input id="f-size" numeric autoComplete="off" value={fromFills("size") ?? d.size} onChange={setStr("size")} disabled={fix != null} {...fieldInvalid("size")} />
-            </Field>
-            <Field label="Hebel" htmlFor="f-lev" suffix="x" help={leverageOver ? <span className="font-medium text-warn">{LEVERAGE_WARNING[account]}</span> : LEVERAGE_HELP[account]}>
-              <Input id="f-lev" numeric autoComplete="off" value={d.leverage} onChange={setStr("leverage")} placeholder="z. B. 4" className={cn(leverageOver && "border-warn/60")} />
-            </Field>
-            <Field label={`Gebühren (${cur})`} htmlFor="f-fees">
-              <Input id="f-fees" numeric autoComplete="off" value={d.fees} onChange={setStr("fees")} placeholder="0" />
-            </Field>
-            <Field label="P&L manuell" htmlFor="f-pnl" help="Leer = wird berechnet" suffix={cur}>
-              <Input id="f-pnl" numeric autoComplete="off" value={d.pnlManual} onChange={setStr("pnlManual")} placeholder="automatisch" />
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Live-Vorschau" role="group">
-            {strip.map(([label, value]) => (
-              <div key={label} className="rounded-xl border border-line bg-ink-950/50 px-3 py-2">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">{label}</div>
-                <div className="num mt-0.5 font-mono text-[14px] font-medium">{value}</div>
-              </div>
-            ))}
-          </div>
-          {riskLive && editor.open && (
-            <Suspense fallback={null}>
-              <RiskPreviewSlot
-                id={trade?.id}
-                account={account}
-                side={t.side}
-                status={t.status}
-                entry={rec.entry}
-                stop={rec.stop}
-                target={rec.target}
-                size={rec.size}
-                qty={v3.qty ?? null}
-                leverage={rec.leverage}
-                marginMode={v3.marginMode}
-                margin={v3.margin ?? null}
-              />
-            </Suspense>
-          )}
-        </Section>
-
-        <Section title="Ausführung" sub="Fills, Teil-Exits, Funding, Margin – alles optional">
-          <ExecutionSection j={t.j} onChange={patchJ} side={t.side} status={t.status} date={d.date} entry={rec.entry} stop={rec.stop} currency={cur} />
-        </Section>
-
-        <Section title="Entscheidungsgrundlage" sub="Warum bist du eingestiegen?">
-          {/* a new chip order (Konto switch) never FLIPs the transparent chips through each other (ED-01): the group
-              fades out, re-orders, the chips cascade back in; the row height follows on a spring */}
-          <AutoHeight className="-my-1.5 py-1.5">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={chipOrder}
-                className="flex flex-wrap gap-2"
-                variants={CHIP_GROUP}
-                initial={reduced ? false : "hidden"}
-                animate="shown"
-                exit={reduced ? undefined : "exit"}
+          {GROUPS.map((g) => {
+            const fields = fieldsIn(layout, g.id);
+            if (fields.length === 0) return null;
+            return (
+              <FormGroup
+                key={g.id}
+                id={g.id}
+                title={g.title}
+                hint={groupHint(layout, g.id)}
+                filled={filledPer[g.id] ?? 0}
+                open={openGroups.includes(g.id)}
+                onToggle={() => toggleGroup(g.id)}
+                instant={snapGroup === g.id}
               >
-                {sortedSetups.map((s) => (
-                  <SetupToggle key={s.id} setup={s} account={account} selected={t.setups.includes(s.id)} onToggle={() => patchT({ setups: t.setups.includes(s.id) ? t.setups.filter((id) => id !== s.id) : [...t.setups, s.id] })} />
-                ))}
-                <motion.button
-                  type="button"
-                  onClick={() => (onNewSetup ? onNewSetup() : openSetupEditor({ fromTrade: true }))}
-                  variants={CHIP}
-                  whileTap={{ scale: 0.96 }}
-                  transition={spring.press}
-                  className="rounded-full border border-dashed border-line-2 px-3 py-1.5 text-[12.5px] text-mute transition-colors hover:border-white/40 hover:text-fg pointer-coarse:min-h-11"
-                >
-                  + Neue Grundlage
-                </motion.button>
-              </motion.div>
-            </AnimatePresence>
-          </AutoHeight>
-          {editor.open && (
-            <Suspense fallback={null}>
-              <ClassifyChipSlot
-                draft={{ side: t.side, pair: d.pair, timeframe: d.timeframe, account, date: d.date, boxSnap: v3.boxSnap ?? draft?.boxSnap, signal: trade?.signal ?? draft?.signal }}
-                picked={t.setups}
-                onApply={(id) => patchT({ setups: [id] })}
-              />
-            </Suspense>
-          )}
-          <Field label="Begründung" htmlFor="f-reason">
-            <Textarea id="f-reason" rows={3} className="leading-relaxed" value={d.reason} onChange={setStr("reason")} placeholder={ED.COPY.reasonPlaceholder} />
-            <VoiceNote value={d.reason} onChange={(reason) => setD((x) => ({ ...x, reason }))} label="Begründung" testId="voice-reason" />
-          </Field>
-        </Section>
+                <ZoneGrid fields={fields} render={render} />
+                {g.id === "targets" && riskInTargets && (
+                  <>
+                    {tiles(stripRisk, "Risiko-Vorschau", "grid-cols-3")}
+                    {riskPreview}
+                  </>
+                )}
+              </FormGroup>
+            );
+          })}
+        </div>
 
-        <Section title="Checkliste" sub={items.length ? <CountRoll checked={checked} total={items.length} /> : undefined}>
-          <ChecklistBar ratio={items.length ? checked / items.length : 0} complete={items.length > 0 && checked === items.length} />
-          <div className="grid gap-2 md:grid-cols-2">
-            {items.map((it) => {
-              const setupName = it.id.startsWith("g:") ? "Grundregel" : settings.setups.find((s) => it.id.startsWith(s.id + ":"))?.name;
-              const auto = autoApplies && it.id.startsWith(`${MTF_SETUP_ID}:`);
-              return (
-                <CheckboxRow key={it.id} checked={Boolean(checks[it.id])} sub={auto ? `${setupName} · automatisch` : setupName} onToggle={() => toggleCheck(it.id)}>
-                  {it.text}
-                </CheckboxRow>
-              );
-            })}
-          </div>
-        </Section>
-
-        <Section title="Überzeugung & Disziplin">
-          <Field label="Wie sicher warst du beim Einstieg?">
-            <ConvictionRadio value={t.conviction} onChange={(conviction) => patchT({ conviction })} />
-          </Field>
-          <div className="grid gap-3.5 md:grid-cols-[auto_1fr]">
-            <Field label="Plan befolgt?">
-              <Segmented<"yes" | "no">
-                aria-label="Plan befolgt?"
-                value={t.followedPlan == null ? null : t.followedPlan ? "yes" : "no"}
-                onChange={(v) => patchT({ followedPlan: (t.followedPlan === true && v === "yes") || (t.followedPlan === false && v === "no") ? null : v === "yes" })}
-                options={[
-                  { v: "yes", label: "Ja" },
-                  { v: "no", label: "Nein" },
-                ]}
-              />
-            </Field>
-            <Field label="Gefühl beim Einstieg">
-              <EmotionChips value={t.emotion} onChange={(emotion) => patchT({ emotion })} />
-            </Field>
-          </div>
-        </Section>
-
-        <Section title="Tags & Bewertung" sub="Wie sauber war die Ausführung?">
-          <div className="grid gap-3.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-            <Field label="Tags">
-              <TagInput value={t.j.tags} onChange={(tags) => patchJ({ tags })} suggestions={journalTags} />
-            </Field>
-            <Field label="Bewertung">
-              <RatingDots value={t.j.rating} onChange={(rating) => patchJ({ rating })} />
-            </Field>
-          </div>
-        </Section>
-
-        <Section title="Psyche" sub="Stress, Zuversicht, Verhalten">
-          <PsychSection j={t.j} onChange={patchJ} />
-        </Section>
-
-        <Section title={MISTAKES_COPY.title} sub={MISTAKES_COPY.sub}>
-          <MistakeChips options={tags} value={t.mistakes} onChange={(mistakes) => patchT({ mistakes })} />
-        </Section>
-
-        <Section title="Review">
-          <Field label="Learnings & Notizen" htmlFor="f-notes">
-            <Textarea id="f-notes" rows={3} className="leading-relaxed" value={d.notes} onChange={setStr("notes")} placeholder="Was lief gut, was mache ich nächstes Mal anders?" />
-            <VoiceNote value={d.notes} onChange={(notes) => setD((x) => ({ ...x, notes }))} label="Learnings und Notizen" testId="voice-notes" />
-          </Field>
-          <Field label="Chart-Link (TradingView)" htmlFor="f-chart">
-            <Input id="f-chart" type="url" value={d.chart} onChange={setStr("chart")} placeholder="https://www.tradingview.com/x/…" autoComplete="off" {...fieldInvalid("chart")} />
-          </Field>
-        </Section>
-
-        <Section title="Screenshots" sub="Ziehen, einfügen oder wählen">
-          <ShotsField value={t.j.screenshots} onChange={updateShots} />
-        </Section>
+        {customizing && (
+          <FieldCustomizer
+            layout={layout}
+            isDefault={isDefaultLayout(layout)}
+            onMove={(id, zone: ZoneId) => changeLayout(moveField(layout, id, zone))}
+            onReset={() => {
+              changeLayout(defaultLayout());
+              setResetNote(CUSTOMIZE_COPY.resetDone);
+            }}
+            onDone={() => setCustomizing(false)}
+            note={resetNote}
+          />
+        )}
       </form>
     </Sheet>
   );
