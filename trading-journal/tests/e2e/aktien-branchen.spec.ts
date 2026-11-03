@@ -137,15 +137,18 @@ test.describe("Branchen-Trend", () => {
     const loading = page.getByTestId("branchen-grid-loading");
     await expect(loading).toBeVisible();
     await expect(loading.locator("li")).toHaveCount(48);
+    // the grid's place is measured INSIDE its section: the cards above it on the page (analyst panels, Kongress, news) load on
+    // their own clock and are the business of `layout-shift.spec`, not of this section
+    const section = page.getByTestId("aktien-branchen");
     const h0 = (await loading.boundingBox())!.height;
-    const top0 = (await loading.boundingBox())!.y + (await page.evaluate(() => window.scrollY));
+    const top0 = (await loading.boundingBox())!.y - (await section.boundingBox())!.y;
     await ready(page);
     const grid = page.getByTestId("branchen-grid");
     const h1 = (await grid.boundingBox())!.height;
-    const top1 = (await grid.boundingBox())!.y + (await page.evaluate(() => window.scrollY));
+    const top1 = (await grid.boundingBox())!.y - (await section.boundingBox())!.y;
     expect(Math.abs(h1 - h0), `Platzhalter ${h0} px, Raster ${h1} px`).toBeLessThan(12);
-    // everything above the grid (status row, stand line, figures) was there before the data: the grid starts where the placeholders started
-    expect(Math.abs(top1 - top0)).toBeLessThan(24);
+    // everything above the grid inside the section (status row, stand line, figures) was there before the data
+    expect(Math.abs(top1 - top0), `Raster beginnt ${top0} px, dann ${top1} px unter der Sektion`).toBeLessThan(24);
     expect(errors).toEqual([]);
   });
 
