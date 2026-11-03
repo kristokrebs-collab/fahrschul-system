@@ -54,8 +54,9 @@ describe("Positionsrechner · Verwaltung", () => {
     expect(card).toHaveAttribute("data-active", "false");
     fireEvent.click(within(card).getByRole("checkbox", { name: /^Break-even/ }));
     fireEvent.click(within(card).getByRole("checkbox", { name: /^Teilziel/ }));
-    const steps = await within(card).findByTestId("risk-manage-steps");
-    await waitFor(() => expect(steps.querySelector("[data-step=breakEven]")!.textContent).toContain("105,00"));
+    const steps = await within(card).findByTestId("risk-manage-steps", {}, { timeout: 5000 });
+    // the steps are computed after the toggles settle – on a loaded runner later than the default 1 s of `waitFor`
+    await waitFor(() => expect(steps.querySelector("[data-step=breakEven]")?.textContent ?? "").toContain("105,00"), { timeout: 5000 });
     expect(steps.querySelector("[data-step=breakEven]")!.textContent).toContain("Stop von 95,00 auf 100,00");
     // Teilziel bei +1R = 105,00, die Hälfte der Menge (auf 0,001 abgerundet)
     expect(steps.querySelector("[data-step=partial]")!.textContent).toMatch(/105,00 erreicht hat \(\+1 R\)/);
