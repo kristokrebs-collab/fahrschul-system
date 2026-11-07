@@ -3,7 +3,8 @@ import { cn } from "@/lib/cn";
 import { StaggerItem } from "@/motion/Stagger";
 import { Button } from "@/primitives/Button";
 import { CopyButton } from "@/primitives/CopyButton";
-import { nextDelay, POLL_TOTAL_MS } from "./pollBackoff";
+import { useConnectUi } from "./open";
+import { nextAttempt, nextDelay, POLL_TOTAL_MS } from "./pollBackoff";
 import { PartnerBox } from "./PartnerBox";
 import { wizardReducer, wizardStart } from "./slotState";
 import { TV } from "./strings";
@@ -62,13 +63,15 @@ export function TradingViewWizard({ onClose }: { onClose: () => void }) {
 
   // poll while the test step is open: fast at first, slower and slower (`pollBackoff`), fast again when something new arrives; only a visible tab,
   // ten minutes at most per opening
+  // the body stays mounted while the sheet closes: a closed dialog does not poll
+  const dialogOpen = useConnectUi((c) => c.service === "tradingview");
   const headId = tvList(status)[0]?.id ?? null;
   const seenHead = useRef<string | null>(headId);
   useEffect(() => {
     seenHead.current = headId;
   }, [headId]);
   useEffect(() => {
-    if (!lastStep) return;
+    if (!lastStep || !dialogOpen) return;
     let attempt = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
@@ -79,7 +82,7 @@ export function TradingViewWizard({ onClose }: { onClose: () => void }) {
       void go.then((st) => {
         if (stopped) return;
         const now = st ? (tvList(st)[0]?.id ?? null) : before;
-        attempt = now !== before ? 0 : attempt + 1;
+        attempt = nextAttempt(attempt, now !== before);
         timer = setTimeout(tick, nextDelay(attempt));
       });
     };
@@ -88,7 +91,7 @@ export function TradingViewWizard({ onClose }: { onClose: () => void }) {
       stopped = true;
       if (timer) clearTimeout(timer);
     };
-  }, [lastStep, startedAt]);
+  }, [lastStep, dialogOpen, startedAt]);
 
   const receipts = status?.receipts ?? [];
   const list = tvList(status);
