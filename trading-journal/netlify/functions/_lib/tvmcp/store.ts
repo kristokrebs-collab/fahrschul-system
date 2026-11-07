@@ -139,7 +139,7 @@ export async function accessTokenFor(userId: string, cfg: OAuthConfig, f: FetchL
   }
   const endsSoon = r.expires_at !== null && Date.parse(r.expires_at) - nowMs < 60_000;
   if (!endsSoon) return { token: access, resource: r.resource };
-  let refresh: string | null = null;
+  let refresh: string | null;
   try {
     refresh = r.refresh_enc ? decrypt(r.refresh_enc, aad(userId, "refresh")) : null;
   } catch {

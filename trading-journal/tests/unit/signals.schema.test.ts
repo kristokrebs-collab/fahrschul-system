@@ -101,7 +101,7 @@ describe("signal/1", () => {
     expect(why(v1({ data: Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`k${i}`, "x".repeat(200)])) }))).toMatch(/2 KiB/);
     expect(MAX_DATA_BYTES).toBe(2048);
     const s = ok(v1({ data: { note: "<img src=x onerror=alert(1)>\u0000\u0007hi" } }));
-    expect(String(s.data!.note)).not.toMatch(/[<>\u0000-\u001f]/);
+    expect([...String(s.data!.note)].some((c) => c === "<" || c === ">" || c.charCodeAt(0) < 32)).toBe(false);
     expect(clean("a\n\t b", 10)).toBe("a b");
   });
 

@@ -24,7 +24,8 @@
 #   /api/v1/account/{backups,delete,export}  /api/v1/audit  /api/v1/log                    (P09)
 #   /api/v1/billing/{status,checkout,portal,code,referral}  /api/v1/stripe/webhook          (P10, the webhook needs the raw body)
 #   /api/v1/exchange/{connect,disconnect,sync,positions,backfill}  /api/v1/hooks/tradingview/:token
-#   /api/v1/trades[/*]                                                                       (P11)
+#   /api/v1/signals/:token  /api/v1/connections/tradingview[/mcp[/*]]                       (B3: signal receiver signal/1 + branchen-trend/1; optional OAuth/MCP connection, operator setup TV_MCP_CLIENT_ID)
+#   /api/v1/trades[/*]                                                                     (P11)
 #   /api/v1/social/{share,shared/:token,groups,invite/*,leaderboard}  /api/v1/feedback      (P12)
 #   /api/v1/coach/ask                                                                        (P04, optional Premium-KI)
 #   /api/v1/shot-extract                                                                     (F29, optional Premium-KI: Screenshot-Import, Bilder ≤ 6 MB Request)
