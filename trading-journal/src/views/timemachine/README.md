@@ -38,3 +38,21 @@ Bewegung nur über `src/motion`-Tokens (transform / opacity / clip-path): der F�
 Touch-Ziele ≥ 44 px bei grobem Zeiger, kein Seitwärtsscrollen bei 390 px (die Tabellen der Vorfälle haben drei Spalten, der Vergleich ist eine Liste).
 
 Tests (A3): `views.timemachine.paths.test.ts` (Stichprobe, Durchsichtigkeit, gebündelte Aufrufe, Zeitscheiben mit falscher Uhr, wo ein Pfad endet), `views.timemachine.persist.test.tsx` (Karte: speichern, Neustart, „Neu rechnen“, Alle Pfade, Stichprobe, Trade-Block), e2e `timemachine-persist.spec.ts` und `timemachine-perf.spec.ts`. Tests: `tests/unit/views.timemachine.stocks.test.tsx` (Aktien-Worte ohne Funding), `tests/unit/timemachine.stocks.test.ts` (Stunden- und Tageskerzen einer Aktie durch die echte Rechnung), `tests/unit/views.timemachine.test.tsx` (Modell, Geometrie, Trade → Plan mit Gründen, Formular, Karte in allen Zuständen), `tests/e2e/timemachine.spec.ts` (Labor und Trade-Detail, mobil + Desktop).
+
+## Messung der Bildzeit „alle 10 000 Pfade“ (A3)
+
+`tests/e2e/timemachine-perf.spec.ts` (Chromium, Desktop-Projekt): Plan durchgespielt, „Alle Pfade (Alpha)“ gewählt, dabei die CPU per CDP (`Emulation.setCPUThrottlingRate`) auf ×1 und ×4 gebremst; einmal mit dem Worker auf einem `OffscreenCanvas`, einmal mit der Seite in Scheiben (`OffscreenCanvas` entfernt). Gemessen wird die Zeichenzeit, die längste Scheibe (vom Maler selbst, Wanduhr), Long Tasks (`PerformanceObserver`) und die Bildabstände (`requestAnimationFrame`) – dazu ein Grundrauschen: 1,5 s derselben ruhenden Seite bei gleicher CPU-Rate.
+
+**Wichtig – wie belastbar das ist:** gemessen auf einer geteilten Maschine mit Last ≈ 18–35 auf 4 Kernen (sechs Agenten gleichzeitig), nicht auf einem ruhigen Messplatz und nicht auf einem echten Gerät. Die Zahlen schwanken von Lauf zu Lauf stark (siehe Spanne); sie belegen die Größenordnung, keine Garantie.
+
+| Variante | gezeichnet | Zeichenzeit | längste Scheibe | Strich-Aufrufe | Long Tasks im Fenster (Anzahl, längster) | größter Bildabstand |
+|---|---|---|---|---|---|---|
+| Worker, CPU ×1 | 10 000 | 38 ms | 23 ms | 627 | 4, 668 ms | 433 ms |
+| Worker, CPU ×4 | 10 000 | 27 ms | 9 ms | 630 | 7, 402 ms | 433 ms |
+| Seite in Scheiben, ×1 | 10 000 | 648 ms | 8,6 ms | 626 | 3, 357 ms | 600 ms |
+| Seite in Scheiben, ×4 | 10 000 | 0,8–3,7 s (drei Läufe) | 8,0–8,4 ms | 625 | 6–10, 543–2 502 ms | 1 000–2 600 ms |
+
+Was daraus folgt, ehrlich:
+- **Der Maler hält sein Versprechen:** jede Scheibe dauert (Wanduhr) etwa so lang wie ihr Budget, 8–9 ms – auch bei ×4 und auch auf dieser Maschine (einmal 23 ms beim ersten Stück). 10 000 Pfade sind 625 Strich-Aufrufe (16 Pfade je Aufruf); der Stapel schrumpft bis auf einen Pfad, wenn die Zeit nicht reicht. Im Worker braucht das Bild 27–38 ms und die Seite zeichnet nichts.
+- **Das heißt nicht „kein Long Task“:** im Fenster nach dem Klick gab es Long Tasks (51–2 500 ms) – **auch in der Worker-Variante, in der die Seite nichts zeichnet**, und in der ruhenden Vergleichsseite nur selten. Sie kommen also vom Umschalten (Einhängen der Ansicht, Layout der langen Seite) und von der Last der Maschine, nicht vom Zeichnen; getrennt nachgewiesen habe ich das nicht. „Kein Long Task > 50 ms“ für das Umschalten selbst ist damit **nicht belegt** – es braucht eine ruhige Maschine (offen).
+- Weicht ein Browser aus (kein `OffscreenCanvas`, kein Worker), zeichnet die Seite in Scheiben; bei ×4 dauert das Bild dann Sekunden, die Seite bleibt bedienbar, das Bild baut sich sichtbar auf.
