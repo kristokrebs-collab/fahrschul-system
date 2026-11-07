@@ -155,6 +155,10 @@ export default defineConfig(({ mode }) => {
       globals: true,
       include: ["tests/unit/**/*.test.ts", "tests/unit/**/*.test.tsx", "src/**/*.test.ts"],
       setupFiles: ["tests/setup.ts"],
+      // ~8,000 tests share a 2-core CI runner: single render-heavy tests (the whole Aktien page, the position calculator with its
+      // lazy cards) take 5–7 s there, vitest's 5 s default made them fail without any defect. A hung test still fails after 20 s.
+      testTimeout: 20_000,
+      hookTimeout: 20_000,
     },
   };
 });
