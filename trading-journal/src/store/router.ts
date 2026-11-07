@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { TradeFilter } from "@/domain/types";
 import { parseShareHash, SHARE_ROUTE } from "@/social/links";
+import { parseReturnParam, setReturnTo, type ReturnTarget } from "./returnTo";
 import { consumeHandledHashChange, installBackStack, pushPageEntry, replaceEntryURL } from "./backStack";
 import { useJournal } from "./journalStore";
 import { DEFAULT_TRADE_FILTER, PAGES, useUi, type Page } from "./uiStore";
@@ -19,6 +20,8 @@ export interface Route {
   query?: string;
   /** `#share/<token>`: the public view of a share link (P12) – shown instead of the pages, no login needed. */
   share?: string;
+  /** `?returnTo=feature:<id>` / `page:<page>` on any page: "after the login go there" (`returnTo.ts`); the key is taken out of `query`. */
+  returnTo?: ReturnTarget;
 }
 
 /** Pages whose query the router keeps (each validates its own keys; every other page drops the query). */
@@ -43,10 +46,20 @@ export function parseHash(hash: string, knownSetupIds?: readonly string[]): Rout
   const h = hash.startsWith("#") ? hash.slice(1) : hash;
   const share = parseShareHash(h);
   if (share) return { page: "overview", share };
-  const [pageRaw = "", queryRaw = ""] = h.split("?");
+  const [pageRaw = "", rawQuery = ""] = h.split("?");
   if (!isPage(pageRaw)) return { page: "overview" };
-  if (pageRaw !== "trades") return queryRaw && QUERY_PAGES.has(pageRaw) ? { page: pageRaw, query: queryRaw } : { page: pageRaw };
-  if (!queryRaw) return { page: "trades" };
+  // `returnTo` means the same on every page: it is read here and taken out of the query the page's own seam sees
+  let queryRaw = rawQuery;
+  let returnTo: ReturnTarget | null = null;
+  if (rawQuery.includes("returnTo=")) {
+    const rp = new URLSearchParams(rawQuery);
+    returnTo = parseReturnParam(rp.get("returnTo"));
+    rp.delete("returnTo");
+    queryRaw = rp.toString();
+  }
+  const extra = returnTo ? { returnTo } : {};
+  if (pageRaw !== "trades") return queryRaw && QUERY_PAGES.has(pageRaw) ? { page: pageRaw, query: queryRaw, ...extra } : { page: pageRaw, ...extra };
+  if (!queryRaw) return { page: "trades", ...extra };
 
   const p = new URLSearchParams(queryRaw);
   const filter: TradeFilter = { ...DEFAULT_TRADE_FILTER };
@@ -61,7 +74,7 @@ export function parseHash(hash: string, knownSetupIds?: readonly string[]): Rout
   if (acc && ACCS.has(acc as TradeFilter["acc"])) filter.acc = acc as TradeFilter["acc"];
   const q = p.get("q");
   if (q) filter.q = q.slice(0, Q_MAX);
-  return { page: "trades", filter };
+  return { page: "trades", filter, ...extra };
 }
 
 /**
@@ -336,6 +349,11 @@ function applyRoute(route: Route): void {
   }
   void ensureSeam(route.page);
   restoreScroll(route.page, Boolean(route.filter));
+  if (route.returnTo) {
+    // "after the login go there": noted for `ReturnHost`, and the address is cleaned (the task is no part of the page's URL)
+    setReturnTo(route.returnTo, { on: "signedIn" });
+    replaceHash(uiHash());
+  }
 }
 
 /**

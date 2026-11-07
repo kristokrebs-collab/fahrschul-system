@@ -11,7 +11,7 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, seed, toast } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, seed } from "./helpers";
 import { openUx, themeSettled, UX_PROJECTS } from "./uxHarness";
 
 const layer = (page: Page, key: string) => page.locator(`[data-page="${key}"][data-page-role="current"]`);
@@ -203,7 +203,7 @@ test.describe("Finder: die spät gekommenen Bereiche in den Worten des Traders",
       await seed(page);
       await openPage(page, "overview");
       const nav = await openNav(page);
-      await nav.getByRole("searchbox", { name: "Was willst du tun?" }).fill(g.query);
+      await nav.getByRole("combobox", { name: "Was willst du tun?" }).fill(g.query);
       const hits = nav.getByTestId("nav-finder-results").locator("[data-feature]");
       await expect(hits.first()).toBeVisible({ timeout: 15_000 });
       await expect(hits.first()).toHaveAttribute("data-feature", g.feature);
@@ -243,7 +243,7 @@ test.describe("Finder: die spät gekommenen Bereiche in den Worten des Traders",
     await seed(page);
     await openPage(page, "overview");
     const nav = await openNav(page);
-    await nav.getByRole("searchbox", { name: "Was willst du tun?" }).fill("Pizza bestellen");
+    await nav.getByRole("combobox", { name: "Was willst du tun?" }).fill("Pizza bestellen");
     await expect(nav.getByTestId("nav-finder-none")).toContainText("Dazu steht nichts in der Liste", { timeout: 15_000 });
     await expect(nav.locator("[data-feature]")).toHaveCount(0);
     expect(errors, errors.join("\n")).toEqual([]);
@@ -299,20 +299,22 @@ test.describe("Barrierefreiheit der Navigation und der Siehe-auch-Zeilen (axe)",
 });
 
 test.describe("Hinweis zur Zustellung", () => {
-  test("a function without its page present says so in a toast (no dead end)", async ({ page }, info) => {
+  // A4: the honest sentence is the arrival note now (stays, says why, offers the next step) – no toast
+  test("a function without its page present says so in the arrival note, not in a toast (no dead end)", async ({ page }, info) => {
     test.skip(!UX_PROJECTS.includes(info.project.name), "runs on mobile + desktop");
     test.setTimeout(120_000);
     const errors = collectErrors(page);
     await seed(page);
     await openPage(page, "overview");
     const nav = await openNav(page);
-    await nav.getByRole("searchbox", { name: "Was willst du tun?" }).fill("Ergebnisbeleg");
+    await nav.getByRole("combobox", { name: "Was willst du tun?" }).fill("Ergebnisbeleg");
     const hits = nav.getByTestId("nav-finder-results").locator("[data-feature]");
     await expect(hits.first()).toHaveAttribute("data-feature", "ergebnisbeleg", { timeout: 15_000 });
     await hits.first().click();
     // without the cloud the place is not there: the page opens and one honest sentence says why
     await expect(page).toHaveURL(/#community$/);
-    await expect(toast(page).filter({ hasText: /Cloud|Konto|nicht sichtbar|Stelle/ }).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("arrival-note").filter({ hasText: /Cloud|Konto|nicht sichtbar|Stelle/ }).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator("[data-toast-island]").filter({ hasText: /\S/ })).toHaveCount(0);
     expect(errors, errors.join("\n")).toEqual([]);
   });
 });

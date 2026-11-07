@@ -1,71 +1,98 @@
 /**
- * "Was willst du tun?" inside the command navigation (⌘K / Ctrl+K, the header menu): a field that finds any FUNCTION of the
- * app – not just a page – and a clear way to the full list ("Alle Funktionen"). The field and the link are part of the first
- * load (a few lines); the answers come from the function register, a lazy chunk that is fetched with the first typed letter
- * (`NavFinderResults`). Enter opens the best hit; the hits are navigation items (↑ ↓) like the page links around them.
+ * "Was willst du tun?" inside the command navigation (⌘K / Ctrl+K, the header menu): a field that finds any FUNCTION and any PAGE
+ * of the app ("Einstellungen" leads to the page, not only to a card of it) and a clear way to the full list ("Alle Funktionen").
+ * It is the shared `SearchField` (clay glass, combobox: ↑ ↓ Enter Esc, status line, filter chips Alles / Seiten / Funktionen); this
+ * file only wires it. The field and the link are part of the first load; the answers come from the function register, a lazy chunk
+ * (`navFinderHits.ts`) that is fetched with the first typed letter. Enter opens the best hit.
  *
- * Motion (Runde 10): the field warms up when it takes focus (a soft ring, the magnifier brightens and leans in), and the answers
- * open under it – the box grows on a spring (`grid-template-rows` 0fr → 1fr, so what is below is pushed smoothly instead of
- * jumping) while the hits rise one after the other and the selection glides between them. Emptying the field folds the box shut
- * on the same spring with the last answers still in it.
+ * No hit is a dead end and none is a toast: the empty answer stays in the box and offers the full list and the assistant. Opening a
+ * hit is `openFeature` (`featureOpen.ts`): it opens what covers the target and – when the card is not there – leaves the arrival
+ * note on the page it landed on.
  */
-import { lazy, Suspense, useEffect, useId, useState, type KeyboardEvent } from "react";
-import { NF_VARS } from "@/app/shellFx";
-import { cn } from "@/lib/cn";
-import { Icon } from "@/primitives/icons";
-
-const Results = lazy(() => import("./NavFinderResults"));
+import { useEffect, useMemo, useState } from "react";
+import { SearchField, type SearchChip, type SearchOption } from "@/primitives/SearchField";
 
 export const NAV_FINDER_STRINGS = {
   label: "Was willst du tun?",
-  placeholder: "Funktion suchen: Strategie testen, Wochenbericht …",
+  placeholder: "Was suchst du? z. B. Einstellungen, Wochenbericht, Daten sichern",
   all: "Alle Funktionen",
   allHint: "Alle Funktionen ansehen",
+  ask: "Assistent fragen",
+  none: "Dazu steht nichts in der Liste.",
+  searching: "Suche …",
+  chips: "Treffer eingrenzen",
+  chipAll: "Alles",
+  chipPages: "Seiten",
+  chipFeatures: "Funktionen",
 } as const;
 
-/** How long the folded-shut box keeps the last answers inside (ms): a little longer than its spring needs. */
-const FOLD_MS = 480;
+type Filter = "all" | "page" | "feature";
 
 export interface NavFinderProps {
-  /** a function was chosen: close the navigation and open it */
+  /** a function or page was chosen (`page:<page>` for a page): close the navigation and open it */
   onOpen: (id: string) => void;
   /** the full list: close the navigation and show the page `Funktionen` */
   onAll: () => void;
+  /** nothing fits: close the navigation and open the assistant */
+  onAsk?: () => void;
 }
 
-export function NavFinder({ onOpen, onAll }: NavFinderProps) {
+export function NavFinder({ onOpen, onAll, onAsk }: NavFinderProps) {
   const [q, setQ] = useState("");
-  const id = useId();
+  const [filter, setFilter] = useState<Filter>("all");
   const query = q.trim();
-  // the last answers stay in the box while it folds shut (state from props; cleared by the timer below)
-  const [kept, setKept] = useState(query);
-  if (query && query !== kept) setKept(query);
+  // the answers of the last finished lookup; `done` is the query they belong to (until it catches up, the field says "Suche …")
+  const [found, setFound] = useState<{ done: string; options: { option: SearchOption; kind: "page" | "feature" }[] }>({ done: "", options: [] });
+
   useEffect(() => {
-    if (query) return;
-    const t = setTimeout(() => setKept(""), FOLD_MS);
-    return () => clearTimeout(t);
+    if (!query) return;
+    let live = true;
+    void import("@/app/navFinderHits").then((m) => {
+      if (!live) return;
+      const options = m.findHits(query).map((h) => ({ option: m.toOption(h), kind: m.kindOf(h) }));
+      setFound({ done: query, options });
+    });
+    return () => {
+      live = false;
+    };
   }, [query]);
-  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === "Enter" && query) {
-      e.preventDefault();
-      void import("@/app/featureQuery").then((m) => {
-        const first = m.searchFeatures(query)[0];
-        if (first) onOpen(first.entry.id);
-      });
-    }
-    if (e.key === "Escape" && q) {
-      // the first Escape clears the field, only the next one closes the navigation
-      e.preventDefault();
-      e.stopPropagation();
-      setQ("");
-    }
-  };
+
+  const ready = found.done === query;
+  const all = useMemo(() => (ready ? found.options : []), [ready, found.options]);
+  const visible = useMemo(() => all.filter((x) => filter === "all" || x.kind === filter).slice(0, 6), [all, filter]);
+  // the chips are always there (no row that appears and pushes the answers); the counts come with the answers
+  const chips: SearchChip[] = useMemo(() => {
+    const n = (k?: "page" | "feature"): number | undefined => (query && ready ? all.filter((x) => !k || x.kind === k).length : undefined);
+    return [
+      { id: "all", label: NAV_FINDER_STRINGS.chipAll, count: n() },
+      { id: "page", label: NAV_FINDER_STRINGS.chipPages, count: n("page") },
+      { id: "feature", label: NAV_FINDER_STRINGS.chipFeatures, count: n("feature") },
+    ];
+  }, [all, query, ready]);
+
+  const empty = ready ? (
+    <p className="pb-1 pt-2 text-[12.5px] leading-relaxed text-mute" data-testid="nav-finder-none">
+      {NAV_FINDER_STRINGS.none}{" "}
+      <button type="button" data-cmd-item="" onClick={onAll} className="min-h-11 underline decoration-line-2 underline-offset-4 outline-none hover:text-fg focus-visible:outline-2 focus-visible:outline-white">
+        {NAV_FINDER_STRINGS.allHint}
+      </button>
+      {onAsk && (
+        <>
+          {" · "}
+          <button type="button" data-cmd-item="" onClick={onAsk} data-testid="nav-finder-ask" className="min-h-11 underline decoration-line-2 underline-offset-4 outline-none hover:text-fg focus-visible:outline-2 focus-visible:outline-white">
+            {NAV_FINDER_STRINGS.ask}
+          </button>
+        </>
+      )}
+    </p>
+  ) : null;
+
   return (
-    <div data-testid="nav-finder" style={NF_VARS}>
+    <div>
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <label htmlFor={id} className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-mute">
+        <span aria-hidden="true" className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-mute">
           {NAV_FINDER_STRINGS.label}
-        </label>
+        </span>
         <a
           href="#funktionen"
           data-cmd-item=""
@@ -80,37 +107,28 @@ export function NavFinder({ onOpen, onAll }: NavFinderProps) {
           <span aria-hidden="true">→</span>
         </a>
       </div>
-      <div className="group/field relative">
-        <span aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-mute transition-[color,translate] duration-300 ease-out group-focus-within/field:translate-x-0.5 group-focus-within/field:text-fg [&>svg]:size-4">
-          <Icon name="search" />
-        </span>
-        <input
-          id={id}
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder={NAV_FINDER_STRINGS.placeholder}
-          autoComplete="off"
-          spellCheck={false}
-          enterKeyHint="search"
-          data-cmd-item=""
-          data-testid="nav-finder-input"
-          className="h-12 w-full rounded-xl border border-line-2 bg-ink-900 pl-10 pr-3 text-[16px] text-fg outline-none transition-[border-color,box-shadow] duration-300 placeholder:text-mute hover:border-white/30 focus:border-white/50 focus:shadow-[0_0_0_4px_rgb(255_255_255/0.05)] [&::-webkit-search-cancel-button]:hidden"
-        />
-      </div>
-      {/* the answers open under the field: the row grows on a spring, the content only translates / fades (inside `overflow: hidden`) */}
-      <div className={cn("grid [transition-duration:var(--nf-ms)] [transition-property:grid-template-rows] [transition-timing-function:var(--nf-ease)]", query ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
-        <div inert={!query} className="min-h-0 overflow-hidden">
-          <div className="pt-2">
-            {kept && (
-              <Suspense fallback={null}>
-                <Results query={kept} onOpen={onOpen} onAll={onAll} />
-              </Suspense>
-            )}
-          </div>
-        </div>
-      </div>
+      <SearchField
+        testId="nav-finder"
+        size="lg"
+        label={NAV_FINDER_STRINGS.label}
+        labelHidden
+        placeholder={NAV_FINDER_STRINGS.placeholder}
+        value={q}
+        onChange={(v) => {
+          setQ(v);
+          if (!v.trim()) setFilter("all");
+        }}
+        options={visible.map((x) => x.option)}
+        onSelect={(id) => onOpen(id)}
+        listLabel="Treffer"
+        status={query && !ready ? NAV_FINDER_STRINGS.searching : undefined}
+        empty={empty}
+        chips={chips}
+        chipValue={filter}
+        onChipChange={(id) => setFilter(id as Filter)}
+        chipsLabel={NAV_FINDER_STRINGS.chips}
+        inputProps={{ "data-cmd-item": "" }}
+      />
     </div>
   );
 }

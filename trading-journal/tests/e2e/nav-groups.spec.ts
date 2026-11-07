@@ -37,7 +37,7 @@ test.describe("Navigation in vier Gruppen", () => {
     await bar.getByRole("button", { name: "Mehr" }).click();
     const menu = page.getByRole("dialog", { name: "Navigation" });
     await expect(menu).toBeVisible();
-    await expect(menu.getByRole("searchbox", { name: "Was willst du tun?" })).toBeVisible();
+    await expect(menu.getByRole("combobox", { name: "Was willst du tun?" })).toBeVisible();
     await expect(menu.getByTestId("cmd-group")).toHaveCount(4);
     await menu.getByRole("link", { name: /^Handelsplan/ }).click();
     await expect(page).toHaveURL(/#plan$/);

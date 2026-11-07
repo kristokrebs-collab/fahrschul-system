@@ -7,6 +7,7 @@ export { Stepper, type StepperProps } from "@/primitives/Stepper";
 export { CopyButton, copyToClipboard, type CopyButtonProps } from "@/primitives/CopyButton";
 export { spawnRipple, rippleGeometry, MAX_RIPPLES, type RippleGeometry } from "@/primitives/ripple";
 export { Input, Textarea, inputClass, type InputProps, type TextareaProps } from "@/primitives/Input";
+export { SearchField, SEARCH_STRINGS, type SearchChip, type SearchFieldProps, type SearchOption } from "@/primitives/SearchField";
 export { Field, type FieldProps } from "@/primitives/Field";
 export { shakeField, useShake, revealInvalid, rectFullyVisible, SHAKE_X, PULSE_OPACITY, SCROLL_SETTLE_MS } from "@/primitives/fieldFx";
 export { Segmented, type SegmentedProps, type SegmentedOption } from "@/primitives/Segmented";

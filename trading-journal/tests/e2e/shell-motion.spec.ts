@@ -271,27 +271,26 @@ test.describe("Seitenleiste und Menü: Bewegung", () => {
     const nav = page.getByRole("dialog", { name: "Navigation" });
     await expect(nav).toBeVisible();
     await page.waitForTimeout(900);
-    const input = nav.getByRole("searchbox", { name: "Was willst du tun?" });
+    const input = nav.getByRole("combobox", { name: "Was willst du tun?" });
     await input.fill("Wochenbericht");
     const hits = nav.getByTestId("nav-finder-results").locator("[data-feature]");
     await expect(hits.first()).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(900);
-    // every hit is the same height, so the gliding plate needs no measuring
-    const heights = await hits.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
-    expect(new Set(heights).size).toBe(1);
-    // ArrowDown from the field: focus on the first hit (or the all-functions link before it), the plate shows up
-    await input.press("ArrowDown");
-    await hits.first().focus();
-    const plate = nav.getByTestId("nav-finder-results").locator("xpath=following-sibling::span[1]");
+    // A4: the field is a combobox (focus stays in it; ↓ moves the active answer) and one plate glides behind the active answer
+    // (the plate measures the answer – no fixed height needed)
+    const plate = nav.locator(".sf-plate");
     await expect(plate).toBeAttached();
     await expect.poll(async () => Number(await plate.evaluate((el) => getComputedStyle(el).opacity)), { timeout: 4000 }).toBeGreaterThan(0.9);
     if ((await hits.count()) > 1) {
-      await hits.nth(1).focus();
-      await expect.poll(async () => Math.round((await plate.boundingBox())!.y - (await hits.nth(1).boundingBox())!.y), { timeout: 4000 }).toBeLessThan(2);
+      await input.press("ArrowDown");
+      await expect(hits.nth(1)).toHaveAttribute("aria-selected", "true");
+      await expect(input).toBeFocused();
+      await expect.poll(async () => Math.round(Math.abs((await plate.boundingBox())!.y - (await hits.nth(1).boundingBox())!.y)), { timeout: 4000 }).toBeLessThan(2);
     }
     // emptied: the box folds shut and the field stays
     await input.fill("");
     await expect(nav.getByTestId("nav-finder-results")).toBeHidden({ timeout: 4000 });
+    await expect(input).toHaveAttribute("aria-expanded", "false");
     expect(errors, errors.join("\n")).toEqual([]);
   });
 });

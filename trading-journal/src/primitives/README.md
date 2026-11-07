@@ -10,6 +10,7 @@ UI strings are German. Every component is dark-only, keyboard-accessible and res
 | `chipClass` | `(on, { size?: "sm"\|"md"; tone?: "neutral"\|"win"\|"loss"; className? }) => string` | The one look of every on/off pill (filters, choices) that is not a `Button`: quiet outline off, plain fill on (no rim), 32 px row, 44 px on coarse pointers, same focus ring. Pair with `aria-pressed`. A chosen chip (`aria-pressed` / `aria-checked`) gets a ✓ badge on its corner that pops in on a spring and draws its tick (`.fx-chip`, `--fx-tick` per tone; no space in the flow, nothing moves). |
 | `Fold` | `{ id; title; hint; className?; children }` | A whole card folded into one row (native `details[data-fold]`, ≥ 56 px, "Zuklappen: …" when open). The content stays in the DOM; `openFoldsAround(el)` (`src/app/reveal.ts`, used by `revealCard`/`revealSection`/`revealInvalid`) opens it before a jump. Remembered per browser (`tj2-folds`, `"*"` = all open, the e2e seed). `[data-rich]` pages: after the first tap the content glides in (`fx-fold-in`, `data-touched`), the chevron turns on an overshoot curve. |
 | `Input` / `Textarea` | `InputHTMLAttributes & { numeric?; invalid?; wrapperClassName? }` | The control sits in `span[data-input]` (use `wrapperClassName` for layout). A pre-rendered focus ring (`--ring-glow-input`, `--ring-glow-invalid` when invalid) fades/scales in with `peer-focus`, plus a pulse ring `[data-input-pulse]`. `numeric` → `inputMode="decimal" font-mono`. Exports `inputClass`. `type="search"`: a round × (`.fx-clear`, spring pop) shows on `[data-rich]` pages as soon as there is text and clears it through `onChange`, focus stays in the field (the browser's own clear button stays elsewhere); `clearable={false}` for a field that brings its own × (the Funktionen search). |
+| `SearchField` | `{ value; onChange; label; options?; onSelect?; size?; listMode?; chips?; status?; empty?; … }` | The one search field: clay glass, clear button, status line (`aria-live`), filter chips and – with `options` – a combobox (↑ ↓ Enter Esc). See the section below and `docs/KOMPONENTEN-QUELLEN.md`. |
 | `Field` | `{ label; htmlFor?; children; help?; error?; suffix?; invalidKey?; className? }` | Root `[data-field]`; `invalidKey` shakes the field (`SHAKE_X` on `tween.shake`) and pulses its border (`tween.flash`) whenever the key changes; the error line (`role="alert"`, id `{htmlFor}-error`) fades in. Imperative: `shakeField(elOrId)`, `useShake()`, `revealInvalid(idOrEl, { reduced })` (`fieldFx.ts`). An `error` that newly appears without an `invalidKey` shakes the field once too; `[data-rich]` pages: the label lights up on focus and turns loss-red while the control is `aria-invalid`. |
 | `CopyButton` | `{ text? \| onCopy?; label? ("Kopieren"); doneLabel? ("Kopiert"); onResult?; hold?; iconOnly?; …ButtonProps }` | Copy feedback in one place: the symbol turns into a ✓ that draws itself, the label rolls to „Kopiert“ (`TextRoll`), a soft green wash, back after `hold` (`dwell.done`). A failed copy shakes once and keeps the label (the caller reports it: `onResult(false)`). Width is reserved for the longer label (`.fx-reserve`, no text in the DOM). `iconOnly` for icon buttons (give an `aria-label`). `copyToClipboard(text)` has the textarea fallback. |
 | `useActionStatus` | `(hold = dwell.done · 1000) => { status; run(fn); set(next) }` | The three button states without timer boilerplate: `loading` while `fn` works, `success` (it returned, not `false`) or `error` (it threw / returned `false`), back to `idle` after `hold`; a new run cancels the old wait; timers cleared on unmount. |
@@ -54,6 +55,54 @@ Helpers (all from `@/primitives`):
 | `emptyGlyph.ts` | `EMPTY_GLYPH`, `EMPTY_GLYPH_FRAMES`, `breathingFrames` | dot-matrix ∅ for `EmptyState` |
 | `rollValue.ts` | `parseRollValue`, `formatRoll` | toast win-value roll |
 | `heroField.ts` | `createField`, `stepField`, `FIELD_*` | pure flicker state for `HeroBackdrop` |
+
+## `SearchField` – the one search field (A4/A6)
+
+A soft, spatial "clay" surface of frosted glass: a field with a symbol in front, a clear button, an optional status line, filter chips and – with
+`options` – the answers under it as an ARIA 1.2 combobox. One component for every search of the app; the callers differ in `size`, `listMode` and what
+they pass in. Look and motion: `src/styles/controls.css` (`.sf-*`); sources and licence: `docs/KOMPONENTEN-QUELLEN.md`.
+
+```tsx
+import { SearchField } from "@/primitives/SearchField";
+
+const [q, setQ] = useState("");
+<SearchField
+  label="Was willst du tun?"           // accessible name (visible unless labelHidden)
+  value={q} onChange={setQ}            // controlled – the caller filters
+  options={hits.map((h) => ({ id: h.id, label: h.name, description: h.task, meta: h.where }))}   // array = combobox; undefined = plain searchbox
+  onSelect={(id, how) => open(id)}     // Enter / click
+  empty={<p>Nichts gefunden.</p>}      // inside the answer area when the query has no answer
+  chips={[{ id: "all", label: "Alles", count: 7 }, { id: "page", label: "Seiten", count: 2 }]} chipValue={filter} onChipChange={setFilter}
+/>
+```
+
+| prop | meaning |
+|---|---|
+| `value`, `onChange`, `label`, `labelHidden?`, `placeholder?` | the field is controlled; `label` is the accessible name |
+| `size` | `lg` 56 px (a page's main search) · `md` 48 px (default; a menu) · `sm` 40 px, **44 px on touch** (a toolbar / list search: trades, assets) |
+| `options?` | `{ id, label, description?, meta?, attrs? }[]` – an array (even an empty one) makes it a **combobox** (`role="combobox"`, `aria-autocomplete="list"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`); `attrs` are extra `data-*` of the option element |
+| `onSelect(id, how)` | `how` is `"enter"` or `"click"` |
+| `listMode` | `inline` (default: the box opens under the field and pushes what is below on a spring) or `popover` (floats over it, scrolls inside `min(60vh, 24rem)`) |
+| `listLabel?`, `empty?`, `status?` | name of the listbox; the empty state; the live line (default derived: "3 Treffer …" / "Kein Treffer"; the caller may say "Suche …") |
+| `chips?`, `chipValue?`, `onChipChange?`, `chipsLabel?` | a labelled group of toggle buttons (`aria-pressed`), optional counts; chips are always rendered by the caller (no row that appears and pushes the answers) |
+| `onSubmit?(value)` | Enter in a plain field (without `options`) |
+| `ref?`, `testId?`, `inputProps?`, `className?` | `ref` goes to the `<input>`; `testId` (default `search-field`) names the wrapper, `${testId}-input`, `-results`, `-panel`, `-status`, `-clear`, `-chips`, `-empty`; `inputProps` carries `data-*` / `name` / `autoFocus` |
+
+**Keyboard.** `↓` `↑` move the active answer (wrapping; consumed **only while answers are shown**, so a surrounding menu keeps its own arrows when there are none);
+`Enter` chooses the active answer (the first one when none was moved to) – without answers it calls `onSubmit`; `Esc` clears a typed query first and is consumed,
+the next one bubbles (a dialog around closes). The first answer is active from the start, so the row `Enter` opens is always visible. Focus stays in the input
+(`aria-activedescendant`); IME composition is respected.
+
+**Screen reader.** One polite live region (`aria-live="polite"`, **no** `role="status"`: the toast lane owns that role, and the finder specs count it); the answers are
+a `listbox` named by `listLabel`; the closed box is `inert` and `aria-hidden`; the clear button leaves the tab order while the field is empty.
+
+**Motion** (`transform` / `opacity` / `filter` only): focus ring + 1 px lift **200 ms**; each answer rises in **220 ms**, 28 ms apart (max. 6 steps); the selection plate glides on
+`spring.layout`, the clear button pops on `spring.pop` (both as CSS `linear()` from `springCurve`); the box opens in 240 ms. Reduced motion (`useReducedFx` + base.css): everything is simply there.
+
+**Material.** `--color-ink-850` 90 % opaque over a soft gradient (inner light top left `--sf-hi`, inner shadow bottom right `--sf-lo`), `backdrop-filter: blur(14px)`; without it
+(old browser, `html[data-safe-fx]`) the surface is the same colour, opaque – the text keeps ≥ AA on every ground. Dark and light follow the theme tokens.
+
+Used by: the finder of the command navigation (`src/app/NavFinder.tsx`). Planned: the page "Funktionen", trade and asset search.
 
 ## Effect kit for feature pages (`@/motion/fx`, P01)
 

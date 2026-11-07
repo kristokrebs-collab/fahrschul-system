@@ -276,7 +276,7 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
 | `BottomFade.tsx` | `BottomFade`, `EdgeBlur`, `BOTTOM_BANDS`, `bandMask`, `bandBox` | `fixed z-[45] h-28` gradient (`BOTTOM_BANDS = []`, no blur) |
 | `HeaderTicker.tsx` | `HeaderTicker`, `tickerPrice`, `tickerChange`, `tickerChangePct`, `tickerDecimals`, `tickerJump`, `priceStep` | live price (Runde 10: `RollingDigits source` – an odometer, the digits that change roll on `spring.price`; only a new price class re-renders) + 24 h change from `priceMv` / `open24hMv` (text MotionValue) |
 | `PageHost.tsx` | `PageHost`, `pageDirection`, `pageShiftPx`, `layerRole`, `PAGE_ENTER_X`, `PAGE_EXIT_X` | see "Page host"; Runde 10: the slide length follows the groups crossed (`pageShiftPx` 12 – 24 px), the direction follows the order the reader sees (`pageDirection(from, to, order)`) |
-| `NavFinder.tsx` / `NavFinderResults.tsx` | `NavFinder`, `NAV_FINDER_STRINGS` / default `NavFinderResults`, `HIT_HEIGHT`, `HIT_PITCH` | Runde 10: the answers open under the field on a spring (rows 0fr → 1fr), the hits rise one after the other (`nf-hit`), one plate glides behind the selection (hover and focus; every hit is 80 px, so only its index is needed) |
+| `NavFinder.tsx`, `navFinderHits.ts` | `NavFinder`, `NAV_FINDER_STRINGS` / `findHits`, `toOption`, `kindOf` | A4: the finder of the menu is the shared `SearchField` (clay glass, combobox, chips Alles / Seiten / Funktionen); the answers (functions AND pages) come from the lazy `navFinderHits.ts`. See the section "A4 – Suche bis zur Aufgabe" below |
 | `ScenarioWatcher.tsx` | `ScenarioWatcher`, `TRIGGER_LAST_KEY` | renders null; `useFeedSelect("kline_4h", selectClosed4h)` → `scenario` – re-renders only when a 4h bar closes; toast only on key change with a newer close time |
 | `marketBoot.ts` | `bootMarket(): () => void` | see boot |
 | `toasts.ts` | `toIslandToast(uiToast)`, `toastLifetime` | `success→ok`, `error→error`, `signal/info→warn` (info glyph); passes the lifetime (`TOAST_MS` or the toast's `duration`, `0` = sticky) as the island `duration` – the island owns the countdown, `uiStore` never auto-dismisses |
@@ -359,7 +359,7 @@ Hauptgruppe nach Aufgabe** + Zwischenüberschrift `sub`, Seite + Anker + Abschni
 `settings.assistant.interests`, „Zuletzt benutzt“ aus `searchStore.recent`, „Empfohlen / Neu“, `whereIs`); `featureOpen.ts` = `openFeature(id)` (Aktion oder Seite +
 Scrollen mit ehrlichem Toast, wenn die Stelle fehlt); `reveal.ts` = `whenShown` / `revealCard` / `revealSection` / `keepAligned` / `openFoldsAround` (öffnet eingeklappte Karten, `Fold`, vor dem Sprung) (aus `search/actions.ts`
 herausgelöst, dort re-exportiert); `featureChips.ts` = die Chips „Zuletzt benutzte Funktionen“ der Befehlsnavigation (dynamischer Import, nur bei vorhandenen
-Einträgen); `NavFinder.tsx` (+ lazy `NavFinderResults.tsx`) = **das Feld „Was willst du tun?“ der Befehlsnavigation** mit dem deutlichen Weg „Alle Funktionen →“: Es
+Einträgen); `NavFinder.tsx` (+ lazy `navFinderHits.ts`, seit A4 auf dem gemeinsamen `SearchField`) = **das Feld „Was willst du tun?“ der Befehlsnavigation** mit dem deutlichen Weg „Alle Funktionen →“: Es
 findet jede Funktion, nicht nur Seiten (das Register lädt mit dem ersten Buchstaben), Enter öffnet den besten Treffer, Pfeile gehen von Feld zu Treffern zu den Seitenlinks, im
 Feld sind Ziffern und Pos1/Ende Text, das erste Esc leert; `FeatureLinks.tsx` = „Auch hier: …“-Zeile für Seiten, deren Nachbarfunktionen sonst zufällig gefunden würden (Coach). Das Register
 ist nur im Lazy-Chunk der Seite / Suche / des Assistenten – die Erstladung importiert es nicht (`shellStats` zeigt für die Seite den festen Text „Index“).
@@ -519,3 +519,24 @@ Belastbarer ist der CPU-Zeit-Zähler der Seite (CDP `Performance.getMetrics`, `T
 **Offen:** eine Messung auf einer ruhigen Maschine oder einem Gerät (Frames bei 120 Hz, Long Tasks ≤ 50 ms, INP) steht aus; die Ausgangslage dafür sind die Zahlen oben und `tests/e2e/shell-motion.spec.ts` („Messung“, die Zahlen stehen im Testprotokoll).
 
 **Budget** (`npm run budget`, Erstladung): JS 780,0 → 782,8 KiB gz (Haupt-Chunk 560,3 → 563,1; +2,8 KiB, Grenze +4), CSS 45,9 → 47,1 KiB gz (+1,2 KiB, Grenze +1,5). Neue Lazy-Chunks: keine (die Menü-Treffer liegen wie zuvor im Chunk `NavFinderResults`).
+
+
+## A4 – Suche bis zur Aufgabe (Runde 11)
+
+Der Finder bringt nicht nur zu einer Stelle, sondern **bis zur Aufgabe**: Seiten sind Treffer, Alltagssprache führt auf die Funktion, was das Ziel verdeckt wird geöffnet,
+und wer unterwegs eine Anmeldung oder einen Tarif braucht, kommt danach zurück.
+
+| Datei | Inhalt |
+|---|---|
+| `pageTargets.ts` | die 19 Seiten als Treffer (`page:<seite>`): Name aus `PAGE_LABELS`, Satz aus `PAGE_HINT`, **Alltagswörter** je Seite (`PAGE_WORDS`: „Optionen“, „einloggen“, „Tarife“ …) – dieselbe Bewertung wie bei Funktionen (`searchTargets` in `featureQuery.ts`); bei gleicher Punktzahl steht die Seite vorn, eine Funktion mit dem Namen der Seite („Assistent“, „Backup“) verliert ihren Platz nicht |
+| `featureSynonyms.ts` | **Alltagssätze je Funktion** (`EVERYDAY`, 2–5 je Eintrag, jede F-ID mindestens drei zusammen mit den `intents`): „wie viel soll ich einsetzen“, „daten sichern“, „wo ändere ich mein startkapital“; `featureQuery.ts` liest sie wie die `intents` |
+| `featureReveal.ts` | verdecktes Ziel: `openAround` (Fold, zugeklappte Schalter `aria-expanded=false`+`aria-controls`, nicht gewählte Tabs), `REVEAL_STEPS` (die Auswahl, nach der ein Ziel erst existiert – „Eigene Idee“ vor dem Baukasten), `NEAR_ANCHOR` (die nächste immer vorhandene Karte, wenn die eigene fehlt), `focusTarget` (Fokus ohne Scrollen), `isShown` |
+| `reveal.ts` (`keepAligned`) | richtet das Ziel auf seine Linie, solange die Seite darüber noch wächst; **ein ersetztes Ziel** (Platzhalter → echte Karte, `isConnected` false) wird über `data-testid` bzw. Überschrift in derselben Seitenebene neu gesucht (höchstens 1,5 s, kein Dauer-Loop) und die Ausrichtung folgt dem neuen Element; der Finder hält 7 s (`holdMs`) und gibt dem Fokus dasselbe Nachführen (`REFOCUS_MS`) |
+| `featureOpen.ts` | `openFeature(id)` für Funktion **und** `page:<seite>`: Seite öffnen → Verdecktes öffnen → scrollen → fokussieren; fehlt die Karte, landet man auf der nächsten Karte (sonst auf der Seitenüberschrift) und der **Fundort-Hinweis** sagt warum; **kein Toast** mehr |
+| `arrival.ts`, `ArrivalNote.tsx` | der Fundort-Hinweis: eine Karte über dem Dock (`aria-live=polite`, kein `role=status`), bleibt bis Schließen / Seitenwechsel / neuer Hinweis, mit dem nächsten Schritt als Knopf (Tarif ansehen, Anmelden, Assistent fragen); „So geht’s“-Wege schließen sich nach 12 s |
+| `ReturnHost.tsx`, `../store/returnTo.ts` | **Rückführung**: Vor Anmeldung / Tarifwechsel merkt sich die App die Aufgabe (`feature:<id>` / `page:<seite>`, nur diese Whitelist, `sessionStorage`, 30 min) und die Bedingung (`signedIn`, `entitled`, `connected`); sobald sie stimmt, öffnet `ReturnHost` genau einmal die ursprüngliche Aufgabe. Der Finder wartet mit dem Scrollen, bis kein modaler Dialog offen ist (`afterModals`: Willkommens-Sheet nach der Anmeldung, schließendes Menü) und sucht nach dem „noch nicht zu sehen“-Hinweis 25 s weiter (`lateReveal`, endet bei Rad / Touch / Taste / Klick / Seitenwechsel; ein spät kommendes Ziel nimmt den Hinweis zurück). Der Router liest `#seite?returnTo=feature:backup` auf jeder Seite, nimmt es aus der Adresse und meldet „nach der Anmeldung dorthin“; ein freier Link oder eine unbekannte Seite wird still verworfen |
+
+Kein Treffer endet in einem Toast: der Finder zeigt „Kein Treffer“ (Status + Leerzustand) mit „Alle Funktionen ansehen“ und „Assistent fragen“; ein Ziel, das es hier nicht gibt (Konto fehlt, Karte
+entsteht erst nach einem Lauf, höherer Tarif), landet auf der Seite und der Fundort-Hinweis nennt den Grund und den Weg. Tests: `tests/unit/features.everyday.test.ts` (zwanzig Alltagsfragen, Seiten als Treffer),
+`features.open.test.ts`, `store.returnTo.test.tsx`, `app.arrivalNote.test.tsx`, `primitives.searchField.test.tsx`, E2E `funktionsfinder.spec.ts` (die 15 Ziele + 20 Alltagsfragen + Tastatur / Seiten / verdeckte Ziele)
+und `funktionsfinder-rueckkehr.spec.ts` (Cloud-Build gegen den Supabase-Mock). Die E2E-Hooks `__tjSession` und `__tjArrival` (nur mit dem Seed-Flag) gibt `DeferredHosts` frei.
