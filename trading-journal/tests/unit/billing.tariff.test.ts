@@ -153,8 +153,8 @@ describe("the contract: prices, plans, quotas", () => {
       const live = LIMIT_INFO[k].state === "live";
       expect(limitOffered(k, { coachAi: true }), k).toBe(live);
     }
-    // the planned ones are named, so nobody forgets to switch them on with their package
-    expect(LIMIT_KEYS.filter((k) => LIMIT_INFO[k].state === "geplant").sort()).toEqual(["alertChannels", "phoneCallsPerMonth", "simulationsPerDay", "tvConnections"]);
+    // the planned ones are named, so nobody forgets to switch them on with their package (C2 switched alertChannels and phoneCallsPerMonth on: the alarms enforce them)
+    expect(LIMIT_KEYS.filter((k) => LIMIT_INFO[k].state === "geplant").sort()).toEqual(["simulationsPerDay", "tvConnections"]);
     for (const k of LIMIT_KEYS) expect(LIMIT_INFO[k].enforcedBy.length, k).toBeGreaterThan(8);
     expect([...LIMIT_ORDER].sort()).toEqual([...LIMIT_KEYS].sort());
   });

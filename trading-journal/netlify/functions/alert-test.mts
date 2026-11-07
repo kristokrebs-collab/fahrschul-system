@@ -17,6 +17,7 @@ import { requireUser } from "./_lib/auth";
 import { safeTz } from "./_lib/alertWatch/clock";
 import { appOrigin, buildTestMail, mailConfig, sendMail, SEND_MESSAGE } from "./_lib/alertWatch/mail";
 import { recipientOf } from "./_lib/alertWatch/recipient";
+import { logEmailDelivery } from "./_lib/alerts/log";
 import { loadHeartbeat } from "./_lib/alertWatch/store";
 import { handler, HttpError, json, requireMethod } from "./_lib/http";
 import { paymentsConfigured, planOf, requireFeature } from "./_lib/plan";
@@ -58,6 +59,7 @@ export default handler(async (req) => {
   const now = Date.now();
   const content = buildTestMail({ now, tz: await tzOf(user.id), appUrl: appOrigin() });
   const sent = await sendMail(cfg, { to: rcpt.email, ...content });
+  await logEmailDelivery(user.id, "test", sent.ok ? { ok: true, ref: sent.id } : { ok: false, code: sent.code });
   if (!sent.ok) {
     console.error("[fn] alert-test send failed", sent.code);
     throw new HttpError(502, "alerts_send_failed", SEND_MESSAGE[sent.code], { reason: sent.code });

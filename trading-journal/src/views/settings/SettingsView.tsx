@@ -41,6 +41,7 @@ import { MistakesCard } from "./MistakesCard";
 import { RulesCard } from "./RulesCard";
 import { SignalCheckCard } from "./SignalCheckCard";
 import { StorageCard } from "./StorageCard";
+import { AlertsGroup } from "./alerts/AlertsGroup";
 import { SettingsGroup } from "./SettingsGroup";
 import { SettingsNav } from "./SettingsNav";
 import { SymbolField } from "./SymbolField";
@@ -409,6 +410,9 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
         </div>
         <span ref={observeSlot} aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px" />
       </motion.form>
+
+      {/* C2: the four alarms – below the form (own save, own buttons), its card is fetched only when the fold is opened */}
+      <AlertsGroup />
 
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
 

@@ -103,7 +103,7 @@ ein Weg durch die Oberfläche). Der Stand sagt ehrlich, ob die Funktion nur teil
 
 ### Heute vorbereiten
 
-_Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 9 Funktionen
+_Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 10 Funktionen
 
 **Lage & Plan**
 
@@ -120,6 +120,7 @@ _Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 9 Funktionen
 |---|---|---|---|
 | Dich benachrichtigen lassen, wenn eine Marke erreicht wird | Alarme & Zustellprotokoll | Markt › Alarme & Zustellprotokoll | teilweise |
 | Per E-Mail Bescheid bekommen, auch wenn die App zu ist | E-Mail-Alarm bei geschlossener App | Markt › Alarme & Zustellprotokoll › E-Mail-Alarm | teilweise |
+| Gewarnt werden, wenn ein Markt auf Grün oder Rot dreht – auch per Anruf | Vier Alarme: Grün und Rot, Vorwarnung und Bestätigung | Einstellungen › Benachrichtigungen › Alarme | teilweise |
 
 **Dein Zustand**
 

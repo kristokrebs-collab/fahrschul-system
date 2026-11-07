@@ -44,6 +44,7 @@ import { localClock, safeTz } from "./clock";
 import { appOrigin, buildAlertMail, mailConfig, sendMail, type MailConfig } from "./mail";
 import { barsNeeded, createMarket, marketErrorCode, type Market } from "./market";
 import { recipientOf } from "./recipient";
+import { logEmailDelivery } from "../alerts/log";
 import { listWatchRows, MigrationMissing, saveHeartbeat, writeServerAlerts, type WatchRow } from "./store";
 
 /** Scheduled functions stop at 30 s. */
@@ -209,6 +210,7 @@ async function processAccount(row: WatchRow, ctx: Ctx, retry = true): Promise<vo
       .slice(0, 40);
     const sent = await sendMail(ctx.mail, { to: rcpt.email, subject: content.subject, text: content.text, idempotencyKey: key }, ctx.sendFetch);
     outcome = sent.ok ? { ok: true } : { ok: false, code: sent.code };
+    await logEmailDelivery(row.userId, "alarm", sent.ok ? { ok: true, ref: sent.id } : { ok: false, code: sent.code });
     if (!sent.ok) console.error("[fn] alert-watch send failed", sent.code);
   }
   if (outcome.ok) ctx.tally.mails += 1;

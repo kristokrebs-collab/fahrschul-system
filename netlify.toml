@@ -39,6 +39,9 @@
 #   alert-watch-cron     */5 * * * *    E-Mail-Alarm bei geschlossener App (F21): needs RESEND_API_KEY + ALERT_FROM and migration 0008,
 #                                       does nothing without them; /api/v1/alerts/test = status + test mail. Binance is read direct, on
 #                                       451 through the /api/binance proxy below (set the functions region to the EU if both are blocked)
+#   alerts-cron          */5 * * * *    vier Alarme (C2): Quellen lesen → Ereignisse → Jobs (E-Mail / Telefon, Lease, Wiederholung, Dead-Letter);
+#                                       needs migration 0014, does nothing without it (ALERTS_CRON_ENABLED=0 switches it off)
+#   /api/v1/alerts/{prefs,phone,feed}  /api/v1/alerts/twilio/status                          (C2: Einstellungen, Telefon mit Einwilligung + Nummernprüfung, Zustellprotokoll, Twilio-Status-Webhook mit Signaturprüfung)
 # Background function: exchange-backfill-background (first import of a new exchange connection, up to 15 min).
 [functions]
   directory = "netlify/functions"

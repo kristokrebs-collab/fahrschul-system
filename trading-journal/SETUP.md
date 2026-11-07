@@ -59,7 +59,7 @@ Prüfbefehle (dieselben wie in der CI): `npm run typecheck && npm run lint && np
    - **Publishable key** (`sb_publishable_…`) → `VITE_SUPABASE_PUBLISHABLE_KEY` (öffentlich, landet im Bundle)
    - **Secret key** (`sb_secret_…`) → `SUPABASE_SECRET_KEY` (**nur** für die Functions, niemals mit `VITE_`-Präfix)
 
-### 2.1 Migrationen 0001 → 0012
+### 2.1 Migrationen 0001 → 0014
 
 Die Dateien liegen in `trading-journal/supabase/migrations/` und werden **genau einmal, in dieser Reihenfolge**
 ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als neue Datei):
@@ -79,6 +79,7 @@ ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als n
 | `0011_simulations.sql` | Zeitmaschine: gespeicherte Simulationen (Tabelle `simulations`, nur eigene Zeilen, 2FA-Regel, Größenprüfung in der Datenbank). Ohne sie bleibt die Simulation auf dem Gerät (IndexedDB), nur der Cloud-Abgleich fehlt |
 | `0012_connections.sql` | Verbindungen: Empfangsprotokoll des TradingView-Webhooks (`webhook_receipts`, höchstens 30 Zeilen je Nutzer, ohne Alarmtext, Token und IP). Binance braucht keine Schema-Änderung. Ohne sie zeigt der Assistent keinen Empfangsbeleg |
 | `0013_signals.sql` | TradingView-Signal-Empfänger (B3): Tabelle `signals` (jede Zustellung mit Ausgang verarbeitet / doppelt / abgelehnt samt Grund, nur eigene Zeilen lesbar, eindeutiger Schlüssel je Nutzer + Quelle + Signal-ID gegen Doppelte, ohne Rohtext, Token und IP) sowie `tv_mcp_states` und `tv_mcp_connections` für die OAuth-Verbindung zum offiziellen TradingView-MCP (Tokens verschlüsselt, für Clients gar nicht lesbar). Ohne sie antwortet `/api/v1/signals/:token` mit 503 „nicht eingerichtet“ und nimmt nichts an; die Karte zeigt dann den Empfangsbeleg aus 0012 |
+| `0014_alerts.sql` | Vier Alarme + Zustellung (C2): Alarm-Einstellungen (`alert_prefs`), Telefon-Einwilligung und -Status ohne Nummer (`alert_phones`), die verschlüsselte Nummer (`alert_phone_secrets`, kein Zugriff für Clients), Gedächtnis der Alarm-Engine (`alert_state`), Ereignisse mit eindeutigem Dedup-Schlüssel (`alert_events`), Zustellprotokoll (`alert_deliveries`) und die Job-Warteschlange mit Lease, Wiederholung und Dead-Letter (`jobs`), dazu die Server-Funktionen `alert_enqueue`, `jobs_claim`, `alert_phone_reserve` (Anruf wird VOR dem Wählen festgeschrieben) u. a. Clients dürfen nur eigene Zeilen lesen, schreiben nur die Functions. Läuft nach 0001, 0005 und 0008 (0011–0013 gehören anderen Paketen und sind unabhängig). Ohne sie meldet `alerts-cron` „migration“ und tut nichts; `supabase/tests/0014_alerts.test.sql` prüft die Regeln gegen eine Scratch-Datenbank |
 
 **Variante A – SQL-Editor (ohne CLI):** Supabase → **SQL Editor → New query** → Inhalt von `0001_core.sql` einfügen →
 **Run** → „Success“ abwarten. Dann `0002` bis `0010` genauso.
@@ -156,6 +157,13 @@ Netlify → **Site configuration → Environment variables → Add a variable**.
 | `LOG_SAMPLE_RATE` | optional `0`–`1`, Anteil gespeicherter Fehlerberichte (Standard `1`) | Functions |
 | `RESEND_API_KEY` | optional, E-Mail-Alarm bei geschlossener App (6.1): API-Schlüssel von Resend (`re_…`). Ohne ihn (oder ohne `ALERT_FROM`) tut der Zeitplan nichts und die App sagt „Einrichtung nötig“ | Functions, secret |
 | `ALERT_FROM` | optional, Absender der Alarm-Mails, z. B. `Trading Journal <alarm@deine-domain.de>` – die Domain muss bei Resend verifiziert sein | Functions |
+| `TWILIO_ACCOUNT_SID` | optional, Telefon-Alarm (6.2): Account-SID (`AC…`) von Twilio. Ohne SID, Token und Absender wird nie angerufen, die App sagt „Einrichtung nötig“ | Functions |
+| `TWILIO_AUTH_TOKEN` | optional, Telefon-Alarm: Auth-Token von Twilio; prüft auch die Signatur der Status-Rückmeldung | Functions, secret |
+| `TWILIO_FROM` | optional, Telefon-Alarm: Absendernummer im Format E.164 (eine Twilio-Nummer oder verifizierte Anrufer-ID) | Functions |
+| `TWILIO_VERIFY_SERVICE_SID` | optional, Telefon-Alarm: Twilio-Verify-Dienst (`VA…`) für die Nummernprüfung per SMS-Code. Ohne ihn lässt sich keine Nummer bestätigen, also wird auch nicht angerufen | Functions |
+| `ALERT_PHONE_DAILY_MAX` | optional, Kostenbremse: höchstens so viele Anrufe pro Tag über ALLE Konten (Vorgabe 50); danach „Kostenbremse des Servers erreicht“ im Protokoll | Functions |
+| `ALERT_PHONE_USER_DAILY_MAX` | optional: höchstens so viele Anrufe pro Konto und Tag, Testanrufe eingerechnet (Vorgabe 5) | Functions |
+| `ALERTS_CRON_ENABLED` | optional, `0` schaltet den Alarm-Zeitplan `alerts-cron` ab (Vorgabe: an) | Functions |
 | `IP_HASH_PEPPER` | empfohlen, `openssl rand -base64 32`: geheimer Schlüssel der IP-Pseudonyme in Audit-Log und Rate-Limits (HMAC). Ohne ihn wird er aus `SUPABASE_SECRET_KEY` abgeleitet; die rohe IP wird nie gespeichert | Functions, secret |
 | `ANTHROPIC_API_KEY` | optional, KI-Formulierung im Coach und **Screenshot-Import** (Premium). Ohne den Schlüssel ist der Screenshot-Import aus: „Aus Screenshot übernehmen“ erscheint nicht, die Einstellungen → Daten nennen den Grund. Ein abgelehnter Schlüssel zeigt sich erst beim Auslesen („Der KI-Schlüssel auf dem Server wurde abgelehnt“). Ohne Schlüssel verkauft die Preisseite keinen „KI-Coach“: Premium-Highlight, Vergleichstabelle und Upgrade-Dialog lassen ihn weg (`billing/status` meldet `coachAi: false`) | Functions, secret |
 | `TV_MCP_CLIENT_ID` | optional, **Betreiber-Einrichtung**: OAuth-Client-ID der App beim offiziellen TradingView-MCP (Registrierung siehe `docs/ENV.md`). Ohne sie (oder ohne `SITE_ORIGIN`) zeigt die Verbindungen-Karte „Einrichtung nötig (Betreiber)“ und startet nichts | Functions |
@@ -387,6 +395,7 @@ Karte Börse) liest die Exporte von Bitunix, Binance, Bybit und weiteren Plattfo
 | `backup-nightly` | täglich | Server-Backup jedes geänderten Journals nach `backups/<user>/<tag>.json`, 14 Tage aufbewahrt |
 | `social-aggregate` | täglich | Bestenlisten-Schnappschüsse und Community-Verteilungen (nur Opt-ins, mindestens 10 Personen) |
 | `alert-watch-cron` | alle 5 min | E-Mail-Alarm bei geschlossener App (F21): prüft die Schlüsselmarken der Konten mit eingeschaltetem Schalter und mailt eine Sammelmail (siehe 6.1). Ohne `RESEND_API_KEY` / `ALERT_FROM` und Migration 0008 passiert nichts |
+| `alerts-cron` | alle 5 min | Vier Alarme (C2): liest die Quellen (Branchen-Trend, Top-Trader-Umschlag, Schlüsselmarken), entscheidet die Ereignisse, stellt per E-Mail / Telefon zu (Jobs mit Lease, Wiederholung mit Wartezeit, Dead-Letter) und gleicht Anrufstatus ab. Ohne Migration 0014 passiert nichts; `ALERTS_CRON_ENABLED=0` schaltet ab |
 
 Netlify → **Functions** listet sie mit „Scheduled“ und dem nächsten Lauf. Zeitpläne stehen im Code der Functions
 (`export const config = { schedule }`), `netlify.toml` dokumentiert sie.
@@ -411,6 +420,19 @@ nicht veröffentlicht (Zeitpläne laufen nur auf veröffentlichten Deploys) oder
 `app_config` (`alert-watch`). Der Zeitplan läuft ohne Konto mit Schalter an nur eine Abfrage lang.
 
 ---
+
+
+### 6.2 Vier Alarme und Telefon einrichten (optional)
+
+Die vier Alarme (Grün-/Rot-Vorwarnung, Grün-/Rot-Bestätigung) laufen im Browser und per E-Mail ohne weitere Einrichtung außer Migration `0014_alerts.sql`
+und dem Zeitplan `alerts-cron`. Das **Telefon** braucht zusätzlich:
+
+1. **Twilio** (twilio.com): Konto, eine Rufnummer mit Sprachfunktion (oder verifizierte Anrufer-ID) und einen **Verify-Dienst** anlegen.
+2. Netlify → Environment variables: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` (secret), `TWILIO_FROM` (E.164), `TWILIO_VERIFY_SERVICE_SID`;
+   `EXCHANGE_ENC_KEY_V1` und `SITE_ORIGIN` müssen gesetzt sein (die Nummer wird verschlüsselt gespeichert, Twilio meldet den Anrufstatus an
+   `SITE_ORIGIN/api/v1/alerts/twilio/status`). Optional die Kostenbremsen `ALERT_PHONE_DAILY_MAX` / `ALERT_PHONE_USER_DAILY_MAX`. **Neu deployen.**
+3. Die Nutzer bestätigen ihre Nummer selbst (SMS-Code) und willigen ausdrücklich ein; Anrufe gibt es nur ab Premium (30 pro Monat, Team 60).
+4. Ehrlich: ohne Twilio-Konto ist kein echter Anruf möglich – alles dahinter ist gegen Fakes getestet, nicht gegen das echte Netz.
 
 ## 7. Sicherheit nach der Einrichtung
 

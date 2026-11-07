@@ -76,8 +76,8 @@ der Browser spiegelt ihn. Solange Zahlungen nicht eingerichtet sind, ist nichts 
 | Börsen-Verbindungen | 1 | 1 | 5 | 5 | gebaut | Server: exchange-connect (requireLimit) | Free = Vorgabe des Betreibers (1, lesend, von Hand); Pro / Premium / Team = Vorschlag (5 ab Premium) |
 | Automatischer Abgleich im Hintergrund | – | 1 | 5 | 5 | gebaut | Server: exchange-sync-cron (Tarif-Prüfung je Verbindung) | Vorschlag (folgt aus: Auto-Sync ab Pro, so viele wie Verbindungen) |
 | TradingView-Verbindungen | 1 | 1 | 5 | 5 | geplant – nicht auf der Preisseite | Paket B3 (TradingView-Verbindung) | Free = Vorgabe des Betreibers (1); Pro / Premium / Team = Vorschlag, nicht abgesprochen |
-| Alarm-Kanäle | 1 | 2 | 3 | 3 | geplant – nicht auf der Preisseite | Paket C2 (vier Alarme und Zustellung) | Vorschlag (Browser; plus E-Mail ab Pro; plus Telefon ab Premium) |
-| Telefon-Anrufe pro Monat | – | – | 30 | 60 | geplant – nicht auf der Preisseite | Paket C2 (Telefonie) | Vorschlag (0 / 0 / 30 / 60) |
+| Alarm-Kanäle | 1 | 2 | 3 | 3 | gebaut | Server: alerts-prefs (Kanäle) und alerts-cron (Zustellung) | Vorschlag (Browser; plus E-Mail ab Pro; plus Telefon ab Premium) |
+| Telefon-Anrufe pro Monat | – | – | 30 | 60 | gebaut | Server: alerts-phone und alerts-cron (Anruf-Zähler in der Datenbank) | Vorschlag (0 / 0 / 30 / 60) |
 | Screenshot-Speicher | – | 2 GB | 20 GB | 20 GB | gebaut | Datenbank: Speicher-Richtlinien des Buckets screenshots | bestehend (unverändert) |
 | Screenshot-Import pro Tag | – | – | 20 | 20 | gebaut | Server: shot-extract (Tageszähler) | Vorschlag (0 / 0 / 20 / 20; bisher 30 in Premium) |
 | KI-Coach pro Tag | – | – | 50 | 50 | gebaut | Server: coach-ask, assistant-route, strategy-compile (Tageszähler) | bestehend (0 / 0 / 50 / 50) |

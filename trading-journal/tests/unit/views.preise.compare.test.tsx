@@ -54,8 +54,9 @@ describe("price comparison by goal", () => {
   it("lists the quotas in the contract's order and leaves out those whose function is not built yet", () => {
     const rows = comparisonGroups({ coachAi: true }).at(-1)!.rows.map((r) => r.key);
     expect(rows).toEqual(LIMIT_ORDER.filter((k) => limitOffered(k, { coachAi: true })));
-    for (const k of ["tvConnections", "alertChannels", "phoneCallsPerMonth", "simulationsPerDay"]) expect(rows).not.toContain(k);
-    for (const k of ["exchangeConnections", "backgroundSyncConnections", "shotExtractPerDay", "coachAiPerDay"]) expect(rows).toContain(k);
+    for (const k of ["tvConnections", "simulationsPerDay"]) expect(rows).not.toContain(k);
+    // C2: the alarms enforce the channel and call quotas now, so the price page names them
+    for (const k of ["exchangeConnections", "backgroundSyncConnections", "shotExtractPerDay", "coachAiPerDay", "alertChannels", "phoneCallsPerMonth"]) expect(rows).toContain(k);
     // Free's one read-only connection is a number, the automatic sync is 'not included'
     const ex = comparisonGroups({ coachAi: true }).at(-1)!.rows.find((r) => r.key === "exchangeConnections")!;
     expect(ex.cells.map((c) => c.text)).toEqual(["1", "1", "5", "5"]);

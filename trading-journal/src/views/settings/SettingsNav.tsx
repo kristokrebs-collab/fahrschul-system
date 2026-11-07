@@ -15,6 +15,7 @@ const NAV: readonly SectionNavItem[] = [
   { id: "s-regeln-gruppe", label: "Regeln" },
   { id: "s-sichern", label: "Sichern" },
   { id: "s-aussehen", label: "Aussehen und Hilfe" },
+  { id: "s-alarme", label: "Benachrichtigungen" },
 ];
 
 export function SettingsNav() {

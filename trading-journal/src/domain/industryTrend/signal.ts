@@ -24,6 +24,13 @@ export interface SignalRun {
   exposure: Uint8Array;
   /** `1 / (σ × √252)` on the last day when the industry is in and σ > 0, else 0 */
   unitLast: number;
+  /**
+   * Where the last day stands against the lines that decide the NEXT change (used by the alarms, C2; the signal itself does not read it):
+   * `price` the running product, `upper` the entry line (the upper channel of the last day, `NaN` while undefined) and `stop` the
+   * stop as it stands (only while the industry is in, else `NaN`). Entry is taken when a later price reaches `upper`, exit when it
+   * falls to the stop – so the distances are "to the line as of today"; tomorrow's lower channel can still raise the stop.
+   */
+  edge?: { price: number; upper: number; stop: number };
 }
 
 /**
@@ -77,7 +84,7 @@ export function runSignal(returns: ArrayLike<number>, p: Pick<TrendParams, "up" 
   }
   const last = T - 1;
   const unitLast = exposure[last] === 1 && vol[last]! > 0 ? 1 / (vol[last]! * SQ) : 0;
-  return { exposure, unitLast };
+  return { exposure, unitLast, edge: { price: price[last]!, upper: prevUp, stop: on === 1 ? stop : NaN } };
 }
 
 /** Index of the last day on which `exposure` differs from the day before, `null` when it never changed. */

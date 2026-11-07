@@ -9,6 +9,7 @@
  */
 export const EVERYDAY: Readonly<Record<string, readonly string[]>> = {
   // Runde 11: neue Einträge mit F-ID
+  "vier-alarme": ["anruf bei signalwechsel", "alarm aufs handy bekommen", "mich anrufen lassen", "benachrichtigung grün rot", "warnung vor umschlag"],
   "boerse-auto-sync": ["trades automatisch holen", "börse im hintergrund abgleichen", "von selbst importieren", "automatisch synchronisieren"],
   "binance-verbinden": ["binance anschließen", "binance konto verbinden", "binance key eintragen", "trades von binance holen"],
   "bild-originale": ["screenshot im original speichern", "bild nicht verkleinern", "originaldatei behalten", "bild prüfsumme ansehen"],
