@@ -38,6 +38,8 @@ Nur auf Seiten mit `[data-rich]` (nie Übersicht/Cockpit):
 | `ConnectHost.tsx` | der Dialog (ein `Sheet` für alle Dienste), pro Öffnen neu eingehängt |
 | `BinanceWizard.tsx` | Binance: Anleitung → Key eintragen → Prüfung (Rechte lesen: ablehnen / nachfragen / ok) → Erstimport mit Fortschritt; verbunden: abgleichen, Probelauf, neu einlesen, trennen |
 | `TradingViewWizard.tsx`, `tvStore.ts`, `tvTemplates.ts` | Zieladresse erstellen/ersetzen/löschen → Alarm-Vorlagen und Pine-Beispiel kopieren → Testsignal senden → Empfang |
+| `TvSignals.tsx`, `pollBackoff.ts` | die Liste der letzten Signale (verarbeitet / doppelt / abgelehnt mit Grund, reiner Text) und der Rhythmus der Abfrage (2 s, dann langsamer bis 20 s, bei Neuem wieder schnell, nur sichtbarer Tab, nur bei offenem Fenster, höchstens 10 Minuten) |
+| `TvMcpPanel.tsx` | „TradingView-Konto lesend verbinden“: vier ehrliche Zustände (Einrichtung nötig · nicht verbunden · verbunden mit Lese-Test · abgelaufen), Trennen fragt nach und sagt, wenn TradingView den Widerruf nicht bestätigt; die Rückkehr von TradingView (`/?tvmcp=ok|abgebrochen|fehler#settings`) öffnet der Hub (`ConnectionsHub.tsx`) |
 | `InfoPanels.tsx` | Bitunix (übergibt an den vorhandenen Dialog), E-Mail-Alarm, Telefon-Alarm, Cloud-Konto |
 | `partners.ts`, `PartnerBox.tsx` | Partnerlinks, **aus** solange der Betreiber keinen eigenen Link setzt (heute keiner); immer gekennzeichnet mit einem Satz in einfachen Worten, ohne Land und ohne Rechtsbegriff (`docs/PARTNERLINKS.md`) |
 | `ConnectionsHub.tsx` | die Karte für Einstellungen |
@@ -47,7 +49,7 @@ Nur auf Seiten mit `[data-rich]` (nie Übersicht/Cockpit):
 
 - **Binance** wurde nach der offiziellen Dokumentation gebaut und gegen Test-Doubles geprüft, **nicht gegen das echte Binance** (die Entwicklungsumgebung
   erreicht es nicht, HTTP 451). Der Dialog behauptet nichts darüber hinaus.
-- **TradingView ohne OAuth/MCP:** die Verbindung ist die Zieladresse des Nutzers; die App liest nichts aus dessen TradingView-Konto. Das steht im Dialog.
+- **TradingView:** die Verbindung ist die Zieladresse des Nutzers; sie liest nichts aus dessen TradingView-Konto (das steht im Dialog). Daneben gibt es einen getrennten, optionalen OAuth-Weg zum offiziellen TradingView-MCP (nur Lesen, `TvMcpPanel.tsx`): ohne Betreiber-Kennung „Einrichtung nötig (Betreiber)“. **Nur gegen Nachbauten geprüft**, nie gegen das echte TradingView (docs/ENV.md).
 - **Telefon-Alarm** gibt es noch nicht (`PHONE_ALERTS_READY = false` in `services.ts`).
 - Der Schlüssel eines Nutzers wird nie im Browser gehalten: er geht einmal an `POST /api/v1/exchange/connect`, wird dort verschlüsselt, und kommt nie zurück
   (nur die letzten 4 Zeichen). Das eingetippte Secret verlässt den Zustand und das DOM, bevor die Anfrage rausgeht (`flushSync`).

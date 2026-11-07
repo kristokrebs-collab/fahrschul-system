@@ -12,7 +12,7 @@ import { hasClaudeRuntime } from "@/store/capability";
 import { fetchAlertStatus, type AlertStatus } from "@/views/schluesselmarken/emailAlertApi";
 import { binanceMarketOf, PHONE_ALERTS_READY, type ServiceId } from "./services";
 import { OFFLINE_FACTS, slotState, type SlotFacts, type SlotState } from "./slotState";
-import { loadTv, tvAvailable, useTv, type TvStatus } from "./tvStore";
+import { loadTv, tvAvailable, tvList, useTv, type TvStatus } from "./tvStore";
 
 export interface ServiceView {
   id: ServiceId;
@@ -71,15 +71,16 @@ export function exchangeView(id: ServiceId, status: ExchangeStatus | null, o: { 
 
 /** TradingView view from its status – pure, tested. */
 export function tvView(status: TvStatus | null, o: { enabled: boolean; signedIn: boolean; loading: boolean }): ServiceView {
-  const last = status?.receipts.find((r) => r.kind !== "rejected") ?? null;
-  // the newest receipt was refused (wrong plan, bad message): say so – a later accepted one clears it
-  const newest = status?.receipts[0] ?? null;
-  const refused = newest && newest.kind === "rejected" ? newest : null;
+  const list = tvList(status);
+  const last = list.find((r) => r.status !== "rejected") ?? null;
+  // the newest delivery was refused (wrong plan, bad message, a body the schema does not know): say so – a later accepted one clears it
+  const newest = list[0] ?? null;
+  const refused = newest && newest.status === "rejected" ? newest : null;
   const facts: SlotFacts = {
     configured: o.enabled,
     needsSignIn: o.enabled && !o.signedIn,
     busy: false,
-    error: refused ? `Letztes Signal abgelehnt: ${refused.detail ?? "unbekannter Grund"}` : null,
+    error: refused ? `Letztes Signal abgelehnt: ${refused.reason ?? "unbekannter Grund"}` : null,
     connected: !!status?.hasToken && !!last,
     entitled: true,
   };

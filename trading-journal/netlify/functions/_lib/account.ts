@@ -83,6 +83,8 @@ export const EXPORT_TABLES: ExportTable[] = [
   { table: "affiliate_ledger", userColumn: "referrer_id", columns: "id,kind,amount,currency,status,created_at" },
   { table: "team_seats", userColumn: "owner_id", columns: "owner_id,member_id,created_at" },
   { table: "sync_runs", userColumn: "user_id", columns: "*" },
+  // B3 (0013_signals): the signals that arrived at the user's TradingView address (never the OAuth token tables)
+  { table: "signals", userColumn: "user_id", columns: "id,source,signal_id,kind,status,reason,schema_id,strategy,market,symbol,direction,signal_time,data,via,received_at" },
   // P12 (0004_social): pseudonym, own groups / memberships, what the user posted or shared, their figures, feedback
   { table: "social_profiles", userColumn: "user_id", columns: "pseudonym,created_at,updated_at" },
   { table: "groups", userColumn: "owner_id", columns: "id,kind,name,description,created_at" },

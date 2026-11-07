@@ -53,6 +53,45 @@ Hinweise:
 - **Migration:** `supabase/migrations/0012_connections.sql` (Empfangsprotokoll des TradingView-Webhooks). Ohne sie nimmt der Webhook Testsignale an, der
   Assistent zeigt aber keinen Empfang und sagt das.
 
+## TradingView: Signal-Empfänger und MCP-Verbindung (Paket B3)
+
+**Signal-Empfänger** (`POST /api/v1/signals/:token`, dieselbe Zieladresse wie `/api/v1/hooks/tradingview/:token`): braucht **keine** neue Variable, nur die
+Migration `0013_signals.sql` (Tabelle `signals`). Ohne die Migration antwortet er 503 „nicht eingerichtet“ und nimmt nichts an (ohne Tabelle ließe sich nichts
+gegen Doppelte schützen). Der Webhook `hooks-tradingview` bleibt wie er war (Journal-Trades aus `open` / `close`, Testsignal) und nimmt zusätzlich `signal/1` und
+`branchen-trend/1` an.
+
+**MCP-Verbindung** (pro Nutzer, OAuth 2.1 mit PKCE gegen den offiziellen TradingView-MCP, nur lesend). **Betreiber-Einrichtung nötig**, sonst zeigt die Karte „Einrichtung nötig (Betreiber)“:
+
+| Name | Zweck | Pflicht? | Ohne sie |
+|---|---|---|---|
+| `TV_MCP_CLIENT_ID` | OAuth-Client-ID der App bei TradingView. TradingViews Anmelde-Server nennt in seiner Beschreibung einen Registrierungs-Endpunkt (`registration_endpoint`, dynamische Client-Registrierung); ob und unter welchen Bedingungen ein Betreiber dort eine App für **dieses Produkt** registrieren darf, ist **nicht belegt** (siehe „Offen“) | Ja, für die MCP-Verbindung | „Einrichtung nötig (Betreiber)“, nichts wird gestartet |
+| `TV_MCP_CLIENT_SECRET` | nur für einen vertraulichen Client | Nein | öffentlicher Client mit PKCE |
+| `TV_MCP_URL` | Server-URL | Nein | `https://mcp.tradingview.com/mcp` |
+| `TV_MCP_SCOPES` | angeforderte Scopes | Nein | `mcp:read mcp:tools` |
+| `SITE_ORIGIN` | `https`-Adresse der Seite; die Rücksprung-Adresse ist `<SITE_ORIGIN>/api/v1/connections/tradingview/mcp/callback` und muss bei TradingView genau so eingetragen sein | Ja (auch für die MCP-Verbindung) | wie oben |
+| `EXCHANGE_ENC_KEY_V1` | verschlüsselt Zugangs- und Erneuerungs-Token (AES-256-GCM, gebunden an Nutzer und Feld) | Ja | Start der Verbindung scheitert mit „nicht eingerichtet“ |
+
+**Fundstellen (am 07.11.2026 abgerufen, nichts erfunden):**
+
+- Dokumentation: <https://www.tradingview.com/mcp/docs> – Server `https://mcp.tradingview.com/mcp`, „Authentication is OAuth 2.1“, „Included in Essential and above; trial
+  plans don't include MCP access“, „Tool calls are rate-limited to ~100 requests per minute per user“, 35 Werkzeuge, je als „Read-only“ oder „Write“ markiert. Die Seite nennt **keine**
+  Endpunkte, **keine** Scopes und **keine** Nutzungsbedingungen für eigene Anwendungen.
+- Der Server selbst sagt es maschinenlesbar: `https://mcp.tradingview.com/.well-known/oauth-protected-resource/mcp` (RFC 9728: Anmelde-Server `https://www.tradingview.com`) und
+  `https://www.tradingview.com/.well-known/oauth-authorization-server` (RFC 8414: `authorization_endpoint` …/mcp/oauth/authorize, `token_endpoint` …/mcp/oauth/token, `revocation_endpoint`
+  …/mcp/oauth/revoke, `registration_endpoint` …/mcp/oauth/register, `code_challenge_methods_supported: ["S256"]`, `scopes_supported: ["mcp:read","mcp:tools"]`,
+  `token_endpoint_auth_methods_supported: ["none","client_secret_basic","client_secret_post"]`). Der Client **liest diese Adressen zur Laufzeit** (RFC 9728 → RFC 8414), prüft sie (https, Aussteller
+  stimmt, alle Endpunkte auf dessen Herkunft, PKCE S256 vorhanden) und sendet `resource` (RFC 8707).
+- TradingView-Hilfe zu Webhooks <https://www.tradingview.com/support/solutions/43000529348-about-webhooks/>: „webhook alerts are only allowed when 2-factor authentication is enabled“; gültiges JSON kommt als
+  `application/json`, alles andere als `text/plain`; nur Port 80 und 443; **nach 3 Sekunden bricht TradingView die Anfrage ab**; feste Absender-Adressen werden genannt; keine Zugangsdaten im Body. Welche **Tarife**
+  Webhooks erlauben, steht dort **nicht** – die App sagt „laut Hilfe von TradingView zu prüfen“.
+
+**Was nur gegen einen Mock geprüft ist:** der gesamte OAuth-/MCP-Ablauf (Entdeckung, PKCE, State, Token-Tausch, Erneuerung, Widerruf, Lese-Test) läuft in den Tests gegen einen nachgebauten Server in der Form der
+oben genannten Beschreibung. Gegen das echte TradingView wurde **nichts** angemeldet (kein Client, kein Konto). Gelesen wurden nur die zwei öffentlichen Beschreibungsdokumente.
+
+**Offen (Betreiber):** (1) Darf ein Betreiber für ein eigenes Produkt einen Client registrieren, und unter welchen Bedingungen (Nutzungsbedingungen, kommerzielle Nutzung, Datenrechte)? Die Dokumentation sagt dazu nichts.
+(2) Die Client-ID wird einmalig beantragt; die App registriert nichts selbst. (3) Die App ruft ausschließlich die als „Read-only“ markierten Werkzeuge `list_watchlists`, `get_watchlist`, `get_active_watchlist`, `search_symbols`, `get_ohlcv`,
+`get_symbol_data`, `get_technicals_rating`, `list_alerts`, `get_alerts` auf (Allowlist in `netlify/functions/_lib/tvmcp/mcpClient.ts`); heute nutzt nur der Lese-Test davon `list_watchlists`.
+
 ## Weitere Variablen
 
 Siehe `.env.example` (Supabase, Stripe, Resend, Anthropic, SEC …). Ergänzungen der anderen Pakete folgen in diesem Dokument.

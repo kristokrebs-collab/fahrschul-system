@@ -4,7 +4,7 @@
  * is closed, nothing is ever sold short. An Not-Aus stops every new position; no order is sent anywhere; old data open nothing.
  * The rules are `@/domain/industryTrend/paper`; the actions live in `paperStore`.
  */
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { BASE_PARAMS, fmtDay, industryName, strategyId } from "@/domain/industryTrend";
 import { bookStats, instrumentOf, MAX_SIGNAL_AGE_DAYS, positionIdOf, signalAgeDays, signalOfRow, type PaperPosition, type TrendSignal } from "@/domain/industryTrend/paper";
 import { cn } from "@/lib/cn";
@@ -12,7 +12,9 @@ import { date as fmtDate, time as fmtTime } from "@/lib/format";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
+import { loadTv } from "@/connect/tvStore";
 import { CardNote, Mini } from "../ui";
+import { BridgeLog } from "./BridgeLog";
 import { useBranchen } from "./store";
 import { paperNow, usePaper, type CheckRun } from "./paperStore";
 import { PAPER } from "./paperStrings";
@@ -170,6 +172,10 @@ export function PaperCard() {
   const setKill = usePaper((s) => s.setKillSwitch);
   const check = usePaper((s) => s.check);
   const strat = useMemo(() => strategyId(BASE_PARAMS), []);
+  // received signals (TradingView address) are settled against this book when the card opens (the status load starts the bridge)
+  useEffect(() => {
+    void loadTv();
+  }, []);
 
   const signals = useMemo(() => (ampel ? ampel.rows.map((r) => ({ row: r, signal: signalOfRow(r, ampel.asOf, strat) })) : []), [ampel, strat]);
   const candidates = signals.filter((x) => x.row.state === "kauf" && instrumentOf(x.row.code));
@@ -258,6 +264,8 @@ export function PaperCard() {
             </ul>
           )}
         </section>
+
+        <BridgeLog />
 
         <section aria-labelledby="paper-pos-h" className="grid gap-2">
           <Mini>

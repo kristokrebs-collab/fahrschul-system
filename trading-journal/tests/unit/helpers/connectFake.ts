@@ -49,6 +49,11 @@ function query(state: State, name: string) {
         if (name === "sync_runs") Object.assign(r, { started_at: r.started_at ?? new Date().toISOString(), fetched: 0, inserted: 0, updated: 0, unchanged: 0, skipped: 0, meta: {} });
         if (name === "api_tokens") Object.assign(r, { revoked_at: null, last_used_at: null });
         if (name === "webhook_receipts") Object.assign(r, { received_at: new Date().toISOString() });
+        // migration 0013: the partial unique index of the dedup key, and the table default
+        if (name === "signals") {
+          if (r.status === "processed" && r.kind === "signal" && all().some((x) => x.user_id === r.user_id && x.source === r.source && x.signal_id === r.signal_id && x.status === "processed" && x.kind === "signal")) return { data: null, error: { code: "23505" } };
+          Object.assign(r, { received_at: new Date().toISOString() });
+        }
         if (name === "exchange_connections") Object.assign(r, { last_sync_at: null, last_error: null, meta: r.meta ?? {} });
         all().push(r);
       }
@@ -58,7 +63,7 @@ function query(state: State, name: string) {
       const r = patch as Row;
       const hit = all().find((x) => onConflict.every((k) => x[k] === r[k]));
       if (hit) Object.assign(hit, r);
-      else all().push({ ...r });
+      else all().push({ created_at: new Date().toISOString(), ...r });
       return { data: null, error: null };
     }
     if (op === "update") {

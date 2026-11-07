@@ -16,6 +16,9 @@
  *        ("long"/"short", or "sell" = closes a long, "buy" = a short). A qty/size on the close fills a missing size.
  * test → `{"action":"test","symbol":"{{ticker}}"}`: the connection assistant's test signal. Creates no trade, needs no size,
  *        works in every plan; it is only recorded in `webhook_receipts` ("Empfang" in the assistant).
+ * signal/1 + branchen-trend/1 → the same address also takes the signal formats of the receiver (`signals-receive.mts`, `_lib/signals`):
+ *        no journal trade, no plan gate (a signal has no size and sends no order), ≤ 8 KiB, de-duplicated; every other message of this
+ *        function (test, accepted open / close) is ALSO written to the signal list, best effort, so the card shows one list.
  * Re-delivered alerts change nothing. 60 per minute per token; plan feature `apiAccess` for open / close. Every call is
  * written to the receipt log (kind, symbol, short reason – no alert text). Always JSON, never echoes the token.
  */
@@ -29,6 +32,8 @@ import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
 import { profileTz, upsertSyncedTrades } from "./_lib/exchanges/store";
 import { hashToken, resolveToken } from "./_lib/exchanges/tokens";
 import { recordReceipt } from "./_lib/connections/receipts";
+import { MAX_SIGNAL_BYTES, isSignalSchemaBody, parseSignalBody } from "./_lib/signals/schema";
+import { ingest } from "./_lib/signals/store";
 
 const MAX_BYTES = 16 * 1024;
 
@@ -75,15 +80,35 @@ export default handler(async (req, ctx) => {
   const ping = tvTestPing(text);
   if (ping) {
     await recordReceipt(owner.userId, { kind: "test", via: ping.via, symbol: ping.symbol });
+    await mirrorToSignals(owner.userId, text);
     return json({ ok: true, result: "test" });
   }
+  // the signal formats (signal/1, branchen-trend/1) belong to the signal receiver: same address, no journal trade, no plan gate
+  if (isSignalSchemaBody(text)) {
+    if (new TextEncoder().encode(text).length > MAX_SIGNAL_BYTES) throw new HttpError(413, "payload_too_large");
+    const out = await ingest(owner.userId, text, Date.now());
+    if (out.http === 422) throw new HttpError(422, "invalid_signal", out.reason);
+    return json({ ok: true, result: out.result, ...(out.signalId ? { signalId: out.signalId } : {}) });
+  }
   try {
-    return await handleAlert(owner.userId, text);
+    const res = await handleAlert(owner.userId, text);
+    await mirrorToSignals(owner.userId, text);
+    return res;
   } catch (e) {
     if (e instanceof HttpError) await recordReceipt(owner.userId, { kind: "rejected", detail: `${e.status} ${e.message}` });
     throw e;
   }
 });
+
+/** The older messages also show up in the signal list. Best effort: it never changes the answer of this function. */
+async function mirrorToSignals(userId: string, text: string): Promise<void> {
+  try {
+    // a message the signal format cannot carry (e.g. a short entry) is not listed as "rejected": the journal alert itself was fine
+    if (parseSignalBody(text, Date.now()).ok) await ingest(userId, text, Date.now());
+  } catch {
+    /* the signal list is an addition; the journal alert has been handled */
+  }
+}
 
 async function handleAlert(userId: string, text: string): Promise<Response> {
   const owner = { userId };

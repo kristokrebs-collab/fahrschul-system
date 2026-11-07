@@ -32,6 +32,10 @@ export const SERVER_ENV = [
   "BINANCE_EGRESS_IP",
   "BINANCE_SPOT_BASE",
   "BINANCE_FUTURES_BASE",
+  "TV_MCP_CLIENT_ID",
+  "TV_MCP_CLIENT_SECRET",
+  "TV_MCP_URL",
+  "TV_MCP_SCOPES",
 ] as const;
 
 /** Known names plus further key versions for rotation (`EXCHANGE_ENC_KEY_V2`, …). */

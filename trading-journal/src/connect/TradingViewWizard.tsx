@@ -1,16 +1,17 @@
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { StaggerItem } from "@/motion/Stagger";
 import { Button } from "@/primitives/Button";
 import { CopyButton } from "@/primitives/CopyButton";
+import { useConnectUi } from "./open";
+import { nextAttempt, nextDelay, POLL_TOTAL_MS } from "./pollBackoff";
 import { PartnerBox } from "./PartnerBox";
 import { wizardReducer, wizardStart } from "./slotState";
 import { TV } from "./strings";
-import { TV_CLOSE_MESSAGE, TV_OPEN_MESSAGE, TV_PINE, TV_TEST_MESSAGE, maskedUrl } from "./tvTemplates";
-import { createTv, loadTv, revokeTv, sendAppTest, useTv, type TvReceipt } from "./tvStore";
-
-const POLL_MS = 2_500;
-const POLL_MAX_MS = 10 * 60_000;
+import { TV_CLOSE_MESSAGE, TV_OPEN_MESSAGE, TV_PINE, TV_PINE_SIGNAL, TV_SIGNAL_FLAT_MESSAGE, TV_SIGNAL_MESSAGE, TV_TEST_MESSAGE, maskedUrl, signalsUrl } from "./tvTemplates";
+import { createTv, loadTv, revokeTv, sendAppTest, tvList, useTv, type TvReceipt } from "./tvStore";
+import { TvMcpPanel } from "./TvMcpPanel";
+import { TvSignals } from "./TvSignals";
 
 function Code({ label, text, testId }: { label: string; text: string; testId?: string }) {
   return (
@@ -60,19 +61,43 @@ export function TradingViewWizard({ onClose }: { onClose: () => void }) {
     void loadTv();
   }, []);
 
-  // poll the receipts while the test step is open (visible tab only, three minutes at most per opening)
+  // poll while the test step is open: fast at first, slower and slower (`pollBackoff`), fast again when something new arrives; only a visible tab,
+  // ten minutes at most per opening
+  // the body stays mounted while the sheet closes: a closed dialog does not poll
+  const dialogOpen = useConnectUi((c) => c.service === "tradingview");
+  const headId = tvList(status)[0]?.id ?? null;
+  const seenHead = useRef<string | null>(headId);
   useEffect(() => {
-    if (!lastStep) return;
-    const t = setInterval(() => {
-      if (document.hidden || Date.now() - startedAt > POLL_MAX_MS) return;
-      void loadTv();
-    }, POLL_MS);
-    return () => clearInterval(t);
-  }, [lastStep, startedAt]);
+    seenHead.current = headId;
+  }, [headId]);
+  useEffect(() => {
+    if (!lastStep || !dialogOpen) return;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
+    const tick = (): void => {
+      if (stopped || Date.now() - startedAt > POLL_TOTAL_MS) return;
+      const before = seenHead.current;
+      const go = document.hidden ? Promise.resolve(null) : loadTv();
+      void go.then((st) => {
+        if (stopped) return;
+        const now = st ? (tvList(st)[0]?.id ?? null) : before;
+        attempt = nextAttempt(attempt, now !== before);
+        timer = setTimeout(tick, nextDelay(attempt));
+      });
+    };
+    timer = setTimeout(tick, nextDelay(0));
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [lastStep, dialogOpen, startedAt]);
 
   const receipts = status?.receipts ?? [];
+  const list = tvList(status);
+  const signalsOn = !!status?.signalsAvailable;
   const hasToken = !!status?.hasToken;
-  const newest = receipts.find((r) => r.kind === "test") ?? null;
+  const newest = list.find((r) => r.kind === "test" && r.status === "processed") ?? null;
 
   return (
     <div className="grid gap-5" data-testid="tv-wizard">
@@ -148,6 +173,8 @@ export function TradingViewWizard({ onClose }: { onClose: () => void }) {
               {TV.rotate}
             </Button>
           )}
+          {hasToken && list.length > 0 && <TvSignals list={list} limit={3} />}
+          <TvMcpPanel />
           <PartnerBox partner="tradingview" />
         </div>
       )}
@@ -173,6 +200,16 @@ export function TradingViewWizard({ onClose }: { onClose: () => void }) {
           <Code label={TV.tplOpen} text={TV_OPEN_MESSAGE} testId="tv-tpl-open" />
           <Code label={TV.tplClose} text={TV_CLOSE_MESSAGE} />
           <Code label={TV.tplPine} text={TV_PINE} testId="tv-tpl-pine" />
+          <Code label={TV.tplSignal} text={TV_SIGNAL_MESSAGE} testId="tv-tpl-signal" />
+          <Code label={TV.tplSignalFlat} text={TV_SIGNAL_FLAT_MESSAGE} testId="tv-tpl-signal-flat" />
+          <Code label={TV.tplPineSignal} text={TV_PINE_SIGNAL} testId="tv-tpl-pine-signal" />
+          <Code label={TV.signalUrlLabel} text={signalsUrl(url, status?.origin ?? null, typeof location !== "undefined" ? location.origin : "")} testId="tv-signal-url" />
+          <p className="text-[11.5px] leading-relaxed text-faint" data-testid="tv-signal-url-hint">
+            {TV.signalUrlHint}
+          </p>
+          <p className="text-[11.5px] leading-relaxed text-faint" data-testid="tv-plan-note">
+            {TV.planNote}
+          </p>
           <p className="text-[11.5px] leading-relaxed text-faint" data-testid="tv-trade-note">
             {status && !status.tradeAlerts.allowed ? `${TV.tradeNote} In deinem Tarif (${status.tradeAlerts.plan}) ist es nicht enthalten.` : TV.tradeNote}
           </p>
@@ -198,7 +235,7 @@ export function TradingViewWizard({ onClose }: { onClose: () => void }) {
             <span className="label">{TV.receiptsTitle}</span>
             {newest ? (
               <p className="rounded-xl border border-win/35 bg-win/[0.06] px-3 py-2 text-[12.5px] text-fg" data-testid="tv-arrived" data-via={newest.via}>
-                {newest.via === "extern" ? TV.gotExtern : TV.gotApp}
+                <strong className="font-semibold">{TV.confirmed}</strong> {newest.via === "extern" ? TV.gotExtern : TV.gotApp}
               </p>
             ) : (
               <p className="text-[12.5px] text-mute" data-testid="tv-waiting">
@@ -206,13 +243,18 @@ export function TradingViewWizard({ onClose }: { onClose: () => void }) {
               </p>
             )}
             {status && !status.receiptsAvailable && <p className="text-[11.5px] text-warn">{TV.migration}</p>}
-            {receipts.length > 0 && (
-              <ul className="grid gap-1.5">
-                {receipts.slice(0, 5).map((r) => (
-                  <Receipt key={r.id} r={r} />
-                ))}
-              </ul>
+            {signalsOn ? (
+              <TvSignals list={list} limit={10} />
+            ) : (
+              receipts.length > 0 && (
+                <ul className="grid gap-1.5">
+                  {receipts.slice(0, 5).map((r) => (
+                    <Receipt key={r.id} r={r} />
+                  ))}
+                </ul>
+              )
             )}
+            {signalsOn && <p className="text-[11px] text-faint">{TV.signalsPolling}</p>}
           </div>
         </div>
       )}

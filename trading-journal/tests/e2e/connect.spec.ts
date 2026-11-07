@@ -383,7 +383,7 @@ test.describe("Verbindungen · mit Konto (Cloud-Build gegen die Mocks)", () => {
     await expect(s).toHaveAttribute("data-state", "disconnected", { timeout: 25_000 });
     await s.click();
     const d = dialog(page);
-    await expect(d.getByTestId("tv-honest")).toContainText("keine OAuth-Anbindung");
+    await expect(d.getByTestId("tv-honest")).toContainText("liest nichts aus deinem TradingView-Konto"); // B3: the OAuth way exists now (behind the operator's setup), the address itself still reads nothing
     await d.getByTestId("tv-create").click();
     await expect(d.getByTestId("tv-url")).toContainText(`/api/v1/hooks/tradingview/${TV_TOKEN}`);
     await d.getByTestId("tv-next").click();
