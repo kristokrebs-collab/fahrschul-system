@@ -121,6 +121,26 @@ settles signed out without loading anything), installs the error reporting, pass
 idle sign-out, mounts the lazy `AuthSheet` from its first open on. Prop `onOpenAccount` (→ `navigate("konto")`). StrictMode
 safe. Inert on claude.ai and without cloud config.
 
+## B1 Konto produktiv (Datenübernahme, Sitzungsregeln, Wiederherstellung)
+
+- **Datenübernahme beim ersten Login** (`sync/takeover.ts` rein, `sync/undo.ts`, `takeover.ts` Store, `ui/TakeoverDialog.tsx` lazy,
+  `ui/TakeoverUndoLine.tsx` in der Sync-Karte). Hat dieser Browser Daten, die das Konto nicht hat (oder die abweichen, oder die zu einem
+  ANDEREN Konto gehörten), fragt die Engine (`EngineDeps.decideTakeover`) vor dem ersten Byte: *Zusammenführen* (neuere Version gewinnt),
+  *Lokale Daten übernehmen* (dieses Gerät gewinnt bei Unterschieden, Konto-Einträge bleiben), *Nur Cloud* (Gerät übernimmt das Konto),
+  *Lokal behalten* (Sync auf diesem Gerät aus, nichts wird gelesen oder geschrieben). Leeres Konto: nur Übernehmen/Behalten; fremdes Journal:
+  nur Nur-Cloud/Behalten (nie in ein fremdes Konto hochladen). Ohne Entscheidungsbedarf (Gerät leer, alles schon im Konto) läuft es still wie vorher.
+  Keine Dubletten: stabile IDs, Inhalts-Hash (`hashDoc`), Trade-Signatur des Import-Merges; die Vorschau zählt gleich / nur hier / nur im Konto /
+  unterschiedlich / Doppelte. Vorher Sicherung (`import-<ISO>`); beide Seiten werden nach der Wahl neu gelesen. **Rückgängig** 15 Minuten
+  (`UNDO_WINDOW_MS`): Gerät wie vorher, vom Konto geschriebene Zeilen zurück (neue → Tombstone, überschriebene → alter Inhalt), danach fragt es erneut.
+  Das Login-Sheet bleibt während der Frage ausgehängt (zwei Sheets auf der Morph-Ebene brachten das geschlossene zurück).
+- **Passwort ändern/zurücksetzen beendet alle anderen Sitzungen** (`updatePassword` → `signOut({scope:"others"})`, Hinweis im Toast).
+  „Überall abmelden“ gibt es in der Login-Karte, „Andere Geräte abmelden“ + Geräteliste in Sicherheit.
+- **Wiederherstellungscodes** (`ui/RecoverySection.tsx`, `netlify/functions/account-mfa-recovery.mts`): 8 Einmal-Codes, einmal angezeigt (Kopieren,
+  Datei, Bestätigung „gesichert“), nur Hashes serverseitig. Verlust-Pfad im 2FA-Schritt des Login-Sheets: Passwort-Sitzung + Code entfernt den Faktor.
+- **Betreiber-Pause** (`flags.ts`): `/api/v1/flags` (vier Booleans) wird vor dem ersten Sync gelesen (`primeOpsFlags`, nach 3 s fail-open); `KILL_SYNC` →
+  Sync-Karte sagt es, der Controller startet nicht.
+- Tests: `tests/unit/cloud.takeover.test.ts`, `cloud.b1.ui.test.tsx`, `tests/e2e/konto-b1.spec.ts`; Betrieb/Audits siehe `docs/BETRIEB.md`.
+
 ## Tests
 
 `tests/unit/cloud.sync.test.ts` (reconcile table + engine against an in-memory `journal_docs`: first-login merge,

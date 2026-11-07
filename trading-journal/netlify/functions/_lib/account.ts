@@ -4,6 +4,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DOC_COLUMNS, rowsToBackup, type BackupShape, type DocRow } from "../../../src/cloud/sync/docs";
+import { screenshotManifest, type ShotManifest } from "./accountShots";
 import { HttpError } from "./http";
 import { supabaseAdmin } from "./supabase";
 
@@ -59,6 +60,8 @@ export async function journalBackup(userId: string, now: Date = new Date(), sb: 
  */
 export interface ExportTable {
   table: string;
+  /** Key in the export when a table is listed twice with different owner columns (`team_seats` as owner and as member). */
+  as?: string;
   /** Column holding the user id. */
   userColumn: string;
   /** PostgREST select list. */
@@ -82,6 +85,8 @@ export const EXPORT_TABLES: ExportTable[] = [
   { table: "referral_codes", userColumn: "user_id", columns: "user_id,code,commission_pct,created_at" },
   { table: "affiliate_ledger", userColumn: "referrer_id", columns: "id,kind,amount,currency,status,created_at" },
   { table: "team_seats", userColumn: "owner_id", columns: "owner_id,member_id,created_at" },
+  // B1: the member's own seat (the owner id of someone else's team is not exported – only that the seat exists and since when)
+  { table: "team_seats", as: "team_seats_as_member", userColumn: "member_id", columns: "member_id,created_at" },
   { table: "sync_runs", userColumn: "user_id", columns: "*" },
   // B3 (0013_signals): the signals that arrived at the user's TradingView address (never the OAuth token tables)
   { table: "signals", userColumn: "user_id", columns: "id,source,signal_id,kind,status,reason,schema_id,strategy,market,symbol,direction,signal_time,data,via,received_at" },
@@ -92,6 +97,8 @@ export const EXPORT_TABLES: ExportTable[] = [
   { table: "group_reviews", userColumn: "author_id", columns: "id,group_id,payload,question,status,created_at" },
   { table: "comments", userColumn: "author_id", columns: "id,review_id,body,hidden,created_at" },
   { table: "group_goals", userColumn: "student_id", columns: "id,group_id,draft,status,created_at" },
+  // B1: goals the user wrote as the mentor (the student's id stays out)
+  { table: "group_goals", as: "group_goals_as_mentor", userColumn: "mentor_id", columns: "id,group_id,draft,status,created_at" },
   { table: "shares", userColumn: "user_id", columns: "id,kind,payload,created_at,expires_at,revoked_at,views" },
   { table: "member_stats", userColumn: "user_id", columns: "*" },
   { table: "feedback", userColumn: "user_id", columns: "id,kind,message,page,target_type,target_id,status,created_at" },
@@ -150,6 +157,8 @@ export interface AccountExport {
    * backups AND lets the user fetch them (review DSGVO-01). A file without a link is still listed in `files`.
    */
   links: { expiresAt: string } & Record<UserBucket, { path: string; url: string }[]>;
+  /** B1: hash list of the screenshots (recorded SHA-256 per picture, the server's SHA-256 of the stored bytes, orphans, missing files). */
+  screenshots: ShotManifest;
 }
 
 /** Validity of the file links in an export (24 h). */
@@ -181,13 +190,15 @@ export async function collectExport(userId: string, now: Date = new Date(), sb: 
   const tables: Record<string, unknown[]> = {};
   for (const t of EXPORT_TABLES) {
     const rows = await exportTable(t, userId, sb);
-    if (rows) tables[t.table] = rows;
+    if (rows) tables[t.as ?? t.table] = rows;
   }
   const files = {} as Record<UserBucket, string[]>;
   for (const b of USER_BUCKETS) files[b] = await listUserFiles(b, userId, sb);
   const links = { expiresAt: new Date(now.getTime() + FILE_LINK_TTL_S * 1000).toISOString() } as AccountExport["links"];
   // staged exports (`exports/`) are the export itself, not stored data
   for (const b of USER_BUCKETS) links[b] = await signedLinks(b, files[b].filter((p) => !p.startsWith(`${userId}/${EXPORTS_DIR}/`)), FILE_LINK_TTL_S, sb);
+  const journal = await journalBackup(userId, now, sb);
+  const screenshots = await screenshotManifest(journal.trades, files.screenshots, sb);
   return {
     format: "trade-journal-account-export",
     version: 1,
@@ -199,10 +210,11 @@ export async function collectExport(userId: string, now: Date = new Date(), sb: 
       lastSignInAt: user?.last_sign_in_at ?? null,
       factors: (user?.factors ?? []).map((f) => ({ type: f.factor_type, friendlyName: f.friendly_name ?? null, status: f.status, createdAt: f.created_at ?? null })),
     },
-    journal: await journalBackup(userId, now, sb),
+    journal,
     tables,
     files,
     links,
+    screenshots,
   };
 }
 

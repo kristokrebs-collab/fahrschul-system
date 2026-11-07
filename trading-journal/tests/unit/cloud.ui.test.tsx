@@ -91,9 +91,12 @@ describe("KontoView", () => {
     expect(screen.getByRole("heading", { name: "Zwei-Faktor-Schutz" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Konto löschen" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Dieses Gerät")).toBeInTheDocument());
-    // the delete hold button appears only once the word is typed
+    // B1: the delete hold button appears only once the word is typed AND the subscription status is acknowledged (here the
+    // server is not reachable, an unknown status counts as "running": deleting ends it at once – the user must say they know)
     expect(screen.queryByRole("button", { name: "Halten zum Löschen" })).toBeNull();
     fireEvent.change(screen.getByLabelText("Tippe LÖSCHEN zur Bestätigung"), { target: { value: "löschen" } });
+    expect(screen.queryByRole("button", { name: "Halten zum Löschen" })).toBeNull();
+    fireEvent.click(await screen.findByTestId("delete-ack"));
     expect(screen.getByRole("button", { name: "Halten zum Löschen" })).toBeInTheDocument();
   });
 

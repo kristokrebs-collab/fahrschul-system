@@ -488,3 +488,28 @@ export async function waitForStableLayout(page: Page, timeout = 30_000): Promise
     last = now;
   }
 }
+
+/**
+ * After the sign-in form was sent: ends the first-login flow whichever way it goes. A browser that already holds a journal
+ * the account lacks gets the data-takeover question (B1) – the recommended choice is applied, the summary closed; otherwise
+ * the welcome sheet runs through to "Los geht’s". Both end with no dialog open and the first sync done.
+ */
+export async function finishSignIn(page: Page, opts: { choice?: "merge" | "local" | "cloud" | "keep" } = {}): Promise<void> {
+  const question = page.getByTestId("takeover-choose");
+  const welcome = page.getByText("Alles synchron.", { exact: false });
+  await expect(question.or(welcome)).toBeVisible({ timeout: 20_000 });
+  if (await question.isVisible()) {
+    if (opts.choice) await question.getByTestId(`takeover-${opts.choice}`).check();
+    await question.getByTestId("takeover-apply").click();
+    if (opts.choice === "keep") {
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      return;
+    }
+    const done = page.getByTestId("takeover-done");
+    await expect(done).toBeVisible({ timeout: 20_000 });
+    await done.getByRole("button", { name: "Schließen" }).click();
+  } else {
+    await page.getByRole("button", { name: "Los geht’s" }).click();
+  }
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+}

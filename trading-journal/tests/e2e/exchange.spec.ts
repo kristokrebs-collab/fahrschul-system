@@ -12,7 +12,7 @@
  * default build without cloud). `PW_BOERSE_URL` overrides the cloud URL; `P11_SHOTS_DIR` writes review screenshots.
  */
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, seed } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, seed, finishSignIn } from "./helpers";
 import { mockBilling } from "./mocks/billing";
 import { mockExchange, WRONG_SECRET, type MockExchangeOptions } from "./mocks/exchange";
 import { mockSupabase } from "./mocks/supabase";
@@ -61,8 +61,7 @@ async function signIn(page: Page): Promise<void> {
   await sheet.getByLabel("E-Mail").fill(EMAIL);
   await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
   await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
+  await finishSignIn(page);
   await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 

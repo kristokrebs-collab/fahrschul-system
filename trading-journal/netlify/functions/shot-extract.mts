@@ -39,6 +39,7 @@ import {
 import { requireUser } from "./_lib/auth";
 import { envOptional } from "./_lib/env";
 import { handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
+import { assertRunning, killed } from "./_lib/killswitch";
 import { paymentsConfigured, requireFeature } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 
@@ -185,8 +186,9 @@ export async function extract(body: ExtractBody, apiKey: string, model: string):
 export default handler(async (req) => {
   requireMethod(req, "GET", "POST");
   const apiKey = envOptional("ANTHROPIC_API_KEY");
-  if (req.method.toUpperCase() === "GET") return json({ enabled: !!apiKey, maxImages: MAX_IMAGES, maxLongEdge: MAX_LONG_EDGE, maxImageBytes: MAX_IMAGE_BYTES });
+  if (req.method.toUpperCase() === "GET") return json({ enabled: !!apiKey && !killed("ai"), maxImages: MAX_IMAGES, maxLongEdge: MAX_LONG_EDGE, maxImageBytes: MAX_IMAGE_BYTES });
   const user = await requireUser(req, { aal2: "ifEnrolled" });
+  assertRunning("ai");
   if (!apiKey) throw new HttpError(503, "shot_extract_unavailable", VISION_OFF_MESSAGE);
   const plan = await requireFeature(user.id, "shotExtract");
   const daily = paymentsConfigured() ? limitOf(plan.plan, "shotExtractPerDay") : DEFAULT_DAILY;

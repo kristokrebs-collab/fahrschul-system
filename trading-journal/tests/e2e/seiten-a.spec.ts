@@ -9,7 +9,7 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, seed } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, seed, finishSignIn } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockBilling, mockSubscription } from "./mocks/billing";
 import { mockSocial } from "./mocks/social";
@@ -79,8 +79,7 @@ async function signIn(page: Page): Promise<void> {
   await sheet.getByLabel("E-Mail").fill("trader@example.com");
   await sheet.getByLabel("Passwort", { exact: true }).fill("richtig-geheim-42");
   await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
+  await finishSignIn(page);
   await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 

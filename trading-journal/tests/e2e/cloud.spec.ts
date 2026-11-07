@@ -10,7 +10,7 @@
  * `/dev/konto.html`). `P09_SHOTS_DIR` also writes review screenshots.
  */
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed, stored, toast } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, finishSignIn, fixture, openRoute, seed, stored, toast } from "./helpers";
 import { mockSupabase, TOTP_CODE, type MockSupabase } from "./mocks/supabase";
 
 const KONTO_URL = process.env.PW_KONTO_URL ?? cloudUrl("konto");
@@ -47,10 +47,8 @@ async function signIn(page: Page, sb: MockSupabase, opts: { mfa?: boolean } = {}
   await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
   await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
   if (opts.mfa) return;
-  await expect(page.getByRole("dialog", { name: "Willkommen" })).toBeVisible();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // B1: the fixture journal on this device is not in the (empty) account → the takeover question comes first
+  await finishSignIn(page);
   await expect.poll(() => [...sb.rows.values()].filter((r) => r.kind === "trade").length).toBe(FIXTURE_TRADES.length);
 }
 
@@ -98,11 +96,12 @@ test.describe("Konto & Cloud", () => {
 
     await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
     await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-    const welcome = page.getByRole("dialog", { name: "Willkommen" });
-    await expect(welcome).toBeVisible();
-    await expect(welcome.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-    await shot(page, info, "welcome");
-    await welcome.getByRole("button", { name: "Los geht’s" }).click();
+    // B1: this browser holds a journal the (empty) account lacks → the question comes before anything is uploaded
+    const question = page.getByTestId("takeover-choose");
+    await expect(question).toBeVisible({ timeout: 20_000 });
+    expect(sb.rows.size).toBe(0);
+    await shot(page, info, "takeover");
+    await finishSignIn(page);
 
     // every local trade is in the cloud, the settings row too; a safety snapshot was written before the merge
     await expect.poll(() => [...sb.rows.values()].filter((r) => r.kind === "trade").length).toBe(FIXTURE_TRADES.length);

@@ -20,6 +20,7 @@ import { limitOf } from "../../src/billing/plans";
 import { requireUser } from "./_lib/auth";
 import { envOptional } from "./_lib/env";
 import { handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
+import { assertRunning, killed } from "./_lib/killswitch";
 import { paymentsConfigured, requireFeature } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 
@@ -145,8 +146,9 @@ export async function routeQuestion(input: RouteInput, apiKey: string, model: st
 export default handler(async (req) => {
   requireMethod(req, "GET", "POST");
   const apiKey = envOptional("ANTHROPIC_API_KEY");
-  if (req.method.toUpperCase() === "GET") return json({ enabled: !!apiKey });
+  if (req.method.toUpperCase() === "GET") return json({ enabled: !!apiKey && !killed("ai") });
   const user = await requireUser(req, { aal2: "ifEnrolled" });
+  assertRunning("ai");
   if (!apiKey) throw new HttpError(503, "assistant_ai_unavailable", ROUTER_OFF_MESSAGE);
   const plan = await requireFeature(user.id, "coachAi");
   await enforceRateLimit(rateKey("assistant-route", user.id), 20, 600);

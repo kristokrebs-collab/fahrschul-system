@@ -13,6 +13,7 @@ import { audit } from "./_lib/audit";
 import { requireUser } from "./_lib/auth";
 import { clientIp, handler, json, readJson, requireMethod } from "./_lib/http";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
+import { assertRunning } from "./_lib/killswitch";
 import { createCheckout, siteOrigin } from "./_lib/stripe";
 
 const Body = z.object({
@@ -27,6 +28,7 @@ const Body = z.object({
 export default handler(async (req, ctx) => {
   requireMethod(req, "POST");
   const user = await requireUser(req, { aal2: "ifEnrolled" });
+  assertRunning("checkout");
   await enforceRateLimit(rateKey("billing-checkout", user.id), 10, 600);
   const body = await readJson(req, Body, { maxBytes: 2048 });
   const out = await createCheckout(user, body, siteOrigin(req));

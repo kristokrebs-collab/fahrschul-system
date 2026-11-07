@@ -505,7 +505,54 @@ function SentView() {
 
 /* ------------------------------------------------------------------ 2FA step-up */
 
+/** Lost device (B1): a recovery code instead of the app code – ends the second factor, the account then works with the password. */
+function RecoveryForm({ onBack }: { onBack: () => void }) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<FieldError | null>(null);
+  const id = useId();
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy || !code.trim()) return;
+    setBusy(true);
+    const m = await cloudOrError();
+    const r = m ? await m.redeemRecoveryCode(code) : null;
+    setBusy(false);
+    if (!r || !r.ok) {
+      setErr(errorOf("code", r && !r.ok ? r.message : AUTH.unavailable));
+      return;
+    }
+    pushToast({ kind: "success", title: AUTH.recoveryDone, detail: AUTH.recoveryDoneDetail, duration: 9000 });
+    setAuthView("welcome");
+  }
+  return (
+    <form className="grid gap-4" noValidate onSubmit={(e) => void submit(e)} data-testid="recovery-form">
+      <StaggerItem>
+        <p className="text-[13px] leading-relaxed text-mute">{AUTH.recoveryLead}</p>
+      </StaggerItem>
+      <StaggerItem>
+        <Field label={AUTH.recoveryLabel} htmlFor={`${id}-rc`} error={err?.message} invalidKey={err?.key ?? null}>
+          <Input id={`${id}-rc`} value={code} autoComplete="off" spellCheck={false} autoFocus onChange={(e) => setCode(e.target.value)} placeholder="ABCDE-FGHJK" className="font-mono uppercase tracking-[0.12em]" />
+        </Field>
+      </StaggerItem>
+      <StaggerItem>
+        <p className="text-[11.5px] leading-relaxed text-faint">{AUTH.recoveryNoCodes}</p>
+      </StaggerItem>
+      <StaggerItem className="flex flex-wrap items-center justify-between gap-3">
+        <LinkButton onClick={onBack}>{AUTH.recoveryBack}</LinkButton>
+        <SubmitButton busy={busy} idle={AUTH.recoverySubmit} busyLabel={AUTH.recoveryBusy} disabled={!code.trim()} />
+      </StaggerItem>
+    </form>
+  );
+}
+
 function MfaView() {
+  const [recovery, setRecovery] = useState(false);
+  if (recovery) return <RecoveryForm onBack={() => setRecovery(false)} />;
+  return <MfaCodeForm onLost={() => setRecovery(true)} />;
+}
+
+function MfaCodeForm({ onLost }: { onLost: () => void }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<FieldError | null>(null);
@@ -565,6 +612,9 @@ function MfaView() {
         </LinkButton>
         <SubmitButton busy={busy} idle="Bestätigen" busyLabel={AUTH.busy.mfa} disabled={code.length !== CODE_LENGTH} />
       </StaggerItem>
+      <StaggerItem>
+        <LinkButton onClick={onLost}>{AUTH.lostDevice}</LinkButton>
+      </StaggerItem>
     </form>
   );
 }
@@ -587,7 +637,7 @@ export function NewPasswordForm({ reason, onDone }: { reason: "reset" | "change"
     const r = m ? await m.updatePassword(pw, reason) : null;
     setBusy(false);
     if (!r || !r.ok) return setErr(errorOf(r && !r.ok && r.field === "password" ? "password" : null, r && !r.ok ? r.message : AUTH.unavailable));
-    pushToast({ kind: "success", title: AUTH.passwordSaved });
+    pushToast({ kind: "success", title: AUTH.passwordSaved, detail: r.value.othersSignedOut ? AUTH.passwordOthersOut : AUTH.passwordOthersKept });
     onDone();
   }
   return (

@@ -82,7 +82,7 @@ ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als n
 | `0014_alerts.sql` | Vier Alarme + Zustellung (C2): Alarm-Einstellungen (`alert_prefs`), Telefon-Einwilligung und -Status ohne Nummer (`alert_phones`), die verschlüsselte Nummer (`alert_phone_secrets`, kein Zugriff für Clients), Gedächtnis der Alarm-Engine (`alert_state`), Ereignisse mit eindeutigem Dedup-Schlüssel (`alert_events`), Zustellprotokoll (`alert_deliveries`) und die Job-Warteschlange mit Lease, Wiederholung und Dead-Letter (`jobs`), dazu die Server-Funktionen `alert_enqueue`, `jobs_claim`, `alert_phone_reserve` (Anruf wird VOR dem Wählen festgeschrieben) u. a. Clients dürfen nur eigene Zeilen lesen, schreiben nur die Functions. Läuft nach 0001, 0005 und 0008 (0011–0013 gehören anderen Paketen und sind unabhängig). Ohne sie meldet `alerts-cron` „migration“ und tut nichts; `supabase/tests/0014_alerts.test.sql` prüft die Regeln gegen eine Scratch-Datenbank |
 
 **Variante A – SQL-Editor (ohne CLI):** Supabase → **SQL Editor → New query** → Inhalt von `0001_core.sql` einfügen →
-**Run** → „Success“ abwarten. Dann `0002` bis `0010` genauso.
+**Run** → „Success“ abwarten. Dann `0002` bis `0011` genauso.
 
 **Variante B – CLI:**
 
@@ -445,6 +445,12 @@ und dem Zeitplan `alerts-cron`. Das **Telefon** braucht zusätzlich:
 - **Supabase → Auth → Rate Limits** prüfen; die Functions haben eigene Limits (`rate_hit()`).
 - Geheimnisse nur in Netlify (Scope Functions) – nie in `VITE_*`, nie ins Repo. `.env` / `.env.local` sind
   git-ignoriert.
+- **Betrieb (C4):** `OPS_TOKEN` setzen (mindestens 24 Zeichen, `openssl rand -base64 32`), dann zeigt
+  `curl -H "Authorization: Bearer $OPS_TOKEN" "$SITE/api/v1/ops/status?probe=1&stats=1"` pro Funktion, welche Variablen
+  fehlen („nicht eingerichtet“ heißt: läuft nicht, nie „frei“). Vor dem Deploy: `node scripts/releaseCheck.mjs`.
+  Notfall-Schalter `KILL_SYNC`, `KILL_CALLS`, `KILL_AI`, `KILL_CHECKOUT` (`true` = Bereich aus, danach neu deployen).
+  Alle Variablen mit Zweck und Verhalten ohne sie: `docs/ENV.md`; Überwachung, Backup-Probe, Kostenbudget, Notfall und
+  Löschfristen: `docs/BETRIEB.md`.
 
 ---
 

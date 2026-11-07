@@ -11,14 +11,17 @@ import { hasClaudeRuntime } from "@/store/capability";
 import { getAdapter, switchAdapter, useJournal } from "@/store/journalStore";
 import { KEY_PREFIX } from "@/store/storage";
 import { pushToast } from "@/store/uiStore";
-import { usePrivacy } from "../privacy";
+import { useOpsFlags } from "../flags";
+import { setPrivacy, usePrivacy } from "../privacy";
 import { useSyncGate } from "../runtime";
 import { useCloudSession } from "../session";
+import { requestTakeover, setUndoUntil, takeoverHooks } from "../takeover";
 import { localBaseStore } from "./base";
 import { createOutbox, idbOutboxStorage } from "./outbox";
 import { createSupabaseRemote } from "./remote";
 import { patchSyncStatus, resetSyncStatus, type SyncPhase } from "./status";
 import { createSupabaseAdapter, type SupabaseAdapter } from "./supabaseAdapter";
+import { idbUndoStorage, memoryUndoStorage } from "./undo";
 
 let active: { userId: string; adapter: SupabaseAdapter } | null = null;
 
@@ -31,7 +34,7 @@ function idlePhase(): SyncPhase {
   const s = useCloudSession.getState();
   if (s.phase !== "signedIn") return "off";
   if (s.needsMfa) return "locked";
-  if (!usePrivacy.getState().sync) return "paused";
+  if (!usePrivacy.getState().sync || useOpsFlags.getState().sync) return "paused";
   return "off";
 }
 
@@ -40,7 +43,7 @@ export function startSyncController(sb: SupabaseClient): () => void {
   const evaluate = () => {
     if (disposed) return;
     const s = useCloudSession.getState();
-    const want = s.phase === "signedIn" && !!s.user && !s.needsMfa && usePrivacy.getState().sync && useSyncGate.getState().entitled && !hasClaudeRuntime();
+    const want = s.phase === "signedIn" && !!s.user && !s.needsMfa && usePrivacy.getState().sync && !useOpsFlags.getState().sync && useOpsFlags.getState().settled && useSyncGate.getState().entitled && !hasClaudeRuntime();
     const uid = want ? s.user!.id : null;
     if (uid && active?.userId === uid) return;
     if (active) {
@@ -56,8 +59,14 @@ export function startSyncController(sb: SupabaseClient): () => void {
         base: localBaseStore,
         snapshot: (tag, snap) => writeSnapshot(tag, snap),
         notify: (t) => pushToast(t),
+        // B1: the first login of this browser asks what happens to the journal on this device (dialog, undo window)
+        decideTakeover: requestTakeover,
+        takeover: takeoverHooks,
+        undo: idbUndoStorage(`${KEY_PREFIX}cloud-undo`, uid) ?? memoryUndoStorage(),
+        onKeepLocal: () => setPrivacy({ sync: false }),
       });
       active = { userId: uid, adapter };
+      void adapter.engine.pendingUndo().then((e) => setUndoUntil(e?.expiresAt ?? null));
       void switchAdapter(adapter).then((ok) => {
         if (!ok && active?.adapter === adapter) active = null;
       });
@@ -68,7 +77,7 @@ export function startSyncController(sb: SupabaseClient): () => void {
     // the boot kept "Verbinde …" for a stored login that will not sync (expired, 2FA pending, paused): settle local
     if (s.phase !== "loading" && s.phase !== "idle" && useJournal.getState().mode === "connecting" && getAdapter()?.mode === "local") useJournal.getState().setMode("local");
   };
-  const offs = [useCloudSession.subscribe(evaluate), usePrivacy.subscribe(evaluate), useSyncGate.subscribe(evaluate)];
+  const offs = [useCloudSession.subscribe(evaluate), usePrivacy.subscribe(evaluate), useSyncGate.subscribe(evaluate), useOpsFlags.subscribe(evaluate)];
   evaluate();
   return () => {
     disposed = true;
