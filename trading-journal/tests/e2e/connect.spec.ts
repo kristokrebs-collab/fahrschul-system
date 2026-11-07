@@ -9,12 +9,21 @@
  *
  * Nothing here says the live exchange works – the report lists what is mock only.
  */
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed } from "./helpers";
 import { mockSupabase } from "./mocks/supabase";
 
 const PROJECTS = ["mobile", "desktop"];
+const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+
+async function expectAccessible(page: Page, include: string, what: string): Promise<void> {
+  await page.waitForTimeout(1200);
+  const res = await new AxeBuilder({ page }).include(include).withTags(TAGS).analyze();
+  const lines = res.violations.map((v) => `${v.id} (${v.impact}): ${v.help} → ${v.nodes.slice(0, 4).map((n) => n.target.join(" ")).join(" | ")}`);
+  expect(lines, `${what}: axe violations`).toEqual([]);
+}
 const EMAIL = "trader@example.com";
 const PASSWORD = "richtig-geheim-42";
 const KEY = "bnk9f3a1c2d4e5f60718293a4b5c6d7e";
@@ -223,6 +232,20 @@ test.describe("Verbindungen · Standard-Ausgabe (kein Cloud-Konto im Build)", ()
     expect(await tops()).toEqual(t1);
   });
 
+  for (const theme of ["dark", "light"] as const) {
+    test(`Barrierefreiheit der Verbindungen-Karte und des Dialogs (axe, ${theme === "dark" ? "dunkles" : "helles"} Thema)`, async ({ page }) => {
+      await seed(page, { extra: { "tj2-theme": JSON.stringify(theme) } });
+      await openRoute(page, "/#settings", "Einstellungen");
+      const hub = page.getByTestId("connections-hub");
+      await hub.scrollIntoViewIfNeeded();
+      await expect(slot(page, "tradingview")).toBeVisible({ timeout: 30_000 });
+      await expectAccessible(page, '[data-testid="connections-hub"]', `Verbindungen (${theme})`);
+      await slot(page, "binance-spot").click();
+      await expect(dialog(page).getByTestId("connect-info")).toBeVisible();
+      await expectAccessible(page, '[data-testid="connect-dialog"]', `Dialog „nicht eingerichtet“ (${theme})`);
+    });
+  }
+
   test("Telefon-Alarm im Alarm-Bereich der Markt-Seite sagt ehrlich, dass es ihn noch nicht gibt", async ({ page }) => {
     await seed(page);
     await openRoute(page, "/#markt", "Markt");
@@ -280,6 +303,7 @@ test.describe("Verbindungen · mit Konto (Cloud-Build gegen die Mocks)", () => {
     expect(m.connects).toHaveLength(1);
     expect(m.connects[0]).toMatchObject({ exchange: "binance", market: "futures", readOnlyConfirmed: true });
     expect(m.conn).toBeNull();
+    await expectAccessible(page, '[data-testid="connect-dialog"]', "Binance-Dialog (abgelehnt)");
     await expectNoHorizontalScroll(page);
     if (hasTouch(info)) {
       const misses = await page.evaluate(auditHitBoxes, { selector: HIT_SELECTOR, root: '[data-testid="connect-dialog"]' });
@@ -373,6 +397,7 @@ test.describe("Verbindungen · mit Konto (Cloud-Build gegen die Mocks)", () => {
     expect(m.hooks[0]!.body).toContain('"action":"test"');
     expect(m.hooks[0]!.url).toContain(TV_TOKEN);
     await expectNoHorizontalScroll(page);
+    await expectAccessible(page, '[data-testid="connect-dialog"]', "TradingView-Dialog (Testsignal)");
     if (hasTouch(info)) {
       const misses = await page.evaluate(auditHitBoxes, { selector: HIT_SELECTOR, root: '[data-testid="connect-dialog"]' });
       expect(misses, JSON.stringify(misses)).toEqual([]);
