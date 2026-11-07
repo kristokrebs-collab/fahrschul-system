@@ -484,7 +484,7 @@ _Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 7 Funktionen
 
 ### Konto, Einstellungen & Hilfe
 
-_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 21 Funktionen
+_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 22 Funktionen
 
 **Konto & Tarif**
 
@@ -507,6 +507,7 @@ _Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 21 Funktionen
 | Deine Backtest-Zahlen als Vergleichswert hinterlegen | Backtest-Referenz | Einstellungen › Backtest-Referenz | fertig |
 | Hyblock-Daten anbinden | Hyblock-Connector | Einstellungen › Hyblock-Connector | fertig |
 | App installieren, Speicher und Version ansehen | Version & Speicher | Einstellungen › Version & Speicher | fertig |
+| Impressum, Datenschutz, AGB, Widerruf und Risikohinweis lesen | Rechtliches: Impressum, Datenschutz, AGB, Widerruf | Einstellungen › Rechtliches | fertig |
 
 **Oberfläche**
 

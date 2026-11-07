@@ -5,11 +5,11 @@
  */
 import type { MouseEvent } from "react";
 import { cn } from "@/lib/cn";
-import { LEGAL_LABEL, legalConfig, legalDeepLink, legalShown, type LegalDoc } from "./config";
+import { LEGAL_LABEL, legalConfig, legalDeepLink, legalShown, type LegalPage } from "./config";
 import { openLegal } from "./store";
 
-export function LegalLink({ doc, className, children }: { doc: LegalDoc; className?: string; children?: React.ReactNode }) {
-  const url = legalConfig().urls[doc];
+export function LegalLink({ doc, className, children }: { doc: LegalPage; className?: string; children?: React.ReactNode }) {
+  const url = doc === "hinweise" ? null : legalConfig().urls[doc];
   const label = children ?? LEGAL_LABEL[doc];
   if (url && doc !== "impressum")
     return (
@@ -29,10 +29,16 @@ export function LegalLink({ doc, className, children }: { doc: LegalDoc; classNa
   );
 }
 
-export function LegalLinks({ className, roomy = false }: { className?: string; roomy?: boolean }) {
+/**
+ * `extended` (default): all five – the Widerrufsbelehrung and the Hinweise (Risiko, Preise, Partnerlinks, Marken) exist in
+ * the app as drafts, so they are always one tap away. The narrow sidebar passes `extended={false}`: Impressum ·
+ * Datenschutz · AGB (· Widerruf when the operator has a page of its own).
+ */
+export function LegalLinks({ className, roomy = false, extended = true }: { className?: string; roomy?: boolean; extended?: boolean }) {
   if (!legalShown()) return null;
-  const docs: LegalDoc[] = ["impressum", "datenschutz", "agb"];
-  if (legalConfig().urls.widerruf) docs.push("widerruf");
+  const docs: LegalPage[] = ["impressum", "datenschutz", "agb"];
+  if (extended) docs.push("widerruf", "hinweise");
+  else if (legalConfig().urls.widerruf) docs.push("widerruf");
   // `roomy` (menu, sidebar): every link is its own 44 px tall box with padding on both sides – the tap areas never overlap
   if (roomy)
     return (

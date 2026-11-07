@@ -18,6 +18,14 @@ interface ImportMetaEnv {
   readonly VITE_LEGAL_DATENSCHUTZ_URL?: string;
   readonly VITE_LEGAL_AGB_URL?: string;
   readonly VITE_LEGAL_WIDERRUF_URL?: string;
+  /** "true" = the operator declares the in-app draft texts (`docs/RECHT/`) reviewed by a lawyer: the „Entwurf“ bar goes away. */
+  readonly VITE_LEGAL_DRAFTS_REVIEWED?: string;
+}
+
+/** The legal drafts are read as raw text (`src/legal/texts.ts`). */
+declare module "*.md?raw" {
+  const source: string;
+  export default source;
 }
 
 interface ImportMeta {

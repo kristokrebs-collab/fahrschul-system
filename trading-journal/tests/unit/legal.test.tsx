@@ -5,6 +5,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { impressumComplete, legalComplete, legalConfigOf, legalDocOfUrl, missingLegal, safeLegalUrl, setLegalConfigForTests } from "@/legal/config";
+import { LegalCard, legalStatus } from "@/views/settings/LegalCard";
 import { LegalHost } from "@/legal/LegalHost";
 import { LegalLinks } from "@/legal/LegalLinks";
 import { closeLegal, openLegal, useLegal } from "@/legal/store";
@@ -73,7 +74,9 @@ describe("sheet", () => {
     );
     expect(screen.getByTestId("legal-datenschutz")).toHaveAttribute("href", "https://example.com/datenschutz");
     expect(screen.getByTestId("legal-datenschutz")).toHaveAttribute("target", "_blank");
-    expect(screen.queryByTestId("legal-widerruf")).toBeNull();
+    // the Widerruf and the Hinweise exist in the app as drafts: always linked (the narrow sidebar row keeps the old three)
+    expect(screen.getByTestId("legal-widerruf")).toHaveAttribute("href", "?rechtliches=widerruf");
+    expect(screen.getByTestId("legal-hinweise")).toHaveAttribute("href", "?rechtliches=hinweise");
     fireEvent.click(screen.getByTestId("legal-impressum"));
     const sheet = await screen.findByTestId("legal-sheet");
     expect(within(sheet).queryByTestId("legal-placeholder")).toBeNull();
@@ -97,5 +100,68 @@ describe("sheet", () => {
     expect(window.location.search).toBe("");
     expect(window.location.hash).toBe("#preise");
     window.history.replaceState(null, "", "/");
+  });
+});
+
+describe("drafts in the sheet", () => {
+  it("no page of the operator: the marked placeholder AND the in-app draft with the Entwurf bar, placeholders marked inside", async () => {
+    setLegalConfigForTests(legalConfigOf({}));
+    render(
+      <MotionRoot>
+        <LegalHost />
+      </MotionRoot>,
+    );
+    act(() => openLegal("datenschutz"));
+    const doc = await screen.findByTestId("legal-document");
+    expect(await within(doc).findByText(/Datenschutzerklärung/, { selector: "h3" })).toBeInTheDocument();
+    expect(within(doc).getByTestId("legal-draft-bar")).toHaveTextContent("Entwurf – Prüfung durch Anwalt nötig");
+    expect(within(doc).getAllByTestId("legal-field")[0]).toHaveTextContent(/^\[Platzhalter: VITE_LEGAL_/);
+    expect(within(doc).getAllByTestId("legal-todo").length).toBeGreaterThan(5);
+    expect(screen.getByTestId("legal-placeholder")).toHaveTextContent("VITE_LEGAL_DATENSCHUTZ_URL");
+  });
+
+  it("the Hinweise are always the in-app text (risk notice first); an own operator page replaces a draft; the bar goes only with the operator's declaration", async () => {
+    setLegalConfigForTests(legalConfigOf({ VITE_LEGAL_DATENSCHUTZ_URL: "https://example.com/datenschutz", VITE_LEGAL_DRAFTS_REVIEWED: "true" }));
+    render(
+      <MotionRoot>
+        <LegalHost />
+      </MotionRoot>,
+    );
+    act(() => openLegal("hinweise"));
+    const doc = await screen.findByTestId("legal-document");
+    expect(await within(doc).findByText("Risikohinweis", { selector: "h3" })).toBeInTheDocument();
+    expect(within(doc).queryByTestId("legal-draft-bar")).toBeNull();
+    expect(doc).toHaveTextContent("Keine professionelle Finanzberatung.");
+    act(() => openLegal("datenschutz"));
+    expect(await screen.findByRole("button", { name: /Datenschutz des Betreibers öffnen/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("legal-document")).toBeNull();
+  });
+});
+
+describe("settings card", () => {
+  it("status per page is honest: placeholder / draft / own page / data", () => {
+    expect(legalStatus("impressum", legalConfigOf({}))).toEqual({ text: "Platzhalter – Angaben fehlen", tone: "warn" });
+    expect(legalStatus("impressum", FULL).tone).toBe("ok");
+    expect(legalStatus("datenschutz", legalConfigOf({}))).toEqual({ text: "Entwurf – Prüfung durch Anwalt nötig", tone: "warn" });
+    expect(legalStatus("datenschutz", FULL).text).toBe("Eigene Seite des Betreibers");
+    expect(legalStatus("widerruf", FULL).text).toBe("Steht in den AGB des Betreibers");
+    expect(legalStatus("hinweise", FULL).tone).toBe("warn");
+    expect(legalStatus("hinweise", legalConfigOf({ VITE_LEGAL_DRAFTS_REVIEWED: "true" })).tone).toBe("ok");
+  });
+
+  it("lists the five documents, each opens the sheet; says no cookies / no trackers and carries the risk sentence", async () => {
+    setLegalConfigForTests(legalConfigOf({}));
+    render(
+      <MotionRoot>
+        <LegalCard />
+        <LegalHost />
+      </MotionRoot>,
+    );
+    const card = screen.getByTestId("settings-legal-card");
+    for (const p of ["impressum", "datenschutz", "agb", "widerruf", "hinweise"]) expect(within(card).getByTestId(`settings-legal-${p}`)).toBeInTheDocument();
+    expect(within(card).getByTestId("settings-legal-storage")).toHaveTextContent(/keine Cookies und keine Tracker/);
+    expect(within(card).getByTestId("settings-legal-risk")).toHaveTextContent("Keine professionelle Finanzberatung.");
+    fireEvent.click(within(within(card).getByTestId("settings-legal-agb")).getByRole("button"));
+    expect(await screen.findByTestId("legal-sheet")).toHaveAttribute("data-doc", "agb");
   });
 });
