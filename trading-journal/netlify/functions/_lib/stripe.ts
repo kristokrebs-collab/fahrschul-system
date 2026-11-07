@@ -62,6 +62,7 @@ import type { AuthUser } from "./auth";
 import { envOptional, type ServerEnvName } from "./env";
 import { HttpError } from "./http";
 import { paymentsConfigured, planOf } from "./plan";
+import { assertPurchaseOpen, checkConsents, contractMailReady, linkConsentSession, purchaseGate, returnUrls, serverConsentHash, storeConsents } from "./purchase";
 import { supabaseAdmin } from "./supabase";
 
 /* ------------------------------------------------------------------ env */
@@ -125,8 +126,9 @@ export interface StripeApi {
   customers: {
     create(params: Stripe.CustomerCreateParams, options?: Stripe.RequestOptions): Promise<{ id: string }>;
     createBalanceTransaction(id: string, params: Stripe.CustomerCreateBalanceTransactionParams, options?: Stripe.RequestOptions): Promise<{ id: string }>;
+    list(params: Stripe.CustomerListParams): Promise<{ data: Stripe.Customer[] }>;
   };
-  checkout: { sessions: { create(params: Stripe.Checkout.SessionCreateParams): Promise<{ id: string; url: string | null }> } };
+  checkout: { sessions: { create(params: Stripe.Checkout.SessionCreateParams, options?: Stripe.RequestOptions): Promise<{ id: string; url: string | null }> } };
   billingPortal: { sessions: { create(params: Stripe.BillingPortal.SessionCreateParams): Promise<{ url: string }> } };
   subscriptions: {
     retrieve(id: string): Promise<Stripe.Subscription>;
@@ -171,6 +173,8 @@ export async function stripeCall<T>(what: string, fn: () => Promise<T>): Promise
     if (e instanceof HttpError) throw e;
     const err = e as { type?: string; code?: string; statusCode?: number };
     console.error(`[fn] stripe ${what} failed`, err.type ?? "", err.code ?? "", err.statusCode ?? "");
+    // the same order (idempotency key) sent again with other details: never a second session, say so
+    if (err.type === "StripeIdempotencyError") throw new HttpError(409, "order_changed", "Diese Bestellung wurde schon mit anderen Angaben gestartet. Bitte starte sie neu.");
     throw new HttpError(502, "billing_unavailable", STRIPE_DOWN);
   }
 }
@@ -528,8 +532,14 @@ export async function configuredPrices(now = Date.now()): Promise<BillingConfig[
 
 export async function billingConfig(): Promise<BillingConfig> {
   const enabled = billingConfigured();
+  const gate = purchaseGate();
   return {
     enabled,
+    purchaseOpen: gate.open,
+    ...(gate.open ? {} : { purchaseBlockedBy: gate.blockedBy }),
+    automaticTax: automaticTax(),
+    consentHash: await serverConsentHash(),
+    mailReady: contractMailReady(),
     ...(enabled ? {} : { reason: "stripe_missing" as const }),
     trialDays: trialDays(),
     referralTrialDays: referralTrialDays(),
@@ -633,14 +643,31 @@ export async function lookupCode(raw: string): Promise<CodeLookup> {
   };
 }
 
-/** Creates a Stripe Checkout session for the signed-in user (redirect URL). */
+/**
+ * The text Stripe shows next to ITS submit button (`custom_text.submit`, up to 1200 chars): the order creates a payment
+ * obligation (§ 312j Abs. 3 BGB). Stripe's own button reads "Zahlen" / "Testversion starten" - that wording cannot be set to
+ * "zahlungspflichtig bestellen" in Checkout, so this text states it right beside the button. A point for the lawyer.
+ */
+export function checkoutSubmitText(trialDays: number): string {
+  const trial = trialDays > 0 ? ` Nach der Testphase (${trialDays} Tage) beginnt die Zahlung automatisch.` : "";
+  return `Mit dem Klick auf den Button gibst du eine zahlungspflichtige Bestellung ab.${trial} Das Abo verlängert sich automatisch um die gewählte Laufzeit, bis du kündigst – jederzeit zum Ende der Laufzeit über „Verträge hier kündigen“ in der App.`;
+}
+
+/**
+ * Creates a Stripe Checkout session for the signed-in user (redirect URL). Order of the checks: the purchase flow is open
+ * (Stripe + the operator's legal texts), no running subscription, BOTH consents ticked with the CURRENT wording, the evidence
+ * is stored - only then the session is created, with an idempotency key per order (a double click or a retried request
+ * returns the SAME session; the same order with other details is refused as `order_changed`).
+ */
 export async function createCheckout(user: AuthUser, body: CheckoutRequest, origin: string): Promise<CheckoutResponse> {
+  assertPurchaseOpen();
   const priceId = priceIdFor(body.plan, body.interval);
   if (!billingConfigured() || !priceId) throw new HttpError(503, "billing_unavailable", OFF_MESSAGE);
   const rows = await subscriptionRows(user.id);
   if (rows.some((r) => grantsPlan(r.status) || r.status === "paused")) {
     throw new HttpError(409, "already_subscribed", "Du hast schon ein Abo. Tarif wechseln oder kündigen kannst du im Kundenportal.");
   }
+  const consentHash = await checkConsents(body.consents, body.consentHash);
   const used = await trialUsed(user.id, rows);
   let ref = normalizeRefCode(body.ref);
   const referrer = ref ? await referrerOf(ref) : null;
@@ -653,12 +680,21 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
     if (!pc) throw new HttpError(422, "invalid_code", "Dieser Code ist ungültig oder abgelaufen.");
     discounts = [{ promotion_code: pc.id }];
   }
-  const customer = await ensureCustomer(user);
   const team = body.plan === "team";
   const cat = PLAN_CATALOG.team;
   const seats = team ? Math.max(cat.minSeats ?? 2, Math.min(cat.maxSeats ?? 50, Math.round(body.seats ?? cat.minSeats ?? 2))) : 1;
-  const { path, hash } = safeReturnTo(body.returnTo);
-  const meta: Record<string, string> = { supabase_user_id: user.id, plan: body.plan, interval: body.interval, ...(ref ? { ref } : {}) };
+  const consentAt = await storeConsents({ userId: user.id, orderId: body.orderId, plan: body.plan, interval: body.interval, seats });
+  const customer = await ensureCustomer(user);
+  const urls = returnUrls(origin, body.returnTo, body.orderId);
+  const meta: Record<string, string> = {
+    supabase_user_id: user.id,
+    plan: body.plan,
+    interval: body.interval,
+    order_id: body.orderId,
+    consent_at: consentAt,
+    consent_hash: consentHash,
+    ...(ref ? { ref } : {}),
+  };
   const cardless = days > 0 && cardlessTrial();
   const tax = automaticTax();
   const params: Stripe.Checkout.SessionCreateParams = {
@@ -669,8 +705,8 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
     line_items: [
       { price: priceId, quantity: seats, ...(team ? { adjustable_quantity: { enabled: true, minimum: cat.minSeats ?? 2, maximum: cat.maxSeats ?? 50 } } : {}) },
     ],
-    success_url: `${origin}${path}?billing=success&session_id={CHECKOUT_SESSION_ID}${hash}`,
-    cancel_url: `${origin}${path}?billing=cancel${hash}`,
+    success_url: urls.success,
+    cancel_url: urls.cancel,
     metadata: meta,
     subscription_data: {
       metadata: meta,
@@ -680,13 +716,17 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
     ...(cardless ? { payment_method_collection: "if_required" as const } : {}),
     // allow_promotion_codes and discounts are mutually exclusive: a pre-checked code is applied, otherwise the field shows
     ...(discounts ? { discounts } : { allow_promotion_codes: true }),
+    // § 312j Abs. 3 BGB: Stripe's button cannot read "zahlungspflichtig bestellen" - `pay` + the text beside it say so
+    submit_type: "pay",
+    custom_text: { submit: { message: checkoutSubmitText(days) } },
     ...(tax
       ? { automatic_tax: { enabled: true }, customer_update: { address: "auto" as const, name: "auto" as const }, tax_id_collection: { enabled: true } }
       : {}),
     billing_address_collection: tax ? "required" : "auto",
   };
-  const session = await stripeCall("checkout", () => stripeApi().checkout.sessions.create(params));
+  const session = await stripeCall("checkout", () => stripeApi().checkout.sessions.create(params, { idempotencyKey: `tj-checkout-${user.id}-${body.orderId}` }));
   if (!session.url) throw new HttpError(502, "billing_unavailable", STRIPE_DOWN);
+  await linkConsentSession(user.id, body.orderId, session.id);
   return { url: session.url, sessionId: session.id };
 }
 
