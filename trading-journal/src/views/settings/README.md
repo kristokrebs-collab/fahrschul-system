@@ -57,6 +57,9 @@ const health = useHealth(); // market layer
 
 Tests: `tests/unit/views.settings.konten.test.tsx`, `tests/unit/views.settings.rules.test.tsx`, `tests/unit/views.settings.motion.test.tsx`.
 
+## Alarme (C2, `alerts/`)
+Gruppe „Benachrichtigungen“ (`AlertsGroup`, `data-section="s-alarme"`) UNTER dem Einstellungsformular (eigener Speichern-Knopf, keine verschachtelte `form`): eine `Fold` „Alarme“, deren Karte (`alerts/AlertSettingsCard`, eigener Chunk) erst beim Aufklappen geladen wird. Vier Ereignisse × drei Kanäle als Schalter-Tabelle (`data-testid="alert-matrix"`, `ev-<kanal>-<ereignis>`), Quellen mit Schwellen, Ruhezeit, Wiederholungssperre, Sprache, Testknopf je Kanal (`test-browser|email|phone`), `Protocol` (Zustellprotokoll mit Dead-Letter), `AlertConnectSlot` (dünne Stelle für fehlende Verbindungen; später durch `ConnectSlot` ersetzbar) mit `PhoneSetup` (Nummer → Einwilligung → SMS-Code → Abmelden). Alles Serverseitige (Tarifgrenzen, was eingerichtet ist) kommt mit `/api/v1/alerts/prefs`; `AlertFeedHost` (lazy, nur bei gesetztem Browser-Kanal-Flag `browserFlag.ts`) holt wartende Browser-Alarme ab. Tests: `tests/unit/views.settings.alerts.model.test.ts`, `tests/e2e/alarme.spec.ts`.
+
 ## Merge pass (Einstiegs-Check, Fehler-Tags, Grenzen, Version & Speicher)
 Card order: Konten · Backtest-Referenz · Live-Status · Live-Daten · **Einstiegs-Check** (full width) · Hyblock-Connector (full width) · Daten · Grundregeln · **Fehler-Tags** · **Disziplin-Grenzen** · **Version & Speicher** (full width). `Card` puts `className` on its inner surface, so full-width cards sit in a `lg:col-span-2` grid item (the old `className="lg:col-span-2"` on Hyblock never spanned).
 
