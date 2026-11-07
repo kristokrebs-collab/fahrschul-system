@@ -373,6 +373,14 @@ Karte Börse) liest die Exporte von Bitunix, Binance, Bybit und weiteren Plattfo
 
 ---
 
+---
+
+### 5.4 Binance, TradingView und Partnerlinks (Paket Verbindungen)
+
+- **Binance (nur Lesen, Spot und Futures als zwei getrennte Verbindungen):** Binance erlaubt Schlüssel nur mit fester IP-Freigabe. Die Ausgangs-IP des Servers muss deshalb feststehen (fester Proxy oder feste Function-Region); trage sie als `BINANCE_EGRESS_IP` ein – sie wird den Nutzern in der Anleitung gezeigt. Ohne diese Angabe bleibt der Binance-Platzhalter bei „nicht eingerichtet“. `BINANCE_SPOT_BASE` und `BINANCE_FUTURES_BASE` sind nur Test-Überschreibungen (https), im Normalbetrieb leer. Der Verschlüsselungsschlüssel `EXCHANGE_ENC_KEY_V1` (Abschnitt 5.1) wird auch für Binance-Schlüssel gebraucht.
+- **TradingView-Assistent und Signal-Empfänger (B3):** braucht `SITE_ORIGIN` (für die Zieladresse des Webhooks) und die Migrationen `0012_connections.sql` (Empfangsbeleg) und `0013_signals.sql` (Signale mit Ausgang verarbeitet / doppelt / abgelehnt; ohne sie nimmt `POST /api/v1/signals/:token` nichts an). Die Zieladresse liest nichts aus dem TradingView-Konto. Optional und getrennt davon: die OAuth-/MCP-Verbindung zum offiziellen TradingView-MCP (nur Lesen) mit `TV_MCP_CLIENT_ID` (+ `SITE_ORIGIN`, `EXCHANGE_ENC_KEY_V1`); ohne die Client-ID sagt die Oberfläche „Einrichtung nötig (Betreiber)“. Fundstellen, offene Fragen und was nur gegen einen Mock geprüft ist: `docs/ENV.md`.
+- **Partnerlinks:** `VITE_PARTNER_TRADINGVIEW_REF`, `VITE_PARTNER_BINANCE_REF`, `VITE_PARTNER_BITUNIX_REF` sind leer (= aus). Trage nur eigene, vom Anbieter vergebene Empfehlungs-IDs ein; sie erscheinen dann gekennzeichnet als „Partnerlink“ (siehe `docs/PARTNERLINKS.md`, `docs/RECHT/partnerlinks.md`). Vorher die Bedingungen des jeweiligen Programms prüfen.
+
 ## 6. Geplante Functions und Logs
 
 | Function | Zeitplan | Aufgabe |
