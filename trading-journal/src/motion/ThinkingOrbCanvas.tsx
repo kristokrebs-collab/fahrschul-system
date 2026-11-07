@@ -54,7 +54,14 @@ export default function ThinkingOrbCanvas({ variant, size, active, className }: 
     canvas.height = Math.round(size * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     let color = getComputedStyle(canvas).color || "#fff";
-    const draw = (t: number): void => paintOrb(ctx, size, activeRef.current ? orbFrame(variant, t) : orbStill(variant), color);
+    // a canvas that cannot draw (a stubbed context, a lost GPU context) leaves the orb blank – never an error in the frame loop
+    const draw = (t: number): void => {
+      try {
+        paintOrb(ctx, size, activeRef.current ? orbFrame(variant, t) : orbStill(variant), color);
+      } catch {
+        /* blank orb */
+      }
+    };
     const loop = createOrbLoop(draw, undefined, { active: activeRef.current, inView: true });
     loopRef.current = loop;
     const onVisibility = (): void => {
