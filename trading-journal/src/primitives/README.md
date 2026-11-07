@@ -102,7 +102,7 @@ a `listbox` named by `listLabel`; the closed box is `inert` and `aria-hidden`; t
 **Material.** `--color-ink-850` 90 % opaque over a soft gradient (inner light top left `--sf-hi`, inner shadow bottom right `--sf-lo`), `backdrop-filter: blur(14px)`; without it
 (old browser, `html[data-safe-fx]`) the surface is the same colour, opaque – the text keeps ≥ AA on every ground. Dark and light follow the theme tokens.
 
-Used by: the finder of the command navigation (`src/app/NavFinder.tsx`). Planned: the page "Funktionen", trade and asset search.
+Used by: the finder of the command navigation (`src/app/NavFinder.tsx`, `lg`, combobox with chips); **the sidebar's search** (`src/app/SidebarParts.tsx` `SidebarSearch`, `sm`, `listMode="popover"`, combobox over pages and functions – in the narrow rail the field is its 48 px glass tile with the magnifier, the answers float over the rows; its status line is screen-reader only there); **the page "Funktionen"** (`src/views/funktionen/FunktionenView.tsx`, `lg`, the plain mode – no answer list of its own, the hits are the page's own rows below; Enter = `onSubmit` opens the best hit, `testId="feature-search"` → input `feature-search-input`, status `feature-search-status`, clear `feature-search-clear`; the label stays visible; role `searchbox`). Planned: trade and asset search.
 
 ## Effect kit for feature pages (`@/motion/fx`, P01)
 

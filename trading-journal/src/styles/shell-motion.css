@@ -35,7 +35,7 @@ html[data-motion-tier="team"] {
     background:
       linear-gradient(180deg, rgb(var(--gl-hi) / calc(0.06 + var(--mt-d, 0) * 0.02)), transparent 40%),
       radial-gradient(120% 45% at 0 100%, color-mix(in srgb, var(--color-signal) 9%, transparent), transparent),
-      color-mix(in srgb, var(--color-ink-900) 84%, transparent);
+      color-mix(in srgb, var(--color-ink-900) 90%, transparent);
     -webkit-backdrop-filter: blur(18px) saturate(1.35);
     backdrop-filter: blur(18px) saturate(1.35);
   }
@@ -80,7 +80,7 @@ html[data-motion-tier="team"] {
     border-radius: 9999px;
     background:
       linear-gradient(180deg, rgb(var(--gl-hi) / calc(0.12 + var(--mt-d, 0) * 0.03)), rgb(var(--gl-hi) / 0.02)),
-      color-mix(in srgb, var(--color-ink-850) 76%, transparent);
+      color-mix(in srgb, var(--color-ink-850) 90%, transparent);
     border: 1px solid rgb(var(--gl-ink) / 0.14);
     box-shadow:
       inset 0 1px 0 rgb(var(--gl-hi) / 0.16),
@@ -178,8 +178,10 @@ html[data-motion-tier="team"] {
   .sb-line {
     width: 1.5rem;
   }
+  /* open: the group's name stands on its own (no line behind the words – the panel is glass, a masking plate would show) */
   .sb[data-open] .sb-line {
     width: 100%;
+    opacity: 0;
   }
   /* the active row's red dot rides on the marker: right end of the open row, top corner of the rail row */
   .sb-dot {
@@ -191,7 +193,8 @@ html[data-motion-tier="team"] {
     transition: translate var(--sb-ms, 420ms) var(--sb-ease, cubic-bezier(0.22, 1, 0.36, 1));
   }
   /* labels: fade and slide in one after the other, top to bottom (`--i` = row index), out again at once */
-  .sb-lbl {
+  .sb-lbl,
+  .sb-tag {
     opacity: 0;
     visibility: hidden;
     translate: -8px 0;
@@ -200,7 +203,8 @@ html[data-motion-tier="team"] {
       translate 120ms ease-out,
       visibility 0s linear 120ms;
   }
-  .sb[data-open] .sb-lbl {
+  .sb[data-open] .sb-lbl,
+  .sb[data-open] .sb-tag {
     opacity: 1;
     visibility: visible;
     translate: 0 0;

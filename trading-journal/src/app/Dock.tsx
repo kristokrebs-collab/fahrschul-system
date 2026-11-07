@@ -327,7 +327,6 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
       )}
     >
       <motion.span aria-hidden="true" className="absolute inset-0 rounded-full" style={{ scale: fx.scale, originY: 1 }}>
-        {tab && <span className="absolute inset-0 rounded-full bg-white/[0.05]" />}
         {/* pack hover pill: fades in 25 ms after the label (τ 40 ms), out a little slower (τ 45 ms) */}
         <span className="absolute inset-0 rounded-full bg-line-2 opacity-0 [transition:var(--dock-pill-out)] group-hover/dock:opacity-100 group-hover/dock:[transition:var(--dock-pill-in)] group-focus-visible/dock:opacity-100 group-focus-visible/dock:[transition:var(--dock-pill-in)] group-data-[scrub]/dock:opacity-100 group-data-[scrub]/dock:[transition:var(--dock-pill-in)]" />
         {tab && active && <DockMarker kind="bg" className="dock-plate absolute inset-0 rounded-full" style={MARKER_BG_STYLE} />}

@@ -219,8 +219,9 @@ export function SearchField({
   }, [status, combo, query, live.length]);
   const showStatus = combo || status !== undefined;
 
+  // the popover scrolls (`max-height`): a scrollable region must be reachable by keyboard (axe `scrollable-region-focusable`) – a tab stop only while it is open
   const panel = combo ? (
-    <div className="sf-panel" data-mode={listMode} data-open={open ? "" : undefined} data-testid={`${testId}-panel`}>
+    <div className="sf-panel" data-mode={listMode} data-open={open ? "" : undefined} data-testid={`${testId}-panel`} tabIndex={listMode === "popover" && open ? 0 : undefined}>
       <div className="sf-panel-in" inert={!open} aria-hidden={!open || undefined}>
         {shown.length > 0 ? (
           <div className="sf-wrap" ref={wrap}>

@@ -17,7 +17,7 @@
  * animated (an inherited one restyles the whole sidebar every frame – measured). Pinned open, nothing is clipped and the group titles (44 px
  * buttons) fold their rows on the same spring; the sections of Einstellungen then show as nested entries under their row.
  *
- * Material: frosted glass from the existing tokens (`ink-900` at 84 %, blur only while the panel is open – at rest nothing moves under the rail), solid
+ * Material: frosted glass from the existing tokens (`ink-900` at 90 %, blur only while the panel is open – at rest nothing moves under the rail), solid
  * where `backdrop-filter` is missing or the safe-effects flag is set. The plan's motion profile (`html[data-motion-tier]`, `motion/tier.ts`) deepens it.
  *
  * Marker: one plate behind the active row glides from row to row (`spring.layout`, a transform written by `animate`, no layout
@@ -103,12 +103,12 @@ function Row({ page, current, expanded, badge, onGo }: { page: Page; current: bo
         <span className="truncate text-[11px] leading-tight text-mute">{PAGE_HINT[page]}</span>
       </span>
       {badge.fresh && (
-        <span aria-hidden="true" className="sb-lbl shrink-0 rounded-full bg-signal px-1.5 text-[10px] font-semibold uppercase leading-4 tracking-[0.06em] text-(--color-on-fill)">
+        <span aria-hidden="true" className="sb-tag shrink-0 rounded-full bg-signal px-1.5 text-[10px] font-semibold uppercase leading-4 tracking-[0.06em] text-(--color-on-fill)">
           {SIDEBAR_PART_STRINGS.fresh}
         </span>
       )}
       {badge.count !== undefined && (
-        <span aria-hidden="true" className="sb-lbl shrink-0 rounded-full border border-line-2 bg-white/[0.05] px-1.5 font-mono text-[10.5px] leading-[18px] text-mute">
+        <span aria-hidden="true" className="sb-tag shrink-0 rounded-full border border-line-2 bg-white/[0.05] px-1.5 font-mono text-[10.5px] leading-[18px] text-mute">
           {badge.count > 999 ? "999+" : badge.count}
         </span>
       )}
@@ -217,9 +217,12 @@ function SidebarPanel() {
     return () => c.stop();
   }, [page, expanded, reduced, y, markerOpacity, currentOpen]);
 
-  // the sidebar scrolls on a short screen: the page you are on is always in view
+  // the sidebar scrolls on a short screen: the page you are on is always in view – also while its group is still unfolding (the box grows on the spring:
+  // the resize observer below looks again until `keepInView` is over)
+  const keepInView = useRef(0);
   useLayoutEffect(() => {
     const el = nav.current?.querySelector<HTMLElement>(`[data-nav-page="${page}"]`);
+    keepInView.current = performance.now() + 900;
     if (el && currentOpen) el.scrollIntoView?.({ block: "nearest", behavior: "instant" });
   }, [page, currentOpen]);
 
@@ -230,6 +233,7 @@ function SidebarPanel() {
     const ro = new ResizeObserver(() => {
       const el = box.querySelector<HTMLElement>(`[data-nav-page="${page}"]`);
       if (el) y.jump(el.offsetTop);
+      if (el && performance.now() < keepInView.current) el.scrollIntoView?.({ block: "nearest", behavior: "instant" });
     });
     for (const child of Array.from(box.children)) if (child !== box.querySelector("[data-sidebar-marker]")) ro.observe(child);
     return () => ro.disconnect();
@@ -319,7 +323,7 @@ function SidebarPanel() {
           <div className="shrink-0 px-2 pb-1">
             <SidebarSearch />
           </div>
-          <nav ref={nav} id={id} aria-label={SIDEBAR_LABEL} onKeyDown={onNavKey} className={cn("relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3", expanded ? "pt-3" : "pt-0")}>
+          <nav ref={nav} id={id} aria-label={SIDEBAR_LABEL} onKeyDown={onNavKey} className={cn("relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3", expanded ? "pt-3" : "pt-2.5")}>
             {/* the marker: one rounded plate behind the active row, travelling on `spring.layout` (transform only); the dot rides on it */}
             <motion.span aria-hidden="true" data-sidebar-marker="" className="sb-mark pointer-events-none absolute left-2 top-0 h-11 rounded-xl bg-white/[0.07]" style={{ y, opacity: markerOpacity, scaleY: stretch }}>
               <span className="sb-dot absolute right-2.5 top-[19px] size-1.5 rounded-full bg-signal" />
@@ -355,7 +359,7 @@ function SidebarPanel() {
                     // the rail's divider; with the peek the group's name sits on it (a passive label – the group has its aria-label)
                     <div aria-hidden="true" className={cn("relative mx-3 h-px", i === 0 ? "my-1.5" : "mb-2")} style={{ "--i": first } as CSSProperties}>
                       <span className={cn("sb-line absolute inset-y-0 left-0 bg-line-2", i === 0 && "opacity-0")} />
-                      <span className="sb-lbl absolute -left-0.5 top-1/2 -translate-y-1/2 whitespace-nowrap bg-ink-900 pr-2 font-mono text-[10px] font-semibold uppercase leading-3 tracking-[0.16em] text-mute">{g.label}</span>
+                      <span className="sb-lbl absolute -left-0.5 top-1/2 -translate-y-1/2 whitespace-nowrap font-mono text-[10px] font-semibold uppercase leading-3 tracking-[0.16em] text-mute">{g.label}</span>
                     </div>
                   )}
                   {/* a folded group keeps its rows in the DOM (inert, 0 high) so the marker and the page reach them without a remount */}

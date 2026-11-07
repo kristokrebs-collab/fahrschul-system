@@ -29,8 +29,6 @@ export const LOGO_MARKS: readonly LogoMark[] = [
 
 /** The sequence lasts at most this long (ms), whatever the number of strokes. */
 export const LOGO_TOTAL_MS = 1200;
-/** The whole mark rests this long fully drawn before the next one starts to draw (ms, inside the total). */
-export const LOGO_HOLD_MS = 0;
 
 export interface LogoSlot {
   /** index of the mark */

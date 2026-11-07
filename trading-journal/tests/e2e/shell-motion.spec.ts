@@ -62,6 +62,10 @@ test.describe("Seitenleiste und Menü: Bewegung", () => {
     await expect(page.getByText("Netto-P&L").first()).toBeVisible();
     const aside = side(page);
     await aside.getByRole("button", { name: "Trade eintragen" }).focus();
+    // Runde 11: the search field stands between the primary action and the rows – the first Tab lands in it (and opens the panel with it)
+    await page.keyboard.press("Tab");
+    await expect(aside.getByRole("combobox", { name: "Seiten und Funktionen suchen" })).toBeFocused();
+    await expect(aside).toHaveAttribute("data-open", "", { timeout: 5000 });
     await page.keyboard.press("Tab");
     await expect(aside.locator("a:focus")).toHaveCount(1);
     await expect(aside).toHaveAttribute("data-open", "", { timeout: 5000 });
