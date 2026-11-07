@@ -10,6 +10,7 @@ import type { Config } from "@netlify/functions";
 import { z } from "zod";
 import { CANCEL_REASONS, PORTAL_ACTIONS, PORTAL_FLOWS } from "../../src/billing/contract";
 import { audit } from "./_lib/audit";
+import { recordInAppCancel } from "./_lib/contractRequest";
 import { requireUser } from "./_lib/auth";
 import { clientIp, handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
@@ -31,7 +32,13 @@ export default handler(async (req, ctx) => {
   const body = await readJson(req, Body, { maxBytes: 4096 });
   if (body.action) {
     if (body.flow) throw new HttpError(422, "invalid_body", "Entweder flow oder action.");
-    return json(await changeSubscription(user.id, body.action, { reason: body.reason, comment: body.comment, months: body.months }));
+    const out = await changeSubscription(user.id, body.action, { reason: body.reason, comment: body.comment, months: body.months });
+    // § 312k Abs. 4 BGB: the cancellation is confirmed by mail (content, date and time, end of the contract) when mail is set up
+    if (body.action === "cancel") {
+      const mail = await recordInAppCancel(user, out.subscription?.cancelAt ?? out.subscription?.currentPeriodEnd ?? null);
+      return json({ ...out, mail });
+    }
+    return json(out);
   }
   const flow = body.flow ?? "manage";
   const url = await createPortal(user.id, flow, siteOrigin(req), body.returnTo);

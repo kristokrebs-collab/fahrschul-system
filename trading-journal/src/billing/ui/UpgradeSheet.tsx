@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { openAuthSheet, useCloudSession } from "@/cloud/session";
 import { TactileHighlight } from "@/motion/pulse/TactileHighlight";
 import { Sheet } from "@/motion/Sheet";
 import { StaggerItem } from "@/motion/Stagger";
@@ -8,10 +7,7 @@ import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
 import { displayPrice, formatMoney } from "../format";
 import { featureOffered, FEATURE_INFO, featuresGained, PAID_PLANS, PLAN_CATALOG, planIncludes, upgradePlanFor, yearlySavingsPct, type PaidPlanId } from "../plans";
-import { acceptTerms, closeUpgrade, setBillingInterval, startCheckout, useBilling, useBillingMode, useEffectivePlan, useOffer, useTrialDays } from "../store";
-import { legalShown } from "@/legal/config";
-import { ConsentCheck } from "@/legal/ConsentCheck";
-import { LegalLink } from "@/legal/LegalLinks";
+import { closeUpgrade, requestOrder, setBillingInterval, useBilling, useBillingMode, useEffectivePlan, useOffer, useTrialDays } from "../store";
 import { BILLING, UPGRADE } from "../strings";
 import type { BillingInterval } from "../types";
 import { ClosedNotice, Mark, PriceDigits } from "./parts";
@@ -27,17 +23,6 @@ export interface UpgradeSheetProps {
  * the plan's price rolls between Monat / Jahr (shared toggle with the pricing page), the gained features check in one
  * after another (drawn ticks). The CTA starts Stripe Checkout (signed out: the login sheet first, then the checkout).
  */
-/** The consent before Stripe Checkout (the operator's own documents are linked – Review F07). */
-export const UPGRADE_LEGAL = {
-  consentPre: "Ich akzeptiere die ",
-  consentMid: " des Betreibers und habe die ",
-  widerruf: "Widerrufsbelehrung",
-  consentMid2: " und die ",
-  datenschutz: "Datenschutzerklärung",
-  consentPost: " zur Kenntnis genommen.",
-  missing: "Bitte bestätige zuerst die AGB.",
-} as const;
-
 export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
   const upgrade = useBilling((s) => s.upgrade);
   const interval = useBilling((s) => s.interval);
@@ -46,7 +31,6 @@ export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
   const mode = useBillingMode();
   const current = useEffectivePlan();
   const trial = useTrialDays();
-  const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const [landed, setLanded] = useState(false);
   const feature = upgrade.feature;
   const eligible = PAID_PLANS.filter((p) => (feature ? planIncludes(p, feature) : true));
@@ -68,23 +52,10 @@ export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
     setPicked(null);
     closeUpgrade();
   };
-  const consentNeeded = legalShown();
-  const termsAccepted = useBilling((s) => s.termsAccepted);
-  const [consentMissing, setConsentMissing] = useState(false);
+  // the order itself is placed in the order sheet (consents, summary, "Zahlungspflichtig bestellen"); here only the way there
   const go = () => {
-    if (consentNeeded && !termsAccepted) {
-      setConsentMissing(true);
-      return;
-    }
-    if (!signedIn) {
-      openAuthSheet("signup", "card");
-      useBilling.setState({
-        pending: { plan, interval, ...(plan === "team" ? { seats: useBilling.getState().seats } : {}) },
-        upgrade: { ...upgrade, open: false },
-      });
-      return;
-    }
-    void startCheckout({ plan, interval, ...(plan === "team" ? { seats: useBilling.getState().seats } : {}) });
+    close();
+    requestOrder({ plan, interval, ...(plan === "team" ? { seats: useBilling.getState().seats } : {}) });
   };
 
   return (
@@ -110,7 +81,7 @@ export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
           )}
           <span className="flex-1" />
           <Button variant="primary" disabled={mode !== "open" || !!busy} onClick={go} data-testid="upgrade-cta">
-            {busy === "checkout" ? BILLING.redirecting : signedIn ? UPGRADE.cta(trial) : UPGRADE.ctaSignIn}
+            {UPGRADE.cta}
           </Button>
         </>
       }
@@ -177,33 +148,6 @@ export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
                 </li>
               ))}
             </ul>
-          </StaggerItem>
-        )}
-
-        {consentNeeded && mode === "open" && (
-          <StaggerItem className="grid gap-1.5">
-            <ConsentCheck
-              checked={termsAccepted}
-              onChange={(v) => {
-                acceptTerms(v);
-                if (v) setConsentMissing(false);
-              }}
-              invalid={consentMissing}
-              testId="upgrade-consent"
-            >
-              {UPGRADE_LEGAL.consentPre}
-              <LegalLink doc="agb" />
-              {UPGRADE_LEGAL.consentMid}
-              <LegalLink doc="widerruf">{UPGRADE_LEGAL.widerruf}</LegalLink>
-              {UPGRADE_LEGAL.consentMid2}
-              <LegalLink doc="datenschutz">{UPGRADE_LEGAL.datenschutz}</LegalLink>
-              {UPGRADE_LEGAL.consentPost}
-            </ConsentCheck>
-            {consentMissing && !termsAccepted && (
-              <p role="alert" className="text-[12px] text-loss">
-                {UPGRADE_LEGAL.missing}
-              </p>
-            )}
           </StaggerItem>
         )}
 

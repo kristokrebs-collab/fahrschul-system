@@ -14,7 +14,7 @@ import { Card } from "@/primitives/Card";
 import type { SubscriptionSummary } from "../contract";
 import { daysUntil, formatMoney, nextLine, STATUS_LABEL, statusTone } from "../format";
 import { PLAN_CATALOG } from "../plans";
-import { changeSubscription, loadBilling, openCancel, openPortal, openUpgrade, useBilling, useBillingMode, useEffectivePlan } from "../store";
+import { changeSubscription, loadBilling, openCancel, openManage, openPortal, openUpgrade, useBilling, useBillingMode, useEffectivePlan } from "../store";
 import { BILLING, PLAN_CARD } from "../strings";
 import type { LimitKey, PlanInfo } from "../types";
 import { LimitMeter } from "./LimitMeter";
@@ -196,7 +196,7 @@ function Current({
         {!sub && !seatMember && (
           <>
             <Button variant="primary" size="sm" fx={false} onClick={() => openUpgrade(null, "pro")}>
-              Pro testen
+              Pro wählen
             </Button>
             {onNavigate && (
               <Button size="sm" onClick={() => onNavigate("preise")}>
@@ -226,7 +226,7 @@ function Current({
           </Button>
         )}
         {account?.hasCustomer && (
-          <Button size="sm" disabled={!!busy} onClick={() => void openPortal("manage")}>
+          <Button size="sm" disabled={!!busy} onClick={() => (open ? openManage() : void openPortal("manage"))} data-testid="manage-open">
             {PLAN_CARD.manage}
           </Button>
         )}

@@ -45,7 +45,7 @@ ships: `tvConnections` B3, `alertChannels` / `phoneCallsPerMonth` C2, `simulatio
 
 | export | where (P14 wiring) | motion |
 |---|---|---|
-| `BillingHost` | once in `App`, leaf host after `CloudSyncHost` | mounts `UpgradeSheet`, `CancelSheet`, `CheckoutReturn`; reads `?ref` / the Stripe return; loads status when the session settles; continues a checkout that waited for the login; frees buttons on a bfcache return |
+| `BillingHost` | once in `App`, leaf host after `CloudSyncHost` | mounts `UpgradeSheet`, `CancelSheet`, `ContractHost` and – lazily – the purchase chunk `purchase/PurchaseHost` (order sheet, tariff detail, management, result page); reads `?ref` / the Stripe return; loads status when the session settles; continues a checkout that waited for the login; frees buttons on a bfcache return |
 | `BillingBanner` | app shell under the `LocalModeBanner` | `WarnBanner` (drop + clip wipe, finite pings): failed payment → "Zahlung aktualisieren"; trial ends in ≤ 3 days (+ "Zahlungsmittel hinterlegen" without a card); paused → "Fortsetzen"; dismissable per session |
 | `PlanCard` | Konto (`extraCards`) | plan name decodes in (`AsciiCascade`) next to its `DotMatrixText` glyph tile, trial days on `RollingDigits` + draining bar, status badge, one `BorderBeam` lap when the plan changes; **"Vertrag hier kündigen" always visible while an abo runs** (§ 312k BGB); optional `usage` → `LimitMeter`s |
 | `BillingCard` | Konto | invoices from Stripe (cascade via `RevealGroup`, links only to Stripe-hosted pages), "Zahlungsmittel ändern", portal |
@@ -53,7 +53,6 @@ ships: `tvConnections` B3, `alertChannels` / `phoneCallsPerMonth` C2, `simulatio
 | `UpgradeTeaser` | `<Gate fallback>` | lock pops in on first view (`spring.pop`), feature name gets the `TactileHighlight` marker; "Freischalten" → `UpgradeSheet` |
 | `UpgradeSheet` | via `BillingHost` | `Sheet`; feature wipes in with `TactileHighlight` as the sheet lands, plan + Monat/Jahr `Segmented`, price on `RollingDigits`, gained features tick in (drawn checks) |
 | `CancelSheet` | via `BillingHost` | reason → offer (pause / cheaper plan, only when it fits, always skippable) → confirm "Jetzt kündigen" → done (drawn ✓, "Kündigung zurücknehmen"); steps slide on `spring.enter`; portal cancel flow as alternative |
-| `CheckoutReturn` | via `BillingHost` | `FullscreenWipe`: DotMatrix wave while the webhook lands (status polled ≤ 10×), then "Willkommen bei <Plan>" (`AsciiCascade`) + `celebrateRecord` from the button; honest "Stripe braucht einen Moment" when slow |
 | `LimitMeter` | wherever a limit is used (`<LimitMeter limitKey="savedViews" used={n} />`) | rolling count, bar fills on first view (`useFirstInView`), warn + "Mehr mit Pro" at the limit |
 
 Rules kept: transform / opacity / filter / clip-path only; timings from `tokens.ts`; reduced motion → static end states;
@@ -66,3 +65,22 @@ through the island); the busy DotMatrix wave unmounts with the confirmation. No 
 flows against a stubbed fetch), `billing.ui.test.tsx` (cards, teaser → sheet, cancellation, pricing page),
 `billing.contract.test.tsx` (Wave-0 contract), `functions.stripe.test.ts` (server). e2e: `tests/e2e/preise.spec.ts` with
 `tests/e2e/mocks/billing.ts` (fake functions + fake Stripe Checkout / Portal pages) on the dev harness `dev/preise.html`.
+
+
+## Purchase flow (B4: Kaufstrecke, Bezahlfenster, Abo-Modelle) – ENTWURF, Anwalt prüft
+
+One path: **Tarifkarte** (`views/preise/PlanGrid`, glass cards, Monat/Jahr with rolling digits, Team seats stepper, Premium with one border-beam lap) → optional **Tarif im Detail** (`purchase/TariffDetailSheet`: benefit, included, limits, unlocks – from `plans.ts` / `tariff.ts` only) → **Bestellübersicht** (`purchase/OrderSheet`: plan, interval, seats, total, price AFTER the trial with date, renewal date, cancellation, tax sentence by Stripe-Tax state, two separate unticked boxes, button exactly „Zahlungspflichtig bestellen“) → **Stripe Checkout** → **Ergebnisseite** (`views/preise/ResultView`, five states, the return URL confirms nothing: only `billing-status`, written by the webhook, says „aktiv“; backoff 0.8 → 6 s, ≈ 60 s, then „Wir warten noch auf die Bestätigung von Stripe“).
+
+| file | what |
+|---|---|
+| `purchase/order.ts` | pure: `summarize` (price after trial, first payment, renewal), `yearlySaving` / `planSaving` (computed from the SHOWN prices – list prices unless Stripe reports others), `addInterval`, `orderReadiness`, the `order:<plan>.<interval>.<seats>` grammar of `returnTo` |
+| `purchase/result.ts` | pure state machine `resultStateOf` (confirmed · pending · action · canceled · failed; `staleId` = the older subscription of the account), `pollDelay`, `pollAttempts`, the honest texts |
+| `purchase/orderState.ts` | lazy store of the sheet (boxes never pre-ticked, `orderId` = idempotency key, `phase`), `submitOrder` (the ONLY place that places an order), `lastOrder` (this tab) |
+| `purchase/PayButton.tsx` | Button → Pay morph: label · small orbs (`Button loader="orbs"`) · „Weiter zu Stripe …“, width stable (labels share one grid cell) |
+| `purchase/ManageSheet.tsx`, `manage.ts` | Konto › „Abo verwalten“: facts, Stripe portal (payment method, invoices, switch month ↔ year, seats), „Verträge hier kündigen“, „Vertrag widerrufen“ (only in the first 14 days) |
+| `purchase/purchase.css` | glass surface `.pay-glass` / `.pay-sheet` (88–94 % opaque, fallback without `backdrop-filter` and under `data-safe-fx`), `.pay-orbs`, `.pay-swap` |
+| `ui/ContractSheet.tsx`, `ui/ContractHost.tsx`, `contractStore.ts` | „Verträge hier kündigen“ / „Vertrag widerrufen“ WITHOUT a login: form → confirmation page → receipt → link of the e-mail (`/?kuendigen[=token]`, `/?widerruf[=token]`) |
+| `planChange.ts` | the hook „the SERVER confirmed another plan“: `onPlanChange(({ to }) => setMotionTier(to))` – the motion package registers; nothing happens without it |
+| `src/legal/consentRecord.ts` | the two consent wordings, version, SHA-256 (client and server hash the same bytes), order id |
+
+Server: `billing-checkout` (locked while Stripe OR the operator's legal texts are missing → `purchase_closed`; both consents + current wording or 422 / 409; evidence in `consents` BEFORE the session, fail-closed; Stripe idempotency key `tj-checkout-<user>-<order>`; success / cancel URLs same origin only; `submit_type: pay` + `custom_text.submit`), `billing-contract` (+ `/confirm`; `_lib/contractRequest.ts`, `_lib/contractMail.ts`), `billing-portal` (cancel records and mails the confirmation; `feedback` = the reason AFTER the confirmation), `_lib/purchase.ts`. Migration `0016_consents.sql`. Tests: `billing.purchase.order.test.ts`, `billing.purchase.ui.test.tsx`, `purchase.functions.test.ts` (fake Stripe, no network), `supabase.consents.test.ts`, e2e `kaufstrecke.spec.ts`. Checked only against fakes: a real Stripe account, the real webhook delivery, the real Resend mail.

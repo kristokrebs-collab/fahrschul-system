@@ -13,14 +13,14 @@ Stand: 07.11.2026. Das ist die Liste dessen, was ein Anwalt entscheiden muss, be
 
 ### B. Kaufstrecke und Verbraucherrecht
 
-7. Button-Beschriftung (§ 312j Abs. 3 BGB): Genügt der Stripe-Checkout-Button („Abonnieren“/„Testversion starten“) plus Hinweis in der App? Sind „N Tage gratis testen“ und „Anmelden und testen“ in der App als erste Stufe zulässig, oder müssen sie bereits „zahlungspflichtig“ tragen? Wortlaut-Vorschlag: „Zahlungspflichtig abonnieren“ (Testphase: „Testphase starten – danach zahlungspflichtig“).
+7. Button-Beschriftung (§ 312j Abs. 3 BGB): Genügt der Stripe-Checkout-Button („Abonnieren“/„Testversion starten“) plus Hinweis in der App? Sind „N Tage gratis testen“ und „Anmelden und testen“ in der App als erste Stufe zulässig, oder müssen sie bereits „zahlungspflichtig“ tragen? Stand B4: der Button der App heißt jetzt genau „Zahlungspflichtig bestellen“ (`BUTTON_LABELS.order`), die Karten und der Upgrade-Dialog führen mit „Weiter zur Bestellung“ dorthin; bei Stripe steht `submit_type: pay` plus ein `custom_text` neben dem Button (der Stripe-Button selbst bleibt „Zahlen“/„Testversion starten“). Genügt das?
 8. Zustimmung zum sofortigen Beginn und Wertersatz (§ 356 BGB, § 357a BGB): Dienst oder digitales Produkt? Wie wirkt das bei Testphase, bei Abo ohne „vollständige“ Erbringung? Wann beginnt die Frist (Start der Testphase oder erste Zahlung)? Reicht der Wortlaut aus docs/RECHT/widerruf.md?
 9. Widerrufsfunktion (§ 356a BGB seit 19.06.2026): Muss sie für jedes Abo mit Widerrufsrecht gebaut werden (ja nach Quellen), ohne Login, mit Eingangsbestätigung? Wo gehört die Schaltfläche hin?
 10. Kündigungsbutton (§ 312k BGB): Muss „Verträge hier kündigen“ ohne Login erreichbar sein (OLG Nürnberg 3 U 2214/23; OLG Düsseldorf 20 UKl 3/23)? Stripe-Portal und App-Dialog reichen das? Sind der Grund-Schritt und die Angebote (Pause/Tarif wechseln) vor „Jetzt kündigen“ zulässig (BGH-Entscheidung zu Bestätigungsseite 2026 prüfen)?
 11. § 309 Nr. 9 BGB: automatische Verlängerung von Jahres-Abos gegenüber Verbrauchern; Kündigungsfrist.
 12. Pflichtangaben vor der Bestellung (§ 312j Abs. 2 BGB, Art. 246a § 1 EGBGB): Laufzeit, Verlängerung, Preis nach Testphase, Mindestlaufzeit, Zahlungsmittel – sind sie im Bestellschritt (App und Stripe) vollständig und „unmittelbar vor“ der Bestellung?
 13. Preisangaben (PAngV): „inkl. USt“ am Preis; Darstellung für Besucher außerhalb der EU; „Jährlich −X %“ als Preisermäßigung (§ 11 PAngV); Team „pro Sitz“.
-14. Nachweis: Speicherung von Zustimmungen (Zeit, Fassung, Nutzer) – wie lange und welche Daten?
+14. Nachweis: Speicherung von Zustimmungen (Zeit, Fassung, Nutzer) – wie lange und welche Daten? Stand B4: `consents` (Wortlaut, Hash, Fassung, Konto, Zeit, Tarif) und `contract_requests`; sie hängen am Konto und verschwinden bei der Kontolöschung. Aufbewahrung gegen Art. 17 DSGVO abwägen. Weg und offene Punkte der Kündigung/des Widerrufs ohne Login: `kuendigung-widerruf.md`.
 15. § 36 VSBG: Erklärung zur Streitbeilegung; OS-Plattform ist abgeschaltet (seit 20.07.2025).
 16. AGB-Inhalt: Haftungsklausel einschließlich Datenverlust, Änderungsklausel (BGH XI ZR 26/20), Rechtswahl bei weltweitem Angebot, Free-Tarif als digitales Produkt (§§ 327 ff. BGB, Änderungen nach § 327r BGB).
 

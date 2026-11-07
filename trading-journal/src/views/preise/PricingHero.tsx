@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { cn } from "@/lib/cn";
 import { displayPrice } from "@/billing/format";
 import { PLAN_CATALOG } from "@/billing/plans";
-import { startCheckout, useBilling, useBillingMode, useTrialDays } from "@/billing/store";
+import { requestOrder, useBilling, useBillingMode, useTrialDays } from "@/billing/store";
 import { Mark, PriceDigits } from "@/billing/ui/parts";
 import { AsciiCascade } from "@/motion/pulse/AsciiCascade";
 import { LaunchGrid, LaunchSlot } from "@/motion/pulse/LaunchGrid";
@@ -97,8 +97,8 @@ export function PricingHero({ className }: { className?: string }) {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-line bg-ink-900 px-5 py-4">
           <span className="text-[14px] text-fg/90">{mode === "open" ? PREISE.heroHud(trial) : PREISE.heroHud(0)}</span>
           {mode === "open" && (
-            <Button variant="primary" fx={false} disabled={!!busy} onClick={() => void startCheckout({ plan: "pro", interval })} data-testid="hero-cta">
-              {PREISE.heroCta(trial)}
+            <Button variant="primary" fx={false} disabled={!!busy} onClick={() => requestOrder({ plan: "pro", interval })} data-testid="hero-cta">
+              {PREISE.heroCta()}
             </Button>
           )}
         </div>

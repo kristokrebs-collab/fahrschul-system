@@ -487,7 +487,7 @@ _Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 7 Funktionen
 
 ### Konto, Einstellungen & Hilfe
 
-_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 25 Funktionen
+_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 27 Funktionen
 
 **Konto & Tarif**
 
@@ -498,6 +498,8 @@ _Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 25 Funktionen
 | Sehen, was deine TradingView-Alarme geschickt haben und was daraus wurde | TradingView-Signale empfangen | Einstellungen › Verbindungen › TradingView › Letzte Signale | teilweise |
 | Dein TradingView-Konto der App lesend erlauben | TradingView-Konto lesend verbinden (OAuth) | Einstellungen › Verbindungen › TradingView › TradingView-Konto lesend verbinden | teilweise |
 | Tarif wählen, Abo verwalten oder kündigen | Abo & Tarife | Preise | fertig |
+| Einen Tarif wählen und kaufen | Tarif wählen und kaufen | Preise › Pro wählen | fertig |
+| Ein Abo kündigen, auch ohne dich anzumelden | Verträge hier kündigen (ohne Anmeldung) | Preise › Verträge hier kündigen | fertig |
 | Sehen, welcher Tarif welche Funktion enthält | Tarife im Vergleich | Preise › Alle Funktionen im Vergleich | fertig |
 | Freunde einladen und Gutschrift erhalten | Freunde einladen (Empfehlungscode) | Konto | teilweise |
 | Nachlesen, wo deine Daten liegen | Lokaler Modus erklärt | Übersicht – Kopfzeile → „Lokaler Modus“ antippen (nur im lokalen Modus sichtbar) | fertig |

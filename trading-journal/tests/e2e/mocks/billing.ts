@@ -14,6 +14,7 @@ import type {
   BillingStatus,
   CheckoutRequest,
   CodeLookup,
+  ContractDeclaration,
   InvoiceSummary,
   PortalRequest,
   SubscriptionSummary,
@@ -32,12 +33,28 @@ export interface MockBillingOptions {
   /** Valid referral codes → trial days. */
   referrals?: Record<string, number>;
   trialDays?: number;
+  /** B4: the purchase flow is open (default true); false = the operator's legal texts are missing (`purchaseOpen: false`, locked). */
+  purchaseOpen?: boolean;
+  /** B4: Stripe Tax on (default true: "Steuer wird im nächsten Schritt von Stripe berechnet"). */
+  automaticTax?: boolean;
+  /** B4: contract e-mails are set up (default true). */
+  mailReady?: boolean;
+  /**
+   * What the (fake) WEBHOOK makes of the order once the fake Stripe page "pays": `trialing` (default) / `active` · `incomplete`
+   * (payment needs a confirmation) · `unpaid` (failed) · `never` (the server never hears: the result page stays "in Bearbeitung").
+   */
+  outcome?: "trialing" | "active" | "incomplete" | "unpaid" | "never";
+  /** B4: the webhook lands only after this many status requests (the result page polls until then). */
+  webhookAfterStatusCalls?: number;
 }
 
 export interface MockBilling {
   state: { plan: PlanInfo; subscription: SubscriptionSummary | null; invoices: InvoiceSummary[]; hasCustomer: boolean; trialUsed: boolean };
   checkouts: CheckoutRequest[];
   portals: PortalRequest[];
+  /** B4: declarations of the public cancel / withdraw pages and the links confirmed. */
+  contracts: ContractDeclaration[];
+  confirmed: string[];
   calls: string[];
 }
 
@@ -60,6 +77,11 @@ function config(o: MockBillingOptions): BillingConfig {
         }
       : {},
     available: enabled ? ["pro", "premium", "team"] : [],
+    purchaseOpen: enabled && o.purchaseOpen !== false,
+    ...(enabled && o.purchaseOpen === false ? { purchaseBlockedBy: ["legal" as const] } : {}),
+    automaticTax: o.automaticTax !== false,
+    consentHash: "a".repeat(64),
+    mailReady: o.mailReady !== false,
   };
 }
 
@@ -97,8 +119,13 @@ export async function mockBilling(page: Page, opts: MockBillingOptions = {}): Pr
     },
     checkouts: [],
     portals: [],
+    contracts: [],
+    confirmed: [],
     calls: [],
   };
+  const sessions = new Map<string, string>();
+  let statusCalls = 0;
+  let held: { plan: PlanInfo; subscription: SubscriptionSummary } | null = null;
   let pending: { req: CheckoutRequest; origin: string } | null = null;
   const cfg = config(opts);
   const send = (route: Route, status: number, body: unknown) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -124,6 +151,12 @@ export async function mockBilling(page: Page, opts: MockBillingOptions = {}): Pr
     })();
     switch (url.pathname) {
       case "/api/v1/billing/status": {
+        statusCalls += 1;
+        // the webhook of the fake Stripe lands after N status requests
+        if (held && statusCalls > (opts.webhookAfterStatusCalls ?? 0)) {
+          mock.state = { ...mock.state, plan: held.plan, subscription: held.subscription, hasCustomer: true, trialUsed: true };
+          held = null;
+        }
         const status: BillingStatus = {
           config: cfg,
           plan: authed ? mock.state.plan : null,
@@ -139,14 +172,23 @@ export async function mockBilling(page: Page, opts: MockBillingOptions = {}): Pr
         if (!authed) return send(route, 401, { error: { code: "unauthenticated", message: "Bitte melde dich an." } });
         if (!cfg.enabled) return send(route, 503, { error: { code: "billing_unavailable", message: "Zahlungen sind noch nicht eingerichtet." } });
         const r = body as unknown as CheckoutRequest;
+        if (!cfg.purchaseOpen) return send(route, 503, { error: { code: "purchase_closed", message: "Die Bestellung ist noch nicht freigeschaltet." } });
+        // B4: both consents, the order id (idempotency key) – like the real function
+        if (!r.consents?.terms || !r.consents?.immediateStart) return send(route, 422, { error: { code: "consent_required", message: "Bitte bestätige beide Kästchen vor der Bestellung." } });
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(r.orderId ?? "")))
+          return send(route, 422, { error: { code: "invalid_body", message: "Ungültige Bestellung." } });
+        const known = sessions.get(r.orderId);
+        if (known) {
+          pending = { req: r, origin: url.origin };
+          return send(route, 200, { url: `https://checkout.stripe.com/c/pay/${known}`, sessionId: known });
+        }
         if (r.code && !opts.codes?.[String(r.code).toUpperCase()])
           return send(route, 422, { error: { code: "invalid_code", message: "Dieser Code ist ungültig oder abgelaufen." } });
         mock.checkouts.push(r);
         pending = { req: r, origin: url.origin };
-        return send(route, 200, {
-          url: `https://checkout.stripe.com/c/pay/cs_test_e2e_${mock.checkouts.length}`,
-          sessionId: `cs_test_e2e_${mock.checkouts.length}`,
-        });
+        const sid = `cs_test_e2e_${mock.checkouts.length}`;
+        sessions.set(r.orderId, sid);
+        return send(route, 200, { url: `https://checkout.stripe.com/c/pay/${sid}`, sessionId: sid });
       }
       case "/api/v1/billing/portal": {
         if (!authed) return send(route, 401, { error: { code: "unauthenticated", message: "Bitte melde dich an." } });
@@ -155,6 +197,7 @@ export async function mockBilling(page: Page, opts: MockBillingOptions = {}): Pr
         const sub = mock.state.subscription;
         if (r.action) {
           if (!sub) return send(route, 404, { error: { code: "no_subscription", message: "Es läuft gerade kein Abo." } });
+          if (r.action === "feedback") return send(route, 200, { subscription: mock.state.subscription, plan: mock.state.plan });
           if (r.action === "cancel") mock.state.subscription = { ...sub, cancelAtPeriodEnd: true, cancelAt: sub.trialEnd ?? sub.currentPeriodEnd };
           else if (r.action === "resume") {
             mock.state.subscription = {
@@ -169,12 +212,24 @@ export async function mockBilling(page: Page, opts: MockBillingOptions = {}): Pr
             mock.state.subscription = { ...sub, status: "paused", pausedUntil: day(30) };
             mock.state.plan = { plan: "free", status: "paused", trialEnd: null };
           }
-          return send(route, 200, { subscription: mock.state.subscription, plan: mock.state.plan });
+          return send(route, 200, { subscription: mock.state.subscription, plan: mock.state.plan, ...(r.action === "cancel" ? { mail: cfg.mailReady ? "sent" : "unavailable" } : {}) });
         }
         if (!mock.state.hasCustomer)
           return send(route, 404, { error: { code: "no_customer", message: "Du hast noch kein Abo – es gibt nichts zu verwalten." } });
         const back = ret(url.origin, r.returnTo, "billing=portal");
         return send(route, 200, { url: `https://billing.stripe.com/p/session/test_e2e?flow=${r.flow ?? "manage"}&return=${encodeURIComponent(back)}` });
+      }
+      case "/api/v1/billing/contract": {
+        const r = body as unknown as ContractDeclaration;
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(r.email ?? ""))) return send(route, 422, { error: { code: "invalid_email", message: "Bitte gib eine gültige E-Mail-Adresse an." } });
+        mock.contracts.push(r);
+        return send(route, 200, { kind: r.kind, receivedAt: new Date().toISOString(), mail: cfg.mailReady ? "sent" : "unavailable", next: authed ? "done" : "check" });
+      }
+      case "/api/v1/billing/contract/confirm": {
+        const token = String(body.token ?? "");
+        mock.confirmed.push(token);
+        const last = mock.contracts.at(-1);
+        return send(route, 200, { kind: last?.kind ?? "cancel", status: "done", endsAt: day(20), confirmedAt: new Date().toISOString() });
       }
       case "/api/v1/billing/code": {
         if (!cfg.enabled) return send(route, 503, { error: { code: "billing_unavailable", message: "Zahlungen sind noch nicht eingerichtet." } });
@@ -214,19 +269,24 @@ export async function mockBilling(page: Page, opts: MockBillingOptions = {}): Pr
     if (url.pathname === "/__e2e/complete" && pending) {
       const { req, origin } = pending;
       pending = null;
+      const outcome = opts.outcome ?? "trialing";
       const sub = mockSubscription({
         plan: req.plan,
         interval: req.interval,
         seats: req.seats ?? 1,
         amount: req.plan === "premium" ? 2400 : req.plan === "team" ? 1900 * (req.seats ?? 2) : 1200,
+        status: outcome === "never" ? "trialing" : outcome,
+        ...(outcome === "trialing" ? {} : { trialEnd: null }),
       });
-      mock.state = {
-        ...mock.state,
-        plan: { plan: req.plan, status: "trialing", trialEnd: sub.trialEnd },
-        subscription: sub,
-        hasCustomer: true,
-        trialUsed: true,
-      };
+      const planState: PlanInfo = outcome === "incomplete" || outcome === "unpaid" ? { plan: "free", status: outcome, trialEnd: null } : { plan: req.plan, status: sub.status, trialEnd: sub.trialEnd };
+      if (outcome === "never") {
+        /* the webhook never arrives: the server state stays as it was */
+      } else if ((opts.webhookAfterStatusCalls ?? 0) > 0) {
+        statusCalls = 0;
+        held = { plan: planState, subscription: sub };
+      } else {
+        mock.state = { ...mock.state, plan: planState, subscription: sub, hasCustomer: true, trialUsed: true };
+      }
       mock.state.invoices = [
         {
           id: "in_e2e_1",
