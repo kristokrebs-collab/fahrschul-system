@@ -402,6 +402,12 @@ nicht veröffentlicht (Zeitpläne laufen nur auf veröffentlichten Deploys) oder
 - **Supabase → Auth → Rate Limits** prüfen; die Functions haben eigene Limits (`rate_hit()`).
 - Geheimnisse nur in Netlify (Scope Functions) – nie in `VITE_*`, nie ins Repo. `.env` / `.env.local` sind
   git-ignoriert.
+- **Betrieb (C4):** `OPS_TOKEN` setzen (mindestens 24 Zeichen, `openssl rand -base64 32`), dann zeigt
+  `curl -H "Authorization: Bearer $OPS_TOKEN" "$SITE/api/v1/ops/status?probe=1&stats=1"` pro Funktion, welche Variablen
+  fehlen („nicht eingerichtet“ heißt: läuft nicht, nie „frei“). Vor dem Deploy: `node scripts/releaseCheck.mjs`.
+  Notfall-Schalter `KILL_SYNC`, `KILL_CALLS`, `KILL_AI`, `KILL_CHECKOUT` (`true` = Bereich aus, danach neu deployen).
+  Alle Variablen mit Zweck und Verhalten ohne sie: `docs/ENV.md`; Überwachung, Backup-Probe, Kostenbudget, Notfall und
+  Löschfristen: `docs/BETRIEB.md`.
 
 ---
 
