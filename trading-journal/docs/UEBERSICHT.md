@@ -334,7 +334,7 @@ _Warum du verlierst, was du verpasst, was du ändern kannst._ · 17 Funktionen
 
 ### Auswerten & Berichte
 
-_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 28 Funktionen
+_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 29 Funktionen
 
 **Berichte**
 
@@ -346,6 +346,7 @@ _Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 28 Funktionen
 | Einen kurzen Rückblick auf Woche oder Monat lesen | Rückblick | Übersicht › Rückblick | fertig |
 | Käufe, Verkäufe, Gebühren und Funding als Buch prüfen | Transaktionsbuch | Berichte › Transaktionsbuch | teilweise |
 | Berichte als PDF, CSV oder Markdown speichern | Berichte exportieren | Berichte › Export | fertig |
+| Trade oder Bericht kopieren, als Bild sichern oder weitergeben | Teilen als Fächer (Trade und Bericht) | Berichte › Export › Weitergeben | fertig |
 
 **Kennzahlen**
 
@@ -428,7 +429,7 @@ _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
 
 ### Trades eintragen & Daten
 
-_Trades hineinbekommen, ordnen, sichern und prüfen._ · 17 Funktionen
+_Trades hineinbekommen, ordnen, sichern und prüfen._ · 19 Funktionen
 
 **Eintragen**
 
@@ -467,6 +468,7 @@ _Trades hineinbekommen, ordnen, sichern und prüfen._ · 17 Funktionen
 | Marktzahlen und Analyse-Stände auf diesem Gerät aufzeichnen | Datenarchiv | Einstellungen › Datenarchiv | teilweise |
 | Die letzten Tage Marktzahlen von Binance einmal nachholen | Börsenhistorie nachladen | Einstellungen › Datenarchiv › Börsenhistorie nachladen | teilweise |
 | Prüfen, ob Alarme und Kerzen zuverlässig angekommen sind | Daten- und Alarmqualität | Coach › Daten- und Alarmqualität | teilweise |
+| Entfernten Screenshot oder Entwürfe 6 Sekunden zurückholen | Rückgängig (Papierkorb) | Trades (Fenster: newTrade) | fertig |
 
 ### Community & Teilen
 
