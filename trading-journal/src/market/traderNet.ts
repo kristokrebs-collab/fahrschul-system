@@ -10,6 +10,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { buildTraderNet, type TraderNetView } from "@/domain/signals/traderNet";
+import type { NetSeriesId } from "@/domain/signals/netSeries";
 import type { Candle, ProviderHealth, RatioPoint, Stamped } from "./types";
 import { getProvider, useFeed, useFeedSelect, useHealthSelect } from "./marketStore";
 import { isBinanceSeries } from "./mapping";
@@ -31,6 +32,8 @@ export interface LiveTraderNet {
 }
 
 const FEED = "topPositionRatio" as const;
+/** The feed of each series the card can show: the top accounts counted by position size, or by account. */
+const SERIES_FEED = { position: "topPositionRatio", account: "topAccountRatio" } as const satisfies Record<NetSeriesId, "topPositionRatio" | "topAccountRatio">;
 /** Candle feed per point spacing: hours and longer → 1 h candles (≈ 21 days), shorter → 15 m candles (≈ 15 days). */
 const BAR_FEED = { hour: "kline_1h", quarter: "kline_15m" } as const;
 const MINUTE = 60_000;
@@ -46,8 +49,8 @@ export function stepOf(points: readonly Pick<RatioPoint, "time">[]): number | nu
 }
 
 /** Health fields the status reads (the provider replaces the health object several times a second). */
-export function traderNetHealthSignature(h: ProviderHealth): string {
-  const f = h.feeds[FEED];
+export function traderNetHealthSignature(h: ProviderHealth, feed: "topPositionRatio" | "topAccountRatio" = FEED): string {
+  const f = h.feeds[feed];
   return `${h.online ? 1 : 0}|${h.primary.blocked ? 1 : 0}|${f ? `${f.state}:${f.source}:${f.reason ?? ""}:${f.consecutiveFailures}` : "-"}`;
 }
 
@@ -66,9 +69,10 @@ export function deriveLiveTraderNet(
   health: ProviderHealth | null,
   now: number,
   statusText?: string,
+  feed: "topPositionRatio" | "topAccountRatio" = FEED,
 ): LiveTraderNet {
-  const ok = !!health && !!ratio && isBinanceSeries(health, FEED, ratio);
-  const f = health?.feeds[FEED];
+  const ok = !!health && !!ratio && isBinanceSeries(health, feed, ratio);
+  const f = health?.feeds[feed];
   const src = ok && f ? (f.source === "proxy" ? "proxy" : "binance") : null;
   if (!ok || !ratio) {
     const detail = !health
@@ -91,10 +95,16 @@ export function deriveLiveTraderNet(
   return { view, status: stale ? "stale" : "live", detail: stale ? "Top-Trader-Daten veraltet" : undefined, stepMs: step, source: src };
 }
 
-/** React: the live net view of the Top-Trader positions (see the module comment). */
-export function useTraderNet(): LiveTraderNet {
-  const ratio = useFeed(FEED);
-  const healthSig = useHealthSelect(traderNetHealthSignature);
+const healthSigOf = {
+  position: (h: ProviderHealth): string => traderNetHealthSignature(h, SERIES_FEED.position),
+  account: (h: ProviderHealth): string => traderNetHealthSignature(h, SERIES_FEED.account),
+} as const;
+
+/** React: the live net view of the Top-Trader positions, or of the accounts (see the module comment). */
+export function useTraderNet(series: NetSeriesId = "position"): LiveTraderNet {
+  const feed = SERIES_FEED[series];
+  const ratio = useFeed(feed);
+  const healthSig = useHealthSelect(healthSigOf[series]);
   // the candle feeds only wake this hook when a new bar opens (never per tick)
   const hourKey = useFeedSelect(BAR_FEED.hour, lastBarTime);
   const quarterKey = useFeedSelect(BAR_FEED.quarter, lastBarTime);
@@ -109,9 +119,9 @@ export function useTraderNet(): LiveTraderNet {
     const step = ratio ? (stepOf(ratio.data) ?? PERIOD_MS["1h"]) : PERIOD_MS["1h"];
     const bars = p ? p.get(step >= PERIOD_MS["1h"] ? BAR_FEED.hour : BAR_FEED.quarter) : undefined;
     const now = providerNow(p);
-    return deriveLiveTraderNet(ratio, bars, health, now, p?.statusLabel(FEED).text);
+    return deriveLiveTraderNet(ratio, bars, health, now, p?.statusLabel(feed).text, feed);
     // `healthSig` / `hourKey` / `quarterKey` / `minute` are the change signals for the provider reads above
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ratio, healthSig, hourKey, quarterKey, minute]);
+  }, [ratio, healthSig, hourKey, quarterKey, minute, feed]);
 }
 

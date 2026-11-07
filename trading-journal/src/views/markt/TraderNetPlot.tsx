@@ -17,7 +17,8 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ink, withAlpha } from "@/chart/ink";
-import { netDayText, type NetFlip, type NetPoint } from "@/domain/signals";
+import type { WhaleMark } from "@/domain/alerts/replay";
+import { netDayText, type NetFlip, type NetGap, type NetPoint } from "@/domain/signals";
 import { cn } from "@/lib/cn";
 import { playWaapi } from "@/motion/fx/shared";
 import { useFirstInView } from "@/motion/inView";
@@ -26,7 +27,8 @@ import { ease, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useTheme } from "@/store/themeStore";
 import { nearestIndex, netGeometry, readoutOf, type NetGeometry } from "@/views/overview/traderNetChart";
-import { netTicks, pillPlacement, plotPad, priceTicks, timeTicks } from "./traderNetCardModel";
+import { gapAt, gapReadout, netTicks, pillPlacement, plotPad, plotStops, priceTicks, splitRuns, timeTicks, type PlotStop } from "./traderNetCardModel";
+import { marksByTime, markText } from "./traderNetWal";
 
 const FONT = "10px 'IBM Plex Mono', ui-monospace, Menlo, monospace";
 const FONT_BOLD = "600 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace";
@@ -50,8 +52,8 @@ function netAt(points: readonly NetPoint[], t: number): number {
   return b.t > a.t ? a.net + ((b.net - a.net) * (Math.min(Math.max(t, a.t), b.t) - a.t)) / (b.t - a.t) : a.net;
 }
 
-/** Both halves of the area around zero: a soft vertical gradient (`strength` lifts it for the hover glow), the curve on top. */
-function fillAreas(ctx: CanvasRenderingContext2D, g: NetGeometry, pts: readonly NetPoint[], strength: number, stroke: boolean): void {
+/** Both halves of the area around zero: a soft vertical gradient (`strength` lifts it for the hover glow), the curve on top. A run is drawn on its own: nothing joins two runs across a gap. */
+function fillAreas(ctx: CanvasRenderingContext2D, g: NetGeometry, runs: readonly (readonly NetPoint[])[], strength: number, stroke: boolean): void {
   for (const up of [true, false]) {
     ctx.save();
     ctx.beginPath();
@@ -62,34 +64,120 @@ function fillAreas(ctx: CanvasRenderingContext2D, g: NetGeometry, pts: readonly 
     const grad = ctx.createLinearGradient(0, g.zeroY, 0, up ? g.top : g.bottom);
     grad.addColorStop(0, withAlpha(color, 0.03 * strength));
     grad.addColorStop(1, withAlpha(color, Math.min(0.9, 0.4 * strength)));
-    ctx.beginPath();
-    ctx.moveTo(g.x(pts[0]!.t), g.zeroY);
-    for (const p of pts) ctx.lineTo(g.x(p.t), g.y(p.net));
-    ctx.lineTo(g.x(pts[pts.length - 1]!.t), g.zeroY);
-    ctx.closePath();
     ctx.fillStyle = grad;
-    ctx.fill();
-    if (stroke) {
+    for (const pts of runs) {
+      if (pts.length < 2) continue;
       ctx.beginPath();
-      pts.forEach((p, i) => (i ? ctx.lineTo(g.x(p.t), g.y(p.net)) : ctx.moveTo(g.x(p.t), g.y(p.net))));
+      ctx.moveTo(g.x(pts[0]!.t), g.zeroY);
+      for (const p of pts) ctx.lineTo(g.x(p.t), g.y(p.net));
+      ctx.lineTo(g.x(pts[pts.length - 1]!.t), g.zeroY);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (stroke) {
       ctx.strokeStyle = color;
+      ctx.fillStyle = color;
       ctx.lineWidth = 1.7;
       ctx.lineJoin = "round";
-      ctx.stroke();
+      for (const pts of runs) {
+        if (pts.length === 1) {
+          // a run of one point (the history has a gap on both sides): a dot, not a line
+          ctx.beginPath();
+          ctx.arc(g.x(pts[0]!.t), g.y(pts[0]!.net), 2.2, 0, Math.PI * 2);
+          ctx.fill();
+          continue;
+        }
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(g.x(p.t), g.y(p.net)) : ctx.moveTo(g.x(p.t), g.y(p.net))));
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
 }
 
+/** The stretches without points: a faint band with dashed edges and, when it is wide enough, the words "keine Daten". Nothing is drawn inside. */
+function paintGaps(ctx: CanvasRenderingContext2D, g: NetGeometry, gaps: readonly NetGap[]): void {
+  if (!gaps.length) return;
+  ctx.save();
+  for (const gap of gaps) {
+    const x0 = g.x(gap.from);
+    const x1 = g.x(gap.to);
+    if (x1 - x0 < 1) continue;
+    ctx.fillStyle = withAlpha(ink.fg, 0.055);
+    ctx.fillRect(x0, g.top, x1 - x0, g.bottom - g.top);
+    ctx.setLineDash([2, 4]);
+    ctx.strokeStyle = withAlpha(ink.fg, 0.32);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const x of [x0, x1]) {
+      ctx.moveTo(Math.round(x) + 0.5, g.top);
+      ctx.lineTo(Math.round(x) + 0.5, g.bottom);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (x1 - x0 >= 64) {
+      ctx.fillStyle = withAlpha(ink.axis, 0.95);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("keine Daten", (x0 + x1) / 2, g.bottom - 12);
+    }
+  }
+  ctx.restore();
+}
+
+/** The alert marks on the curve: a ring for a Vorwarnung, a filled diamond for a Bestätigung; green or red by the side; a mark the repeat block held back is faint. */
+function paintMarks(ctx: CanvasRenderingContext2D, g: NetGeometry, pts: readonly NetPoint[], marks: readonly WhaleMark[]): void {
+  if (!marks.length) return;
+  const net = new Map(pts.map((p) => [p.t, p.net] as const));
+  ctx.save();
+  for (const m of marks) {
+    const v = net.get(m.t);
+    if (v === undefined) continue;
+    const x = g.x(m.t);
+    const y = g.y(v);
+    const color = m.side === "green" ? ink.win : ink.loss;
+    ctx.globalAlpha = m.suppressed ? 0.5 : 1;
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    if (m.level === "warn") {
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = ink.bg;
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.moveTo(x, y - 6.5);
+      ctx.lineTo(x + 6.5, y);
+      ctx.lineTo(x, y + 6.5);
+      ctx.lineTo(x - 6.5, y);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = ink.bg;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 /** The glow layer: the same areas, stronger, no axes – its `opacity` is what the time-axis hover animates. */
-export function paintGlow(ctx: CanvasRenderingContext2D, g: NetGeometry, pts: readonly NetPoint[]): void {
+export function paintGlow(ctx: CanvasRenderingContext2D, g: NetGeometry, pts: readonly NetPoint[], gaps: readonly NetGap[] = []): void {
   ctx.clearRect(0, 0, g.w, g.h);
-  fillAreas(ctx, g, pts, 1.7, false);
+  fillAreas(ctx, g, splitRuns(pts, gaps), 1.7, false);
+}
+
+/** What the plot shows on top of the curve: the stretches without points and the alert marks. */
+export interface PlotDecor {
+  gaps: readonly NetGap[];
+  marks: readonly WhaleMark[];
 }
 
 /** Paints the whole plot; `progress` 0 … 1 is the wipe (1 = finished, with the flip arrow and the newest point). */
-export function paintPlot(ctx: CanvasRenderingContext2D, g: NetGeometry, pts: readonly NetPoint[], flip: NetFlip | null, progress: number, priceName = "BTC"): void {
+export function paintPlot(ctx: CanvasRenderingContext2D, g: NetGeometry, pts: readonly NetPoint[], flip: NetFlip | null, progress: number, priceName = "BTC", decor: PlotDecor = { gaps: [], marks: [] }): void {
   ctx.clearRect(0, 0, g.w, g.h);
+  const runs = splitRuns(pts, decor.gaps);
   ctx.font = FONT;
   ctx.lineWidth = 1;
   // grid and the net axis (left)
@@ -133,6 +221,7 @@ export function paintPlot(ctx: CanvasRenderingContext2D, g: NetGeometry, pts: re
     ctx.fillText(t.label, t.x, g.h - 7);
   }
   ctx.textBaseline = "middle";
+  paintGaps(ctx, g, decor.gaps);
 
   // the wipe: areas, curve, price line and the glowing head all live inside the growing clip
   const front = g.left + (g.right - g.left) * progress;
@@ -140,20 +229,22 @@ export function paintPlot(ctx: CanvasRenderingContext2D, g: NetGeometry, pts: re
   ctx.beginPath();
   ctx.rect(0, 0, front + 1, g.h);
   ctx.clip();
-  fillAreas(ctx, g, pts, 1, true);
+  fillAreas(ctx, g, runs, 1, true);
   if (g.pMin !== null) {
     ctx.beginPath();
-    let pen = false;
-    for (const p of pts) {
-      if (p.price === null) {
-        pen = false;
-        continue;
+    for (const run of runs) {
+      let pen = false;
+      for (const p of run) {
+        if (p.price === null) {
+          pen = false;
+          continue;
+        }
+        const x = g.x(p.t);
+        const y = g.yPrice(p.price);
+        if (pen) ctx.lineTo(x, y);
+        else ctx.moveTo(x, y);
+        pen = true;
       }
-      const x = g.x(p.t);
-      const y = g.yPrice(p.price);
-      if (pen) ctx.lineTo(x, y);
-      else ctx.moveTo(x, y);
-      pen = true;
     }
     ctx.strokeStyle = withAlpha(ink.fg, 0.78);
     ctx.lineWidth = 1.2;
@@ -161,9 +252,10 @@ export function paintPlot(ctx: CanvasRenderingContext2D, g: NetGeometry, pts: re
     ctx.stroke();
   }
   ctx.restore();
-  if (progress > 0 && progress < 1) {
-    // the head riding the tip of the curve
-    const hy = g.y(netAt(pts, g.tMin + progress * (g.tMax - g.tMin)));
+  const headT = g.tMin + progress * (g.tMax - g.tMin);
+  if (progress > 0 && progress < 1 && !gapAt(decor.gaps, headT)) {
+    // the head riding the tip of the curve (not inside a gap: nothing runs there)
+    const hy = g.y(netAt(pts, headT));
     const c = hy <= g.zeroY ? ink.win : ink.loss;
     ctx.beginPath();
     ctx.arc(front, hy, 7, 0, Math.PI * 2);
@@ -190,6 +282,7 @@ export function paintPlot(ctx: CanvasRenderingContext2D, g: NetGeometry, pts: re
   ctx.arc(g.x(last.t), g.y(last.net), 3.2, 0, Math.PI * 2);
   ctx.fillStyle = lastColor;
   ctx.fill();
+  paintMarks(ctx, g, pts, decor.marks);
   if (flip) paintFlip(ctx, g, pts, flip);
   ctx.restore();
 }
@@ -266,9 +359,16 @@ export interface TraderNetPlotProps {
   priceName: string;
   /** accessible name of the plot */
   label: string;
+  /** stretches without points inside the range: drawn as a band, the line breaks there */
+  gaps?: readonly NetGap[];
+  /** the alert rule's marks inside the range */
+  marks?: readonly WhaleMark[];
 }
 
-export default function TraderNetPlot({ points, flip, windowKey, priceName, label }: TraderNetPlotProps) {
+const NO_GAPS: readonly NetGap[] = [];
+const NO_MARKS: readonly WhaleMark[] = [];
+
+export default function TraderNetPlot({ points, flip, windowKey, priceName, label, gaps = NO_GAPS, marks = NO_MARKS }: TraderNetPlotProps) {
   const reduced = useReducedFx();
   const theme = useTheme((s) => `${s.resolved}:${s.accent}`);
   const wrap = useRef<HTMLDivElement>(null);
@@ -282,11 +382,16 @@ export default function TraderNetPlot({ points, flip, windowKey, priceName, labe
   const tipStamp = useRef<HTMLSpanElement>(null);
   const tipNet = useRef<HTMLSpanElement>(null);
   const tipPrice = useRef<HTMLSpanElement>(null);
+  const tipMark = useRef<HTMLSpanElement>(null);
   const speak = useRef<HTMLSpanElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   /** the range whose draw-in has finished (`data-drawn`, for the specs) */
   const [drawnKey, setDrawnKey] = useState<string | null>(null);
   const geo = useMemo(() => netGeometry(points as NetPoint[], size.w, size.h, plotPad(size.w)), [points, size.w, size.h]);
+  const decor = useMemo<PlotDecor>(() => ({ gaps, marks }), [gaps, marks]);
+  // the stops of the crosshair and the arrow keys: every point and every gap between two points
+  const stops = useMemo<PlotStop[]>(() => plotStops(points, gaps), [points, gaps]);
+  const markAt = useMemo(() => marksByTime(marks), [marks]);
   const seen = useFirstInView(wrap, !reduced);
   const raf = useRef(0);
   const idx = useRef(-1);
@@ -342,8 +447,8 @@ export default function TraderNetPlot({ points, flip, windowKey, priceName, labe
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     paintRef.current = () => {
-      paintPlot(ctx, geo, points, flip, progress.current, priceName);
-      if (progress.current >= 1) paintGlow(gctx, geo, points);
+      paintPlot(ctx, geo, points, flip, progress.current, priceName, decor);
+      if (progress.current >= 1) paintGlow(gctx, geo, points, gaps);
       else gctx.clearRect(0, 0, geo.w, geo.h);
     };
     // the first sight of the plot (and a changed range) draws it in; before that only the axes stand there
@@ -381,40 +486,56 @@ export default function TraderNetPlot({ points, flip, windowKey, priceName, labe
     if (!reduced && seen && wipedFor.current === windowKey && progress.current < 1) loop.current?.wake();
     // the theme is a repaint signal (the palette is read while drawing)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geo, points, flip, reduced, seen, windowKey, theme, priceName, hide]);
+  }, [geo, points, flip, reduced, seen, windowKey, theme, priceName, hide, decor, gaps]);
 
   useEffect(() => () => loop.current?.stop(), []);
 
+  /** the crosshair and the readout at stop `k` (a point, or a gap between two points – there is no value inside a gap) */
   const show = useCallback(
-    (i: number, announce: boolean) => {
-      if (!geo || i < 0 || i >= points.length) return;
-      idx.current = i;
-      const p = points[i]!;
-      const x = geo.x(p.t);
-      const r = readoutOf(p);
+    (k: number, announce: boolean) => {
+      const stop = stops[k];
+      if (!geo || !stop) return;
+      idx.current = k;
+      let x: number;
+      let line: { stamp: string; net: string; price: string; speak: string };
+      let mark = "";
+      if (stop.kind === "point") {
+        const p = points[stop.i]!;
+        x = geo.x(p.t);
+        const r = readoutOf(p);
+        line = { ...r, price: r.price.replace(/^Preis/, priceName), speak: r.speak.replace(/Preis /, `${priceName} `) };
+        mark = (markAt.get(p.t) ?? []).map(markText).join(" · ");
+        if (mark) line.speak += `. ${mark}`;
+        if (dot.current) {
+          dot.current.style.transform = `translate(${x.toFixed(1)}px, ${geo.y(p.net).toFixed(1)}px)`;
+          dot.current.style.opacity = "1";
+        }
+        if (dotPrice.current) {
+          const has = p.price !== null && geo.pMin !== null;
+          dotPrice.current.style.transform = `translate(${x.toFixed(1)}px, ${has ? geo.yPrice(p.price as number).toFixed(1) : 0}px)`;
+          dotPrice.current.style.opacity = has ? "1" : "0";
+        }
+      } else {
+        x = (geo.x(stop.gap.from) + geo.x(stop.gap.to)) / 2;
+        line = gapReadout(stop.gap);
+        if (dot.current) dot.current.style.opacity = "0";
+        if (dotPrice.current) dotPrice.current.style.opacity = "0";
+      }
       if (cross.current) {
         cross.current.style.transform = `translateX(${x.toFixed(1)}px)`;
         cross.current.style.opacity = "1";
-      }
-      if (dot.current) {
-        dot.current.style.transform = `translate(${x.toFixed(1)}px, ${geo.y(p.net).toFixed(1)}px)`;
-        dot.current.style.opacity = "1";
-      }
-      if (dotPrice.current) {
-        const has = p.price !== null && geo.pMin !== null;
-        dotPrice.current.style.transform = `translate(${x.toFixed(1)}px, ${has ? geo.yPrice(p.price as number).toFixed(1) : 0}px)`;
-        dotPrice.current.style.opacity = has ? "1" : "0";
       }
       if (tip.current) {
         tip.current.style.transform = `translateX(${Math.max(2, Math.min(geo.w - TIP_W - 2, x < geo.w / 2 ? x + 14 : x - 14 - TIP_W)).toFixed(1)}px)`;
         tip.current.style.opacity = "1";
       }
-      if (tipStamp.current) tipStamp.current.textContent = r.stamp;
-      if (tipNet.current) tipNet.current.textContent = r.net;
-      if (tipPrice.current) tipPrice.current.textContent = r.price.replace(/^Preis/, priceName);
-      if (announce && speak.current) speak.current.textContent = r.speak.replace(/Preis /, `${priceName} `);
+      if (tipStamp.current) tipStamp.current.textContent = line.stamp;
+      if (tipNet.current) tipNet.current.textContent = line.net;
+      if (tipPrice.current) tipPrice.current.textContent = line.price;
+      if (tipMark.current) tipMark.current.textContent = mark;
+      if (announce && speak.current) speak.current.textContent = line.speak;
     },
-    [geo, points, priceName],
+    [geo, points, stops, markAt, priceName],
   );
 
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
@@ -427,6 +548,15 @@ export default function TraderNetPlot({ points, flip, windowKey, priceName, labe
     return () => document.removeEventListener("pointerdown", away);
   }, [hide]);
 
+  /** the stop under a position: inside a gap the gap, else the nearest point */
+  const stopAt = (px: number): number => {
+    if (!geo) return -1;
+    const t = geo.tMin + ((Math.min(Math.max(px, geo.left), geo.right) - geo.left) / (geo.right - geo.left)) * (geo.tMax - geo.tMin);
+    const gap = gaps.length ? gapAt(gaps, t) : null;
+    if (gap) return stops.findIndex((s) => s.kind === "gap" && s.gap.from === gap.from);
+    const i = nearestIndex(points as NetPoint[], geo, px);
+    return stops.findIndex((s) => s.kind === "point" && s.i === i);
+  };
   const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!geo) return;
     // the position comes from the event (the layers do not take pointer events, so the target is the box itself)
@@ -436,10 +566,10 @@ export default function TraderNetPlot({ points, flip, windowKey, priceName, labe
     // over the time axis the area lights up as well (the crosshair keeps following)
     if (glow.current) glow.current.style.opacity = oy > geo.bottom + 2 && progress.current >= 1 ? "1" : "0";
     cancelAnimationFrame(raf.current);
-    raf.current = requestAnimationFrame(() => show(nearestIndex(points as NetPoint[], geo, ox), false));
+    raf.current = requestAnimationFrame(() => show(stopAt(ox), false));
   };
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    const n = points.length;
+    const n = stops.length;
     const cur = idx.current < 0 ? n - 1 : idx.current;
     const next = e.key === "ArrowLeft" ? cur - 1 : e.key === "ArrowRight" ? cur + 1 : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : e.key === "Escape" ? -2 : null;
     if (next === null) return;
@@ -467,6 +597,8 @@ export default function TraderNetPlot({ points, flip, windowKey, priceName, labe
       className="relative h-[256px] w-full select-none overflow-hidden rounded-xl border border-line bg-ink-950/40 outline-none focus-visible:border-white/50 lg:h-[336px] [touch-action:pan-y]"
       data-testid="trader-net-plot"
       data-points={points.length}
+      data-gaps={gaps.length}
+      data-marks={marks.length}
       data-flip={flip ? String(Math.round(flip.at)) : "none"}
       data-drawn={reduced || drawnKey === windowKey ? "true" : "false"}
     >
@@ -485,6 +617,7 @@ export default function TraderNetPlot({ points, flip, windowKey, priceName, labe
           <span ref={tipStamp} className="text-mute" />
           <span ref={tipNet} className="text-fg" />
           <span ref={tipPrice} className="text-mute" />
+          <span ref={tipMark} className="text-fg empty:hidden" data-testid="trader-net-tip-mark" />
         </div>
       </div>
       <span ref={speak} className="sr-only" aria-live="polite" />
