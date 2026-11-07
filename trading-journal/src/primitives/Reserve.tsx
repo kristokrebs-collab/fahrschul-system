@@ -20,8 +20,13 @@ import { Skeleton, SkeletonSwap } from "@/primitives/Skeleton";
  * Nothing here animates a size – the floor is a plain `min-height`, the placeholder shimmers by `transform`.
  */
 
-/** px per breakpoint: `base` below 640 px, `sm` from 640 px, `lg` from 1024 px (each falls back to the one before). */
-export type ReserveHeight = number | { base: number; sm?: number; lg?: number };
+/**
+ * px per breakpoint: `base` below 640 px, `sm` from 640 px, `lg` from 1024 px (each falls back to the one before). `wide`
+ * (optional, from 1360 px – where the 1320 px page column has stopped growing) is for pages whose cards end at clearly
+ * different sizes between a 1280 px and a full-size desktop window; it falls back to `lg`. It is applied by plain CSS
+ * (`src/styles/base.css`, the rules for `[style*="--reserve-wide"]`): a Tailwind `min-[1360px]:` utility is emitted BEFORE `lg:` and would lose.
+ */
+export type ReserveHeight = number | { base: number; sm?: number; lg?: number; wide?: number };
 
 /** CSS custom properties of a reserve (`--reserve`, `--reserve-sm`, `--reserve-lg`), for `style`. */
 export function reserveStyle(height: ReserveHeight): CSSProperties {
@@ -29,7 +34,9 @@ export function reserveStyle(height: ReserveHeight): CSSProperties {
   const base = Math.max(0, Math.round(h.base));
   const sm = Math.max(0, Math.round(h.sm ?? h.base));
   const lg = Math.max(0, Math.round(h.lg ?? h.sm ?? h.base));
-  return { "--reserve": `${base}px`, "--reserve-sm": `${sm}px`, "--reserve-lg": `${lg}px` } as CSSProperties;
+  const style: Record<string, string> = { "--reserve": `${base}px`, "--reserve-sm": `${sm}px`, "--reserve-lg": `${lg}px` };
+  if (h.wide !== undefined) style["--reserve-wide"] = `${Math.max(0, Math.round(h.wide))}px`;
+  return style as CSSProperties;
 }
 
 /** The floor itself: `min-height` from the custom properties of `reserveStyle`. */
