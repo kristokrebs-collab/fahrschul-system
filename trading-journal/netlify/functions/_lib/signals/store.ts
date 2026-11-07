@@ -126,7 +126,9 @@ export async function prune(userId: string, now: number = Date.now()): Promise<v
  * recorded as 'duplicate' (200: the sender must not retry). A missing table (migration 0013 not applied) is a 503: without it nothing
  * can be de-duplicated, so nothing is accepted.
  */
-export async function ingest(userId: string, body: string, nowMs: number, defer: (p: Promise<unknown>) => void = () => undefined): Promise<IngestOutcome> {
+export async function ingest(userId: string, body: string, nowMs: number, defer?: (p: Promise<unknown>) => void): Promise<IngestOutcome> {
+  // after the answer is decided: with the platform's `waitUntil` the cleanup runs behind the response (TradingView gives up after 3 s), else it is awaited
+  const after = async (p: Promise<unknown>): Promise<void> => (defer ? defer(p) : void (await p));
   const parsed = parseSignalBody(body, nowMs);
   const sb = supabaseAdmin();
   const unavailable = () => new HttpError(503, "signals_unavailable", "Der Signal-Empfang ist auf diesem Server noch nicht eingerichtet.");
@@ -144,13 +146,13 @@ export async function ingest(userId: string, body: string, nowMs: number, defer:
       if (isMissingTable(error)) throw unavailable();
       console.error("[fn] signal reject write failed", error.code ?? "");
     }
-    defer(prune(userId, nowMs));
+    await after(prune(userId, nowMs));
     return { http: 422, result: "rejected", reason: parsed.reason };
   }
   const s = parsed.signal;
   const first = await sb.from("signals").insert(insertRow(userId, s, "processed", null));
   if (!first.error) {
-    defer(prune(userId, nowMs));
+    await after(prune(userId, nowMs));
     return { http: 200, result: s.kind === "test" ? "test" : "processed", signalId: s.signalId };
   }
   if (isMissingTable(first.error)) throw unavailable();
@@ -161,6 +163,6 @@ export async function ingest(userId: string, body: string, nowMs: number, defer:
   // the same signal arrived before: remember the delivery, change nothing
   const dup = await sb.from("signals").insert(insertRow(userId, s, "duplicate", "Dieses Signal ist schon angekommen."));
   if (dup.error) console.error("[fn] signal duplicate write failed", dup.error.code ?? "");
-  defer(prune(userId, nowMs));
+  await after(prune(userId, nowMs));
   return { http: 200, result: "duplicate", signalId: s.signalId };
 }
