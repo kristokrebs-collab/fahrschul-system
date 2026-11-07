@@ -533,7 +533,10 @@ export default function TraderNetPlot({ points, flip, windowKey, priceName, labe
       if (tipStamp.current) tipStamp.current.textContent = line.stamp;
       if (tipNet.current) tipNet.current.textContent = line.net;
       if (tipPrice.current) tipPrice.current.textContent = line.price;
-      if (tipMark.current) tipMark.current.textContent = mark;
+      if (tipMark.current) {
+        tipMark.current.textContent = mark;
+        tipMark.current.hidden = mark === "";
+      }
       if (announce && speak.current) speak.current.textContent = line.speak;
     },
     [geo, points, stops, markAt, priceName],
@@ -618,7 +621,7 @@ export default function TraderNetPlot({ points, flip, windowKey, priceName, labe
           <span ref={tipStamp} className="text-mute" />
           <span ref={tipNet} className="text-fg" />
           <span ref={tipPrice} className="text-mute" />
-          <span ref={tipMark} className="text-fg empty:hidden" data-testid="trader-net-tip-mark" />
+          <span ref={tipMark} hidden className="text-fg" data-testid="trader-net-tip-mark" />
         </div>
       </div>
       <span ref={speak} className="sr-only" aria-live="polite" />

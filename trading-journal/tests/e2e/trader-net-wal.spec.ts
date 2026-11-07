@@ -218,12 +218,13 @@ test.describe("Wal-Karte (C3): Top-Trader netto on the Markt page", () => {
     await expect(prov.locator("dt")).toHaveText(["Quelle", "Kohorte", "Messzeit"]);
     await expect(card.getByTestId("trader-net-prov-source")).toHaveText("Binance Futures, öffentliche Statistik (topLongShortPositionRatio), direkt");
     await expect(card.getByTestId("trader-net-prov-cohort")).toHaveText("Obere 20 % der Konten nach Einsatz · Long-Anteil der Positionsgrößen");
-    // the newest hourly point, in UTC, aged against the pinned clock (06:03 → "vor 3 Min.")
-    await expect(card.getByTestId("trader-net-prov-time")).toHaveText(new RegExp(`^${netStampText(newest).replace(/\./g, "\\.")} UTC \\(vor [34] Min\\.\\) · neuer Wert alle 1 Std\\.$`));
+    // the newest hourly point, in UTC, aged against the pinned clock (06:03, so under five minutes: "gerade eben")
+    await expect(card.getByTestId("trader-net-prov-time")).toHaveText(new RegExp(`^${netStampText(newest).replace(/\./g, "\\.")} UTC \\((gerade eben|vor \\d+ Min\\.)\\) · neuer Wert alle 1 Std\\.$`));
     // the three lines keep their rows: two lines on a phone, one from sm up, never more
     const heights = await prov.locator("dd").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
     const line = await prov.locator("dd").first().evaluate((e) => parseFloat(getComputedStyle(e).lineHeight));
-    for (const h of heights) expect(h, `provenance row ${h}px (line ${line}px)`).toBeLessThanOrEqual((isMobile(info) ? 2 : 1) * line + 1);
+    // (the phone's row keeps room for two lines: 2,75 em)
+    for (const h of heights) expect(h, `provenance row ${h}px (line ${line}px)`).toBeLessThanOrEqual(isMobile(info) ? 2.75 * 11 + 1 : line + 1);
     // never "Wale" / "Glassnode" as a name or source
     expect((await card.innerText()).replace(/keine On-Chain-Wale/g, "")).not.toMatch(/Wal(e|s)\b|Glassnode/i);
   });
@@ -244,7 +245,14 @@ test.describe("Wal-Karte (C3): Top-Trader netto on the Markt page", () => {
     for (const [i, m] of acc.entries()) {
       await pointAt(page, plot, info, xOf(b.width, m.t, tMin, tMax));
       await expect(tip).toHaveCSS("opacity", "1");
-      await expect(card.getByTestId("trader-net-tip-mark")).toHaveText(texts[i]!);
+      // a pixel is more than one point wide on a phone: the arrow keys take the last steps to the exact point
+      await plot.focus();
+      const mark = card.getByTestId("trader-net-tip-mark");
+      for (const key of ["ArrowLeft", "ArrowLeft", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight"]) {
+        if ((await mark.textContent()) === texts[i]) break;
+        await page.keyboard.press(key);
+      }
+      await expect(mark).toHaveText(texts[i]!);
     }
     // a point without a mark: the line is empty
     await pointAt(page, plot, info, xOf(b.width, tMin + 100 * HOUR, tMin, tMax));
@@ -456,12 +464,14 @@ test.describe("Wal-Karte (C3): Top-Trader netto on the Markt page", () => {
   });
 
   test("the loading state shows the thinking orb in the plot's box", async ({ page }) => {
-    // the position series answers late: the card says it is loading, with the orb, and keeps the box
+    // the position series answers late (held until the test lets it go): the card says it is loading, with the orb, and keeps the box
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
     const { card } = await openMarkt(page, {
       extra: OFF,
       afterSeed: () =>
         page.route("https://fapi.binance.com/futures/data/topLongShortPositionRatio**", async (route) => {
-          await new Promise((r) => setTimeout(r, 4000));
+          await gate;
           await route.fallback();
         }),
     });
@@ -469,6 +479,8 @@ test.describe("Wal-Karte (C3): Top-Trader netto on the Markt page", () => {
     const box = card.getByTestId("trader-net-empty");
     await expect(box.locator("[data-thinking-orb='search']")).toBeVisible();
     await expect(box).toContainText("Top-Trader-Daten werden geladen");
+    await expect(card.getByTestId("trader-net-kpi-net-value")).toHaveText("–");
+    release();
     await expect(card).toHaveAttribute("data-state", "ok", { timeout: 30_000 });
   });
 

@@ -29,7 +29,7 @@ export function TraderNetArchive({ line, status, recording, stored, canExport, o
   const unavailable = status === "unavailable";
   return (
     <div className="grid gap-2 border-t border-line pt-3" data-testid="trader-net-archive" data-status={status} data-recording={recording ? "on" : "off"} data-stored={stored}>
-      <p className="min-h-[2.6em] text-[11.5px] leading-[1.3] text-mute sm:min-h-[1.3em]" data-testid="trader-net-archive-line">
+      <p className="min-h-[2.75em] text-[11.5px] leading-[1.3] text-mute sm:min-h-[1.3em]" data-testid="trader-net-archive-line">
         {line}
       </p>
       <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2">

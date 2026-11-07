@@ -183,11 +183,11 @@ export default function TraderNetCard() {
         </div>
 
         {/* provenance: three lines, each with room for two on a phone */}
-        <dl className="grid grid-cols-[3.6rem_minmax(0,1fr)] gap-x-3 gap-y-1 text-[11px] leading-[1.3]" data-testid="trader-net-provenance">
+        <dl className="grid gap-1 text-[11px] leading-[1.3]" data-testid="trader-net-provenance">
           {prov.map((p) => (
-            <div key={p.id} className="contents">
-              <dt className="text-mute">{p.label}</dt>
-              <dd className="min-h-[2.6em] min-w-0 text-fg/90 sm:min-h-[1.3em]" data-testid={`trader-net-prov-${p.id}`}>
+            <div key={p.id} className="flex gap-3">
+              <dt className="w-14 shrink-0 text-mute">{p.label}</dt>
+              <dd className="min-h-[2.75em] min-w-0 flex-1 text-fg/90 sm:min-h-[1.3em]" data-testid={`trader-net-prov-${p.id}`}>
                 {p.value}
               </dd>
             </div>
@@ -226,7 +226,7 @@ export default function TraderNetCard() {
           </div>
         )}
 
-        <p className="flex min-h-[4.125em] flex-wrap items-center gap-x-4 gap-y-1 text-[11px] leading-snug text-mute sm:min-h-[2.75em] xl:min-h-[1.375em]" data-testid="trader-net-legend">
+        <p className="flex min-h-[2.75em] flex-wrap items-center gap-x-4 gap-y-1 text-[11px] leading-snug text-mute sm:min-h-[1.375em]" data-testid="trader-net-legend">
           <span className="inline-flex items-center gap-1.5">
             <span aria-hidden="true" className="size-2 rounded-sm bg-win/70" />
             {S.legendLong}
@@ -254,7 +254,7 @@ export default function TraderNetCard() {
             {S.legendConfirm}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-2.5 w-3 rounded-[3px] border border-dashed border-fg/45 bg-fg/[0.06]" />
+            <span aria-hidden="true" className="h-2.5 w-3 rounded-sm border border-dashed border-line bg-white/[0.05]" />
             {S.legendGap}
           </span>
         </p>
