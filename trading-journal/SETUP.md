@@ -59,7 +59,7 @@ Prüfbefehle (dieselben wie in der CI): `npm run typecheck && npm run lint && np
    - **Publishable key** (`sb_publishable_…`) → `VITE_SUPABASE_PUBLISHABLE_KEY` (öffentlich, landet im Bundle)
    - **Secret key** (`sb_secret_…`) → `SUPABASE_SECRET_KEY` (**nur** für die Functions, niemals mit `VITE_`-Präfix)
 
-### 2.1 Migrationen 0001 → 0010
+### 2.1 Migrationen 0001 → 0011
 
 Die Dateien liegen in `trading-journal/supabase/migrations/` und werden **genau einmal, in dieser Reihenfolge**
 ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als neue Datei):
@@ -76,9 +76,10 @@ ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als n
 | `0008_alert_watch.sql` | E-Mail-Alarm bei geschlossener App (F21): die zwei Funktionen `alert_watch_candidates()` (welche Konten den Schalter an haben – liest nur Regeln und Schalter) und `set_server_alerts()` (schreibt nur `data.serverAlerts` der Einstellungen, abgesichert über `rev`), dazu ein Teilindex auf den Schalter. Nur für den Server (service role), kein Client erreicht sie. Ohne diese Migration tut `alert-watch-cron` nichts und meldet „Migration 0008 fehlt“ |
 | `0009_proofs_boards.sql` | Ergebnisbeleg (F57) und Ranglisten (F50 / F71): Freigaben bekommen die vierte Art „proof“ (die vollständige Liste der geschlossenen Trades eines Zeitraums in R – ohne Geld, Kontogröße, Paar und Uhrzeiten; bis 64 KB), Ranglisten tragen den tiefsten Rücksetzer der R-Summe und die Datenherkunft (Börse, Datei, Hand, Bot, gemischt). Gleiche Einwilligung, gleiche Pseudonyme, gleiche Rechte wie zuvor. **Vor dem Deploy ausführen**: Funktion und Rangliste schreiben die neuen Spalten |
 | `0010_cases.sql` | Chartfälle mit Hypothese vorab (F47): öffentliche Kursstrecke bis zur Ankerkerze, je Mitglied eine Hypothese, die nach dem Speichern niemand mehr ändert; andere sehen sie erst nach dem Schließen (Mentor-Gruppen: Schüler sehen Mentoren und die eigene). Das Ergebnis wird nie gespeichert, jedes Gerät rechnet es aus öffentlichen Kerzen. Ohne diese Migration antworten neue Fälle mit „cases_not_ready“, der Rest läuft weiter |
+| `0011_simulations.sql` | Gespeicherte Zeitmaschinen-Simulationen (Kennzahlen und Hashes, nie die schweren Pfade), nur der Eigentümer liest und schreibt |
 
 **Variante A – SQL-Editor (ohne CLI):** Supabase → **SQL Editor → New query** → Inhalt von `0001_core.sql` einfügen →
-**Run** → „Success“ abwarten. Dann `0002` bis `0010` genauso.
+**Run** → „Success“ abwarten. Dann `0002` bis `0011` genauso.
 
 **Variante B – CLI:**
 

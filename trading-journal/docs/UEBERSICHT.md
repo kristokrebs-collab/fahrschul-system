@@ -428,7 +428,7 @@ _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
 
 ### Trades eintragen & Daten
 
-_Trades hineinbekommen, ordnen, sichern und prüfen._ · 17 Funktionen
+_Trades hineinbekommen, ordnen, sichern und prüfen._ · 18 Funktionen
 
 **Eintragen**
 

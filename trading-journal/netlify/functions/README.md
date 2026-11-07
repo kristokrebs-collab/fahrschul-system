@@ -256,3 +256,16 @@ market), cache (a full page of old history: 1 day at the CDN edge; near "now": 2
 120 requests a minute per IP and instance. Response header `x-klines-venue` – the app labels spot candles as spot. Spot answers from any region;
 Binance Futures answers 451 from the default function region (the `/api/binance` rewrite stays the way to Futures). Test:
 `tests/unit/functions.klines.test.ts`.
+
+## Functions (B1 Konto / C4 Betrieb)
+
+| file | route | notes |
+|---|---|---|
+| `account-delete.mts` | GET/POST `/api/v1/account/delete` | GET = Löschplan (Abo-Zustand none/running/ending/issue, Mengen); POST braucht bei laufendem Abo `acknowledgeSubscription: true` (409 sonst); Buckets werden nach dem Löschen erneut gelesen (Rest → 502, Konto bleibt); Wiederherstellungscodes weg; `leftovers` listet Tabellen, die nach dem Cascade noch Zeilen hätten |
+| `account-export.mts` | GET `/api/v1/account/export` | zusätzlich `screenshots`: Hashliste (aufgezeichneter und vom Server aus den Bytes berechneter SHA-256, Waisen, fehlende Dateien) |
+| `account-mfa-recovery.mts` | GET/POST `/api/v1/account/mfa-recovery` | `generate` (aal2), `redeem` (Passwort-Sitzung genügt, 5 / 15 min fail-closed), Status ohne Codes; Hashes in `app_config` (`mfa-recovery:<uid>`) |
+| `ops-status.mts` | GET `/api/v1/ops/status[?probe=1&stats=1]` | nur mit `OPS_TOKEN`; Bereiche, Funktionen, Schalter, Tippfehler, Erreichbarkeit nur für Konfiguriertes, Zahlen der letzten 24 h |
+| `ops-flags.mts` | GET `/api/v1/flags` | öffentlich: Stand der Notfall-Schalter |
+
+`_lib`: `envSpec.ts` (die eine Variablenliste → `docs/ENV.md`, `scripts/releaseCheck.mjs`, Betreiber-Status), `killswitch.ts` (`KILL_SYNC|CALLS|AI|CHECKOUT`), `accountDeletion.ts`, `accountShots.ts`, `mfaRecovery.ts`, `opsProbes.ts`, `opsStats.ts`.
+Audits: `tests/unit/functions.audit.test.ts` (jede Funktion hat ihre Klasse und deren Muster), `functions.b1.test.ts`.
