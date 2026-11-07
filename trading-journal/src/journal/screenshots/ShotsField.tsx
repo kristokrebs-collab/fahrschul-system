@@ -15,7 +15,7 @@ import { ShotLightbox } from "./ShotLightbox";
 import { ShotThumb } from "./ShotThumb";
 import { addShots, MAX_SHOTS, promoteShot } from "./shots";
 import { releaseCloudShots } from "./release";
-import { collectShotGarbage, referencedShotKeys, shotStorage } from "./store";
+import { collectShotGarbage, isRamOnly, localKeyOf, referencedShotKeys, shotStorage } from "./store";
 
 export interface ShotsFieldProps {
   value: readonly ScreenshotRef[];
@@ -136,7 +136,8 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
   };
   const full = value.length >= MAX_SHOTS;
   const memoryOnly = shotStorage() === "memory";
-  const ramShots = value.filter((r) => shotStorageOf(r) === "ram");
+  // pictures that are only in memory AND still there (after a reload the blob is gone – the thumbnail says so instead)
+  const ramShots = value.filter((r) => shotStorageOf(r) === "ram" && isRamOnly(localKeyOf(r) ?? ""));
   const [saving, setSaving] = useState(false);
   const saveAll = async () => {
     setSaving(true);

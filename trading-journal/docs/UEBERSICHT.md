@@ -423,7 +423,7 @@ _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
 
 ### Trades eintragen & Daten
 
-_Trades hineinbekommen, ordnen, sichern und prüfen._ · 16 Funktionen
+_Trades hineinbekommen, ordnen, sichern und prüfen._ · 17 Funktionen
 
 **Eintragen & importieren**
 
@@ -451,6 +451,7 @@ _Trades hineinbekommen, ordnen, sichern und prüfen._ · 16 Funktionen
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Das Journal sichern oder wiederherstellen | Backup & Wiederherstellung | Einstellungen › Daten | fertig |
+| Deine Screenshots unverändert aufbewahren und nachprüfen | Bild-Originale & Hashes | Einstellungen › Daten | teilweise |
 | Prüfen, ob die Marktdaten aktuell sind | Datenstatus | Einstellungen › Live-Daten | teilweise |
 | Marktzahlen und Analyse-Stände auf diesem Gerät aufzeichnen | Datenarchiv | Einstellungen › Datenarchiv | teilweise |
 | Die letzten Tage Marktzahlen von Binance einmal nachholen | Börsenhistorie nachladen | Einstellungen › Datenarchiv › Börsenhistorie nachladen | teilweise |

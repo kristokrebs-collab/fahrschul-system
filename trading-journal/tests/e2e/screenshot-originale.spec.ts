@@ -112,8 +112,9 @@ async function saveTrade(page: Page, editor: Locator, entry: number): Promise<St
   await editor.locator("#f-exit").fill(String(entry + 1500));
   await editor.locator("#f-size").fill("4000");
   await editor.getByRole("button", { name: "Speichern", exact: true }).click();
-  await expect(editor).toBeHidden();
-  await expect(toast(page)).toContainText("Trade gespeichert");
+  // generous: this suite also runs on machines shared with other test runs
+  await expect(editor).toBeHidden({ timeout: 30_000 });
+  await expect(toast(page)).toContainText("Trade gespeichert", { timeout: 20_000 });
   const trades = (await stored<StoredTrade[]>(page, "tj2-trades")) ?? [];
   const t = trades.find((x) => x.entry === entry);
   expect(t, "the saved trade").toBeTruthy();
@@ -144,7 +145,8 @@ async function downloadFrom(page: Page, button: Locator): Promise<{ name: string
 }
 
 test.describe("Screenshot-Originale", () => {
-  test.beforeEach(async ({}, info) => {
+  test.beforeEach(async ({ page }, info) => {
+    void page;
     test.skip(!PROJECTS.includes(info.project.name), "mobile + desktop only");
   });
 

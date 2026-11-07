@@ -35,7 +35,8 @@ vi.mock("@/cloud", async (orig) => ({
     }),
   }),
 }));
-vi.mock("@/billing/entitlements", async (orig) => ({ ...(await orig<typeof import("@/billing/entitlements")>()), entitledNow: () => true }));
+let entitled = true;
+vi.mock("@/billing/entitlements", async (orig) => ({ ...(await orig<typeof import("@/billing/entitlements")>()), entitledNow: () => entitled }));
 
 const { setCloudEnabledForTests } = await import("@/cloud/env");
 const { resetCloudSession, useCloudSession } = await import("@/cloud/session");
@@ -88,6 +89,7 @@ beforeEach(() => {
   bucket.clear();
   uploads.length = 0;
   failUpload = false;
+  entitled = true;
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -227,6 +229,18 @@ describe("original bytes survive saving, reload and the cloud", () => {
     const bad = fakePng(1_500_000, 1600, 900, 99);
     bucket.set(res.ref.key!, new Blob([bad as BlobPart]));
     expect((await loadOriginal(cloudOnly))!.hashOk).toBe(false);
+  });
+
+  it("signed in but without the plan's cloud screenshots (or signed out): nothing is uploaded and nothing is promised", async () => {
+    signIn();
+    entitled = false;
+    const { refs } = await addShots([fileOf(fakePng(30_000))]);
+    expect(await promoteShot(refs[0]!)).toEqual({ ok: false, problem: "unavailable" });
+    expect(uploads).toEqual([]);
+    expect(refs[0]).toMatchObject({ store: "idb", storage: "device", original: true });
+    entitled = true;
+    expect((await promoteShot(refs[0]!)).ok).toBe(true);
+    expect(uploads).toHaveLength(1);
   });
 
   it("a failed upload keeps the original on the device and says why; too big / wrong type are not uploaded at all", async () => {
