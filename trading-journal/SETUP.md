@@ -59,7 +59,7 @@ Prüfbefehle (dieselben wie in der CI): `npm run typecheck && npm run lint && np
    - **Publishable key** (`sb_publishable_…`) → `VITE_SUPABASE_PUBLISHABLE_KEY` (öffentlich, landet im Bundle)
    - **Secret key** (`sb_secret_…`) → `SUPABASE_SECRET_KEY` (**nur** für die Functions, niemals mit `VITE_`-Präfix)
 
-### 2.1 Migrationen 0001 → 0014
+### 2.1 Migrationen 0001 → 0015
 
 Die Dateien liegen in `trading-journal/supabase/migrations/` und werden **genau einmal, in dieser Reihenfolge**
 ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als neue Datei):
@@ -82,7 +82,7 @@ ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als n
 | `0014_alerts.sql` | Vier Alarme + Zustellung (C2): Alarm-Einstellungen (`alert_prefs`), Telefon-Einwilligung und -Status ohne Nummer (`alert_phones`), die verschlüsselte Nummer (`alert_phone_secrets`, kein Zugriff für Clients), Gedächtnis der Alarm-Engine (`alert_state`), Ereignisse mit eindeutigem Dedup-Schlüssel (`alert_events`), Zustellprotokoll (`alert_deliveries`) und die Job-Warteschlange mit Lease, Wiederholung und Dead-Letter (`jobs`), dazu die Server-Funktionen `alert_enqueue`, `jobs_claim`, `alert_phone_reserve` (Anruf wird VOR dem Wählen festgeschrieben) u. a. Clients dürfen nur eigene Zeilen lesen, schreiben nur die Functions. Läuft nach 0001, 0005 und 0008 (0011–0013 gehören anderen Paketen und sind unabhängig). Ohne sie meldet `alerts-cron` „migration“ und tut nichts; `supabase/tests/0014_alerts.test.sql` prüft die Regeln gegen eine Scratch-Datenbank |
 
 **Variante A – SQL-Editor (ohne CLI):** Supabase → **SQL Editor → New query** → Inhalt von `0001_core.sql` einfügen →
-**Run** → „Success“ abwarten. Dann `0002` bis `0011` genauso.
+**Run** → „Success“ abwarten. Dann `0002` bis `0015` genauso.
 
 **Variante B – CLI:**
 

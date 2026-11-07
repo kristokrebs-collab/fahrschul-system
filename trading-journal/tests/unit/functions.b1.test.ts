@@ -46,6 +46,7 @@ function base(over: Partial<AdminState> = {}): AdminState {
       ],
       audit_log: [],
       app_config: [],
+      mfa_recovery_codes: [],
       app_errors: [],
       exchange_connections: [],
     },
@@ -109,6 +110,7 @@ describe("account-delete: plan first, subscription acknowledged, bucket verified
 
   it("deletes completely: both buckets empty, recovery codes gone, auth user deleted, nothing left over", async () => {
     state.tables.app_config = [{ key: `mfa-recovery:${U1}`, value: { v: 1 }, updated_at: "x" }, { key: `mfa-recovery:${U2}`, value: { v: 1 }, updated_at: "x" }];
+    state.tables.mfa_recovery_codes = [{ user_id: U1, codes: [] }, { user_id: U2, codes: [] }];
     state.storage.screenshots!.push({ name: `${U1}/t_2/deep/b.webp`, body: "x" });
     const r = await accountDelete(post("/api/v1/account/delete", { confirm: "löschen" }), ctx);
     expect(r.status).toBe(200);
@@ -116,6 +118,7 @@ describe("account-delete: plan first, subscription acknowledged, bucket verified
     expect(state.storage.screenshots!.map((o) => o.name)).toEqual([`${U2}/b.png`]);
     expect(state.storage.backups).toEqual([]);
     expect(state.tables.app_config!.map((r) => r.key)).toEqual([`mfa-recovery:${U2}`]);
+    expect(state.tables.mfa_recovery_codes!.map((r) => r.user_id)).toEqual([U2]);
     expect(state.deleted).toEqual([U1]);
     expect(state.tables.journal_docs!.every((r) => r.user_id === U2)).toBe(true);
   });
@@ -191,7 +194,7 @@ describe("account-mfa-recovery", () => {
     expect(codes).toHaveLength(8);
     expect(new Set(codes).size).toBe(8);
     for (const c of codes) expect(c).toMatch(/^[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}$/);
-    const stored = JSON.stringify(state.tables.app_config);
+    const stored = JSON.stringify(state.tables.mfa_recovery_codes);
     for (const c of codes) expect(stored).not.toContain(c.replace("-", ""));
     expect(stored).toContain(hashCode(U1, normalizeCode(codes[0]!)!));
     expect(state.tables.audit_log!.at(-1)).toMatchObject({ action: "auth.mfa.recovery.generate" });
@@ -201,7 +204,37 @@ describe("account-mfa-recovery", () => {
     // a new set replaces the old one
     const again = (await (await accountMfaRecovery(post("/api/v1/account/mfa-recovery", { action: "generate" }), ctx)).json()) as { codes: string[] };
     expect(again.codes).not.toEqual(codes);
-    expect(state.tables.app_config!).toHaveLength(1);
+    expect(state.tables.mfa_recovery_codes!).toHaveLength(1);
+    expect(state.tables.app_config).toEqual([]); // nothing lands in the old place once the table exists
+  });
+
+  it("migration path: a set in the old app_config row still works (consumed there); a NEW set goes to the table and removes the old row", async () => {
+    aal2();
+    factorOn();
+    const old = ["ABCDEFGHJK", "LMNPQRSTUV"];
+    const mk = (c: string) => ({ h: hashCode(U1, c), usedAt: null });
+    state.tables.app_config = [{ key: `mfa-recovery:${U1}`, value: { v: 1, createdAt: "2026-01-01T00:00:00.000Z", codes: old.map(mk) }, updated_at: "2026-01-01T00:00:00.000Z" }];
+    expect(await (await accountMfaRecovery(req("/api/v1/account/mfa-recovery"), ctx)).json()).toMatchObject({ total: 2, remaining: 2 });
+    state.claims = { ...state.claims, aal: "aal1" };
+    const r = await accountMfaRecovery(post("/api/v1/account/mfa-recovery", { action: "redeem", code: "ABCDE-FGHJK" }), ctx);
+    expect(r.status).toBe(200);
+    expect(state.tables.app_config).toEqual([]); // the rest of the set is dropped with the reset
+    // new set: table, old row gone
+    state.tables.app_config = [{ key: `mfa-recovery:${U1}`, value: { v: 1, createdAt: "x", codes: old.map(mk) }, updated_at: "x" }];
+    factorOn();
+    aal2();
+    await accountMfaRecovery(post("/api/v1/account/mfa-recovery", { action: "generate" }), ctx);
+    expect(state.tables.mfa_recovery_codes).toHaveLength(1);
+    expect(state.tables.app_config).toEqual([]);
+  });
+
+  it("migration pending (table missing): generate and redeem keep working through app_config", async () => {
+    state.tables.mfa_recovery_codes = undefined;
+    const codes = await setUp();
+    expect(state.tables.app_config).toHaveLength(1);
+    const r = await accountMfaRecovery(post("/api/v1/account/mfa-recovery", { action: "redeem", code: codes[0]! }), ctx);
+    expect(r.status).toBe(200);
+    expect(state.tables.app_config).toEqual([]);
   });
 
   async function setUp(): Promise<string[]> {
@@ -218,7 +251,7 @@ describe("account-mfa-recovery", () => {
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({ factorsRemoved: 1 });
     expect(state.factors).toEqual([]);
-    expect(state.tables.app_config).toEqual([]);
+    expect(state.tables.mfa_recovery_codes).toEqual([]);
     expect(state.tables.audit_log!.at(-1)).toMatchObject({ action: "auth.mfa.recovery.used", meta: { factorsRemoved: 1 } });
     // 2FA is off now: the same code (or any) answers "not active", the account works with the password
     const again = await accountMfaRecovery(post("/api/v1/account/mfa-recovery", { action: "redeem", code: codes[2]! }), ctx);

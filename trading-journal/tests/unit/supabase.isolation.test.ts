@@ -58,6 +58,13 @@ const PROBES: Probe[] = [
   { table: "member_stats", owner: "user_id", cols: "user_id", b: 1, a: 1 },
   { table: "sync_runs", owner: "user_id", cols: "id", b: 1, a: 1 },
   { table: "team_seats", owner: "owner_id", cols: "owner_id", b: 0, a: 1 },
+  // 0012–0014: the browser only reads; every write goes through a function with the service role
+  { table: "webhook_receipts", owner: "user_id", cols: "id", b: 1, a: 1 },
+  { table: "signals", owner: "user_id", cols: "id", b: 1, a: 1 },
+  { table: "alert_prefs", owner: "user_id", cols: "user_id", b: 1, a: 1 },
+  { table: "alert_phones", owner: "user_id", cols: "user_id", b: 1, a: 1 },
+  { table: "alert_events", owner: "user_id", cols: "id", b: 1, a: 1 },
+  { table: "alert_deliveries", owner: "user_id", cols: "id, status, channel", b: 1, a: 1 },
 ];
 
 beforeAll(async () => {
@@ -83,7 +90,18 @@ beforeAll(async () => {
      insert into public.feedback (user_id, kind, message) values ('${A}', 'idea', 'Mehr Boxen bitte'), ('${B}', 'idea', 'Mehr Boxen bitte B');
      insert into public.member_stats (user_id) values ('${A}'), ('${B}');
      insert into public.sync_runs (user_id, exchange, kind) values ('${A}', 'bitunix', 'manual'), ('${B}', 'bitunix', 'manual');
-     insert into public.team_seats (owner_id, member_id) values ('${A}', '${C}')`,
+     insert into public.team_seats (owner_id, member_id) values ('${A}', '${C}');
+     insert into public.webhook_receipts (user_id, kind) values ('${A}', 'test'), ('${B}', 'test');
+     insert into public.signals (user_id, source, kind, status) values ('${A}', 'tradingview', 'test', 'processed'), ('${B}', 'tradingview', 'test', 'processed');
+     insert into public.tv_mcp_connections (user_id, client_id, resource, access_enc) values ('${A}', 'c', 'https://r.test', 'v1:a'), ('${B}', 'c', 'https://r.test', 'v1:b');
+     insert into public.alert_prefs (user_id, prefs) values ('${A}', '{}'), ('${B}', '{}');
+     insert into public.alert_phones (user_id, status, masked, consent_at, consent_version) values ('${A}', 'verified', '+49 ••• ••67', now(), 'v1'), ('${B}', 'verified', '+49 ••• ••12', now(), 'v1');
+     insert into public.alert_phone_secrets (user_id, number_enc, number_hash) values ('${A}', 'v1:a', '${"a".repeat(64)}'), ('${B}', 'v1:b', '${"b".repeat(64)}');
+     insert into public.alert_state (user_id) values ('${A}'), ('${B}');
+     insert into public.alert_events (user_id, dedup_key, source, market_key, market, event, occurred_at) values ('${A}', 'k1', 'industry', 'm', 'BTC', 'green_warn', now()), ('${B}', 'k1', 'industry', 'm', 'BTC', 'green_warn', now());
+     insert into public.alert_deliveries (user_id, kind, channel, status, provider_ref) values ('${A}', 'test', 'phone', 'sent', 'CA_secret_A'), ('${B}', 'test', 'phone', 'sent', 'CA_secret_B');
+     insert into public.jobs (user_id, kind, job_key) values ('${A}', 'alert.deliver', 'a:phone'), ('${B}', 'alert.deliver', 'b:phone');
+     insert into public.mfa_recovery_codes (user_id, codes) values ('${A}', '[{"h":"x","usedAt":null}]'), ('${B}', '[{"h":"y","usedAt":null}]')`,
   );
   await t.db.exec(`insert into auth.sessions (id, user_id, aal) values ('aaaaaaaa-0000-4000-8000-000000000001', '${A}', 'aal1'), ('bbbbbbbb-0000-4000-8000-000000000001', '${B}', 'aal1'), ('bbbbbbbb-0000-4000-8000-000000000002', '${B}', 'aal1')`);
   await t.db.exec(`insert into storage.objects (bucket_id, name) values ('screenshots', '${A}/t_1/a.png'), ('screenshots', '${B}/t_2/b.png')`);
@@ -129,7 +147,7 @@ describe("two users, every table the browser can reach", () => {
   });
 
   it("service-only tables are closed to both users, with or without 2FA", async () => {
-    for (const table of ["billing_customers", "rate_hits", "app_errors", "app_config", "stripe_events", "sync_cursor", "leaderboard_snapshots"]) {
+    for (const table of ["billing_customers", "rate_hits", "app_errors", "app_config", "stripe_events", "sync_cursor", "leaderboard_snapshots", "jobs", "tv_mcp_connections", "tv_mcp_states", "alert_phone_secrets", "alert_state", "mfa_recovery_codes"]) {
       for (const who of [jwt(A), jwt(B, "aal2")]) await expect(t.as(who, `select * from public.${table} limit 1`), table).rejects.toThrow(/permission denied/);
     }
   });

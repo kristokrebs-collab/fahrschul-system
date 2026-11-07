@@ -67,9 +67,21 @@ const DEFINER_CALLABLE_WITHOUT_AUTH_UID: Record<string, string> = {
   cloud_shots_allowed: "plan gate of the storage policy, called with auth.uid(); answers one boolean about a plan",
 };
 
+/** R2b – columns whose NAME looks like secret material but that the browser may read, with the reason. */
+const READABLE_SECRET_LOOKING: Record<string, string> = {
+  "audit_log.ip_hash": "salted pseudonym of the user's OWN sign-in address, shown in their own security log (not reversible, never another person's)",
+  "simulations.data_hash": "public integrity hash of the user's own simulation input (the reproducibility proof the card shows)",
+  "simulations.result_hash": "public integrity hash of the user's own simulation result (the reproducibility proof the card shows)",
+};
+
 /** R7 – user-owned tables that are not (separately) in the account export. */
 const EXPORT_EXCEPTIONS: Record<string, string> = {
   journal_docs: "exported as `journal` (backup format) by collectExport",
+  alert_phone_secrets: "the phone number, encrypted (AES-GCM) + HMAC for uniqueness; the export lists the MASKED number (alert_phones). Known gap: the plain number is not part of the export file (the user entered it themselves)",
+  alert_state: "internal memory of the alert engine (hysteresis / cooldown state), derived from the exported alert settings and events",
+  jobs: "delivery queue of the alert pipeline (ids, counters, lease tokens) – the outcome is exported as alert_deliveries",
+  tv_mcp_states: "short-lived (minutes) PKCE state of a running TradingView connection – no lasting data",
+  mfa_recovery_codes: "HMAC hashes of the recovery codes (secret material, useless outside the server); the export would only show hashes – the status (how many are left) is in the account view",
   sync_cursor: "internal resume position of the exchange sync (a timestamp per stream) – no personal content",
   "group_reviews.reviewed_by": "the mentor who reviewed – the review itself is exported by its author; reviewer id is set null on deletion",
   "referrals.referred_id": "another person's account (the invited one) – never exported, set null on deletion",
@@ -192,6 +204,19 @@ describe("R2 – what `authenticated` may do is tied to the caller", () => {
   it("every exception list entry still points at a real table (no stale exceptions)", async () => {
     const names = new Set((await tables()).map((r) => r.relname));
     for (const k of [...Object.keys(PUBLIC_READ), ...Object.keys(NO_MFA_RULE), ...Object.keys(CLIENT_WRITABLE)]) expect(names.has(k), `${k} is listed but does not exist`).toBe(true);
+  });
+});
+
+describe("R2b – no secret-looking column is readable by the browser", () => {
+  it("`authenticated` holds no select right on token / hash / ciphertext / lease columns", async () => {
+    const rows = await t.catalog<{ t: string; c: string }>(`
+      select c.relname as t, a.attname as c
+      from pg_attribute a join pg_class c on c.oid = a.attrelid join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind in ('r', 'p') and a.attnum > 0 and not a.attisdropped
+        and has_column_privilege('authenticated', c.oid, a.attnum, 'select')
+        and a.attname ~ '(_enc$|_hash$|^lease_token$|^lease_|secret|password|refresh|access_token)'`);
+    const found = rows.map((r) => `${r.t}.${r.c}`).filter((k) => !(k in READABLE_SECRET_LOOKING));
+    expect(found, "readable by the browser although it looks like secret material – restrict the grant or list it with a reason").toEqual([]);
   });
 });
 

@@ -66,7 +66,7 @@ function table(state: AdminState, name: string) {
     }
     if (op === "upsert") {
       for (const u of upserts) {
-        const key = name === "app_config" ? "key" : "id";
+        const key = name === "app_config" ? "key" : name === "mfa_recovery_codes" ? "user_id" : "id";
         const i = all.findIndex((r) => r[key] === u[key]);
         if (i >= 0) all[i] = { ...all[i], ...u };
         else all.push({ ...u });
