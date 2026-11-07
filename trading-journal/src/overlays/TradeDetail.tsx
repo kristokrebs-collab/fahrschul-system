@@ -23,7 +23,7 @@ import { MistakeChips, SignalSummary, tradeSignal } from "./SignalSummary";
 import type { Annotation } from "@/domain/types";
 import { stripEnrichment } from "@/domain/csv";
 import { useEntitlement } from "@/billing/entitlements";
-import { ShareButton } from "@/social/ui/ShareButton";
+import { RadialShareButton } from "@/social/ui/RadialShareButton";
 import { JournalDetail } from "@/journal/ui/JournalDetail";
 import { deleteTradeWithShots } from "@/journal/screenshots/release";
 import { effectiveFees } from "@/domain/fills";
@@ -592,8 +592,8 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
 
         <StaggerItem className="flex flex-wrap items-center justify-between gap-2">
           <span className="flex flex-wrap items-center gap-3">
-            {/* P12: share as a picture (always) or a redacted link (cloud) */}
-            <ShareButton tradeId={e.id} className={COARSE} />
+            {/* P12: share as a picture (always) or a redacted link (cloud); R11: the targets open as a fan around the button */}
+            <RadialShareButton trade={e} className={COARSE} />
             {e.chart && (
               <a href={e.chart} target="_blank" rel="noreferrer" className="label !text-fg underline-offset-4 hover:underline">
                 Chart öffnen ↗

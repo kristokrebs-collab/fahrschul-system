@@ -5,14 +5,18 @@
  * so and opens the upgrade sheet – never a dead button. An empty period has nothing to export and says that.
  */
 import { SeeAlso } from "@/app/FeatureLinks";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useEntitlement } from "@/billing/entitlements";
 import { openUpgrade } from "@/billing/store";
 import { reportFilename, reportToCsv, reportToJson, reportToMarkdown, type Report, type ReportFocus } from "@/domain/reports";
+import { RadialShare, type RadialTarget } from "@/motion/RadialShare";
 import { Button } from "@/primitives/Button";
+import { copyToClipboard } from "@/primitives/CopyButton";
 import { Card } from "@/primitives/Card";
 import { download } from "@/store/download";
 import { pushToast } from "@/store/uiStore";
+import { canNativeShare, nativeShareText } from "@/social/ui/copy";
+import { Glyph } from "@/social/ui/glyphs";
 import { ReportPrint } from "./ReportPrint";
 
 type Fmt = "md" | "csv" | "json";
@@ -28,6 +32,28 @@ export function ExportCard({ report, focus, className }: { report: Report; focus
     if (await download(name, data, MIME[fmt])) pushToast({ kind: "success", title: `${LABEL[fmt]} gespeichert`, detail: name });
   };
   const empty = report.empty;
+  // R11 radial share: only what the card already does - the Markdown as text (clipboard / system share sheet), the Markdown file, the PDF
+  const native = canNativeShare();
+  const targets = useMemo<RadialTarget[]>(() => {
+    const text = () => reportToMarkdown(report, focus);
+    const list: RadialTarget[] = [
+      {
+        id: "copy",
+        label: "Kopieren",
+        icon: <Glyph name="copy" className="size-5" />,
+        onSelect: async () => {
+          pushToast((await copyToClipboard(text())) ? { kind: "success", title: "Bericht kopiert", detail: "Als Markdown." } : { kind: "error", title: "Kopieren ging nicht." });
+        },
+      },
+      { id: "file", label: "Datei", icon: <Glyph name="image" className="size-5" />, onSelect: () => save("md") },
+      pdf
+        ? { id: "pdf", label: "PDF", icon: <Glyph name="link" className="size-5" />, onSelect: () => setPrinting(true), disabled: printing }
+        : { id: "pdf", label: "PDF · Premium", icon: <Glyph name="lock" className="size-5" />, onSelect: () => openUpgrade("reportsPdf") },
+    ];
+    if (native) list.push({ id: "native", label: "Weitergeben", icon: <Glyph name="send" className="size-5" />, onSelect: async () => void (await nativeShareText(report.title, text())) });
+    return list.map((t) => (empty && t.id !== "pdf" ? { ...t, disabled: true, hint: "Keine Trades in diesem Zeitraum" } : t));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `save` only reads `report` / `focus`, both listed
+  }, [report, focus, pdf, printing, native, empty]);
   return (
     <Card title="Export" note={empty ? "Keine Trades in diesem Zeitraum – nichts zu exportieren." : "Wie auf dem Bildschirm, mit deinem Fokus."} className={className} data-testid="report-export">
       <div className="grid grid-cols-2 gap-2">
@@ -45,6 +71,10 @@ export function ExportCard({ report, focus, className }: { report: Report; focus
             PDF · Premium
           </Button>
         )}
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-3 border-t border-line pt-2.5">
+        <span className="text-[11.5px] text-faint">Weitergeben</span>
+        <RadialShare targets={targets} label="Teilen" icon={<Glyph name="share" className="size-4" />} testId="report-share" className="pointer-coarse:min-h-11" />
       </div>
       {pdf && !empty && <p className="mt-2 text-[11px] leading-snug text-faint">PDF: im Druckdialog „Als PDF sichern“ wählen.</p>}
       {printing && <ReportPrint report={report} focus={focus} onDone={() => setPrinting(false)} />}
