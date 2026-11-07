@@ -7,6 +7,7 @@ import { useEffect, useRef } from "react";
 import { canObserveInView, observeInView } from "@/motion/inView";
 import { AmpelCard } from "./AmpelCard";
 import { ErgebnisCard } from "./ErgebnisCard";
+import { PaperCard } from "./PaperCard";
 import { PineCard } from "./PineCard";
 import { ProtokollCard } from "./ProtokollCard";
 import { useBranchen } from "./store";
@@ -37,6 +38,7 @@ export default function BranchenCard() {
       <ErgebnisCard />
       <PineCard />
       <ProtokollCard />
+      <PaperCard />
     </div>
   );
 }

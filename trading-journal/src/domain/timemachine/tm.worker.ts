@@ -5,10 +5,10 @@
  */
 import { createTmHost, type TmRequest, type TmResponse } from "./host";
 
-const scope = self as unknown as { onmessage: ((e: MessageEvent<TmRequest>) => void) | null; postMessage(m: TmResponse): void };
+const scope = self as unknown as { onmessage: ((e: MessageEvent<TmRequest>) => void) | null; postMessage(m: TmResponse, transfer?: Transferable[]): void };
 
 const host = createTmHost({
-  post: (m) => scope.postMessage(m),
+  post: (m, transfer) => scope.postMessage(m, transfer ?? []),
   setTimer: (fn, ms) => setTimeout(fn, ms),
   clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
   now: () => performance.now(),

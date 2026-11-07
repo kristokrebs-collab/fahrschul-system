@@ -8,7 +8,7 @@
  */
 import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
 import { createTmHost, SLICE_DESKTOP, SLICE_MOBILE, type TmRequest, type TmResponse, type TmSlice } from "./host";
-import type { TmInput, TmPhase, TmResult } from "./types";
+import type { TmInput, TmPaths, TmPhase, TmResult } from "./types";
 
 export type TmRunMode = "auto" | "idle";
 
@@ -18,6 +18,14 @@ export interface TmRunOptions {
   /** slices of the work; default: short ones on phones / coarse pointers */
   slice?: TmSlice;
   onProgress?: (progress: number, phase: TmPhase) => void;
+  /** also hand over every simulated path (`runTimeMachineFull`; the canvas mode „alle Pfade“) */
+  withPaths?: boolean;
+}
+
+/** A finished run: the figures (JSON) and – when asked for – every simulated path. */
+export interface TmRun {
+  result: TmResult;
+  paths: TmPaths | null;
 }
 
 /** A worker that sends nothing for this long is given up (the run continues on the main thread). */
@@ -44,7 +52,7 @@ export function sliceForDevice(): TmSlice {
 
 class WorkerFailed extends Error {}
 
-async function viaWorker(input: TmInput, slice: TmSlice, o: TmRunOptions): Promise<TmResult> {
+async function viaWorker(input: TmInput, slice: TmSlice, o: TmRunOptions): Promise<TmRun> {
   let W: new (opts?: { name?: string }) => Worker;
   try {
     W = (await import("./tm.worker?worker&inline")).default;
@@ -53,7 +61,7 @@ async function viaWorker(input: TmInput, slice: TmSlice, o: TmRunOptions): Promi
     throw new WorkerFailed("no worker");
   }
   if (o.signal?.aborted) throw abortError();
-  return new Promise<TmResult>((resolve, reject) => {
+  return new Promise<TmRun>((resolve, reject) => {
     let w: Worker;
     try {
       w = new W({ name: "tj-zeitmaschine" });
@@ -86,7 +94,7 @@ async function viaWorker(input: TmInput, slice: TmSlice, o: TmRunOptions): Promi
       const m = e.data;
       arm();
       if (m.kind === "progress") o.onProgress?.(m.progress, m.phase);
-      else if (m.kind === "done") done(() => resolve(m.result));
+      else if (m.kind === "done") done(() => resolve({ result: m.result, paths: m.paths ?? null }));
       else if (m.kind === "aborted") done(() => reject(abortError()));
       else done(() => reject(new Error(m.message)));
     };
@@ -95,14 +103,14 @@ async function viaWorker(input: TmInput, slice: TmSlice, o: TmRunOptions): Promi
       done(() => reject(new WorkerFailed("worker error")));
     };
     arm();
-    const msg: TmRequest = { kind: "run", input, slice };
+    const msg: TmRequest = { kind: "run", input, slice, ...(o.withPaths ? { withPaths: true } : {}) };
     w.postMessage(msg);
   });
 }
 
 /** The host on the main thread (timers instead of a worker loop). */
-export function runTimeMachineIdle(input: TmInput, o: TmRunOptions = {}): Promise<TmResult> {
-  return new Promise<TmResult>((resolve, reject) => {
+export function runTimeMachineIdleFull(input: TmInput, o: TmRunOptions = {}): Promise<TmRun> {
+  return new Promise<TmRun>((resolve, reject) => {
     if (o.signal?.aborted) return reject(abortError());
     let host: ReturnType<typeof createTmHost> | null = null;
     const finish = (fn: () => void) => {
@@ -117,7 +125,7 @@ export function runTimeMachineIdle(input: TmInput, o: TmRunOptions = {}): Promis
     host = createTmHost({
       post: (m) => {
         if (m.kind === "progress") o.onProgress?.(m.progress, m.phase);
-        else if (m.kind === "done") finish(() => resolve(m.result));
+        else if (m.kind === "done") finish(() => resolve({ result: m.result, paths: m.paths ?? null }));
         else if (m.kind === "error") finish(() => reject(new Error(m.message)));
       },
       setTimer: (fn, ms) => setTimeout(fn, ms),
@@ -126,12 +134,17 @@ export function runTimeMachineIdle(input: TmInput, o: TmRunOptions = {}): Promis
     });
     // on the main thread the rest between slices is never zero: a frame must be able to paint
     const base = o.slice ?? sliceForDevice();
-    host.handle({ kind: "run", input, slice: { workMs: Math.min(base.workMs, 12), restMs: Math.max(base.restMs, 4) } });
+    host.handle({ kind: "run", input, slice: { workMs: Math.min(base.workMs, 12), restMs: Math.max(base.restMs, 4) }, ...(o.withPaths ? { withPaths: true } : {}) });
   });
 }
 
+export const runTimeMachineIdle = async (input: TmInput, o: TmRunOptions = {}): Promise<TmResult> => (await runTimeMachineIdleFull(input, o)).result;
+
 /** Worker when allowed, else (or when the worker fails) slices on the main thread. */
-export async function runTimeMachine(input: TmInput, o: TmRunOptions = {}): Promise<TmResult> {
+export const runTimeMachine = async (input: TmInput, o: TmRunOptions = {}): Promise<TmResult> => (await runTimeMachineFull(input, o)).result;
+
+/** Same as `runTimeMachine`, and with `withPaths` every simulated path as well. */
+export async function runTimeMachineFull(input: TmInput, o: TmRunOptions = {}): Promise<TmRun> {
   if (o.signal?.aborted) throw abortError();
   if (o.mode !== "idle" && tmWorkerAllowed()) {
     try {
@@ -142,7 +155,7 @@ export async function runTimeMachine(input: TmInput, o: TmRunOptions = {}): Prom
       // worker unavailable → the main-thread host below
     }
   }
-  return runTimeMachineIdle(input, o);
+  return runTimeMachineIdleFull(input, o);
 }
 
 /** Test hook: forget a recorded worker failure. */

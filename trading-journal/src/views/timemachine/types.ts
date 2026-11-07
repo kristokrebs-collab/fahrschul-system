@@ -56,4 +56,8 @@ export interface TimeMachineProps {
   /** the market kind; "stocks" leaves funding out of the words (a stock has none). Absent = crypto. */
   market?: "crypto" | "stocks";
   className?: string;
+  /** the journal trade (or paper position) this simulation belongs to: the saved record points at it and the trade shows it */
+  tradeId?: string | null;
+  /** false = do not save the finished simulation and do not look for a saved one (default: save) */
+  persist?: boolean;
 }

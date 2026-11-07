@@ -176,6 +176,26 @@ export interface TmFan {
   bandRuns: number;
 }
 
+/**
+ * Every simulated session as a path (the canvas mode „alle Pfade“): the closes in R from the entry, run after run. Not part of the
+ * JSON result (it would not fit a saved record): the worker hands it over beside the result, and a saved simulation recreates it
+ * by running again with the same seed and candles.
+ */
+export interface TmPaths {
+  /** paths in `data` (the first `bandRuns` runs – all of them unless `runs × (horizon + 1)` exceeds `FAN_CELL_CAP`) */
+  runs: number;
+  /** values per path: horizon + 1 (index 0 = the entry = 0 R) */
+  stride: number;
+  /** closes in R, run-major */
+  data: Float32Array;
+  /** per run: 0 target · 1 stop · 2 neither · 3 moved stop · 255 not played */
+  kind: Uint8Array;
+  /** per run: candle (1-based) the trade ended at the target / stop / moved stop; 0 = it ran to the end of the session */
+  exit: Uint16Array;
+  /** sessions computed in all (`options.runs`) – can be more than `runs` */
+  computed: number;
+}
+
 export interface TmCases {
   worst: number;
   p5: number;

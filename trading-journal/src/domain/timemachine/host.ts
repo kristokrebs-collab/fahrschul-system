@@ -10,7 +10,7 @@
  * message queue is free: an `abort` acts within one slice). Progress is posted at most every `PROGRESS_MS`.
  */
 import { createTmJob, type TmJob } from "./job";
-import type { TmInput, TmPhase, TmResult } from "./types";
+import type { TmInput, TmPaths, TmPhase, TmResult } from "./types";
 
 export interface TmSlice {
   workMs: number;
@@ -22,12 +22,17 @@ export const SLICE_DESKTOP: TmSlice = { workMs: 40, restMs: 0 };
 export const SLICE_MOBILE: TmSlice = { workMs: 14, restMs: 6 };
 export const PROGRESS_MS = 120;
 
-export type TmRequest = { kind: "run"; input: TmInput; slice: TmSlice } | { kind: "abort" };
+export type TmRequest = { kind: "run"; input: TmInput; slice: TmSlice; /** also hand over every simulated path (for the canvas mode) */ withPaths?: boolean } | { kind: "abort" };
 
-export type TmResponse = { kind: "progress"; progress: number; phase: TmPhase } | { kind: "done"; result: TmResult } | { kind: "error"; message: string } | { kind: "aborted" };
+export type TmResponse =
+  | { kind: "progress"; progress: number; phase: TmPhase }
+  | { kind: "done"; result: TmResult; paths?: TmPaths }
+  | { kind: "error"; message: string }
+  | { kind: "aborted" };
 
 export interface TmHostEnv {
-  post(m: TmResponse): void;
+  /** `transfer`: buffers moved (not copied) to the page when the message goes through `postMessage` */
+  post(m: TmResponse, transfer?: Transferable[]): void;
   setTimer(fn: () => void, ms: number): unknown;
   clearTimer(h: unknown): void;
   /** monotonic ms */
@@ -47,6 +52,7 @@ export function createTmHost(env: TmHostEnv): TmHost {
   let timer: unknown;
   let slice: TmSlice = SLICE_DESKTOP;
   let lastPost = -Infinity;
+  let withPaths = false;
 
   const clear = (): void => {
     if (timer !== undefined) env.clearTimer(timer);
@@ -60,7 +66,9 @@ export function createTmHost(env: TmHostEnv): TmHost {
       const finished = job.step(t0 + slice.workMs);
       if (finished) {
         state = "done";
-        env.post({ kind: "done", result: job.result()! });
+        const paths = withPaths ? (job.paths?.() ?? null) : null;
+        if (paths) env.post({ kind: "done", result: job.result()!, paths }, [paths.data.buffer, paths.kind.buffer, paths.exit.buffer]);
+        else env.post({ kind: "done", result: job.result()! });
         return;
       }
       const t = env.now();
@@ -97,6 +105,7 @@ export function createTmHost(env: TmHostEnv): TmHost {
         return;
       }
       slice = { workMs: Math.max(4, m.slice.workMs), restMs: Math.max(0, m.slice.restMs) };
+      withPaths = m.withPaths === true;
       state = "running";
       lastPost = -Infinity;
       timer = env.setTimer(tick, 0);

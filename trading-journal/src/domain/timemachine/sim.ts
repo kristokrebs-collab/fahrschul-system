@@ -41,6 +41,8 @@ export interface SimOut {
   r: Float64Array;
   kind: Uint8Array;
   bars: Uint16Array;
+  /** candle the trade ended at (1-based) for target / stop / moved stop; 0 = ran to the end of the session or not played */
+  exit: Uint16Array;
   mae: Float32Array;
   cost: Float32Array;
   ambiguous: number;
@@ -89,6 +91,7 @@ export class SimJob {
       r: new Float64Array(input.runs),
       kind: new Uint8Array(input.runs).fill(K_SKIPPED),
       bars: new Uint16Array(input.runs),
+      exit: new Uint16Array(input.runs),
       mae: new Float32Array(input.runs),
       cost: new Float32Array(input.runs),
       ambiguous: 0,
@@ -181,6 +184,7 @@ export class SimJob {
     out.r[k] = t.r;
     out.kind[k] = kind;
     out.bars[k] = t.bars;
+    out.exit[k] = kind === K_NEITHER ? 0 : Math.min(65535, t.exitIndex);
     out.mae[k] = excursionR(work, t).mae;
     out.cost[k] = costInR(t);
     if (t.ambiguous) out.ambiguous++;
