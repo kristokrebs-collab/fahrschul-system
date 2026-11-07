@@ -14,6 +14,7 @@ import { expect, test, type Locator, type Page, type TestInfo } from "@playwrigh
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, seed, toast } from "./helpers";
 import { mockBilling, mockSubscription, type MockBillingOptions } from "./mocks/billing";
 import { mockSupabase, type MockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const PREISE_URL = process.env.PW_PREISE_URL ?? cloudUrl("preise");
 const KONTO_URL = process.env.PW_KONTO_URL ?? cloudUrl("konto");
@@ -21,8 +22,6 @@ const ANALYSE_URL = cloudUrl("analyse");
 /** The pricing page with an invitation (`?ref=` is read from the query string, before the hash). */
 const preiseWithRef = (code: string) => (process.env.PW_PREISE_URL ? `${PREISE_URL}?ref=${code}` : cloudUrl("preise", `?ref=${code}`));
 const SHOTS = process.env.P10_SHOTS_DIR;
-const EMAIL = "trader@example.com";
-const PASSWORD = "richtig-geheim-42";
 const P10_PROJECTS = ["mobile", "desktop"];
 
 async function shot(page: Page, info: TestInfo, name: string, fullPage = false): Promise<void> {
@@ -49,6 +48,7 @@ async function setup(
   billing: MockBillingOptions = {},
 ): Promise<{ sb: MockSupabase; bill: Awaited<ReturnType<typeof mockBilling>>; errors: string[] }> {
   const errors = collectErrors(page);
+  await blockExternalNetwork(page);
   const sb = await mockSupabase(page);
   const bill = await mockBilling(page, {
     codes: { TRADER20: { percentOff: 20, duration: "repeating", durationInMonths: 3, message: "−20 % für 3 Monate" } },
@@ -66,15 +66,7 @@ async function ready(sheet: Locator): Promise<void> {
 
 /** Signs in through the header pill and closes the welcome sheet once the first sync is live. */
 async function signIn(page: Page): Promise<void> {
-  await page.locator('[data-cloud-pill="signin"]').click();
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await ready(sheet);
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await signInViaSheet(page, { synced: true });
 }
 
 const srPrice = (page: Page, plan: string) => page.getByTestId(`price-${plan}`).locator(".sr-only").first();

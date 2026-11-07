@@ -12,6 +12,7 @@
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed, stored, toast } from "./helpers";
 import { mockSupabase, TOTP_CODE, type MockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const KONTO_URL = process.env.PW_KONTO_URL ?? cloudUrl("konto");
 const SHOTS = process.env.P09_SHOTS_DIR;
@@ -40,17 +41,8 @@ async function ready(sheet: Locator): Promise<void> {
 
 /** Signs in through the header pill and waits until the first sync is live. */
 async function signIn(page: Page, sb: MockSupabase, opts: { mfa?: boolean } = {}): Promise<void> {
-  await page.locator('[data-cloud-pill="signin"]').click();
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await ready(sheet);
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
+  await signInViaSheet(page, { synced: true, stopAfterSubmit: opts.mfa });
   if (opts.mfa) return;
-  await expect(page.getByRole("dialog", { name: "Willkommen" })).toBeVisible();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect.poll(() => [...sb.rows.values()].filter((r) => r.kind === "trade").length).toBe(FIXTURE_TRADES.length);
 }
 
@@ -75,6 +67,7 @@ test.describe("Konto & Cloud", () => {
 
   test("signed out → wrong password shakes, right password signs in, the local journal is uploaded", async ({ page }, info) => {
     const errors = collectErrors(page);
+    await blockExternalNetwork(page);
     const sb = await mockSupabase(page);
     await seed(page);
     await open(page);
@@ -120,6 +113,7 @@ test.describe("Konto & Cloud", () => {
 
   test("local edits upload, a change from another device arrives via realtime", async ({ page }) => {
     const errors = collectErrors(page);
+    await blockExternalNetwork(page);
     const sb = await mockSupabase(page);
     await seed(page);
     await open(page);
@@ -149,6 +143,7 @@ test.describe("Konto & Cloud", () => {
 
   test("2FA: QR + code + hold to activate; the next login asks for the code", async ({ page }, info) => {
     const errors = collectErrors(page);
+    await blockExternalNetwork(page);
     const sb = await mockSupabase(page);
     await seed(page);
     await open(page);
@@ -185,6 +180,7 @@ test.describe("Konto & Cloud", () => {
 
   test("Daten: export, cloud backups, delete with LÖSCHEN + hold – the journal stays in this browser", async ({ page }, info) => {
     const errors = collectErrors(page);
+    await blockExternalNetwork(page);
     const sb = await mockSupabase(page);
     await seed(page);
     await open(page);

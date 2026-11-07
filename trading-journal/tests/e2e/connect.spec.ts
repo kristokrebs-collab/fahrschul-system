@@ -14,6 +14,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed } from "./helpers";
 import { mockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const PROJECTS = ["mobile", "desktop"];
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -24,8 +25,6 @@ async function expectAccessible(page: Page, include: string, what: string): Prom
   const lines = res.violations.map((v) => `${v.id} (${v.impact}): ${v.help} → ${v.nodes.slice(0, 4).map((n) => n.target.join(" ")).join(" | ")}`);
   expect(lines, `${what}: axe violations`).toEqual([]);
 }
-const EMAIL = "trader@example.com";
-const PASSWORD = "richtig-geheim-42";
 const KEY = "bnk9f3a1c2d4e5f60718293a4b5c6d7e";
 const SECRET = "bns0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c";
 const TV_TOKEN = `tj_${"Q".repeat(43)}`;
@@ -146,53 +145,14 @@ async function mockConnections(page: Page, o: MockOptions = {}): Promise<Mock> {
   return m;
 }
 
-/**
- * Signs in through the header pill. Two things this waits for on purpose (CI failure: "Alles synchron." never showed):
- * - the sheet body is `inert` until the panel's morph has settled (`src/motion/Sheet.tsx`), and Playwright's `fill` on an
- *   inert input "succeeds" without writing anything: on slow runners the e-mail was lost while the dialog already counted
- *   as visible. So: wait until nothing in the dialog is inert, fill, and check that the values really stuck.
- * - the end of the login is the welcome VIEW (`data-auth-view="welcome"`), not the text of the first sync: whether that
- *   sync is already done is the cloud sync's business, not this spec's.
- */
-async function signIn(page: Page): Promise<void> {
-  const pill = page.locator('[data-cloud-pill="signin"]');
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await expect(pill).toBeVisible({ timeout: 20_000 });
-  // the first click can land before the page's handlers are attached (loaded machine): click again until the sheet is there
-  await expect(async () => {
-    if (!(await sheet.isVisible())) await pill.click();
-    await expect(sheet).toBeVisible({ timeout: 3_000 });
-  }).toPass({ timeout: 25_000 });
-  await expect(sheet.locator("[inert]")).toHaveCount(0, { timeout: 20_000 });
-  const email = sheet.getByLabel("E-Mail");
-  const password = sheet.getByLabel("Passwort", { exact: true });
-  await expect(async () => {
-    await email.fill(EMAIL);
-    await password.fill(PASSWORD);
-    await expect(email).toHaveValue(EMAIL, { timeout: 1_000 });
-    await expect(password).toHaveValue(PASSWORD, { timeout: 1_000 });
-  }).toPass({ timeout: 20_000 });
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.locator('[data-auth-view="welcome"]')).toBeVisible({ timeout: 45_000 });
-  const go = page.getByRole("button", { name: "Los geht’s" });
-  await expect(go).toBeVisible();
-  await go.click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-}
-
-/** Hosts that belong to the test world: the preview itself and the Supabase mock. Everything else is not mocked. */
-const isTestHost = (u: URL): boolean => u.hostname === "127.0.0.1" || u.hostname === "localhost" || u.hostname.endsWith("e2e-mock.supabase.co");
-
 async function openCloud(page: Page, hash: string, h1: string, o: MockOptions = {}): Promise<Mock> {
   collectErrors(page);
-  // Registered FIRST = asked last: only requests that no mock below answers land here. In CI they would go out to the real
-  // internet and answer differently than behind the sandbox's proxy; here they fail at once, like offline.
-  await page.route((u) => !isTestHost(u), (route) => route.abort("internetdisconnected"));
+  await blockExternalNetwork(page);
   await mockSupabase(page, {});
   const m = await mockConnections(page, o);
   await seed(page);
   await openRoute(page, cloudUrl(hash), h1, { timeout: 30_000 });
-  await signIn(page);
+  await signInViaSheet(page);
   return m;
 }
 

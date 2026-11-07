@@ -15,14 +15,13 @@ import { clippedTexts, CLOUD_BASE, cloudUrl, collectErrors, expectNoHorizontalSc
 import { mockBilling } from "./mocks/billing";
 import { fig, mockSocial, mockTradePayload, type MockGroup, type MockSocialOptions } from "./mocks/social";
 import { mockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const COMMUNITY_URL = process.env.PW_COMMUNITY_URL ?? cloudUrl("community");
 const TRADES_URL = process.env.PW_COMMUNITY_TRADES_URL ?? cloudUrl("trades");
 /** Page that serves `#share/<token>` (P14: the app root). */
 const SHARE_BASE = process.env.PW_SHARE_BASE ?? `${CLOUD_BASE}/`;
 const SHOTS = process.env.P12_SHOTS_DIR;
-const EMAIL = "trader@example.com";
-const PASSWORD = "richtig-geheim-42";
 const ME = "00000001-1111-4111-8111-111111111111";
 const PROJECTS = ["mobile", "desktop"];
 
@@ -42,6 +41,7 @@ async function open(page: Page, url = COMMUNITY_URL): Promise<void> {
 async function setup(page: Page, social: MockSocialOptions = {}) {
   const errors = collectErrors(page);
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => undefined);
+  await blockExternalNetwork(page);
   const sb = await mockSupabase(page);
   await mockBilling(page, { enabled: false });
   const soc = await mockSocial(page, social);
@@ -65,16 +65,7 @@ async function shareReady(sheet: Locator): Promise<void> {
  * open – unless `expectNext` (an invitation link opens the join sheet right after the login).
  */
 async function signIn(page: Page, { expectNext = false }: { expectNext?: boolean } = {}): Promise<void> {
-  await page.locator('[data-cloud-pill="signin"]').click();
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await ready(sheet);
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
-  if (expectNext) await expect(page.getByRole("dialog", { name: "Willkommen" })).toHaveCount(0);
-  else await expect(page.getByRole("dialog")).toHaveCount(0);
+  await signInViaSheet(page, { synced: true, expectNext });
 }
 
 const member = (id: string, pseudonym: string, role: MockGroup["members"][number]["role"], stats = false) => ({ id, pseudonym, role, shareLevel: stats ? ("stats" as const) : ("none" as const), figures: stats ? fig(0.31, 74, 58) : null });
@@ -324,6 +315,7 @@ test.describe("Community", () => {
 
     // the public view (another tab, same mocks)
     const pub = await context.newPage();
+    await blockExternalNetwork(page);
     await mockSupabase(pub);
     const viewer = await mockSocial(pub);
     viewer.shares.push(...soc.shares);
