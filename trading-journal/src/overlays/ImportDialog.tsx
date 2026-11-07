@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState, type ChangeEvent } from "react";
 import { backupShotInfo, restoreShotsFromBackup } from "@/journal/screenshots/backupShots";
+import type { ZipBackup } from "@/journal/screenshots/backupZip";
 import { fmt } from "@/lib/format";
 import { openScreenshotImport } from "@/journal/ocr/store";
 import { MotionNumber } from "@/motion/MotionNumber";
@@ -11,12 +12,13 @@ import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
+import { pushToast } from "@/store/uiStore";
 import { importBackup, parseBackup, previewText, type ImportMode, type ImportPreview, type ImportResult } from "@/store/backup";
 import { HoldConfirm, useConfirmFocus } from "@/motion/HoldConfirm";
 
 export const IMPORT_STRINGS = {
   title: "Backup importieren",
-  intro: "Wähle eine JSON-Datei aus dem Export. Vor dem Schreiben legt das Journal einen Snapshot des aktuellen Stands an.",
+  intro: "Wähle eine JSON-Datei aus dem Export oder ein ZIP „Backup mit Bildern“. Vor dem Schreiben legt das Journal einen Snapshot des aktuellen Stands an.",
   file: "Backup-Datei",
   choose: "Datei wählen",
   chosen: (name: string) => `Datei: ${name}`,
@@ -58,9 +60,15 @@ export const IMPORT_SHOT_STRINGS = {
   embedded: (n: number) => `inkl. ${n === 1 ? "1 Screenshot" : `${n} Screenshots`} – sie kommen auf dieses Gerät.`,
   missing: (n: number) =>
     `${n === 1 ? "1 Screenshot ist" : `${n} Screenshots sind`} nicht enthalten – nur Verweise. Die Bilder liegen auf dem Gerät, von dem das Backup stammt („Backup mit Bildern“ unter Einstellungen → Daten nimmt sie mit).`,
+  /** A ZIP lists the pictures it could not carry. */
+  zipMissing: (n: number) => `${n === 1 ? "1 Screenshot war" : `${n} Screenshots waren`} beim Export nicht erreichbar und ${n === 1 ? "fehlt" : "fehlen"} im ZIP.`,
+  zipEmbedded: (n: number) => `inkl. ${n === 1 ? "1 Screenshot" : `${n} Screenshots`} als Original – jede Datei wird vor dem Speichern gegen den Hash im Manifest geprüft.`,
 } as const;
 
-type Parsed = { ok: true; text: string; preview: ImportPreview; shots: { embedded: number; missing: number } } | { ok: false; error: string };
+type Parsed = { ok: true; text: string; preview: ImportPreview; shots: { embedded: number; missing: number }; zip?: ZipBackup } | { ok: false; error: string };
+
+/** A chosen file that is (or is named like) a ZIP – the JSON path never sees it. */
+const isZipName = (f: File) => /\.zip$/i.test(f.name) || /zip/i.test(f.type);
 
 export interface ImportDialogProps {
   open: boolean;
@@ -110,6 +118,20 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
     setFileName(file.name);
     setConfirm(false);
     try {
+      if (isZipName(file)) {
+        // „Backup mit Bildern“ (ZIP): manifest + journal + original files (lazy chunk)
+        const m = await import("@/journal/screenshots/backupZip");
+        let zip: ZipBackup;
+        try {
+          zip = await m.readBackupZip(file);
+        } catch (e) {
+          setParsed({ ok: false, error: e instanceof Error ? e.message : IMPORT_STRINGS.readError });
+          return;
+        }
+        const res = parseBackup(zip.journalText);
+        setParsed(res.ok ? { ok: true, text: zip.journalText, preview: res.preview, shots: m.zipShotInfo(zip), zip } : { ok: false, error: res.path ? `${res.path}: ${res.error}` : res.error });
+        return;
+      }
       const text = await (readFile ? readFile(file) : file.text());
       const res = parseBackup(text);
       setParsed(res.ok ? { ok: true, text, preview: res.preview, shots: backupShotInfo(text) } : { ok: false, error: res.path ? `${res.path}: ${res.error}` : res.error });
@@ -125,7 +147,11 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
     try {
       const result = await importBackup(parsed.text, { mode });
       // pictures a "Backup mit Bildern" carries go back into this device's store (Review F08)
-      if (result.ok && shots.embedded > 0) await restoreShotsFromBackup(parsed.text);
+      if (result.ok && parsed.zip) {
+        const m = await import("@/journal/screenshots/backupZip");
+        const told = m.restoreSummary(await m.restoreShotsFromZip(parsed.zip));
+        if (told) pushToast({ ...told, duration: 9000 });
+      } else if (result.ok && shots.embedded > 0) await restoreShotsFromBackup(parsed.text);
       clearInterval(tick);
       setProgress(100);
       if (result.ok) {
@@ -224,7 +250,7 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
         </StaggerItem>
 
         <StaggerItem className="flex flex-wrap items-center gap-3">
-          <input ref={inputRef} type="file" accept=".json,application/json" aria-label={IMPORT_STRINGS.file} onChange={onFile} className="sr-only" />
+          <input ref={inputRef} type="file" accept=".json,.zip,application/json,application/zip" aria-label={IMPORT_STRINGS.file} onChange={onFile} className="sr-only" />
           <Button onClick={() => inputRef.current?.click()} disabled={busy}>
             {IMPORT_STRINGS.choose}
           </Button>
@@ -269,12 +295,12 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
               </p>
               {shots.embedded > 0 && (
                 <p className="text-[12px] text-mute" data-testid="import-shots">
-                  {IMPORT_SHOT_STRINGS.embedded(shots.embedded)}
+                  {parsed.zip ? IMPORT_SHOT_STRINGS.zipEmbedded(shots.embedded) : IMPORT_SHOT_STRINGS.embedded(shots.embedded)}
                 </p>
               )}
               {shots.missing > 0 && (
                 <p className="text-[12px] text-warn" data-testid="import-shots-missing">
-                  {IMPORT_SHOT_STRINGS.missing(shots.missing)}
+                  {parsed.zip ? IMPORT_SHOT_STRINGS.zipMissing(shots.missing) : IMPORT_SHOT_STRINGS.missing(shots.missing)}
                 </p>
               )}
               {parsed.preview.exportedAt && <span className="sr-only">{`${IMPORT_STRINGS.exportedAt} ${fmt.date(new Date(parsed.preview.exportedAt))}`}</span>}

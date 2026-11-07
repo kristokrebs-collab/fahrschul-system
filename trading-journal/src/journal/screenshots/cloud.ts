@@ -32,20 +32,56 @@ function extOf(mime: string): string {
   return "png";
 }
 
-/** Limits of the bucket (migration 0007, review STOR-01): anything else stays on this device instead of failing. */
+/**
+ * Limits of the bucket (migration 0007, review STOR-01): anything else stays on this device instead of failing. The
+ * original is uploaded byte for byte (A2), so a picture over the limit is NOT shrunk to fit – it stays on this device
+ * and the editor says why.
+ */
 export const CLOUD_SHOT_MAX_BYTES = 5 * 1024 * 1024;
 export const CLOUD_SHOT_TYPES: readonly string[] = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
-/** Uploads a blob for the signed-in user; resolves the object path, or `null` (no cloud, signed out, refused). */
-export async function uploadShot(blob: Blob, id: string, mime = blob.type || "image/png"): Promise<string | null> {
+/** Why an upload did not happen: no cloud / not signed in / plan (`unavailable`), too big, wrong type, or it failed. */
+export type UploadProblem = "unavailable" | "tooLarge" | "type" | "failed";
+
+export type UploadResult = { ok: true; path: string } | { ok: false; problem: UploadProblem };
+
+/** German line per problem that deserves telling the trader (`unavailable` is silent: nothing was promised). */
+export const UPLOAD_MESSAGES: Record<Exclude<UploadProblem, "unavailable">, string> = {
+  tooLarge: "Größer als das Cloud-Limit von 5 MB: Das Original bleibt unverändert auf diesem Gerät.",
+  type: "Dieses Bildformat nimmt die Cloud nicht an: Das Original bleibt unverändert auf diesem Gerät.",
+  failed: "Cloud-Upload fehlgeschlagen: Das Original bleibt unverändert auf diesem Gerät.",
+};
+
+/** Uploads the bytes of `blob` unchanged for the signed-in user and says what happened. */
+export async function uploadShotChecked(blob: Blob, id: string, mime = blob.type || "image/png"): Promise<UploadResult> {
   const uid = cloudShotOwner();
-  if (!uid) return null;
-  if (blob.size > CLOUD_SHOT_MAX_BYTES || !CLOUD_SHOT_TYPES.includes(mime)) return null;
+  if (!uid) return { ok: false, problem: "unavailable" };
+  if (blob.size > CLOUD_SHOT_MAX_BYTES) return { ok: false, problem: "tooLarge" };
+  if (!CLOUD_SHOT_TYPES.includes(mime)) return { ok: false, problem: "type" };
   try {
     const m = await ensureCloud();
     const path = `${uid}/${id}.${extOf(mime)}`;
     const { error } = await m.getClient().storage.from(SHOTS_BUCKET).upload(path, blob, { contentType: mime, upsert: true, cacheControl: "31536000" });
-    return error ? null : path;
+    return error ? { ok: false, problem: "failed" } : { ok: true, path };
+  } catch {
+    return { ok: false, problem: "failed" };
+  }
+}
+
+/** Uploads a blob for the signed-in user; resolves the object path, or `null` (no cloud, signed out, refused). */
+export async function uploadShot(blob: Blob, id: string, mime = blob.type || "image/png"): Promise<string | null> {
+  const r = await uploadShotChecked(blob, id, mime);
+  return r.ok ? r.path : null;
+}
+
+/** The bytes of a cloud object through a fresh signed link (`null` when signed out, gone or the download failed). */
+export async function downloadCloudShot(path: string): Promise<Blob | null> {
+  signed.delete(path);
+  const url = await cloudShotUrl(path);
+  if (!url) return null;
+  try {
+    const res = await fetch(url);
+    return res.ok ? await res.blob() : null;
   } catch {
     return null;
   }

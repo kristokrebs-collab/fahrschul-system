@@ -225,6 +225,16 @@ function screenshotsOf(v: unknown): ScreenshotRef[] | undefined {
       else delete s.url;
     }
     if (has(x, "key") && typeof x.key !== "string") delete s.key;
+    // original-bytes fields (A2): a malformed value is dropped, never guessed
+    if (has(x, "sha256") && !(typeof x.sha256 === "string" && /^[0-9a-f]{64}$/.test(x.sha256))) delete s.sha256;
+    if (has(x, "bytes") && !(typeof x.bytes === "number" && Number.isFinite(x.bytes) && x.bytes >= 0)) delete s.bytes;
+    if (has(x, "originalName")) {
+      if (typeof x.originalName === "string" && x.originalName.trim()) s.originalName = x.originalName.slice(0, 200);
+      else delete s.originalName;
+    }
+    if (has(x, "original") && typeof x.original !== "boolean") delete s.original;
+    if (has(x, "storage") && !(x.storage === "device" || x.storage === "cloud" || x.storage === "ram")) delete s.storage;
+    if (has(x, "cacheKey") && typeof x.cacheKey !== "string") delete s.cacheKey;
     if (store === "url" && !s.url) continue;
     out.push(s);
   }

@@ -16,7 +16,8 @@ import { KEYS } from "@/store/storage";
 import { ActionButton, GlyphDownload } from "./fx";
 import { IntroPref } from "./IntroPref";
 import { ExtractSettingsNote } from "@/journal/extract/ExtractSettingsNote";
-import { exportJsonWithShots, localShotCount } from "@/journal/screenshots/backupShots";
+import { localShotCount } from "@/journal/screenshots/backupShots";
+import { countShotRefs } from "@/journal/screenshots/info";
 
 export const DATA_STRINGS = {
   title: "Daten",
@@ -39,10 +40,11 @@ export const DATA_STRINGS = {
   footer: (trades: number, setups: number, rules: number) => `${trades} Trades gespeichert · ${setups} Grundlagen · ${rules} Grundregeln`,
   trades: (n: number) => `${n} Trades`,
   showAll: "Alle anzeigen",
-  /** Review F08: the plain JSON backup carries only references to the pictures. */
-  jsonShots: "Backup mit Bildern",
+  /** Review F08 / A2: the plain JSON backup carries only references to the pictures; the ZIP carries the original files. */
+  jsonShots: "Backup mit Bildern (ZIP)",
+  shotHashes: "Bild-Hashes (CSV)",
   shotsLocal: (n: number) =>
-    `${n === 1 ? "1 Screenshot liegt" : `${n} Screenshots liegen`} nur in diesem Browser – das normale JSON-Backup enthält nur Verweise. „Backup mit Bildern“ nimmt ${n === 1 ? "ihn" : "sie"} mit.`,
+    `${n === 1 ? "1 Screenshot liegt" : `${n} Screenshots liegen`} nur in diesem Browser – das normale JSON-Backup enthält nur Verweise. „Backup mit Bildern (ZIP)“ nimmt ${n === 1 ? "das Original" : "die Originale"} bytegleich mit, mit Hash im Manifest.`,
 } as const;
 
 export const BACKUP_KIND_LABELS: Record<BackupKind, string> = { auto: "Automatisch", import: "Vor Import", v0: "Migration" };
@@ -82,6 +84,7 @@ export function DataCard({ onImport, className }: DataCardProps) {
   const [busy, setBusy] = useState(false);
   const downloadable = canDownload();
   const localShots = useMemo(() => localShotCount(trades), [trades]);
+  const anyShots = useMemo(() => countShotRefs(trades) > 0, [trades]);
 
   // Snapshot list: recomputed after every journal change (import / restore / auto backup) or manual refresh.
   const backups: BackupEntry[] = useMemo(() => listBackups(), [trades, settings, version]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -126,10 +129,15 @@ export function DataCard({ onImport, className }: DataCardProps) {
             <ActionButton icon={<GlyphDownload />} onRun={() => exportJson()}>
               {DATA_STRINGS.json}
             </ActionButton>
-            {localShots > 0 && (
-              <ActionButton icon={<GlyphDownload />} onRun={() => exportJsonWithShots()}>
-                {DATA_STRINGS.jsonShots}
-              </ActionButton>
+            {anyShots && (
+              <>
+                <ActionButton icon={<GlyphDownload />} onRun={() => import("@/journal/screenshots/backupZip").then((m) => m.exportBackupZip())} data-testid="data-backup-zip">
+                  {DATA_STRINGS.jsonShots}
+                </ActionButton>
+                <ActionButton icon={<GlyphDownload />} onRun={() => import("@/journal/screenshots/hashList").then((m) => m.exportShotHashes())} data-testid="data-shot-hashes">
+                  {DATA_STRINGS.shotHashes}
+                </ActionButton>
+              </>
             )}
           </>
         ) : (

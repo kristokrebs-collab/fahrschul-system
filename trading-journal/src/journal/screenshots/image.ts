@@ -1,14 +1,18 @@
 /**
- * Image intake for screenshots (Journal v3, P06): only images, at most `MAX_INPUT_BYTES`; large pictures are scaled
- * down to `MAX_SIDE` px on the long side and re-encoded (WebP, JPEG fallback) so a chart screenshot stays a few
- * hundred kB. Decoding failures keep the original file when it is small enough.
+ * Image intake for screenshots (Journal v3, P06; A2 "Originale bytegleich").
+ *
+ * The file the trader chooses or pastes is kept EXACTLY as it is – `prepareImage` only checks it (an image, at most
+ * `MAX_INPUT_BYTES`) and reads its type and pixel size from the header; it never decodes, shrinks or re-encodes.
+ * The small picture the app shows in lists and previews is derived separately (`preview.ts`, in a worker).
  */
-
-export const MAX_INPUT_BYTES = 15 * 1024 * 1024;
+export const MAX_INPUT_BYTES = 25 * 1024 * 1024;
+/** Long edge of the derived preview (never the stored file). */
+export const PREVIEW_SIDE = 1280;
+/** Default long edge of `fitSize` (the model path scales its own copy to its wire limits; the stored file is never touched). */
 export const MAX_SIDE = 2000;
-const QUALITY = 0.86;
 
 export interface PreparedImage {
+  /** The file itself (same object, same bytes). */
   blob: Blob;
   mime: string;
   w?: number;
@@ -20,7 +24,7 @@ export type IntakeProblem = "type" | "size" | "decode";
 /** German message per problem. */
 export const INTAKE_MESSAGES: Record<IntakeProblem, string> = {
   type: "Nur Bilder (PNG, JPG, WebP, GIF).",
-  size: "Das Bild ist größer als 15 MB.",
+  size: "Das Bild ist größer als 25 MB.",
   decode: "Das Bild ließ sich nicht lesen.",
 };
 
@@ -43,43 +47,27 @@ export function fitSize(w: number, h: number, max = MAX_SIDE): { w: number; h: n
   return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) };
 }
 
-/** Validates and (when needed) shrinks `file`. Rejects with an `IntakeError`. */
+/**
+ * Validates `file` and reads its type / size from the header. The result carries the SAME blob – nothing is shrunk.
+ * A file without a usable `type` (some pastes) is recognised by its first bytes. Rejects with an `IntakeError`.
+ */
 export async function prepareImage(file: Blob): Promise<PreparedImage> {
-  if (!isImage(file)) throw new IntakeError("type");
   if (file.size > MAX_INPUT_BYTES) throw new IntakeError("size");
-  let bitmap: ImageBitmap | null = null;
+  if (file.size === 0) throw new IntakeError("decode");
+  let sniffed: Awaited<ReturnType<typeof import("./sniff").sniffBlob>>;
   try {
-    if (typeof createImageBitmap === "function") bitmap = await createImageBitmap(file);
+    sniffed = await (await import("./sniff")).sniffBlob(file);
   } catch {
-    bitmap = null;
+    sniffed = null;
   }
-  if (!bitmap) {
-    // no decoder here (tests, very old browsers): keep the file as it is when it is small
-    if (file.size <= 4 * 1024 * 1024) return { blob: file, mime: file.type || "image/png" };
-    throw new IntakeError("decode");
+  if (!isImage(file) && !sniffed) throw new IntakeError("type");
+  const mime = isImage(file) ? file.type.toLowerCase().replace("image/jpg", "image/jpeg") : sniffed!.mime;
+  const out: PreparedImage = { blob: file, mime };
+  if (sniffed?.w && sniffed.h) {
+    out.w = sniffed.w;
+    out.h = sniffed.h;
   }
-  const { width, height } = bitmap;
-  const target = fitSize(width, height);
-  const animated = file.type === "image/gif";
-  if (animated || (target.w === width && file.size <= 1.5 * 1024 * 1024)) {
-    bitmap.close?.();
-    return { blob: file, mime: file.type, w: width, h: height };
-  }
-  const canvas = document.createElement("canvas");
-  canvas.width = target.w;
-  canvas.height = target.h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    bitmap.close?.();
-    return { blob: file, mime: file.type, w: width, h: height };
-  }
-  ctx.drawImage(bitmap, 0, 0, target.w, target.h);
-  bitmap.close?.();
-  const encode = (type: string) => new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), type, QUALITY));
-  const webp = await encode("image/webp");
-  const blob = webp && webp.type === "image/webp" ? webp : await encode("image/jpeg");
-  if (!blob) return { blob: file, mime: file.type, w: width, h: height };
-  return { blob, mime: blob.type, w: target.w, h: target.h };
+  return out;
 }
 
 /** Image files of a drop / paste (`DataTransfer`), in order. */

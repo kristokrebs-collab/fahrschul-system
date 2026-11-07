@@ -22,7 +22,7 @@ const png = (bytes = 8) => new Blob([new Uint8Array(bytes)], { type: "image/png"
 afterEach(() => resetShotStoreForTests());
 
 describe("image intake", () => {
-  it("images only, at most 15 MB; never upscales, keeps the ratio", async () => {
+  it("images only, at most 25 MB (A2: the file is kept as it is – no shrinking); fitSize never upscales and keeps the ratio", async () => {
     expect(isImage(png())).toBe(true);
     expect(isImage(new Blob(["x"], { type: "text/plain" }))).toBe(false);
     await expect(prepareImage(new Blob(["x"], { type: "application/pdf" }))).rejects.toMatchObject({ problem: "type" });
@@ -30,7 +30,7 @@ describe("image intake", () => {
     await expect(prepareImage(huge)).rejects.toBeInstanceOf(IntakeError);
     expect(fitSize(4000, 1000)).toEqual({ w: 2000, h: 500 });
     expect(fitSize(800, 600)).toEqual({ w: 800, h: 600 });
-    // no decoder in jsdom: a small file is kept as it is
+    // the file is never decoded or shrunk: the very same blob comes back
     const small = png();
     await expect(prepareImage(small)).resolves.toEqual({ blob: small, mime: "image/png" });
   });

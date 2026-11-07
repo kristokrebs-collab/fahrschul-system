@@ -171,6 +171,20 @@ export interface ScreenshotRef {
   caption?: string;
   /** ISO time the shot was added. */
   at?: string;
+  /**
+   * Original bytes (A2): SHA-256 (64 hex characters) of the file exactly as the trader chose / pasted it, its size, its
+   * file name and where it lives. `original: true` = the stored bytes ARE that file; absent / false = a version from an
+   * older app release that was shrunk on intake ("Version (verkleinert)"), never shown as the original.
+   * `storage`: "device" = IndexedDB of this browser, "cloud" = also in Storage, "ram" = only in memory of this session
+   * (not saved durably). All optional – references from before A2 carry none of them.
+   */
+  sha256?: string;
+  bytes?: number;
+  originalName?: string;
+  original?: boolean;
+  storage?: "device" | "cloud" | "ram";
+  /** Local blob key of the offline copy of a cloud picture (`store: "cloud"`). */
+  cacheKey?: string;
 }
 
 export type AnnotationKind = "hline" | "trend" | "box" | "text" | "arrow";

@@ -7,11 +7,13 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
 import { ExtractButton } from "@/journal/extract/ExtractButton";
-import { cloudShotOwner } from "./cloud";
+import { cloudShotOwner, UPLOAD_MESSAGES } from "./cloud";
 import { imagesOf } from "./image";
+import { shotStorageOf, STORAGE_MESSAGES } from "./info";
+import { Button } from "@/primitives/Button";
 import { ShotLightbox } from "./ShotLightbox";
 import { ShotThumb } from "./ShotThumb";
-import { addShots, MAX_SHOTS, promoteToCloud } from "./shots";
+import { addShots, MAX_SHOTS, promoteShot } from "./shots";
 import { releaseCloudShots } from "./release";
 import { collectShotGarbage, referencedShotKeys, shotStorage } from "./store";
 
@@ -24,8 +26,9 @@ export interface ShotsFieldProps {
 /**
  * Screenshots of a trade in the editor: drop images on the zone (its border turns into marching ants while something
  * is dragged over it), paste them anywhere in the open editor (Strg / ⌘ + V – text pastes stay text), or pick files.
- * Pictures are shrunk and kept locally (IndexedDB); signed in, each one is also uploaded to the cloud in the
- * background. Thumbnails are `NotchedFrame`s that pop in (`spring.pop`, staggered) and open the `StripWipe` lightbox.
+ * Pictures are kept locally exactly as they came (IndexedDB, original bytes + SHA-256; the small preview is derived
+ * separately); signed in, each original is also uploaded unchanged to the cloud in the background. Where a picture is
+ * NOT saved durably (no IndexedDB, device storage full) the field says so and offers the original as a download. Thumbnails are `NotchedFrame`s that pop in (`spring.pop`, staggered) and open the `StripWipe` lightbox.
  *
  * Blobs nobody references any more (a removed picture after saving, an editor closed without saving) are collected
  * when the field unmounts – but only once the journal is loaded.
@@ -50,18 +53,31 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
     if (!files.length) return;
     setBusy((n) => n + 1);
     try {
-      const { refs, errors } = await addShots(files, Math.max(0, MAX_SHOTS - countRef.current));
+      const { refs, errors, notes } = await addShots(files, Math.max(0, MAX_SHOTS - countRef.current));
       if (refs.length) onChange((prev) => [...prev, ...refs]);
       if (errors.length) pushToast({ kind: "error", title: "Screenshot nicht übernommen", detail: errors[0] });
-      // signed in: copy each picture to the cloud and swap the reference when it is there
+      // the device storage is FULL: a surprise, so a toast says so with the way out (without any IndexedDB the field's
+      // standing note and the „nicht dauerhaft gespeichert“ panel below already say it)
+      if (notes.some((n) => n.kind === "quota")) pushToast({ kind: "error", title: "Speicher voll – nicht dauerhaft gespeichert", detail: STORAGE_MESSAGES.quota, duration: 9000 });
+      // signed in: copy each original to the cloud and swap the reference when it is there
       if (refs.length && cloudShotOwner()) {
+        let told = false;
         for (const ref of refs) {
-          void promoteToCloud(ref).then((cloud) => {
-            if (!cloud?.key) return;
-            uploads.current.add(cloud.key);
+          // a picture that is only in memory is uploaded too: signed in, the cloud copy is what makes it durable
+          void promoteShot(ref).then((r) => {
+            if (!r.ok) {
+              // nothing was promised without a cloud / login; a refusal or failure is told once per batch
+              if (r.problem !== "unavailable" && !told && alive.current) {
+                told = true;
+                pushToast({ kind: "info", title: "Nur auf diesem Gerät gespeichert", detail: UPLOAD_MESSAGES[r.problem] });
+              }
+              return;
+            }
+            const cloud = r.ref;
+            uploads.current.add(cloud.key!);
             // the editor closed while the upload ran: the reference can no longer reach a trade – free the object
-            if (!alive.current) void releaseCloudShots([cloud.key]);
-            else onChange((prev) => prev.map((r) => (r.id === ref.id ? cloud : r)));
+            if (!alive.current) void releaseCloudShots([cloud.key!]);
+            else onChange((prev) => prev.map((x) => (x.id === ref.id ? cloud : x)));
           });
         }
       }
@@ -113,6 +129,17 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
   };
   const full = value.length >= MAX_SHOTS;
   const memoryOnly = shotStorage() === "memory";
+  const ramShots = value.filter((r) => shotStorageOf(r) === "ram");
+  const [saving, setSaving] = useState(false);
+  const saveAll = async () => {
+    setSaving(true);
+    try {
+      const m = await import("./original");
+      for (const r of ramShots) pushToast(m.downloadMessage(r, await m.downloadOriginal(r)));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="grid gap-3">
@@ -142,7 +169,17 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
         </label>
         <input id={`${id}-file`} ref={fileRef} type="file" accept="image/*" multiple className="sr-only" onChange={onPick} disabled={full} />
       </div>
-      {memoryOnly && <p className="text-[11.5px] text-warn">Dieser Browser erlaubt keinen lokalen Bildspeicher: Screenshots bleiben nur bis zum Neuladen.</p>}
+      {memoryOnly && <p className="text-[11.5px] text-warn">Nicht dauerhaft gespeichert: Dieser Browser erlaubt keinen lokalen Bildspeicher, Screenshots bleiben nur bis zum Neuladen.</p>}
+      {ramShots.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-ink-950/40 px-3 py-2" role="status" data-testid="shots-ram">
+          <p className="min-w-0 flex-1 text-[11.5px] leading-snug text-warn">
+            {ramShots.length === 1 ? "1 Bild ist" : `${ramShots.length} Bilder sind`} nicht dauerhaft gespeichert {memoryOnly ? "(kein lokaler Bildspeicher)" : "(Speicher voll)"} – das Original bleibt unverändert, solange diese Seite offen ist.
+          </p>
+          <Button size="sm" onClick={() => void saveAll()} loading={saving} data-testid="shots-ram-download">
+            {ramShots.length === 1 ? "Original herunterladen" : "Originale herunterladen"}
+          </Button>
+        </div>
+      )}
       {value.length > 0 && (
         <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" aria-label="Screenshots">
           <AnimatePresence initial={false}>
