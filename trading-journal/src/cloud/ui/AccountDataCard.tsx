@@ -17,6 +17,7 @@ import { ActionButton, GlyphDownload } from "@/views/settings/fx";
 import { ApiError, apiFetch, downloadLinkOf, fetchDownload } from "../api";
 import { agoLabel } from "../device";
 import { ensureCloud } from "../runtime";
+import { useSyncStatus } from "../sync/status";
 import { openAuthSheet, useCloudSession } from "../session";
 import { PixelDissolve } from "./PixelDissolve";
 import { AUDIT_LABELS, DATA_CARD, DATA_CARD_ID } from "./strings";
@@ -267,6 +268,8 @@ function DeleteSection({ onDeleted, onExported }: { onDeleted: () => void; onExp
   const [plan, setPlan] = useState<DeletionPlan | "loading" | "failed">("loading");
   const [ack, setAck] = useState(false);
   const id = useId();
+  // the numbers follow the sync (records uploaded after this card appeared are counted too)
+  const records = useSyncStatus((x) => x.records);
   const wordOk = word.trim().toUpperCase() === DATA_CARD.deleteWord;
   const state = typeof plan === "object" ? plan.subscription.state : null;
   // the acknowledgement is needed unless the server said "no subscription" (an unknown status counts as running)
@@ -281,7 +284,7 @@ function DeleteSection({ onDeleted, onExported }: { onDeleted: () => void; onExp
     return () => {
       alive = false;
     };
-  }, []);
+  }, [records]);
 
   async function del() {
     if (!ready || busy) return;

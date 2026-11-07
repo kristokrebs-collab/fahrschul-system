@@ -36,6 +36,8 @@ export function CloudSyncHost({ onOpenAccount }: CloudSyncHostProps) {
   const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const mounted = useCloudSession((s) => s.sheet.mounted);
   const takeoverMounted = useTakeover((s) => s.mounted);
+  // one sheet at a time: while the takeover question is open the login sheet is unmounted (two sheets sharing the morph layer brought the closed one back)
+  const takeoverOpen = useTakeover((s) => s.phase !== "idle");
 
   useEffect(() => {
     if (!enabled) return;
@@ -73,7 +75,7 @@ export function CloudSyncHost({ onOpenAccount }: CloudSyncHostProps) {
   return (
     <div data-layer="CloudAuth">
       <Suspense fallback={null}>
-        {mounted && <AuthSheet onOpenAccount={onOpenAccount} />}
+        {mounted && !takeoverOpen && <AuthSheet onOpenAccount={onOpenAccount} />}
         {/* B1: the data-takeover dialog – its chunk loads when the engine first asks */}
         {takeoverMounted && <TakeoverDialog />}
       </Suspense>

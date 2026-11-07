@@ -164,10 +164,6 @@ export const SECURITY = {
   recoveryDone: "Fertig",
   recoveryFile: "wiederherstellungscodes.txt",
   recoveryNeedCode: "Zum Erzeugen erst mit dem 2FA-Code bestätigen.",
-  recoverySuggest: "Tipp: Erzeuge jetzt deine Wiederherstellungscodes.",
-  signOutEverywhere: "Überall abmelden",
-  signOutEverywhereAsk: "Auf allen Geräten abmelden, auch hier?",
-  signOutEverywhereHint: "Beendet jede Sitzung dieses Kontos, auch diese. Dein Journal bleibt in diesem Browser.",
   idleTitle: "Automatisch abmelden",
   idleHelp: "Nach so langer Inaktivität wirst du auf diesem Gerät abgemeldet. Dein Journal bleibt hier gespeichert.",
   idleOptions: [

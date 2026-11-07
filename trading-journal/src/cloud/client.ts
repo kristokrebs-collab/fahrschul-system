@@ -15,6 +15,7 @@ import { KEYS } from "@/store/storage";
 import { ApiError, apiFetch, setAccessTokenProvider } from "./api";
 import { authErrorText, type AuthErrorText } from "./authErrors";
 import { cloudConfig, type OAuthProvider } from "./env";
+import { primeOpsFlags } from "./flags";
 import { ACCOUNT_PRIVACY_KEYS, onPrivacyChange, parsePrivacy, setPrivacy, usePrivacy, type PrivacyPrefs } from "./privacy";
 import { openAuthSheet, SIGNED_OUT, useCloudSession } from "./session";
 import { activeSync, startSyncController } from "./sync/controller";
@@ -157,6 +158,8 @@ export function initClient(): Promise<void> {
       void adoptProfilePrivacy();
       if (useCloudSession.getState().needsMfa) openAuthSheet("mfa", "callback");
     }
+    // C4: the operator's switches are read before the first sync may start (fail open after 3 s)
+    void primeOpsFlags();
     stopController ??= startSyncController(sb);
     onPrivacyChange((next, changed) => void pushProfilePrivacy(next, changed));
   })());

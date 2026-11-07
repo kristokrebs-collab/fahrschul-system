@@ -55,13 +55,9 @@ export async function collectStats(now: Date = new Date(), sb: SupabaseClient = 
     count(sb, "app_errors", (b) => q(b).gte("at", day)),
   ]);
 
-  let lastReceivedAt: string | null = null;
-  try {
-    const { data } = await sb.from("stripe_events").select("received_at").order("received_at", { ascending: false }).limit(1);
-    lastReceivedAt = (data?.[0] as { received_at?: string } | undefined)?.received_at ?? null;
-  } catch {
-    lastReceivedAt = null;
-  }
+  const lastReceivedAt: string | null = await Promise.resolve(sb.from("stripe_events").select("received_at").order("received_at", { ascending: false }).limit(1))
+    .then(({ data }) => (data?.[0] as { received_at?: string } | undefined)?.received_at ?? null)
+    .catch(() => null);
 
   // jobs: the table arrives with a later migration (alerts / jobs); until then it is "not available", not "0"
   const jobsAll = await count(sb, "jobs", (b) => q(b).gte("created_at", day));

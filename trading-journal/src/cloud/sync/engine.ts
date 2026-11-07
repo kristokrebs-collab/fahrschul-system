@@ -701,7 +701,7 @@ export function createSyncEngine(d: EngineDeps): SyncEngine {
       return runCycle();
     },
     async undoTakeover() {
-      let ok = false;
+      let ok: boolean;
       try {
         ok = await exclusive(undoNow);
       } catch (e) {

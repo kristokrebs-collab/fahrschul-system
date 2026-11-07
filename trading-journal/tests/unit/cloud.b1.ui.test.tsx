@@ -6,7 +6,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const undoTakeover = vi.fn(async () => true);
-const recoveryStatus = vi.fn(async () => ({ ok: true as const, value: { total: 0, remaining: 0, createdAt: null } }));
+const recoveryStatus = vi.fn(async (): Promise<{ ok: true; value: { total: number; remaining: number; createdAt: string | null } }> => ({ ok: true, value: { total: 0, remaining: 0, createdAt: null } }));
 const generateRecoveryCodes = vi.fn(async () => ({ ok: true as const, value: { codes: ["ABCDE-FGHJK", "KMNPQ-RSTUV"], createdAt: "2026-11-07T10:00:00Z" } }));
 const redeemRecoveryCode = vi.fn(async (code: string): Promise<{ ok: true } | { ok: false; message: string; field: null }> => (code.startsWith("OK") ? { ok: true } : { ok: false, message: "Dieser Code passt nicht oder wurde schon benutzt.", field: null }));
 vi.mock("@/cloud/runtime", async (orig) => {

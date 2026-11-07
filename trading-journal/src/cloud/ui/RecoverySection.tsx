@@ -29,8 +29,16 @@ export function RecoverySection() {
     setStatus(r && r.ok ? r.value : "failed");
   }, []);
   useEffect(() => {
-    void load();
-  }, [load]);
+    let alive = true;
+    void (async () => {
+      const m = await ensureCloud().catch(() => null);
+      const r = m ? await m.recoveryStatus() : null;
+      if (alive) setStatus(r && r.ok ? r.value : "failed");
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   async function generate() {
     setBusy(true);

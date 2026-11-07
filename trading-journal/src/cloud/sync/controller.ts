@@ -43,7 +43,7 @@ export function startSyncController(sb: SupabaseClient): () => void {
   const evaluate = () => {
     if (disposed) return;
     const s = useCloudSession.getState();
-    const want = s.phase === "signedIn" && !!s.user && !s.needsMfa && usePrivacy.getState().sync && !useOpsFlags.getState().sync && useSyncGate.getState().entitled && !hasClaudeRuntime();
+    const want = s.phase === "signedIn" && !!s.user && !s.needsMfa && usePrivacy.getState().sync && !useOpsFlags.getState().sync && useOpsFlags.getState().settled && useSyncGate.getState().entitled && !hasClaudeRuntime();
     const uid = want ? s.user!.id : null;
     if (uid && active?.userId === uid) return;
     if (active) {

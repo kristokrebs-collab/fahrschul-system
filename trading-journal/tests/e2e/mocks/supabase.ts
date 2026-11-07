@@ -419,6 +419,7 @@ export async function mockSupabase(page: Page, opts: MockSupabaseOptions = {}): 
         logs.push(req.postDataJSON());
         return send(202, { stored: true });
       }
+      if (url.pathname === "/api/v1/flags") return send(200, { switches: { sync: !!opts.syncOff, calls: false, ai: false, checkout: false } });
       if (!u) return send(401, { error: { code: "unauthenticated", message: "Bitte melde dich an." } });
       const live = [...rows.values()].filter((r) => r.user_id === u.id && !r.deleted);
       const backup = () => ({
@@ -432,7 +433,6 @@ export async function mockSupabase(page: Page, opts: MockSupabaseOptions = {}): 
         audit.push({ action: "account.export", at: new Date().toISOString() });
         return send(200, { format: "trade-journal-account-export", version: 1, exportedAt: new Date().toISOString(), account: { id: u.id, email: u.email }, journal: backup(), tables: {}, files: { screenshots: [], backups: [] } });
       }
-      if (url.pathname === "/api/v1/flags") return send(200, { switches: { sync: !!opts.syncOff, calls: false, ai: false, checkout: false } });
       if (url.pathname === "/api/v1/account/mfa-recovery") {
         if (req.method() === "GET") return send(200, { total: recovery.codes.length, remaining: recovery.codes.filter((c) => !c.used).length, createdAt: recovery.at });
         const b = req.postDataJSON() as { action?: string; code?: string };
