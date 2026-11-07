@@ -83,6 +83,33 @@ function ocrAssets(share: boolean): Plugin {
   };
 }
 
+/**
+ * Offline-tolerant lazy components (Budget-Schnitt follow-up): every `lazy(() => import("…"))` of `src/` gets its `import()`
+ * wrapped in `loadChunk` (`src/lib/chunkLoad.ts`) – offline the download waits for `online` (the card stays on its skeleton)
+ * instead of failing into the console, and a failed one is tried once more. Only the literal `lazy(() => import("x"))`
+ * shape is rewritten (type positions like `typeof import("x")` and imperative imports stay as they are); the wrapped call
+ * keeps the `import()` expression, so chunking, preloading and `vi.mock` behave as before.
+ */
+function offlineTolerantLazy(): Plugin {
+  const srcRoot = fileURLToPath(new URL("./src/", import.meta.url));
+  return {
+    name: "tj-offline-tolerant-lazy",
+    enforce: "pre",
+    transform(code, id) {
+      const file = id.split("?")[0] ?? id;
+      if (!file.startsWith(srcRoot) || !/\.[cm]?[jt]sx?$/.test(file) || file.endsWith("/lib/chunkLoad.ts")) return null;
+      if (!code.includes("lazy(")) return null;
+      let hits = 0;
+      const out = code.replace(/(\blazy\(\s*\(\)\s*=>\s*)import\((["'][^"'\n]+["'])\)/g, (_m, head: string, spec: string) => {
+        hits += 1;
+        return `${head}__tjChunk(() => import(${spec}))`;
+      });
+      if (!hits) return null;
+      return { code: `import { loadChunk as __tjChunk } from "@/lib/chunkLoad";\n${out}`, map: null };
+    },
+  };
+}
+
 /** Base path of the share edition on the Netlify site (see netlify.toml `/teilen/*`). */
 export const SHARE_BASE = "/teilen/";
 
@@ -113,7 +140,7 @@ export default defineConfig(({ mode }) => {
   const share = mode === "share";
   return {
     base: share ? SHARE_BASE : "/",
-    plugins: [react(), tailwindcss(), ocrAssets(share), ...(share ? [privacyGuard(), shareAppName()] : [keepLegacyDashboard()])],
+    plugins: [offlineTolerantLazy(), react(), tailwindcss(), ocrAssets(share), ...(share ? [privacyGuard(), shareAppName()] : [keepLegacyDashboard()])],
     define: {
       __TJ_EDITION__: JSON.stringify(share ? "share" : "personal"),
       __TJ_TARGET__: JSON.stringify("web"),
