@@ -186,6 +186,21 @@ Tests: `views.markt.squeeze.history.test.tsx`, e2e `backfill.spec.ts`.
 - **Namen:** „Top-Trader (Binance)“, nie „Wale“ oder „Glassnode“; der Hilfesatz sagt: größte Konten einer einzelnen Börse, keine On-Chain-Wale, keine Aussage über den Kurs.
 Tests: `tests/unit/signals.traderNet.title.test.ts` (Überschriften, `previousFlip`), `tests/unit/views.markt.traderNet.test.tsx` (Karte, Plot, Modell), `tests/e2e/trader-net-markt.spec.ts` (mobil + Desktop, mit dem Mock-Skript `flip-short`). **Nicht gegen echte Binance-Werte geprüft** (aus dem Sandbox-Netz antwortet fapi mit 451).
 
+## Wal-Karte vollständig (C3, Runde 11)
+
+Die große Karte oben kann jetzt mehr (`TraderNetCard.tsx`, Modell `traderNetWal.ts`, Archiv-Zeile `TraderNetArchive.tsx`, Plot `TraderNetPlot.tsx`; `data-state` zusätzlich `archive`, `data-series` position / account):
+
+- **Reihen:** Umschalter „Reihe“ (Positionen / Konten): dieselbe Kohorte (obere 20 % der Konten nach Einsatz), einmal nach Positionsgröße (`topLongShortPositionRatio`), einmal nach Konten (`topLongShortAccountRatio`). `useTraderNet(series)` liest den jeweiligen Feed, die Überschrift nennt die Reihe.
+- **Quelle · Kohorte · Messzeit:** drei Zeilen unter den Kennzahlen (`provenanceOf`), in jedem Zustand drei Zeilen mit reservierter Höhe (mobil zwei Zeilen, ab sm eine). „Messzeit“ ist der neueste Punkt der Reihe in UTC mit Alter („gerade eben“ unter fünf Minuten).
+- **Marken:** `replayWhale` (`@/domain/alerts/replay`) spielt dieselbe Quelle (`whaleReading`) und dieselbe Engine (`stepAlerts`) wie der Alarm „Top-Trader-Umschlag“ Punkt für Punkt über den Verlauf: Ring = Vorwarnung, Raute = Bestätigung, grün/rot nach Seite. Standard-Schwellen der Engine (3 / 2 / 1 Punkt, Wiederholungssperre 6 Std.; eine gesperrte Marke ist blass), erster Blick still, ein Sprung über die Linie ist ein Ereignis. Die Regel steht in Worten unter der Legende; die eigenen Alarm-Einstellungen ändern die Marken nicht. Ein Rückblick auf eine Regel, keine Empfehlung.
+- **Verlauf auf diesem Gerät** (`@/market/netArchive`, F26-Erweiterung): vor der geladenen Reihe steht, was die Karte früher gezeigt hat (je Stunde ein Punkt, bis 180 Tage, IndexedDB `tj2-net-archive`, Schalter `tj2-net-archive-cfg`, standardmäßig an). Die Karte fragt dafür nichts bei der Börse an; sie merkt nur, was sie schon hat. Zeile unter dem Bild: wie viel, wie viele Lücken, ob es wächst; Schalter „Verlauf auf diesem Gerät merken“, „Als CSV“, „Löschen“ (zweistufig). Nicht in Backup und Cloud-Sync (kein Server-Archiv, keine Migration). Ohne Binance-Daten zeigt die Karte den gespeicherten Verlauf, gekennzeichnet „gespeichert“.
+- **Lücken statt Interpolation:** ein Abstand über 2,5 Schritte (`findNetGaps`) ist eine Lücke: die Linie bricht, die Strecke ist schraffiert („keine Daten“), Fadenkreuz und Pfeiltasten halten an der Lücke („Lücke … ohne Messwerte – nichts ergänzt“); Überschrift und Kennzahlen kommen aus dem neuesten lückenlosen Abschnitt, die Alarm-Prüfung beginnt nach einer Lücke neu (kein Umschlag wird über eine Lücke datiert).
+- **Zeiträume:** 7 / 30 / 90 Tage und „Alles · N Tage“; was der Verlauf noch nicht füllt, ist sichtbar ausgegraut (`rangeChoices`).
+- **Platz:** `PendingCard` in Endgröße (1369 px bei 390, 978 px bei 820, 975 px ab 1024), CLS ≤ 0,02 beim Laden und beim Wechsel von Reihe und Zeitraum. Kein neues CSS (nur schon vorhandene Utilities), der neue Code ist Teil des Lazy-Chunks der Karte.
+- **Lade-Zustand:** `ThinkingOrb` (search) im Kasten des Bildes.
+
+Tests: `tests/unit/signals.netSeries.test.ts`, `alerts.replay.test.ts`, `market.netArchive.test.ts`, `views.markt.traderNetWal.test.tsx`, `tests/e2e/trader-net-wal.spec.ts` (mobil + Desktop; Fixture `slide-account` in `tests/e2e/mocks/synth.ts`; gegen Mocks, nicht gegen echte Binance-Werte – fapi antwortet aus dem Sandbox-Netz mit 451).
+
 ## Etappe 1c (kürzere Seite)
 - Sechs Karten stehen eingeklappt in einer Zeile (`Fold`, „Mehr anzeigen“): Squeeze, Preis- & RSI-Struktur, Ähnliche Situationen, Alarme & Zustellprotokoll, Ereignisphasen (in `TermineSection`), Box-Einstellungen. Die `data-testid` der Karten bleiben im DOM; der Funktionsfinder öffnet die Karte beim Ansprung. Höhe bei 390 px: 21 273 → 11 200 px.
 

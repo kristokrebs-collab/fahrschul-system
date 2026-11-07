@@ -937,6 +937,10 @@ heller über der Zeitachse (Überblendung per `opacity`); Reduced Motion = ferti
 („Balance Chart“: Flächenlinie nach Trend gefärbt, Zeitraum-Schalter bis „Alles“) nur als Idee; Code und Werte sind eigene.
 
 
+### Wal-Karte vollständig (Runde 11)
+
+Dieselbe Fläche, mehr Auskunft, kein neues CSS: Marken auf der Kurve (Ring = Vorwarnung, Raute = Bestätigung, in Gewinn-/Verlustton; Form statt nur Farbe), Lücken als blasse Fläche mit gestrichelten Rändern und dem Wort „keine Daten“ (Fadenkreuz und Pfeiltasten halten dort an), drei Zeilen Herkunft (Quelle · Kohorte · Messzeit) in Plex Sans 11 px unter den Kennzahlen, darunter zwei Umschalter (Reihe, Zeitraum; was der Verlauf noch nicht füllt, ist ausgegraut). Ladezustand: `ThinkingOrb` im Kasten des Bildes. Alles mit vorhandenen Tokens und Utilities; Höhen reserviert (`PendingCard` 1369 / 978 / 975 px).
+
 ## Reiche Seiten (Runde 10, Karten / Kacheln / Leerzustände)
 
 Auf jeder Seite ausser Übersicht und Cockpit (`[data-rich]`, `RichContext`) ist die Bewegung dichter – dieselbe Sprache, nur mehr davon. Karten: weicher Frost-Schleier beim Hover, wenige Karten mit sehr leichtem Tilt und mitlaufendem Glanz (`Card tilt`), die eine hervorgehobene Karte einer Seite mit einer Randlicht-Runde (`Card highlight`). Kacheln kommen in einer Diagonalwelle. Kopfzeile: Titelwörter werden aus einer Zeile hochgezogen, dahinter zwei sehr langsame Lichtflecke, bei Maus ein Spotlight, ab 1100 px ein Geisterwort (7 % Tinte, kein Seitentitel). Abschnittstitel steigen beim Hereinscrollen um 14 px auf und verlieren 2 px Tiefenunschärfe (nur Scroll-Zeitleiste). Leerzustände zeigen statt des ∅ ein kleines laufendes Bild (Linie zeichnet sich, Orbit, Punkte finden zu einem Ring) – immer mit der Aktion darunter. Alles nur `transform` / `opacity` (ein Strich-Versatz), pausiert ausserhalb des Bildschirms und bei verdecktem Tab, bei Reduced Motion fertig. Einzelheiten und Schutzbedingungen: `src/motion/README.md` („Seiten, Karten, Kacheln, Leerzustände“).

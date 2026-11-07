@@ -393,6 +393,8 @@ predict the price (the help line under the chart says so).
 
 Runde 10 – die große Karte auf Markt › Einordnung (`src/views/markt/TraderNetCard.tsx`) liest dieselbe `TraderNetView`; dafür kamen dazu: `previousFlip` (der Umschlag vor dem letzten: der, der den vorigen Lauf auf der Gegenseite beendete; `null` = keiner im geladenen Verlauf), `netTitle(view)` (die Überschrift in Worten: `since-previous` „… seit 28.10. netto Short – erstmals seit 03.10.“ · `first-in-history` „… – im geladenen Verlauf von 20 Tagen erstmals.“ · `no-flip` · `balanced` · `short` · `none`; nie ein Datum außerhalb des geladenen Verlaufs) und `netDayText` (UTC-Tag `28.10.`, auch für die Achsen). Rechenkern und Flip-Regeln sind unverändert (`lastCrossing` ist die herausgezogene frühere Schleife).
 
+Wal-Karte (C3): `netSeries.ts` (bewusst nicht im Index, damit es im Lazy-Chunk der Karte bleibt – direkt aus `@/domain/signals/netSeries` importieren) – die zwei Reihen (Positionen / Konten), das Raster des gespeicherten Verlaufs, `mergeNetPoints` (gespeicherte Punkte nur vor der Live-Reihe), Lücken (`findNetGaps`, Faktor 2,5, nie gefüllt), `latestRun`, CSV; dazu `buildTraderNetFromPoints` in `traderNet.ts` (dieselbe Ansicht aus fertigen Punkten).
+
 Tests: `tests/unit/signals.traderNet.test.ts`, `tests/unit/signals.traderNet.title.test.ts`, `tests/unit/views.overview.traderNet.test.tsx`, `tests/unit/views.markt.traderNet.test.tsx`, `tests/e2e/trader-net.spec.ts`, `tests/e2e/trader-net-markt.spec.ts`
 (mock script `flip-short` in `tests/e2e/mocks/synth.ts`). Not checked against real Binance values (fapi answers 451 from the sandbox).
 
