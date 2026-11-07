@@ -262,6 +262,10 @@ async function connect(over: Row = {}) {
 }
 
 beforeEach(() => {
+  // The fixtures are dated 2026-10-01 … 12 and the first sync window is 30 days: pin the clock to their time, so the suite
+  // does not rot with the calendar (only `Date` is faked – timers stay real).
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-13T12:00:00Z"));
   process.env.EXCHANGE_ENC_KEY_V1 = randomBytes(32).toString("base64");
   delete process.env.STRIPE_SECRET_KEY;
   delete process.env.SYNC_CRON_ENABLED;
@@ -274,6 +278,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   setSupabaseAdminForTests(null);
   setAdapterRuntimeForTests(null);
   process.env = { ...ORIGINAL_ENV };
