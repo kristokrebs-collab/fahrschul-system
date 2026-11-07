@@ -11,10 +11,11 @@ import { BillingBanner, BillingCard, BillingHost, LimitMeter, PlanCard, UpgradeT
 import { setCloudEnabledForTests } from "@/cloud/env";
 import { resetCloudSession, useCloudSession } from "@/cloud/session";
 import { MotionRoot } from "@/motion/MotionRoot";
+import { clearReturnTo, peekReturnTo } from "@/store/returnTo";
 import { PreiseView } from "@/views/preise";
 
 const USER = { id: "11111111-1111-4111-8111-111111111111", email: "t@example.com", aal: "aal1" as const, mfaEnrolled: false };
-const CONFIG: BillingStatus["config"] = { enabled: true, trialDays: 14, referralTrialDays: 30, cardless: false, prices: {}, available: ["pro", "premium", "team"] };
+const CONFIG: BillingStatus["config"] = { enabled: true, trialDays: 14, referralTrialDays: 30, cardless: false, prices: {}, available: ["pro", "premium", "team"], purchaseOpen: true };
 const SUB: SubscriptionSummary = {
   id: "sub_1",
   plan: "pro",
@@ -50,6 +51,7 @@ beforeEach(() => {
   resetCloudSession();
   useCloudSession.setState({ phase: "signedOut" });
   resetBilling();
+  clearReturnTo();
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string, init: RequestInit = {}) => {
@@ -108,7 +110,7 @@ describe("PlanCard", () => {
     expect(screen.getByTestId("plan-next")).toHaveTextContent("Verlängert sich am 12.11.2026.");
     expect(screen.getByText("12 € pro Monat")).toBeInTheDocument();
     expect(screen.getByTestId("limit-savedViews")).toHaveAttribute("data-full");
-    fireEvent.click(screen.getByRole("button", { name: "Vertrag hier kündigen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Verträge hier kündigen" }));
     expect(useBilling.getState().cancelOpen).toBe(true);
   });
 
@@ -122,7 +124,7 @@ describe("PlanCard", () => {
     useBilling.setState({ account: ACCOUNT({ ...SUB, cancelAtPeriodEnd: true, cancelAt: SUB.currentPeriodEnd }) });
     wrap(<PlanCard />);
     expect(screen.getByRole("button", { name: "Kündigung zurücknehmen" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Vertrag hier kündigen" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Verträge hier kündigen" })).toBeNull();
   });
 });
 
@@ -158,7 +160,8 @@ describe("gates", () => {
     const sheet = await screen.findByTestId("upgrade-sheet");
     expect(sheet).toHaveTextContent("Enthalten in Premium");
     expect(sheet).toHaveTextContent("KI-Coach");
-    expect(screen.getByTestId("upgrade-cta")).toHaveTextContent("Anmelden und testen");
+    // the way to the order summary – the order button itself says "Zahlungspflichtig bestellen" (B4)
+    expect(screen.getByTestId("upgrade-cta")).toHaveTextContent("Weiter zur Bestellung");
   });
 
   it("LimitMeter: usage against the plan's limit, unlimited without payments", () => {
@@ -193,25 +196,31 @@ describe("2FA", () => {
   });
 });
 
-describe("cancellation", () => {
-  it("reason → offer → confirm → done, the reason reaches the server", async () => {
+describe("cancellation (§ 312k: the confirmation first, the reason only after it)", () => {
+  it("confirmation page → 'Jetzt kündigen' → done; THEN the optional reason reaches the server", async () => {
     useCloudSession.setState({ phase: "signedIn", user: USER });
     useBilling.setState({ config: CONFIG, account: ACCOUNT(SUB), cancelOpen: true });
     wrap(<BillingHost />);
     const sheet = await screen.findByTestId("cancel-sheet");
-    fireEvent.click(within(sheet).getByRole("radio", { name: "Zu teuer" }));
-    fireEvent.click(screen.getByRole("button", { name: "Weiter zur Kündigung" }));
-    await waitFor(() => expect(screen.getByTestId("cancel-sheet")).toHaveTextContent("1 Monat pausieren"));
-    fireEvent.click(screen.getByRole("button", { name: "Weiter zur Kündigung" }));
-    await waitFor(() => expect(screen.getByTestId("cancel-sheet")).toHaveAttribute("data-step", "confirm"));
-    // AnimatePresence "wait": the new step mounts after the old one left
-    await waitFor(() => expect(screen.getByTestId("cancel-sheet")).toHaveTextContent("Dein Abo endet am 12.11.2026."));
+    // the FIRST page is the confirmation: no reason chips, no offer in front of it
+    expect(sheet).toHaveAttribute("data-step", "confirm");
+    expect(within(sheet).queryByRole("radio")).toBeNull();
+    expect(sheet).not.toHaveTextContent("pausieren");
+    await waitFor(() => expect(screen.getByTestId("cancel-end")).toHaveTextContent("Dein Abo endet am 12.11.2026."));
     await act(async () => {
       fireEvent.click(screen.getByTestId("cancel-now"));
     });
     await waitFor(() => expect(screen.getByTestId("cancel-sheet")).toHaveAttribute("data-step", "done"));
-    expect(posts.find((p) => p.path.endsWith("/portal"))?.body).toEqual({ action: "cancel", reason: "too_expensive" });
+    expect(posts.find((p) => p.path.endsWith("/portal"))?.body).toEqual({ action: "cancel" });
     expect(useBilling.getState().account?.subscription?.cancelAtPeriodEnd).toBe(true);
+    // the reason comes after, changes nothing
+    const after = await screen.findByTestId("cancel-after");
+    fireEvent.click(within(after).getByRole("radio", { name: "Zu teuer" }));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("cancel-feedback"));
+    });
+    const last = posts.filter((p) => p.path.endsWith("/portal")).at(-1)!;
+    expect(last.body).toEqual({ action: "feedback", reason: "too_expensive" });
   });
 });
 
@@ -226,7 +235,9 @@ describe("PreiseView", () => {
     expect(within(table).getByRole("rowheader", { name: "KI-Coach" })).toBeInTheDocument();
     expect(screen.getByTestId("plan-premium")).toHaveTextContent("KI-Coach mit Wochenanalyse");
     expect(screen.getByTestId("legal-cancel")).toHaveTextContent("Verträge hier kündigen");
-    expect(screen.getByTestId("cta-pro")).toHaveTextContent("14 Tage gratis testen");
+    // never "N Tage gratis testen" on the way to the order (§ 312j Abs. 3 BGB): the button leads to the summary
+    expect(screen.getByTestId("cta-pro")).toHaveTextContent("Weiter zur Bestellung");
+    expect(screen.getByTestId("preise-view")).not.toHaveTextContent(/Tage gratis testen\s*$/);
   });
 
   it("without an AI key on the server the page never sells the KI-Coach (Review F06)", () => {
@@ -246,21 +257,35 @@ describe("PreiseView", () => {
     expect(screen.getByTestId("billing-closed")).toHaveTextContent("Keine Abos in dieser Version");
     expect(screen.queryByTestId("cta-pro")).toBeNull();
     expect(screen.getByTestId("note-pro")).toHaveTextContent("Noch nicht buchbar");
-     // no action → the notch disc is plainly decorative (no red arrow pretending to be a button, review F5)
-    for (const p of ["free", "pro", "premium", "team"]) {
-      expect(within(screen.getByTestId(`plan-${p}`)).queryByRole("button")).toBeNull();
-      expect(within(screen.getByTestId(`plan-${p}`)).getByTestId("notch-disc-quiet")).toBeInTheDocument();
+    for (const p of ["free", "pro", "premium", "team"]) expect(screen.queryByTestId(`cta-${p}`)).toBeNull();
+  });
+
+  it("the cards: the free card registers, a paid card leads to the order (signed out: noted for returnTo, registration opens) or to the detail", async () => {
+    useBilling.setState({ config: CONFIG });
+    wrap(<PreiseView />);
+    fireEvent.click(screen.getByTestId("cta-free"));
+    await waitFor(() => expect(useCloudSession.getState().sheet).toMatchObject({ open: true, view: "signup" }));
+    useCloudSession.setState({ sheet: { ...useCloudSession.getState().sheet, open: false } });
+    fireEvent.click(screen.getByTestId("cta-pro"));
+    expect(peekReturnTo()).toMatchObject({ target: { kind: "order" }, wait: { on: "signedIn" } });
+    fireEvent.click(screen.getByTestId("details-premium"));
+    expect(useBilling.getState().detail).toMatchObject({ open: true, plan: "premium" });
+  });
+
+  it("the purchase flow stays locked while the server says so: the paid cards say 'Noch nicht bestellbar' and offer no order", () => {
+    useBilling.setState({ config: { ...CONFIG, purchaseOpen: false, purchaseBlockedBy: ["legal"] } });
+    wrap(<PreiseView />);
+    for (const p of ["pro", "premium", "team"]) {
+      expect(screen.queryByTestId(`cta-${p}`)).toBeNull();
+      expect(screen.getByTestId(`note-${p}`)).toHaveTextContent("Noch nicht bestellbar");
     }
   });
 
-  it("the notch disc of a card with an action IS that action (review F5)", async () => {
+  it("every price carries the tax note (PAngV) and the yearly saving is a calculation: 24 € / 17 % / 2 months for Pro", () => {
     useBilling.setState({ config: CONFIG });
     wrap(<PreiseView />);
-    const disc = screen.getByTestId("disc-free");
-    expect(disc.tagName).toBe("BUTTON");
-    expect(disc).toHaveAccessibleName("Kostenlos starten");
-    fireEvent.click(disc);
-    await waitFor(() => expect(useCloudSession.getState().sheet).toMatchObject({ open: true, view: "signup" }));
-    expect(screen.getByTestId("disc-pro")).toHaveAccessibleName(screen.getByTestId("cta-pro").textContent!);
+    expect(screen.getByTestId("preise-view")).toHaveTextContent("für Verbraucher inklusive gesetzlicher Umsatzsteuer");
+    expect(screen.getByTestId("price-pro")).toHaveTextContent("2 Monate gratis");
+    expect(screen.getByTestId("price-pro")).toHaveTextContent("spart 24 € gegenüber 12 Monatszahlungen (−17 %)");
   });
 });
