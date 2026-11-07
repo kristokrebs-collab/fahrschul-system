@@ -39,7 +39,7 @@ Nur auf Seiten mit `[data-rich]` (nie Übersicht/Cockpit):
 | `BinanceWizard.tsx` | Binance: Anleitung → Key eintragen → Prüfung (Rechte lesen: ablehnen / nachfragen / ok) → Erstimport mit Fortschritt; verbunden: abgleichen, Probelauf, neu einlesen, trennen |
 | `TradingViewWizard.tsx`, `tvStore.ts`, `tvTemplates.ts` | Zieladresse erstellen/ersetzen/löschen → Alarm-Vorlagen und Pine-Beispiel kopieren → Testsignal senden → Empfang |
 | `InfoPanels.tsx` | Bitunix (übergibt an den vorhandenen Dialog), E-Mail-Alarm, Telefon-Alarm, Cloud-Konto |
-| `partners.ts`, `PartnerBox.tsx` | Partnerlinks, **aus** solange der Betreiber keinen Link setzt; immer gekennzeichnet (`docs/PARTNERLINKS.md`) |
+| `partners.ts`, `PartnerBox.tsx` | Partnerlinks, **aus** solange der Betreiber keinen eigenen Link setzt (heute keiner); immer gekennzeichnet mit einem Satz in einfachen Worten, ohne Land und ohne Rechtsbegriff (`docs/PARTNERLINKS.md`) |
 | `ConnectionsHub.tsx` | die Karte für Einstellungen |
 | `strings.ts`, `services.ts` | Texte, Katalog der Dienste |
 

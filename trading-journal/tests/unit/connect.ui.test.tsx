@@ -437,7 +437,7 @@ describe("partner box", () => {
     expect(a.getAttribute("href")).toBe("https://www.binance.com/register?ref=OPERATOR1");
     expect(a.getAttribute("rel")).toBe("sponsored noopener noreferrer");
     expect(a.getAttribute("target")).toBe("_blank");
-    expect(screen.getByTestId("partner-notice").textContent).toBe("Partnerlink – wir erhalten ggf. eine Provision, für dich ändert sich nichts.");
+    expect(screen.getByTestId("partner-notice").textContent).toBe("Partnerlink – wir bekommen eventuell eine Provision, für dich ändert sich nichts.");
     expect(screen.getByText("Noch kein Konto?")).toBeTruthy();
     expect(a.textContent).toMatch(/Konto bei Binance anlegen/);
   });

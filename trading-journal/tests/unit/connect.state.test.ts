@@ -212,7 +212,9 @@ describe("partner links (off by default)", () => {
     const l = partnerLink("binance", { VITE_PARTNER_BINANCE_REF: "https://www.binance.com/register?ref=OPERATOR1" });
     expect(l).toMatchObject({ id: "binance", name: "Binance", href: "https://www.binance.com/register?ref=OPERATOR1", rel: "sponsored noopener noreferrer" });
     expect(l!.notice).toBe(PARTNER_NOTICE);
-    expect(PARTNER_NOTICE).toBe("Partnerlink – wir erhalten ggf. eine Provision, für dich ändert sich nichts.");
+    expect(PARTNER_NOTICE).toBe("Partnerlink – wir bekommen eventuell eine Provision, für dich ändert sich nichts.");
+    // plain words: no abbreviation, no legal term, no country
+    expect(PARTNER_NOTICE).not.toMatch(/ggf\.|UWG|DDG|Deutschland|EU\b|DSGVO/);
   });
 
   it.each([

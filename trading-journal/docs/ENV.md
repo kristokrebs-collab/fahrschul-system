@@ -17,7 +17,7 @@ die, die sie voraussetzen.
 | `BINANCE_FUTURES_BASE` | Dasselbe für die USDⓈ-M-Futures-API | Nein | `https://fapi.binance.com` |
 | `SITE_ORIGIN` | Öffentliche Adresse der Seite (`https://…`, ohne Schrägstrich am Ende); der TradingView-Assistent baut daraus die Zieladresse | Empfohlen | Der Assistent nimmt die Adresse, unter der die Seite gerade geöffnet ist |
 | `SYNC_CRON_ENABLED` | `false` stoppt den automatischen Abgleich alle 30 Minuten | Nein | Der Abgleich läuft (sofern ein Tarif ihn enthält) |
-| `VITE_PARTNER_TRADINGVIEW_REF` | Vollständiger `https`-Link des TradingView-Partnerprogramms (öffentlich, **kein Geheimnis**) | Nein | Kein Partnerlink, der Dialog sieht aus wie ohne |
+| `VITE_PARTNER_TRADINGVIEW_REF` | Vollständiger `https`-Link des TradingView-Partnerprogramms (öffentlich, **kein Geheimnis**). **Heute leer lassen:** der Betreiber hat noch keine Partnerkonten; gesetzt wird erst mit eigenen Links | Nein | Kein Partnerlink, der Dialog sieht aus wie ohne |
 | `VITE_PARTNER_BINANCE_REF` | Dasselbe für Binance | Nein | dito |
 | `VITE_PARTNER_BITUNIX_REF` | Dasselbe für Bitunix | Nein | dito |
 

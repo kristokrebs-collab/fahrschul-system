@@ -22,8 +22,11 @@ export const PARTNER_ENV: Readonly<Record<PartnerId, string>> = {
   bitunix: "VITE_PARTNER_BITUNIX_REF",
 };
 
-/** The visible mark next to every partner link (UWG / DDG: advertising must be recognisable as such). */
-export const PARTNER_NOTICE = "Partnerlink – wir erhalten ggf. eine Provision, für dich ändert sich nichts.";
+/**
+ * The visible mark next to every partner link – ONE constant, plain words: no legal term, no abbreviation, no country
+ * (the target market is worldwide; which rules apply where is the operator's matter, `docs/PARTNERLINKS.md`).
+ */
+export const PARTNER_NOTICE = "Partnerlink – wir bekommen eventuell eine Provision, für dich ändert sich nichts.";
 
 export interface PartnerLink {
   id: PartnerId;
