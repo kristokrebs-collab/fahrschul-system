@@ -103,6 +103,10 @@ Jeder Zustand eines Knopfes hat eine Stimme, die reichen Feinheiten gibt es nur 
 | Auswahlliste | Zeilen laufen gestaffelt ein, Marker gleitet zur aktiven Zeile, Häkchen zeichnet sich; Öffnen-Logik unberührt | `MorphSelect` (nur Optik) |
 | Toast | gestaffelt rein (Symbol, Text, Wert, Aktion) und raus; Fortschrittsleiste; `milestone` = ein kleines Konfetti, nie bei Routine | `ToastIsland onMilestone` |
 
+### Verbindungen (Launch-Bau, `src/connect`)
+
+Ein klickbarer Platzhalter (`ConnectSlot`) steht überall, wo eine Verbindung gebraucht wird – nur auf `[data-rich]`-Seiten oder in Komponenten, die dort eingebunden sind (nie Übersicht/Cockpit). Er ist eine Glasfläche (`.cx-glass`: Verlauf 7 % → 1,5 % → 5 % Schleier, Glanzkante oben, `backdrop-filter` nur wo er verfügbar ist, sonst die volle Kartenfläche; Text bleibt `fg`/`mute`, Kontrast wie auf einer Karte) mit Kachel, Name, ehrlichem Zustand und der Handlung. Sieben Zustände, nie ein geratener: nicht verbunden · verbindet · verbunden · Fehler (mit Klartext) · im höheren Tarif · nicht eingerichtet · Anmeldung nötig. Mindesthöhe 78 px (Platzhalter-Umriss bis der Lazy-Chunk da ist, kein Springen), die ganze Zeile ist die Tippfläche. Ein Klick öffnet einen geführten Dialog (`Sheet`, Schritte mit Fortschrittsbalken, Prüfung mit Ergebnis, Rückfrage vor dem Fortfahren). Partnerlinks stehen nur unter „Noch kein Konto?“ im Dialog, nur wenn der Betreiber einen Link setzt (heute keiner), immer mit dem Satz „Partnerlink – wir bekommen eventuell eine Provision, für dich ändert sich nichts.“.
+
 ## Do / Don't
 
 **Do**

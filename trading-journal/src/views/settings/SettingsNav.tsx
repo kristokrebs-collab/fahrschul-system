@@ -11,6 +11,7 @@ const SectionNav = lazy(() => import("@/primitives/SectionNav").then((m) => ({ d
 const NAV: readonly SectionNavItem[] = [
   { id: "s-grundlagen", label: "Grundlagen" },
   { id: "s-maerkte", label: "Märkte und Signale" },
+  { id: "s-verbindungen", label: "Verbindungen" },
   { id: "s-regeln-gruppe", label: "Regeln" },
   { id: "s-sichern", label: "Sichern" },
   { id: "s-aussehen", label: "Aussehen und Hilfe" },

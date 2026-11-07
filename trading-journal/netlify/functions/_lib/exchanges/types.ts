@@ -11,6 +11,11 @@ export type ExchangeId = "bitunix" | "binance" | "bybit" | "okx";
 export const EXCHANGE_IDS: readonly ExchangeId[] = ["bitunix", "binance", "bybit", "okx"];
 export const isExchangeId = (v: unknown): v is ExchangeId => typeof v === "string" && (EXCHANGE_IDS as readonly string[]).includes(v);
 
+/** Binance keeps spot and USDⓈ-M futures apart: one connection reads exactly one of them. */
+export type ExchangeMarket = "spot" | "futures";
+export const EXCHANGE_MARKETS: readonly ExchangeMarket[] = ["spot", "futures"];
+export const isExchangeMarket = (v: unknown): v is ExchangeMarket => v === "spot" || v === "futures";
+
 export interface ExchangeCredentials {
   apiKey: string;
   secret: string;
@@ -154,6 +159,8 @@ export interface ExchangeAdapter {
   fetchTpSl(window: TimeWindow, opts?: ListOptions): Promise<ListResult<VenueTpSl>>;
   fetchOpenPositions(): Promise<VenueOpenPosition[]>;
   fetchTickers(symbols: readonly string[]): Promise<VenueTicker[]>;
+  /** Notes of the last reads (adapters that rebuild positions from fills). */
+  notes?(): AdapterNotes;
 }
 
 export interface ListOptions {
@@ -172,6 +179,21 @@ export interface ListResult<T> {
   nextSkip: number;
   /** Requests made (rate-limit budget, tests). */
   requests: number;
+  /**
+   * Where the next call of the same window resumes, when the adapter pages by something other than a row offset
+   * (Binance: the index of the next symbol). Default: `nextSkip − 100` (Bitunix re-reads its last page).
+   */
+  resumeSkip?: number;
+}
+
+/** What an adapter could not turn into a trade (shown as an honest note, never hidden). */
+export interface AdapterNotes {
+  /** Closing fills whose opening lies before the history the venue returns (not a trade). */
+  orphanFills: number;
+  /** Fees paid in a coin that cannot be converted (e.g. BNB discount) – counted as 0 in the trade. */
+  unknownFees: number;
+  /** Symbols read. */
+  symbols: number;
 }
 
 /** Venue error with a German, user-facing message (never contains the key, secret or a signature). */

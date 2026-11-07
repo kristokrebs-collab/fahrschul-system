@@ -102,6 +102,25 @@ export function parseTvAlert(text: string): { ok: true; alert: TvAlert } | { ok:
   return { ok: true, alert: p.data };
 }
 
+/**
+ * The connection assistant's test signal: `{"action":"test","symbol":"{{ticker}}","source":"app"}`. It creates NO trade –
+ * the webhook only records that it arrived (`webhook_receipts`). `source: "app"` marks the button inside this app (the
+ * assistant tests its own URL), anything else counts as external (normally TradingView). Null for every other body.
+ */
+export function tvTestPing(text: string): { via: "app" | "extern"; symbol: string | null } | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  if (o.action !== "test") return null;
+  const symbol = typeof o.symbol === "string" && o.symbol.trim() ? o.symbol.trim().slice(0, 40) : typeof o.ticker === "string" ? o.ticker.trim().slice(0, 40) : null;
+  return { via: o.source === "app" ? "app" : "extern", symbol: symbol || null };
+}
+
 /** A price / size field that means something: > 0, else null (TradingView templates often send 0 for "not set"). */
 function positive(n: number | null | undefined): number | null {
   return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : null;

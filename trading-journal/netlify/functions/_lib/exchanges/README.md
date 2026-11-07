@@ -29,6 +29,29 @@ filtered by open time), `position/get_pending_positions` (live positions + the o
 `trade/get_history_trades` (fills per position, budgeted), `tpsl/get_history_orders` (stop / target),
 `market/tickers` (mark prices for the live positions).
 
+## Binance (`binance.ts`, `binanceTrades.ts`) – API-key route, read only, spot and USDⓈ-M futures kept apart
+
+Written from the official docs (developers.binance.com, 2026-11-06); **never run against the live exchange** (the sandbox gets HTTP 451) – tests use a fake
+venue in the documented payload shapes (`tests/unit/helpers/binanceVenue.ts`) that verifies every signature.
+
+- Signing: `signature = HMAC_SHA256(secret, queryString)` as the LAST parameter, header `X-MBX-APIKEY`, `timestamp` + `recvWindow` signed (the doc's example vector is a test).
+- Read-only by construction: `BinanceClient.get` issues GET only and only to `BINANCE_READ_PATHS`; weight-based spacing (≈ 80 % of the venue limit); 429 → one retry after
+  `Retry-After`; 418 / 451 / -2015 / -1022 / -1003 … → German `ExchangeError`s (451 blames the server region, not the key).
+- **Rights first** (`checkRights` → `/sapi/v1/account/apiRestrictions`, `evaluateRights`): withdrawal, internal / universal transfer, spot & margin trading, options, FIX trading, portfolio margin and a
+  missing read right are **refused** (`422 rights_refused`, nothing stored). Binance has no read-only flag for the futures API – "Futures" must be on – so that is a **warning**
+  the user must confirm (`409 rights_confirm`, then `acceptWarnings: true`); a spot connection with Futures on is a warning too. `permissions` stores `read`, `futures_enabled`, `ip_restricted`.
+- One connection = one market (`meta.market`, default labels "Spot" / "Futures", so both can exist; `unique (user_id, exchange, label)`). Spot extra pairs in `meta.symbols`.
+- No position history exists at Binance: trades are rebuilt from fills. Futures: symbols from the income history (`REALIZED_PNL`, 3 months), fills per symbol in 7-day slices
+  (`/fapi/v1/userTrades`, paged by moving the start), funding from `FUNDING_FEE`, allocated to the position that was open (hedge legs split evenly). Spot: pairs of the coins held now
+  (+ configured extras) found with one public price list, `/api/v3/myTrades` from the start then `fromId`. Reads go 30 days before the window (a position may start earlier).
+- **No duplicates**: the position id is `f-<symbol>[-leg]-<first fill id>` / `s-<symbol>-<first fill id>` → `t_bn_…`; the first fill never changes, so overlapping windows, repeated syncs, a resumed
+  import and the incremental cursor all hit the same record (`upsert_synced_trades` writes nothing for an unchanged one). A closing fill whose opening lies before the history is an
+  *orphan* (counted in `notes.orphanFills`, never made into a trade); an unfinished position is not returned; a fee in BNB is not converted (`notes.unknownFees`, 0 in the trade).
+- Resume: the adapter pages by symbol (`ListResult.resumeSkip`); a symbol is always read to the end, the deadline is checked between symbols.
+- Disconnect: `exchange-disconnect` marks running imports as stopped and deletes the row (key and cursor with it); `runSync` checks the connection before every write (`connection_gone`).
+- Plan: connecting needs the `exchangeSync` feature OR an `exchangeConnections` limit above 0 (`requireExchangeAccess`, read from `plans.ts`); the background cron stays behind `exchangeSync`.
+- Env: `BINANCE_EGRESS_IP`, `BINANCE_SPOT_BASE`, `BINANCE_FUTURES_BASE` (`docs/ENV.md`).
+
 ## Mapping (`mapping.ts`)
 
 - `symbolToPair` (`BTCUSDT` → `BTC/USDT`), `localWallClock(ms, tz)` (journal times are wall clock in the trader's zone).
@@ -56,7 +79,8 @@ filtered by open time), `position/get_pending_positions` (live positions + the o
 | file | what |
 |---|---|
 | `types.ts` | `ExchangeAdapter`, `Venue*` types, `ExchangeError`, `AdapterRuntime` (fetch / clock / sleep, injectable) |
-| `registry.ts` | `adapterFor(exchange, creds)` – Bitunix live; Binance / Bybit / OKX answer 501 with the CSV hint (phase 2) |
+| `registry.ts` | `adapterFor(exchange, creds, { market, symbols })` – Bitunix and Binance live; Bybit / OKX answer 501 with the CSV hint; `keyRights` reads a key's rights (Binance) |
+| `binance.ts`, `binanceTrades.ts` | the Binance adapter and the pure fills → positions step (above) |
 | `store.ts` | connections (`insertConnection` encrypts with the pre-generated id as AAD, `credentialsOf` decrypts, `rotateIfNeeded` re-encrypts with the newest key version after a sync or positions read, `rotateStaleConnections` is the cron's sweep over the rest), cursor, runs, `upsertSyncedTrades`, `pullSyncedTrades` (server-written trades only), `profileTz` |
 | `api.ts` | `requireExchangeSetup` (503 without `EXCHANGE_ENC_KEY_V1`), `exchangeHttpError`, `exchangePlanState`, `cronEnabled` (`SYNC_CRON_ENABLED`, default on), `nextCronAt`, `clientTz` |
 | `tokens.ts` | `tj_<43 base64url>` tokens, SHA-256 at rest, max 10 per user, `resolveToken`, `personalToken(req)` |

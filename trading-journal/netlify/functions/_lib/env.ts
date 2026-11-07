@@ -29,6 +29,9 @@ export const SERVER_ENV = [
   "RESEND_API_KEY",
   "ALERT_FROM",
   "SEC_USER_AGENT",
+  "BINANCE_EGRESS_IP",
+  "BINANCE_SPOT_BASE",
+  "BINANCE_FUTURES_BASE",
 ] as const;
 
 /** Known names plus further key versions for rotation (`EXCHANGE_ENC_KEY_V2`, …). */

@@ -357,8 +357,9 @@ describe("connect / disconnect", () => {
     expect(state.tables.sync_runs ?? []).toHaveLength(0);
   });
 
+  // Binance is live since the Verbindungen package (tests/unit/connect.binance.*.test.ts) – Bybit and OKX still answer 501
   it("other venues answer an honest 501 until phase 2", async () => {
-    const r = await connect({ exchange: "binance" });
+    const r = await connect({ exchange: "bybit" });
     expect(r.status).toBe(501);
     expect(String((r.body.error as Row).message)).toMatch(/CSV-Import/);
   });

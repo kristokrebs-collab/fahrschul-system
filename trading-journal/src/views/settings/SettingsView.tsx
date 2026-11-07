@@ -17,7 +17,7 @@ import { Card } from "@/primitives/Card";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import { Later } from "@/primitives/Later";
-import { RESERVE_CLASS, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
+import { CardSkeleton, RESERVE_CLASS, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 import { Skeleton } from "@/primitives/Skeleton";
 import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
@@ -47,6 +47,8 @@ import { SymbolField } from "./SymbolField";
 
 // F26: the archive card (its store view, export and texts) is its own chunk – fetched when the settings page renders it
 const ArchiveCard = lazy(() => import("./ArchiveCard"));
+// Verbindungen: the hub of every connection (placeholders + dialog) is its own chunk, fetched when the settings page renders it
+const ConnectionsHub = lazy(() => import("@/connect/ConnectionsHub"));
 
 export const SETTINGS_STRINGS = {
   title: "Einstellungen",
@@ -123,6 +125,7 @@ const SIZE = {
   theme: { base: 393, sm: 433, lg: 443 },
   tour: { base: 529, sm: 415, lg: 443 },
   more: { base: 361, sm: 266, lg: 266 },
+  connect: { base: 972, sm: 880, lg: 690 },
 } as const satisfies Record<string, ReserveHeight>;
 
 function LateCard({ size, className, children }: { size: ReserveHeight; className?: string; children: ReactNode }) {
@@ -137,6 +140,7 @@ function LateCard({ size, className, children }: { size: ReserveHeight; classNam
 const G = {
   basics: { title: "Grundlagen", sub: "Konten und die Referenzwerte, mit denen deine Trades verglichen werden." },
   markets: { title: "Märkte und Signale", sub: "Chart-Level, Kursquellen und die Prüfung vor dem Einstieg." },
+  connect: { title: "Verbindungen", sub: "Deine eigenen Konten und Dienste: Börsen, TradingView, Alarme, Cloud-Konto – jede Verbindung gehört dir und lässt sich jederzeit trennen." },
   rules: { title: "Regeln und Disziplin", sub: "Was du dir vornimmst – und woran du Fehler erkennst." },
   keep: { title: "Sichern und Speichern", sub: "Backup, lokales Archiv und Speicher dieses Geräts." },
   look: { title: "Aussehen und Hilfe", sub: "Modus, Akzent, Einführung und die Einstellungen anderer Seiten." },
@@ -329,6 +333,15 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
         </SettingsGroup>
 
         {/* the tags stand tall on the left, the rules and the limits are stacked on the right: no card is half empty next to a gap */}
+        {/* Verbindungen: every service with its honest state (nothing is hosted for the user) */}
+        <SettingsGroup section="s-verbindungen" title={G.connect.title} sub={G.connect.sub}>
+          <LateCard size={SIZE.connect} className="lg:col-span-2">
+            <Suspense fallback={<CardSkeleton rows={6} />}>
+              <ConnectionsHub />
+            </Suspense>
+          </LateCard>
+        </SettingsGroup>
+
         <SettingsGroup section="s-regeln-gruppe" title={G.rules.title} sub={G.rules.sub}>
           <LateCard size={SIZE.mistakes} className="lg:row-span-2">
             <MistakesCard rows={draft.mistakes} onChange={setMistakes} trades={trades} changed={changed.has("mistakes")} />

@@ -47,6 +47,8 @@ export interface MapContext {
   feesIncluded?: boolean | null;
   tpsl?: readonly VenueTpSl[];
   fills?: readonly VenueFill[] | null;
+  /** Binance spot connections write `spot`; everything else is a perpetual (default). */
+  market?: "perp" | "spot";
 }
 
 export interface MappedPosition {
@@ -276,7 +278,7 @@ export function mapClosedPosition(p: VenueClosedPosition, ctx: MapContext): Mapp
     syncSource: `${ctx.exchange}-api`,
     syncedAt: ctx.nowIso,
     origin: { kind: "api" },
-    market: "perp",
+    market: ctx.market ?? "perp",
     side,
     status: "closed",
     date: localWallClock(p.openedAt, tz),

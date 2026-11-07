@@ -8,14 +8,14 @@ import { Button } from "@/primitives/Button";
 import { closeDryRun, primaryConnection, syncNow, useExchange } from "../store";
 import { DRY } from "../strings";
 import type { PositionCheck, SyncResult } from "../types";
-import { Money, shortWhen } from "./parts";
+import { Money, shortWhen, VENUE_NAME } from "./parts";
 
 const TOP = 8;
 
-function conventionLine(r: SyncResult): { text: string; tone: "win" | "warn" } {
+function conventionLine(r: SyncResult, venue: string): { text: string; tone: "win" | "warn" } {
   const c = r.convention;
   if (!c.used) return { text: DRY.conventionOpen, tone: "warn" };
-  return c.feesIncluded ? { text: DRY.conventionIncl(c.samples), tone: "win" } : { text: DRY.conventionOk(c.samples), tone: "win" };
+  return c.feesIncluded ? { text: DRY.conventionIncl(c.samples, venue), tone: "win" } : { text: DRY.conventionOk(c.samples, venue), tone: "win" };
 }
 
 function Row({ c }: { c: PositionCheck }) {
@@ -62,13 +62,14 @@ export function DryRunSheet() {
   const open = useExchange((s) => s.dryOpen);
   const res = useExchange((s) => s.dryRun);
   const busy = useExchange((s) => s.busy);
-  const connectionId = useExchange((s) => primaryConnection(s.status)?.id ?? null);
+  const connectionId = useExchange((s) => s.dryConnectionId ?? primaryConnection(s.status)?.id ?? null);
+  const venue = useExchange((s) => VENUE_NAME[s.status?.connections.find((c) => c.id === (s.dryConnectionId ?? ""))?.exchange ?? "bitunix"] ?? "Bitunix");
   const [all, setAll] = useState(false);
   if (!res) return null;
   const checks = [...res.checks].sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
   const shown = all ? checks : checks.slice(0, TOP);
   const fresh = res.checks.filter((c) => c.state === "new").length;
-  const conv = conventionLine(res);
+  const conv = conventionLine(res, venue);
   return (
     <Sheet
       open={open}
@@ -98,7 +99,7 @@ export function DryRunSheet() {
     >
       <div className="grid gap-4" data-testid="dry-sheet">
         <StaggerItem>
-          <p className="text-[13px] text-mute">{DRY.lead}</p>
+          <p className="text-[13px] text-mute">{DRY.leadFor(venue)}</p>
         </StaggerItem>
         <StaggerItem className="grid grid-cols-3 gap-2">
           {(

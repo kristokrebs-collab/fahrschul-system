@@ -19,6 +19,7 @@ import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
+import { ConnectSlot } from "@/connect/ConnectSlot";
 import { EmailAlertSection } from "./EmailAlertSection";
 import { BASIS_LABEL, ALERTS as A, OUTCOME_TONE } from "./strings";
 import { SwitchRow } from "./SwitchRow";
@@ -125,6 +126,9 @@ export const AlertsCard = memo(function AlertsCard() {
         </div>
 
         <EmailAlertSection />
+
+        {/* Verbindungen: the telephone alarm is not set up yet – the placeholder says so instead of hiding it */}
+        <ConnectSlot service="alert-phone" />
 
         <div className="grid gap-2 border-t border-line pt-4">
           <div className="flex flex-wrap items-center justify-between gap-2">

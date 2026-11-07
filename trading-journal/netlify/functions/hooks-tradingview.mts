@@ -14,18 +14,21 @@
  *        "unchanged"); otherwise (no id, or an id never opened – the exit order of strategy.close/exit has its own id)
  *        the newest open webhook trade of the symbol, of the given side
  *        ("long"/"short", or "sell" = closes a long, "buy" = a short). A qty/size on the close fills a missing size.
- * Re-delivered alerts change nothing. 60 per minute per token; plan feature `apiAccess`. Always JSON, never echoes the
- * token.
+ * test → `{"action":"test","symbol":"{{ticker}}"}`: the connection assistant's test signal. Creates no trade, needs no size,
+ *        works in every plan; it is only recorded in `webhook_receipts` ("Empfang" in the assistant).
+ * Re-delivered alerts change nothing. 60 per minute per token; plan feature `apiAccess` for open / close. Every call is
+ * written to the receipt log (kind, symbol, short reason – no alert text). Always JSON, never echoes the token.
  */
 import type { Config, Context } from "@netlify/functions";
 import { handler, HttpError, json, requireMethod } from "./_lib/http";
 import { requireFeature } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { supabaseAdmin } from "./_lib/supabase";
-import { parseTvAlert, tvCloseFill, tvCloseSet, tvCloseSide, tvOpenItem, tvSymbolToPair, tvTradeId, type SetupRef } from "./_lib/exchanges/inbound";
+import { parseTvAlert, tvCloseFill, tvCloseSet, tvCloseSide, tvOpenItem, tvSymbolToPair, tvTestPing, tvTradeId, type SetupRef } from "./_lib/exchanges/inbound";
 import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
 import { profileTz, upsertSyncedTrades } from "./_lib/exchanges/store";
 import { hashToken, resolveToken } from "./_lib/exchanges/tokens";
+import { recordReceipt } from "./_lib/connections/receipts";
 
 const MAX_BYTES = 16 * 1024;
 
@@ -66,9 +69,25 @@ export default handler(async (req, ctx) => {
   const token = tokenOf(req, ctx);
   await enforceRateLimit(rateKey("hook-tv", hashToken(token).slice(0, 24)), 60, 60);
   const owner = await resolveToken(token, "webhook:tradingview");
-  await requireFeature(owner.userId, "apiAccess");
   const text = await req.text();
   if (new TextEncoder().encode(text).length > MAX_BYTES) throw new HttpError(413, "payload_too_large");
+  // the assistant's test signal: recorded, no trade, no plan gate (connecting must be testable before anything else)
+  const ping = tvTestPing(text);
+  if (ping) {
+    await recordReceipt(owner.userId, { kind: "test", via: ping.via, symbol: ping.symbol });
+    return json({ ok: true, result: "test" });
+  }
+  try {
+    return await handleAlert(owner.userId, text);
+  } catch (e) {
+    if (e instanceof HttpError) await recordReceipt(owner.userId, { kind: "rejected", detail: `${e.status} ${e.message}` });
+    throw e;
+  }
+});
+
+async function handleAlert(userId: string, text: string): Promise<Response> {
+  const owner = { userId };
+  await requireFeature(owner.userId, "apiAccess");
   const parsed = parseTvAlert(text);
   if (!parsed.ok) throw new HttpError(422, "invalid_alert", parsed.message);
   const a = parsed.alert;
@@ -81,7 +100,7 @@ export default handler(async (req, ctx) => {
     if (a.id) {
       const same = await webhookTradesByKey(owner.userId, a.id);
       const open = same.find((r) => !r.deleted && r.data.status === "open");
-      if (open) return json({ ok: true, id: open.id, result: "exists" });
+      if (open) return received(owner.userId, "open", a, { ok: true, id: open.id, result: "exists" });
       // every trade ever created under this key (tombstones too) holds a sequence number – take the next free one
       const taken = new Set(same.map((r) => r.id));
       seq = same.length;
@@ -89,7 +108,7 @@ export default handler(async (req, ctx) => {
     }
     const item = tvOpenItem(a, { userId: owner.userId, nowMs: now, tz, setups: await setupsOf(owner.userId), seq });
     const res = await upsertSyncedTrades(owner.userId, [item]);
-    return json({ ok: true, id: item.id, result: res[item.id] === "inserted" ? "created" : "exists" });
+    return received(owner.userId, "open", a, { ok: true, id: item.id, result: res[item.id] === "inserted" ? "created" : "exists" });
   }
 
   // close: the newest open webhook trade under the id, else the newest open one of the symbol (and side)
@@ -98,7 +117,7 @@ export default handler(async (req, ctx) => {
     const same = await webhookTradesByKey(owner.userId, a.id);
     target = same.find((r) => !r.deleted && r.data.status === "open") ?? null;
     // the key is known but nothing under it is open any more: a re-delivered close – never close another trade with it
-    if (!target && same.length) return json({ ok: true, id: same[0]!.id, result: "unchanged" });
+    if (!target && same.length) return received(owner.userId, "close", a, { ok: true, id: same[0]!.id, result: "unchanged" });
   }
   if (!target && (a.symbol || a.ticker)) {
     let q = sb
@@ -119,7 +138,13 @@ export default handler(async (req, ctx) => {
   if (!target) throw new HttpError(404, "no_open_trade", "Kein offener Webhook-Trade für dieses Symbol gefunden.");
   const id = target.id;
   const res = await upsertSyncedTrades(owner.userId, [{ id, set: tvCloseSet(a, { nowMs: now, tz }), fill: tvCloseFill(a, target.data), new: {} }]);
-  return json({ ok: true, id, result: res[id] === "updated" ? "closed" : "unchanged" });
-});
+  return received(owner.userId, "close", a, { ok: true, id, result: res[id] === "updated" ? "closed" : "unchanged" });
+}
+
+/** Logs an accepted trade alert in the receipt list and answers. */
+async function received(userId: string, kind: "open" | "close", a: { symbol?: string; ticker?: string }, body: Record<string, unknown>): Promise<Response> {
+  await recordReceipt(userId, { kind, symbol: a.symbol ?? a.ticker ?? null, detail: String(body.result ?? "") });
+  return json(body);
+}
 
 export const config: Config = { path: "/api/v1/hooks/tradingview/:token", method: ["POST"] };

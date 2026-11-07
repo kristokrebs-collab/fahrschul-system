@@ -167,7 +167,7 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 17 Funktionen
 
 ### Aktien beobachten & bewerten
 
-_Scannen, beobachten, lesen und bewerten – Aktien und Krypto._ · 9 Funktionen
+_Scannen, beobachten, lesen und bewerten – Aktien und Krypto._ · 10 Funktionen
 
 **Finden & beobachten**
 
@@ -179,6 +179,7 @@ _Scannen, beobachten, lesen und bewerten – Aktien und Krypto._ · 9 Funktionen
 | Sehen, welche Aktiengeschäfte Mitglieder des US-Kongresses gemeldet haben | Kongress-Tracker | Aktien › Kongress | teilweise |
 | Sehen, welche US-Branchen die Trendregel gerade kauft | Branchen-Trend | Aktien › Branchen-Trend | teilweise |
 | Ein grünes Branchen-Signal als Papier-Position durchspielen | Papier-Portfolio aus dem Branchen-Signal | Aktien › Branchen-Trend › Papier-Portfolio | teilweise |
+| Prüfen, ob deine TradingView-Alarme bei der App ankommen | TradingView verbinden (Zieladresse und Testsignal) | Aktien › Branchen-Trend › Pine-Skript | teilweise |
 
 **Zahlen & Bewertung**
 
@@ -428,7 +429,7 @@ _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
 
 ### Trades eintragen & Daten
 
-_Trades hineinbekommen, ordnen, sichern und prüfen._ · 17 Funktionen
+_Trades hineinbekommen, ordnen, sichern und prüfen._ · 19 Funktionen
 
 **Eintragen**
 
@@ -448,6 +449,7 @@ _Trades hineinbekommen, ordnen, sichern und prüfen._ · 17 Funktionen
 | Deine Börse verbinden, damit Trades von selbst kommen | Börsen-Anbindung (Bitunix) | Konto | fertig |
 | Neue Trades im Hintergrund von der Börse holen lassen | Automatischer Börsen-Abgleich | Konto › Börse | fertig |
 | Trades per TradingView-Alert oder Webhook anlegen lassen | TradingView-Webhook & API | Konto | teilweise |
+| Binance verbinden, damit deine Trades von selbst kommen | Binance verbinden (Spot und Futures) | Konto › Verbindungen | teilweise |
 
 **Ansehen & ordnen**
 
@@ -484,13 +486,14 @@ _Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 7 Funktionen
 
 ### Konto, Einstellungen & Hilfe
 
-_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 22 Funktionen
+_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 23 Funktionen
 
 **Konto & Tarif**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Anmelden, synchronisieren und das Konto verwalten | Konto & Cloud-Sync | Konto | fertig |
+| Sehen, was verbunden ist, und fehlende Verbindungen einrichten | Verbindungen (alle Dienste auf einen Blick) | Einstellungen › Verbindungen | fertig |
 | Tarif wählen, Abo verwalten oder kündigen | Abo & Tarife | Preise | fertig |
 | Sehen, welcher Tarif welche Funktion enthält | Tarife im Vergleich | Preise › Alle Funktionen im Vergleich | fertig |
 | Freunde einladen und Gutschrift erhalten | Freunde einladen (Empfehlungscode) | Konto | teilweise |
