@@ -146,6 +146,14 @@ async function mockConnections(page: Page, o: MockOptions = {}): Promise<Mock> {
   return m;
 }
 
+/**
+ * Signs in through the header pill. Two things this waits for on purpose (CI failure: "Alles synchron." never showed):
+ * - the sheet body is `inert` until the panel's morph has settled (`src/motion/Sheet.tsx`), and Playwright's `fill` on an
+ *   inert input "succeeds" without writing anything: on slow runners the e-mail was lost while the dialog already counted
+ *   as visible. So: wait until nothing in the dialog is inert, fill, and check that the values really stuck.
+ * - the end of the login is the welcome VIEW (`data-auth-view="welcome"`), not the text of the first sync: whether that
+ *   sync is already done is the cloud sync's business, not this spec's.
+ */
 async function signIn(page: Page): Promise<void> {
   const pill = page.locator('[data-cloud-pill="signin"]');
   const sheet = page.getByRole("dialog", { name: "Anmelden" });
@@ -155,16 +163,31 @@ async function signIn(page: Page): Promise<void> {
     if (!(await sheet.isVisible())) await pill.click();
     await expect(sheet).toBeVisible({ timeout: 3_000 });
   }).toPass({ timeout: 25_000 });
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
+  await expect(sheet.locator("[inert]")).toHaveCount(0, { timeout: 20_000 });
+  const email = sheet.getByLabel("E-Mail");
+  const password = sheet.getByLabel("Passwort", { exact: true });
+  await expect(async () => {
+    await email.fill(EMAIL);
+    await password.fill(PASSWORD);
+    await expect(email).toHaveValue(EMAIL, { timeout: 1_000 });
+    await expect(password).toHaveValue(PASSWORD, { timeout: 1_000 });
+  }).toPass({ timeout: 20_000 });
   await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 45_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
+  await expect(page.locator('[data-auth-view="welcome"]')).toBeVisible({ timeout: 45_000 });
+  const go = page.getByRole("button", { name: "Los geht’s" });
+  await expect(go).toBeVisible();
+  await go.click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
+/** Hosts that belong to the test world: the preview itself and the Supabase mock. Everything else is not mocked. */
+const isTestHost = (u: URL): boolean => u.hostname === "127.0.0.1" || u.hostname === "localhost" || u.hostname.endsWith("e2e-mock.supabase.co");
+
 async function openCloud(page: Page, hash: string, h1: string, o: MockOptions = {}): Promise<Mock> {
   collectErrors(page);
+  // Registered FIRST = asked last: only requests that no mock below answers land here. In CI they would go out to the real
+  // internet and answer differently than behind the sandbox's proxy; here they fail at once, like offline.
+  await page.route((u) => !isTestHost(u), (route) => route.abort("internetdisconnected"));
   await mockSupabase(page, {});
   const m = await mockConnections(page, o);
   await seed(page);
