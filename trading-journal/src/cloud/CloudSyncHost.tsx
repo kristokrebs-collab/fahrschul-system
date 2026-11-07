@@ -3,6 +3,7 @@ import { useEntitlement } from "@/billing/entitlements";
 import { hasClaudeRuntime } from "@/store/capability";
 import { pushToast } from "@/store/uiStore";
 import { cloudEnabled } from "./env";
+import { refreshOpsFlags } from "./flags";
 import { watchIdle } from "./idle";
 import { installErrorReporting } from "./report";
 import { bootCloud, ensureCloud, setSyncEntitled } from "./runtime";
@@ -46,6 +47,16 @@ export function CloudSyncHost({ onOpenAccount }: CloudSyncHostProps) {
   useEffect(() => {
     setSyncEntitled(entitled);
   }, [entitled]);
+
+  // C4: the operator's emergency switches (public, four booleans) – read once after sign-in, then every 5 minutes while visible
+  useEffect(() => {
+    if (!enabled || !signedIn) return;
+    void refreshOpsFlags();
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void refreshOpsFlags();
+    }, 5 * 60_000);
+    return () => clearInterval(t);
+  }, [enabled, signedIn]);
 
   useEffect(() => {
     if (!enabled || !signedIn) return;

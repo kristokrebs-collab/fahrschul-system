@@ -57,6 +57,10 @@ export interface MockSupabaseOptions {
   otherSessions?: number;
   /** Serve the `/api/v1/*` functions (default true; false = the SPA fallback page, i.e. functions not deployed). */
   functions?: boolean;
+  /** Subscription state the deletion plan reports (default `none`). */
+  subscription?: "none" | "running" | "ending";
+  /** The operator's `KILL_SYNC` switch as `/api/v1/flags` reports it. */
+  syncOff?: boolean;
 }
 
 export interface MockSupabase {
@@ -132,6 +136,7 @@ export async function mockSupabase(page: Page, opts: MockSupabaseOptions = {}): 
   const logs: unknown[] = [];
   const calls: string[] = [];
   const deletedAccounts: string[] = [];
+  const recovery: { at: string | null; codes: { c: string; used: boolean }[] } = { at: null, codes: [] };
   const sockets = new Set<{ ws: WebSocketRoute; topic: string; joinRef: string; userId: string }>();
   let seq = 0;
 
@@ -427,9 +432,37 @@ export async function mockSupabase(page: Page, opts: MockSupabaseOptions = {}): 
         audit.push({ action: "account.export", at: new Date().toISOString() });
         return send(200, { format: "trade-journal-account-export", version: 1, exportedAt: new Date().toISOString(), account: { id: u.id, email: u.email }, journal: backup(), tables: {}, files: { screenshots: [], backups: [] } });
       }
+      if (url.pathname === "/api/v1/flags") return send(200, { switches: { sync: !!opts.syncOff, calls: false, ai: false, checkout: false } });
+      if (url.pathname === "/api/v1/account/mfa-recovery") {
+        if (req.method() === "GET") return send(200, { total: recovery.codes.length, remaining: recovery.codes.filter((c) => !c.used).length, createdAt: recovery.at });
+        const b = req.postDataJSON() as { action?: string; code?: string };
+        if (b.action === "generate") {
+          if (!u.factors.some((f) => f.status === "verified")) return send(409, { error: { code: "mfa_not_enabled", message: "Richte zuerst den Zwei-Faktor-Schutz ein." } });
+          recovery.at = new Date().toISOString();
+          recovery.codes = ["ABCDE-FGHJK", "KMNPQ-RSTUV", "WXYZ2-34567", "89ABC-DEFGH", "JKLMN-PQRST", "UVWXY-Z2345", "67892-ABCDE", "FGHJK-LMNPQ"].map((c) => ({ c, used: false }));
+          return send(200, { codes: recovery.codes.map((x) => x.c), createdAt: recovery.at });
+        }
+        const hit = recovery.codes.find((x) => !x.used && x.c.replace("-", "") === String(b.code ?? "").toUpperCase().replace(/[\s-]/g, ""));
+        if (!hit) return send(422, { error: { code: "invalid_code", message: "Dieser Code passt nicht oder wurde schon benutzt." } });
+        hit.used = true;
+        const removed = u.factors.length;
+        u.factors = [];
+        recovery.codes = [];
+        audit.push({ action: "auth.mfa.recovery.used", at: new Date().toISOString() });
+        return send(200, { factorsRemoved: removed });
+      }
       if (url.pathname === "/api/v1/account/delete") {
-        const b = req.postDataJSON() as { confirm?: string };
+        if (req.method() === "GET") {
+          const sub = opts.subscription ?? "none";
+          return send(200, {
+            confirmWord: "LÖSCHEN",
+            subscription: { state: sub, plan: sub === "none" ? "free" : "pro", status: sub === "none" ? "none" : "active", currentPeriodEnd: sub === "none" ? null : "2026-12-01T00:00:00Z", cancelAtPeriodEnd: sub === "ending" },
+            data: { trades: live.filter((r) => r.kind === "trade").length, hyblock: 0, days: live.filter((r) => r.kind === "day").length, screenshots: 3, backups: 2 },
+          });
+        }
+        const b = req.postDataJSON() as { confirm?: string; acknowledgeSubscription?: boolean };
         if (b.confirm !== "LÖSCHEN") return send(422, { error: { code: "confirm_mismatch", message: "Bitte tippe LÖSCHEN zur Bestätigung." } });
+        if ((opts.subscription ?? "none") !== "none" && b.acknowledgeSubscription !== true) return send(409, { error: { code: "subscription_ack_required", message: "Dein Abo läuft noch." } });
         deletedAccounts.push(u.id);
         for (const [k, r] of rows) if (r.user_id === u.id) rows.delete(k);
         users.splice(users.indexOf(u), 1);

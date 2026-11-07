@@ -12,7 +12,7 @@
 import { createClient, type AuthChangeEvent, type Factor, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { pushToast } from "@/store/uiStore";
 import { KEYS } from "@/store/storage";
-import { apiFetch, setAccessTokenProvider } from "./api";
+import { ApiError, apiFetch, setAccessTokenProvider } from "./api";
 import { authErrorText, type AuthErrorText } from "./authErrors";
 import { cloudConfig, type OAuthProvider } from "./env";
 import { ACCOUNT_PRIVACY_KEYS, onPrivacyChange, parsePrivacy, setPrivacy, usePrivacy, type PrivacyPrefs } from "./privacy";
@@ -370,6 +370,52 @@ export async function unenrollTotp(factorId: string): Promise<ActionResult> {
     return { ok: true };
   } catch (e) {
     return fail(e);
+  }
+}
+
+/* ------------------------------------------------------------------ recovery codes (B1) */
+
+export interface RecoveryStatus {
+  total: number;
+  remaining: number;
+  createdAt: string | null;
+}
+
+function apiFail(e: unknown): { ok: false } & AuthErrorText {
+  if (e instanceof ApiError) return { ok: false, message: e.message, field: null };
+  return { ok: false, message: "Der Server ist gerade nicht erreichbar.", field: null };
+}
+
+/** How many recovery codes are left (never the codes). Needs the code step when 2FA is on. */
+export async function recoveryStatus(): Promise<ActionResult<RecoveryStatus>> {
+  try {
+    return { ok: true, value: await apiFetch<RecoveryStatus>("/account/mfa-recovery") };
+  } catch (e) {
+    return apiFail(e);
+  }
+}
+
+/** A fresh set of 8 single-use codes (replaces the old set); shown once – the caller must show them at once. */
+export async function generateRecoveryCodes(): Promise<ActionResult<{ codes: string[]; createdAt: string }>> {
+  try {
+    return { ok: true, value: await apiFetch<{ codes: string[]; createdAt: string }>("/account/mfa-recovery", { method: "POST", body: { action: "generate" } }) };
+  } catch (e) {
+    return apiFail(e);
+  }
+}
+
+/**
+ * Lost device: a recovery code (with the password session) removes the 2FA factor. Afterwards the session is refreshed and
+ * the account works with the password until the user sets 2FA up again.
+ */
+export async function redeemRecoveryCode(code: string): Promise<ActionResult> {
+  try {
+    await apiFetch("/account/mfa-recovery", { method: "POST", body: { action: "redeem", code } });
+    await getClient().auth.refreshSession().catch(() => undefined);
+    await refreshAuthState({ factors: true });
+    return { ok: true };
+  } catch (e) {
+    return apiFail(e);
   }
 }
 

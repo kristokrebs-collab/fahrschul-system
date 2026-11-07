@@ -11,6 +11,7 @@ import { hasClaudeRuntime } from "@/store/capability";
 import { getAdapter, switchAdapter, useJournal } from "@/store/journalStore";
 import { KEY_PREFIX } from "@/store/storage";
 import { pushToast } from "@/store/uiStore";
+import { useOpsFlags } from "../flags";
 import { setPrivacy, usePrivacy } from "../privacy";
 import { useSyncGate } from "../runtime";
 import { useCloudSession } from "../session";
@@ -33,7 +34,7 @@ function idlePhase(): SyncPhase {
   const s = useCloudSession.getState();
   if (s.phase !== "signedIn") return "off";
   if (s.needsMfa) return "locked";
-  if (!usePrivacy.getState().sync) return "paused";
+  if (!usePrivacy.getState().sync || useOpsFlags.getState().sync) return "paused";
   return "off";
 }
 
@@ -42,7 +43,7 @@ export function startSyncController(sb: SupabaseClient): () => void {
   const evaluate = () => {
     if (disposed) return;
     const s = useCloudSession.getState();
-    const want = s.phase === "signedIn" && !!s.user && !s.needsMfa && usePrivacy.getState().sync && useSyncGate.getState().entitled && !hasClaudeRuntime();
+    const want = s.phase === "signedIn" && !!s.user && !s.needsMfa && usePrivacy.getState().sync && !useOpsFlags.getState().sync && useSyncGate.getState().entitled && !hasClaudeRuntime();
     const uid = want ? s.user!.id : null;
     if (uid && active?.userId === uid) return;
     if (active) {
@@ -76,7 +77,7 @@ export function startSyncController(sb: SupabaseClient): () => void {
     // the boot kept "Verbinde …" for a stored login that will not sync (expired, 2FA pending, paused): settle local
     if (s.phase !== "loading" && s.phase !== "idle" && useJournal.getState().mode === "connecting" && getAdapter()?.mode === "local") useJournal.getState().setMode("local");
   };
-  const offs = [useCloudSession.subscribe(evaluate), usePrivacy.subscribe(evaluate), useSyncGate.subscribe(evaluate)];
+  const offs = [useCloudSession.subscribe(evaluate), usePrivacy.subscribe(evaluate), useSyncGate.subscribe(evaluate), useOpsFlags.subscribe(evaluate)];
   evaluate();
   return () => {
     disposed = true;

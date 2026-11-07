@@ -11,7 +11,7 @@
  * `PW_SHARE_BASE` override the cloud URLs. `P12_SHOTS_DIR` writes review screenshots.
  */
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
-import { clippedTexts, CLOUD_BASE, cloudUrl, collectErrors, expectNoHorizontalScroll, seed, toast } from "./helpers";
+import { clippedTexts, CLOUD_BASE, cloudUrl, collectErrors, expectNoHorizontalScroll, seed, toast, finishSignIn } from "./helpers";
 import { mockBilling } from "./mocks/billing";
 import { fig, mockSocial, mockTradePayload, type MockGroup, type MockSocialOptions } from "./mocks/social";
 import { mockSupabase } from "./mocks/supabase";
@@ -71,8 +71,7 @@ async function signIn(page: Page, { expectNext = false }: { expectNext?: boolean
   await sheet.getByLabel("E-Mail").fill(EMAIL);
   await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
   await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
+  await finishSignIn(page);
   if (expectNext) await expect(page.getByRole("dialog", { name: "Willkommen" })).toHaveCount(0);
   else await expect(page.getByRole("dialog")).toHaveCount(0);
 }

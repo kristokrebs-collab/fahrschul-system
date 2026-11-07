@@ -21,6 +21,7 @@ import { ensureCloud } from "../runtime";
 import { useCloudSession } from "../session";
 import { CODE_LENGTH, CodeSlots } from "./CodeSlots";
 import { QrReveal } from "./QrReveal";
+import { RecoverySection } from "./RecoverySection";
 import { SECURITY } from "./strings";
 import { useTick } from "./SyncStatusCard";
 
@@ -202,6 +203,7 @@ function MfaSection() {
           </motion.div>
         )}
       </AnimatePresence>
+      {verified && !enroll && (aal === "aal2" ? <RecoverySection /> : null)}
     </section>
   );
 }
@@ -224,6 +226,7 @@ function SessionsSection() {
   const [list, setList] = useState<DeviceSession[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [ask, setAsk] = useState(false);
+  const [askAll, setAskAll] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -263,6 +266,16 @@ function SessionsSection() {
     if (!r || !r.ok) return pushToast({ kind: "error", title: r && !r.ok ? r.message : "Cloud nicht erreichbar." });
     pushToast({ kind: "success", title: SECURITY.signedOutOthers, detail: SECURITY.signedOutOthersDetail });
     void load();
+  }
+
+  async function everywhere() {
+    setBusy(true);
+    const m = await ensureCloud().catch(() => null);
+    const r = m ? await m.signOutScope("global") : null;
+    setBusy(false);
+    setAskAll(false);
+    if (!r || !r.ok) return pushToast({ kind: "error", title: r && !r.ok ? r.message : "Cloud nicht erreichbar." });
+    pushToast({ kind: "info", title: "Überall abgemeldet", detail: "Dein Journal bleibt in diesem Browser." });
   }
 
   const otherCount = (list ?? []).filter((s) => !s.current).length;
@@ -320,6 +333,24 @@ function SessionsSection() {
             {SECURITY.signOutOthers}
           </HoldConfirm>
         ))}
+      {askAll ? (
+        <span className="inline-flex flex-wrap items-center gap-2 text-[12.5px] text-(--color-danger-text)" role="alert">
+          {SECURITY.signOutEverywhereAsk}
+          <Button size="sm" variant="danger" onClick={() => void everywhere()} disabled={busy} data-testid="signout-everywhere-yes">
+            {SECURITY.yes}
+          </Button>
+          <Button size="sm" onClick={() => setAskAll(false)}>
+            {SECURITY.no}
+          </Button>
+        </span>
+      ) : (
+        <div className="grid gap-1">
+          <HoldConfirm variant="secondary" className="justify-self-start" onAsk={() => setAskAll(true)} onConfirm={() => void everywhere()} disabled={busy}>
+            {SECURITY.signOutEverywhere}
+          </HoldConfirm>
+          <p className="text-[11.5px] text-faint">{SECURITY.signOutEverywhereHint}</p>
+        </div>
+      )}
     </section>
   );
 }
