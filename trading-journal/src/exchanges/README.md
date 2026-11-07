@@ -103,6 +103,13 @@ the server pairs the exit with the newest open webhook trade of the symbol (and 
 trade under it is open, a repeat is a re-delivery; after the close the same key opens the next trade (sequence number).
 REST: `GET/POST /api/v1/trades` with `Authorization: Bearer tj_…`.
 
+## Binance (Paket Verbindungen)
+
+Binance (Spot und USDⓈ-M-Futures als zwei getrennte Verbindungen) hat seinen eigenen Dialog in `src/connect` (`BinanceWizard`), die Karte hier bleibt die von Bitunix:
+`primaryConnection()` liefert nur die erste Nicht-Binance-Verbindung (die Karte, der Broker-Abgleich und der Probelauf daneben sind Bitunix-Oberflächen), der Probelauf einer
+Binance-Verbindung merkt sich seine Verbindung (`dryConnectionId`) und nennt Binance im Text. `ExchangeConnection.market` / `symbols`, `ExchangeStatus.binance.egressIp` und
+`ExchangePlan.autoSync` kommen vom Server; `ConnectInput` trägt `market`, `symbols`, `acceptWarnings`. Serverseitig: `netlify/functions/_lib/exchanges/README.md`.
+
 ## Wiring (P14)
 
 - `App`: mount `<ExchangeHost />` once (leaf host, next to `BillingHost`).
