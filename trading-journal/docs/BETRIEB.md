@@ -93,6 +93,9 @@ Vier Umgebungsvariablen in Netlify (Site configuration → Environment variables
 | `KILL_CALLS` | jeden Anruf (Twilio): `alerts-phone` (SMS-Code der Nummernprüfung, Testanruf) antwortet 503 `switched_off`; im Anruf-Pfad der Alarme wird die Zustellung als „Übersprungen: Notschalter (Anrufe) des Betreibers ist an“ protokolliert, ohne Budget zu verbrauchen und ohne Wiederholung; zusätzlich prüft `createCall` ihn als letzten Schritt vor Twilio. E-Mail und Browser laufen weiter, die Abmeldung der Nummer bleibt möglich, Status-Rückmeldungen laufender Anrufe werden weiter angenommen | „Anrufe sind gerade abgeschaltet.“ |
 | `KILL_AI` | Coach-Formulierung, Screenshot-Import per KI, Strategie-Übersetzer, Assistent | KI-Knöpfe verschwinden, Antworten 503 „abgeschaltet“; alles lokal Gerechnete bleibt |
 | `KILL_CHECKOUT` | **neue** Käufe (`billing-checkout`) | „Neue Käufe sind gerade pausiert.“ Bestehende Abos, Kundenportal, Kündigung und Webhook laufen weiter |
+| `KILL_MAIL` | jede ausgehende E-Mail (Resend), geprüft in der einen Stelle, durch die jede Mail läuft (`sendMail`): Alarm-Mails (die Zustellung wird als „Übersprungen: Notschalter (E-Mail) des Betreibers ist an“ protokolliert, ohne Wiederholung), Test-Mails, die Bestätigungs-Mails zu Kündigung und Widerruf | „E-Mails werden gerade nicht verschickt.“ Telefon, Browser-Alarm und alles andere laufen weiter |
+
+**Wirkt erst mit dem nächsten Deploy.** Netlify übernimmt eine geänderte Umgebungsvariable erst, wenn die Functions neu ausgeliefert werden: nach dem Setzen von `KILL_*` (oder `ALLOW_UNGATED`) **neu deployen** – bis dahin laufen die Functions mit dem alten Wert. `/api/v1/ops/status` zeigt, was die LAUFENDEN Functions sehen; ein Schalter, den die Seite noch als `false` zeigt, ist noch nicht aktiv. Im Notfall (laufende Kosten) ist der schnellste Weg zusätzlich der Schlüssel beim Anbieter selbst (Twilio / Anthropic / Resend: Schlüssel sperren oder Ausgabelimit setzen).
 
 Abschalten **gelöscht** nichts. Kündigen und Konto löschen bleiben immer möglich. Zustand prüfen: `/api/v1/flags` (öffentlich, vier Booleans) oder die Betreiber-Seite.
 
@@ -102,7 +105,7 @@ Abschalten **gelöscht** nichts. Kündigen und Konto löschen bleiben immer mög
 1. Abo-Status prüfen (Konto → Deine Daten → Löschen zeigt: läuft / endet am … / Zahlungsproblem).
 2. Export anbieten (Download vor dem Löschen).
 3. Löschen mit Bestätigungswort `LÖSCHEN`; läuft ein Abo, verlangt der **Server** zusätzlich die ausdrückliche Bestätigung, dass es **sofort** endet (keine anteilige Erstattung).
-4. Serverseitig: Stripe-Abos beenden → Sitze lösen → Dateien in `screenshots` **und** `backups` löschen und **erneut lesen** (bleibt etwas übrig: Abbruch, Konto bleibt, der Nutzer versucht es erneut) → Wiederherstellungscodes → Auth-Nutzer löschen (löscht alle Tabellen per Cascade) → Kontrolle der Tabellen (`leftovers` im Ergebnis, leer = vollständig).
+4. Serverseitig: Stripe-Abos beenden → Sitze lösen → Dateien in `screenshots` **und** `backups` löschen und **erneut lesen** (bleibt etwas übrig: Abbruch, Konto bleibt, der Nutzer versucht es erneut) → TradingView-MCP-Tokens bei TradingView **widerrufen** → Schlüssel-Hash der Adresse merken, wenn das Konto eine Testphase hatte → Audit-Zeilen des Nutzers löschen und Freitext der Kündigungs-/Widerrufsanfragen leeren → Auth-Nutzer löschen (löscht alle Tabellen per Cascade) → danach Wiederherstellungscodes entfernen und die **Stripe-Kunden anonymisieren** (E-Mail, Name, Telefon, Anschrift geleert; die Rechnungen bleiben) → Kontrolle der Tabellen (`leftovers` im Ergebnis, leer = vollständig).
 5. Rechnungen bleiben bei Stripe (gesetzliche Aufbewahrung – Frist vom Steuerberater bestätigen lassen).
 
 **Zwei-Faktor verloren**
@@ -110,16 +113,28 @@ Abschalten **gelöscht** nichts. Kündigen und Konto löschen bleiben immer mög
 - Ohne Codes: **keine automatische Umgehung**. Identität des Nutzers außerhalb der App prüfen (z. B. Antwort auf die Kontomail plus Nachweis, was nur der Inhaber weiß), dann im Supabase-Dashboard → Authentication → Users → Nutzer → „Remove MFA factor“. Das ist eine bewusste Handarbeit; die App kann Identität nicht prüfen.
 - Ablage der Codes: Tabelle `mfa_recovery_codes` (Migration `0015_mfa_recovery.sql`: eine Zeile je Nutzer, nur HMAC-Hashes, Kaskade auf `auth.users`, RLS an und **kein** Client-Recht). Sätze, die vor der Migration entstanden sind (`app_config`-Zeile `mfa-recovery:<user-id>`), werden weiter angenommen und dort verbraucht; ein NEUER Satz landet immer in der Tabelle und entfernt die alte Zeile. Ohne die Migration schreiben die Functions weiter nach `app_config` (nichts bricht, solange sie aussteht).
 
+## 7a. Betreiber-Einstellungen, die der Code nicht übernehmen kann (Runde 11)
+
+- **Stripe → Webhook:** zusätzlich die Ereignisse `charge.refunded` und `charge.dispute.created` abonnieren (nimmt Empfehlungs-Gutschriften bei Erstattung / Rückbuchung zurück).
+- **Stripe → Kundenportal:** prüfen, ob Planwechsel und Mengenänderung erlaubt sein sollen; die Team-Sitze folgen jetzt jeder Änderung automatisch (überzählige Mitglieder verlieren Sitz und Team-Rechte), der Betreiber muss nichts nachziehen.
+- **Twilio:** Geo Permissions (Voice und SMS) auf die gebrauchten Länder beschränken, Verify **Fraud Guard** einschalten, ein **Spend Limit** für das Konto setzen (die zweite Linie hinter der Länderliste und den Tageslimits der App).
+- **Anthropic:** ein monatliches Ausgabelimit im Konto setzen (die App begrenzt pro Konto, pro Tag über alle Konten `AI_DAILY_MAX` – das Konto-Limit ist die letzte Grenze).
+- **Netlify:** `IP_HASH_PEPPER` setzen (Pflicht in Produktion), `PHONE_HASH_KEY` setzen, **bevor** ein alter `EXCHANGE_ENC_KEY_V<n>` entfernt wird; ob die geplanten Functions (`billing-reconcile`, `backup-nightly`, `alerts-cron`, …) von außen per HTTP erreichbar sind, ist im Repo nicht belegt und wird dort nicht geprüft (die Läufe sind idempotent und begrenzt, aber ein anonymer Aufruf kostete Last): auf einem veröffentlichten Deploy `curl -i https://<site>/.netlify/functions/billing-reconcile` ausprobieren und das Ergebnis festhalten.
+- **Produktion ohne Stripe:** läuft **geschlossen** (jedes Konto Free). Wer bewusst nichts verkauft und alles freigeben will, setzt `ALLOW_UNGATED=true` und trägt die Kosten (Telefon, SMS, KI) selbst.
+
 ## 8. Datenschutz-Löschfristen (Ist-Stand, ehrlich)
 
 | Daten | Frist heute | Automatisch? |
 | --- | --- | --- |
 | Konto, Journal, Verbindungen, Simulationen, Gruppen … | bis zur Kontolöschung (sofort, Cascade) | ja, bei Löschung |
 | Dateien (Screenshots, Backups) | bis zur Kontolöschung; Backups 14 Tage rollierend (das neueste bleibt) | ja |
-| Zwischenablage des Exports (große Exporte in `backups/<id>/exports/`) | 1 Stunde / bei der nächsten Liste, 24 h Link-Gültigkeit | ja |
+| Zwischenablage des Exports (große Exporte in `backups/<id>/exports/`) | 1 Stunde: die nächtliche Aufgabe räumt sie bei ALLEN Nutzern weg (früher nur beim nächsten Export oder bei der nächsten Liste dieses Nutzers), 24 h Link-Gültigkeit | ja |
 | Fehlerberichte (`app_errors`) | 30 Tage, nur mit Einwilligung | ja (`backup-nightly`) |
 | Raten-Zähler (`rate_hits`) | 2 Tage | ja (in `rate_hit`) |
-| Audit-Log (`audit_log`) | **keine** automatische Frist; bei Kontolöschung bleiben die Zeilen ohne Nutzer-ID (IP nur als Pseudonym) | **nein – Betreiber-Entscheidung offen** (Vorschlag 12 Monate) |
+| Audit-Log (`audit_log`) | 365 Tage (`AUDIT_KEEP_DAYS` in `_lib/account.ts`, **Vorschlag – Betreiber bestätigt**); bei der Kontolöschung werden die Zeilen des Nutzers gelöscht (IP nur als Pseudonym), nur die Schlussmarke „gelöscht“ bleibt ohne Nutzer-ID | ja (`backup-nightly`) |
+| Öffentliche Kündigungs-/Widerrufsanfragen ohne Vertrag (`contract_requests`, Status unbekannt / keiner / abgelaufen) | 30 Tage (`REQUEST_KEEP_DAYS`, **Vorschlag**); Anfragen MIT Vertrag sind Nachweise und bleiben, bei Kontolöschung werden Name, Hinweis und Adress-Hash geleert | ja (`backup-nightly`) |
+| Testphasen-Sperre (`trial_tombstones`: nur ein Schlüssel-Hash der Adresse, wenn ein Konto mit Testphase gelöscht wurde) | 24 Monate (`TRIAL_TOMBSTONE_KEEP_DAYS`, **Vorschlag** – in der Datenschutzerklärung nennen: berechtigtes Interesse gegen Mehrfach-Testphasen) | ja (`backup-nightly`) |
+| Twilio (Verify- und Anruf-Protokolle mit der Nummer) | **bei Twilio**, nicht in der App löschbar – in der Twilio-Konsole die Aufbewahrung prüfen und Twilio in der Datenschutzerklärung nennen | nicht in der App |
 | Stripe-Ereignisse (`stripe_events`) | Migration sagt „älter als 90 Tage dürfen weg“, **keine** automatische Löschung | **nein** |
 | Wiederherstellungscodes | bis zur Nutzung, Neuerzeugung oder Kontolöschung | ja |
 | Stripe (Rechnungen, Kunden) | gesetzliche Aufbewahrung beim Zahlungsdienstleister | nicht in der App |
@@ -127,8 +142,8 @@ Abschalten **gelöscht** nichts. Kündigen und Konto löschen bleiben immer mög
 Manuell bis zur Entscheidung (Supabase → SQL Editor, einmal im Monat):
 ```sql
 delete from public.stripe_events where received_at < now() - interval '90 days';
-delete from public.audit_log where at < now() - interval '12 months';   -- Frist selbst festlegen
 ```
+(Das Audit-Log räumt `backup-nightly` seit Runde 11 nach 365 Tagen selbst auf.)
 Rechtliche Würdigung (Auftragsverarbeitung, Fristen, Verzeichnis der Verarbeitungstätigkeiten) ist nicht Teil der App und von einer Fachperson zu prüfen.
 
 ## 9. Zwei-Nutzer-Isolation: was geprüft ist

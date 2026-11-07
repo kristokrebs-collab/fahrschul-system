@@ -16,6 +16,7 @@ vi.mock("../../netlify/functions/_lib/supabase", async () => {
 const plan = vi.hoisted(() => ({ payments: false }));
 vi.mock("../../netlify/functions/_lib/plan", () => ({
   paymentsConfigured: () => plan.payments,
+  gatesOpen: () => !plan.payments,
   effectivePlan: (r: { plan: unknown; plan_status: unknown }) => ({ plan: r.plan, status: r.plan_status, trialEnd: null }),
 }));
 

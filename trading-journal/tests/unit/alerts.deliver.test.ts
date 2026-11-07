@@ -426,6 +426,40 @@ describe("phone", () => {
     expect(tw.calls).toHaveLength(1);
   });
 
+  it("KILL_MAIL (Runde 11): no mail leaves, no request is made, the log says 'Notschalter (E-Mail)' – done, not retried; the phone goes on", async () => {
+    setup();
+    await fire(["phone", "email"]);
+    vi.stubEnv("KILL_MAIL", "true");
+    const t = await runWorker(deps());
+    vi.unstubAllEnvs();
+    expect(resend.requests).toBe(0);
+    expect(resend.sent).toHaveLength(0);
+    expect(dlv("email")).toMatchObject({ status: "skipped", reason: "mail_off" });
+    expect(job("email").status).toBe("done");
+    expect(dlv("phone")).toMatchObject({ status: expect.stringMatching(/queued|ringing|answered/) });
+    expect(tw.calls).toHaveLength(1);
+    expect(t.skipped).toBe(1);
+    // switched on again: a NEW alarm is mailed (the skipped one is not made up for)
+    await fire(["email"], { key: "k-after-mail" });
+    await runWorker(deps());
+    expect(resend.sent).toHaveLength(1);
+  });
+
+  it("a subscription in dunning (past_due) places no calls on the operator's money: the default plan lookup counts it as Free (Runde 11)", async () => {
+    const { defaultDeliverDeps } = await import("../../netlify/functions/_lib/alerts/deliver");
+    const { setSupabaseAdminForTests } = await import("../../netlify/functions/_lib/supabase");
+    const profile = { plan: "premium", plan_status: "past_due", trial_end: null };
+    const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: profile, error: null }) };
+    setSupabaseAdminForTests({ from: () => q } as never);
+    try {
+      expect(await defaultDeliverDeps(store).plan(U)).toBe("free");
+      profile.plan_status = "active";
+      expect(await defaultDeliverDeps(store).plan(U)).toBe("premium");
+    } finally {
+      setSupabaseAdminForTests(null);
+    }
+  });
+
   it("KILL_CALLS is also checked at the last step before Twilio (createCall): no request leaves even if a path forgot the check", async () => {
     vi.stubEnv("KILL_CALLS", "true");
     const res = await createCall(TW, { to: NUMBER, twiml: "<Response/>", statusCallback: null });
