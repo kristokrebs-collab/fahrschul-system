@@ -46,7 +46,8 @@ export const ENV_GROUPS: readonly EnvGroup[] = [
   { id: "billing", label: "Abos (Stripe)", serves: "Kaufstrecke, Kundenportal, Webhook, Tarif-Freischaltung", all: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"], anyOf: [["STRIPE_PRICE_PRO_MONTHLY", "STRIPE_PRICE_PRO_YEARLY", "STRIPE_PRICE_PREMIUM_MONTHLY", "STRIPE_PRICE_PREMIUM_YEARLY", "STRIPE_PRICE_TEAM_MONTHLY", "STRIPE_PRICE_TEAM_YEARLY"]] },
   { id: "exchange", label: "Börsen-Sync", serves: "Börsen-Verbindung (Schlüssel verschlüsselt speichern), Sync, Cron", all: ["EXCHANGE_ENC_KEY_V1"] },
   { id: "mail", label: "E-Mail-Alarm (Resend)", serves: "E-Mail-Alarm bei geschlossener App, Test-Mail", all: ["RESEND_API_KEY", "ALERT_FROM"] },
-  { id: "phone", label: "Telefon-Alarm (Twilio)", serves: "Anruf-Alarm, Testanruf, Nummernprüfung", all: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM"] },
+  { id: "phone", label: "Telefon-Alarm (Twilio)", serves: "Anruf-Alarm, Testanruf, Nummernprüfung (SMS-Code), Status-Rückmeldung von Twilio", all: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM", "TWILIO_VERIFY_SERVICE_SID"] },
+  { id: "tvmcp", label: "TradingView-MCP-Verbindung", serves: "Verbindung pro Nutzer (OAuth 2.1 mit PKCE, nur lesend) in Einstellungen → Verbindungen; braucht außerdem SITE_ORIGIN und EXCHANGE_ENC_KEY_V1", all: ["TV_MCP_CLIENT_ID"] },
   { id: "ai", label: "KI (Anthropic)", serves: "Coach-Formulierung, Screenshot-Import, Strategie-Übersetzer, Assistent", all: ["ANTHROPIC_API_KEY"] },
   { id: "sec", label: "SEC EDGAR", serves: "Quartalszahlen, DCF, Thesen-Monitor", all: ["SEC_USER_AGENT"] },
   { id: "ops", label: "Betreiber-Status", serves: "/api/v1/ops/status", all: ["OPS_TOKEN"] },
@@ -62,31 +63,43 @@ export const ENV_SPEC: readonly EnvVar[] = [
   v({ name: "SUPABASE_URL", purpose: "Projekt-Adresse für die Server-Funktionen", need: "must", scope: "functions", secret: false, group: "supabase", without: "Jede Funktion mit Anmeldung antwortet 500 „Der Server ist nicht vollständig eingerichtet.“" }),
   v({ name: "SUPABASE_SECRET_KEY", purpose: "Service-Schlüssel (sb_secret_…) – umgeht RLS, nur in Funktionen", need: "must", scope: "functions", secret: true, group: "supabase", without: "Wie oben; auch Export, Löschen, Backups und Raten-Begrenzung laufen nicht." }),
   // ── Site
-  v({ name: "SITE_ORIGIN", purpose: "Adresse der Seite (https://…) für Links in E-Mails, Weiterleitungen und den Proxy-Rückfall", need: "must", scope: "functions", secret: false, group: "site", without: "Weiterleitungen nach dem Bezahlen und Links in E-Mails fehlen; der Binance-Proxy-Rückfall des Alarm-Crons ist aus." }),
+  v({ name: "SITE_ORIGIN", purpose: "Öffentliche Adresse der Seite (https://…, ohne Schrägstrich am Ende): Links in E-Mails und Bestätigungs-Mails, Rücksprung-Adressen der Kaufstrecke (mit gesetzter Variable wird jeder andere Ursprung abgelehnt – kein offener Redirect), Binance-Proxy-Rückfall des Alarm-Crons, Zieladresse des TradingView-Assistenten, Rücksprung der TradingView-MCP-Verbindung (<SITE_ORIGIN>/api/v1/connections/tradingview/mcp/callback, bei TradingView genau so eintragen) und Ziel der Twilio-Status-Rückmeldung", need: "must", scope: "functions", secret: false, group: "site", without: "Rücksprung nach dem Bezahlen und Links in E-Mails nehmen den Ursprung der Anfrage; der Binance-Proxy-Rückfall des Alarm-Crons ist aus; der TradingView-Assistent nimmt die Adresse, unter der die Seite gerade geöffnet ist; die TradingView-MCP-Verbindung startet nicht; Anrufe gehen, der Status kommt nur über das Nachfragen bei Twilio (alle 5 Minuten)." }),
   // ── Stripe
-  v({ name: "STRIPE_SECRET_KEY", purpose: "Stripe-Schlüssel (sk_… / rk_…)", need: "feature", scope: "functions", secret: true, group: "billing", without: "„Zahlungen sind noch nicht eingerichtet“: kein Kauf; alle Funktionen sind frei zugänglich (Betreiber-Entscheidung, siehe Konto-Seite)." }),
-  v({ name: "STRIPE_WEBHOOK_SECRET", purpose: "Signatur-Geheimnis des Stripe-Webhooks (whsec_…)", need: "feature", scope: "functions", secret: true, group: "billing", without: "Der Webhook lehnt jede Meldung ab: bezahlte Tarife werden nie freigeschaltet." }),
+  v({ name: "STRIPE_SECRET_KEY", purpose: "Stripe-Schlüssel (sk_… / rk_…): Checkout-Sitzung, Portal, Preise", need: "feature", scope: "functions", secret: true, group: "billing", without: "„Zahlungen sind noch nicht eingerichtet“: `billing-status` meldet `enabled: false`, `billing-checkout` antwortet 503 – kein Fake-Kauf; alle Funktionen sind frei zugänglich (Betreiber-Entscheidung, siehe Konto-Seite)." }),
+  v({ name: "STRIPE_WEBHOOK_SECRET", purpose: "Signatur-Geheimnis des Stripe-Webhooks (whsec_…); NUR der Webhook schaltet einen Tarif frei", need: "feature", scope: "functions", secret: true, group: "billing", without: "Der Webhook antwortet 503 und lehnt jede Meldung ab: bezahlte Tarife werden nie freigeschaltet; die Ergebnisseite bleibt bei „Wir warten noch auf die Bestätigung von Stripe“." }),
   v({ name: "STRIPE_PRICE_PRO_MONTHLY", purpose: "Preis-ID Pro, monatlich", need: "feature", scope: "functions", secret: false, group: "billing", without: "Dieser Tarif/Intervall ist nicht kaufbar." }),
   v({ name: "STRIPE_PRICE_PRO_YEARLY", purpose: "Preis-ID Pro, jährlich", need: "feature", scope: "functions", secret: false, group: "billing", without: "Dieser Tarif/Intervall ist nicht kaufbar." }),
   v({ name: "STRIPE_PRICE_PREMIUM_MONTHLY", purpose: "Preis-ID Premium, monatlich", need: "feature", scope: "functions", secret: false, group: "billing", without: "Dieser Tarif/Intervall ist nicht kaufbar." }),
   v({ name: "STRIPE_PRICE_PREMIUM_YEARLY", purpose: "Preis-ID Premium, jährlich", need: "feature", scope: "functions", secret: false, group: "billing", without: "Dieser Tarif/Intervall ist nicht kaufbar." }),
   v({ name: "STRIPE_PRICE_TEAM_MONTHLY", purpose: "Preis-ID Team je Sitz, monatlich", need: "feature", scope: "functions", secret: false, group: "billing", without: "Dieser Tarif/Intervall ist nicht kaufbar." }),
   v({ name: "STRIPE_PRICE_TEAM_YEARLY", purpose: "Preis-ID Team je Sitz, jährlich", need: "feature", scope: "functions", secret: false, group: "billing", without: "Dieser Tarif/Intervall ist nicht kaufbar." }),
-  v({ name: "TRIAL_DAYS", purpose: "Länge der Testphase in Tagen (Standard 14)", need: "optional", scope: "functions", secret: false, group: "billing", without: "14 Tage." }),
+  v({ name: "TRIAL_DAYS", purpose: "Länge der Testphase in Tagen (Standard 14); die Bestellübersicht nennt den Preis NACH der Testphase und das Datum der ersten Zahlung", need: "optional", scope: "functions", secret: false, group: "billing", without: "14 Tage." }),
   v({ name: "STRIPE_TRIAL_CARDLESS", purpose: "Testphase ohne Karte (true/false, Standard false)", need: "optional", scope: "functions", secret: false, group: "billing", without: "Testphase nur mit Zahlungsmittel." }),
-  v({ name: "STRIPE_AUTOMATIC_TAX", purpose: "Stripe Tax im Checkout (true/false, Standard false)", need: "optional", scope: "functions", secret: false, group: "billing", without: "Keine automatische Steuerberechnung durch Stripe." }),
+  v({ name: "STRIPE_AUTOMATIC_TAX", purpose: "Stripe Tax im Checkout (true/false, Standard false; Betreiberentscheidung mit dem Steuerberater, docs/RECHT/preisangaben.md): Anschrift Pflicht, Steuer-ID abfragbar", need: "optional", scope: "functions", secret: false, group: "billing", without: "Die Bestellübersicht sagt „Stripe Tax ist beim Betreiber nicht eingeschaltet“; mit `true`: „Steuer wird im nächsten Schritt von Stripe berechnet“. Nie ein erfundener Betrag." }),
   v({ name: "REFERRAL_TRIAL_DAYS", purpose: "Testphase über einen Einladungslink in Tagen (Standard 30)", need: "optional", scope: "functions", secret: false, group: "billing", without: "30 Tage." }),
   v({ name: "REFERRAL_REWARD_CENTS", purpose: "Gutschrift je zahlendem Geworbenen in Cent (Standard 1000)", need: "optional", scope: "functions", secret: false, group: "billing", without: "1000 Cent." }),
   // ── Exchange
-  v({ name: "EXCHANGE_ENC_KEY_V1", purpose: "AES-256-Schlüssel (base64, 32 Byte) für Börsen-API-Schlüssel; weitere Versionen V2… für die Rotation", need: "feature", scope: "functions", secret: true, group: "exchange", without: "503 „Der Börsen-Sync ist auf diesem Server noch nicht eingerichtet.“ – es wird kein Börsen-Schlüssel gespeichert." }),
-  v({ name: "SYNC_CRON_ENABLED", purpose: "Geplanter Börsen-Sync an/aus (true/false)", need: "optional", scope: "functions", secret: false, group: "exchange", without: "An." }),
+  v({ name: "EXCHANGE_ENC_KEY_V1", purpose: "AES-256-Schlüssel (base64, 32 Byte, `openssl rand -base64 32`): verschlüsselt die Börsen-API-Schlüssel (Bitunix und Binance; je Nutzer und Verbindung gebunden), die Telefonnummer des Telefon-Alarms (AES-GCM) und die Token der TradingView-MCP-Verbindung; weitere Versionen V2… für die Rotation (höhere Versionsnummer)", need: "feature", scope: "functions", secret: true, group: "exchange", without: "503 „Der Börsen-Sync ist auf diesem Server noch nicht eingerichtet.“ – es wird kein Börsen-Schlüssel gespeichert; das Telefon ist nicht möglich (503 phone_unavailable); die TradingView-MCP-Verbindung scheitert mit „nicht eingerichtet“." }),
+  v({ name: "SYNC_CRON_ENABLED", purpose: "Geplanter Börsen-Sync alle 30 Minuten an/aus (`false` stoppt ihn)", need: "optional", scope: "functions", secret: false, group: "exchange", without: "An (sofern ein Tarif den Abgleich enthält)." }),
+  v({ name: "BINANCE_EGRESS_IP", purpose: "Die FESTE ausgehende IP-Adresse der Server-Funktionen (z. B. über einen Proxy/VPN mit fester Adresse); der Dialog zeigt sie als IP-Whitelist-Eintrag für den Binance-Key", need: "optional", scope: "functions", secret: false, group: "binance", without: "Der Dialog erklärt den Weg „Key ohne IP-Bindung, nur Leserechte“ (Netlify-Funktionen haben keine feste Adresse); Keys mit Auszahlungs-, Transfer- oder Handelsrecht werden immer abgelehnt." }),
+  v({ name: "BINANCE_SPOT_BASE", purpose: "Alternative Basisadresse (https://…, ohne Pfad) der Binance-Spot-API, z. B. ein Proxy in einer erlaubten Region (HTTP 451 aus manchen Ländern, u. a. USA)", need: "optional", scope: "functions", secret: false, group: "binance", without: "https://api.binance.com" }),
+  v({ name: "BINANCE_FUTURES_BASE", purpose: "Dasselbe für die USDⓈ-M-Futures-API", need: "optional", scope: "functions", secret: false, group: "binance", without: "https://fapi.binance.com" }),
   // ── Mail
-  v({ name: "RESEND_API_KEY", purpose: "Resend-Schlüssel für Alarm-Mails", need: "feature", scope: "functions", secret: true, group: "mail", without: "Der Alarm-Cron tut nichts, die App zeigt „Einrichtung nötig“, kein Testmail." }),
+  v({ name: "RESEND_API_KEY", purpose: "Resend-Schlüssel für Alarm-Mails (auch der vier Alarme) und für die Bestätigungs-Mails zu Kündigung (§ 312k BGB) und Widerruf (§ 356a BGB) ohne Login", need: "feature", scope: "functions", secret: true, group: "mail", without: "Der Alarm-Cron tut nichts, die App zeigt „Einrichtung nötig“, kein Testmail; Kündigung/Widerruf ohne Login: die Erklärung wird gespeichert, die Seite sagt „E-Mail-Versand nicht eingerichtet“ und verspricht keine Mail (ausgeführt wird dann nur bei angemeldeter Person)." }),
   v({ name: "ALERT_FROM", purpose: "Absender („Name <alarm@deine-domain>“, Domain bei Resend geprüft)", need: "feature", scope: "functions", secret: false, group: "mail", without: "Wie RESEND_API_KEY." }),
-  // ── Phone (package C2: names agreed in the brief; not read by code in this branch)
-  v({ name: "TWILIO_ACCOUNT_SID", purpose: "Twilio-Konto (AC…)", need: "feature", scope: "functions", secret: false, group: "phone", without: "Kein Telefon-Alarm: „Einrichtung nötig“, kein Testanruf.", planned: true }),
-  v({ name: "TWILIO_AUTH_TOKEN", purpose: "Twilio-Auth-Token", need: "feature", scope: "functions", secret: true, group: "phone", without: "Wie TWILIO_ACCOUNT_SID.", planned: true }),
-  v({ name: "TWILIO_FROM", purpose: "Verifizierte Absendernummer (E.164)", need: "feature", scope: "functions", secret: false, group: "phone", without: "Wie TWILIO_ACCOUNT_SID.", planned: true }),
+  v({ name: "ALERTS_CRON_ENABLED", purpose: "Zeitplan der vier Alarme (`alerts-cron`, alle 5 Minuten) an/aus; `0` schaltet ihn ab", need: "optional", scope: "functions", secret: false, group: "alerts", without: "An." }),
+  // ── Phone (C2)
+  v({ name: "TWILIO_ACCOUNT_SID", purpose: "Twilio-Konto (AC…) für Anrufe und Nummernprüfung", need: "feature", scope: "functions", secret: false, group: "phone", without: "Kein Telefon-Alarm: „Einrichtung nötig“, kein Testanruf; E-Mail und Browser laufen weiter." }),
+  v({ name: "TWILIO_AUTH_TOKEN", purpose: "Zugriff auf Twilio; prüft auch die Signatur der Status-Rückmeldung (/api/v1/alerts/twilio/status)", need: "feature", scope: "functions", secret: true, group: "phone", without: "Wie TWILIO_ACCOUNT_SID; die Status-Rückmeldung antwortet 503." }),
+  v({ name: "TWILIO_FROM", purpose: "Absendernummer (E.164, Twilio-Nummer oder verifizierte Anrufer-ID)", need: "feature", scope: "functions", secret: false, group: "phone", without: "Wie TWILIO_ACCOUNT_SID." }),
+  v({ name: "TWILIO_VERIFY_SERVICE_SID", purpose: "Twilio-Verify-Dienst (VA…): schickt und prüft den SMS-Code der Nummernprüfung", need: "feature", scope: "functions", secret: false, group: "phone", without: "Keine Nummer lässt sich bestätigen, also wird nie angerufen („Einrichtung nötig“)." }),
+  v({ name: "ALERT_PHONE_DAILY_MAX", purpose: "Kostenbremse: Anrufe pro Tag über ALLE Konten (Standard 50)", need: "optional", scope: "functions", secret: false, group: "alerts", without: "50; danach „Kostenbremse des Servers für heute erreicht“ im Zustellprotokoll." }),
+  v({ name: "ALERT_PHONE_USER_DAILY_MAX", purpose: "Anrufe pro Konto und Tag, Testanrufe eingerechnet (Standard 5)", need: "optional", scope: "functions", secret: false, group: "alerts", without: "5." }),
+  // ── TradingView MCP (B3)
+  v({ name: "TV_MCP_CLIENT_ID", purpose: "OAuth-Client-ID der App bei TradingView (Betreiber-Einrichtung; ob ein Betreiber dort für dieses Produkt registrieren darf, ist nicht belegt – siehe Hinweise unten)", need: "feature", scope: "functions", secret: false, group: "tvmcp", without: "Die Karte zeigt „Einrichtung nötig (Betreiber)“, nichts wird gestartet." }),
+  v({ name: "TV_MCP_CLIENT_SECRET", purpose: "Nur für einen vertraulichen OAuth-Client", need: "optional", scope: "functions", secret: true, group: "tvmcp", without: "Öffentlicher Client mit PKCE." }),
+  v({ name: "TV_MCP_URL", purpose: "Adresse des TradingView-MCP-Servers", need: "optional", scope: "functions", secret: false, group: "tvmcp", without: "https://mcp.tradingview.com/mcp" }),
+  v({ name: "TV_MCP_SCOPES", purpose: "Angeforderte OAuth-Scopes", need: "optional", scope: "functions", secret: false, group: "tvmcp", without: "mcp:read mcp:tools" }),
   // ── AI
   v({ name: "ANTHROPIC_API_KEY", purpose: "Anthropic-Schlüssel (nur Server)", need: "feature", scope: "functions", secret: true, group: "ai", without: "Coach-Formulierung, Screenshot-Import per KI, Strategie-Übersetzer und Assistent melden „nicht verfügbar“; die App rechnet alles andere lokal." }),
   v({ name: "COACH_MODEL", purpose: "Modell des Coachs (Standard claude-opus-5-5)", need: "optional", scope: "functions", secret: false, group: "ai", without: "Standardmodell." }),
@@ -96,7 +109,7 @@ export const ENV_SPEC: readonly EnvVar[] = [
   v({ name: "SEC_USER_AGENT", purpose: "Kontakt im User-Agent („Name kontakt@domain“) – die SEC verlangt ihn", need: "feature", scope: "functions", secret: false, group: "sec", without: "Die SEC-Funktionen melden „Einrichtung nötig“ und rufen die SEC nicht auf." }),
   // ── Ops / tuning
   v({ name: "OPS_TOKEN", purpose: "Betreiber-Token für /api/v1/ops/status (mindestens 24 Zeichen, zufällig)", need: "feature", scope: "functions", secret: true, group: "ops", without: "Die Statusseite antwortet 503 „nicht eingerichtet“ und gibt nichts preis." }),
-  v({ name: "IP_HASH_PEPPER", purpose: "Geheimer Schlüssel für IP-Pseudonyme in Audit-Log und Raten-Begrenzung (openssl rand -base64 32)", need: "optional", scope: "functions", secret: true, group: "supabase", without: "Der Schlüssel wird aus SUPABASE_SECRET_KEY abgeleitet." }),
+  v({ name: "IP_HASH_PEPPER", purpose: "Geheimer Schlüssel für IP-Pseudonyme in Audit-Log und Raten-Begrenzung und für den gesalzenen Hash der E-Mail-Adresse in `contract_requests` (openssl rand -base64 32; empfohlen)", need: "optional", scope: "functions", secret: true, group: "supabase", without: "Der Schlüssel wird aus SUPABASE_SECRET_KEY abgeleitet." }),
   v({ name: "LOG_SAMPLE_RATE", purpose: "Anteil gespeicherter Fehlerberichte, 0–1 (Standard 1)", need: "optional", scope: "functions", secret: false, group: "supabase", without: "Alle Berichte (nur mit Einwilligung des Nutzers)." }),
   // ── Emergency switches (C4)
   v({ name: "KILL_SYNC", purpose: "Notfall-Schalter: Cloud-Sync und Börsen-Sync aus (true)", need: "optional", scope: "functions", secret: false, group: "switches", without: "Aus (Sync läuft)." }),
@@ -104,18 +117,23 @@ export const ENV_SPEC: readonly EnvVar[] = [
   v({ name: "KILL_AI", purpose: "Notfall-Schalter: keine KI-Aufrufe (true)", need: "optional", scope: "functions", secret: false, group: "switches", without: "Aus (KI läuft, sobald ein Schlüssel da ist)." }),
   v({ name: "KILL_CHECKOUT", purpose: "Notfall-Schalter: Kaufstrecke zu (true) – neue Käufe gehen nicht, bestehende Abos und das Kundenportal bleiben", need: "optional", scope: "functions", secret: false, group: "switches", without: "Aus (Kauf läuft, sobald Stripe eingerichtet ist)." }),
   // ── Legal (client)
-  v({ name: "VITE_LEGAL_OPERATOR", purpose: "Impressum: Betreiber", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter statt Angabe; nichts wird erfunden." }),
-  v({ name: "VITE_LEGAL_ADDRESS", purpose: "Impressum: Anschrift (Zeilen mit | getrennt)", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter." }),
-  v({ name: "VITE_LEGAL_EMAIL", purpose: "Impressum: E-Mail", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter." }),
-  v({ name: "VITE_LEGAL_PHONE", purpose: "Impressum: Telefon", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter." }),
-  v({ name: "VITE_LEGAL_REPRESENTATIVE", purpose: "Impressum: Vertretungsberechtigte", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter." }),
-  v({ name: "VITE_LEGAL_REGISTER", purpose: "Impressum: Registereintrag", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter." }),
-  v({ name: "VITE_LEGAL_VAT_ID", purpose: "Impressum: USt-IdNr.", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter." }),
-  v({ name: "VITE_LEGAL_RESPONSIBLE", purpose: "Impressum: Verantwortlicher für Inhalte", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter." }),
-  v({ name: "VITE_LEGAL_IMPRESSUM_URL", purpose: "Eigene Impressum-Seite (ersetzt die In-App-Seite)", need: "optional", scope: "client", secret: false, group: "legal", without: "In-App-Impressum aus den Angaben oben." }),
-  v({ name: "VITE_LEGAL_DATENSCHUTZ_URL", purpose: "Eigene Datenschutzerklärung", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter." }),
-  v({ name: "VITE_LEGAL_AGB_URL", purpose: "Eigene AGB", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter." }),
-  v({ name: "VITE_LEGAL_WIDERRUF_URL", purpose: "Eigene Widerrufsbelehrung", need: "optional", scope: "client", secret: false, group: "legal", without: "Die Widerrufsbelehrung ist Teil der AGB." }),
+  v({ name: "VITE_LEGAL_OPERATOR", purpose: "Impressum: Name/Firma des Anbieters (öffentlich, landet im Bundle; auch für die Functions der Kaufstrecke in Netlify setzen: Scope Builds UND Functions)", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter „[Platzhalter: VITE_LEGAL_OPERATOR]“, nichts wird erfunden; ohne Betreiber + Anschrift + E-Mail (oder eine Impressum-URL) bleibt die Kaufstrecke gesperrt (`purchase_closed`)." }),
+  v({ name: "VITE_LEGAL_ADDRESS", purpose: "Impressum: Anschrift (Zeilen mit | getrennt)", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter; Kaufstrecke gesperrt (siehe VITE_LEGAL_OPERATOR)." }),
+  v({ name: "VITE_LEGAL_EMAIL", purpose: "Impressum: Kontakt-E-Mail", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter; Kaufstrecke gesperrt (siehe VITE_LEGAL_OPERATOR)." }),
+  v({ name: "VITE_LEGAL_PHONE", purpose: "Impressum: Telefon (zweiter Kommunikationsweg, empfohlen)", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter in den Entwürfen; im Impressum entfällt die Zeile." }),
+  v({ name: "VITE_LEGAL_REPRESENTATIVE", purpose: "Impressum: vertretungsberechtigte Person (je Rechtsform)", need: "optional", scope: "client", secret: false, group: "legal", without: "Platzhalter in den Entwürfen, im Impressum keine Zeile." }),
+  v({ name: "VITE_LEGAL_REGISTER", purpose: "Impressum: Registergericht und -nummer (je Rechtsform)", need: "optional", scope: "client", secret: false, group: "legal", without: "Wie VITE_LEGAL_REPRESENTATIVE." }),
+  v({ name: "VITE_LEGAL_VAT_ID", purpose: "Impressum: USt-IdNr. (falls vorhanden)", need: "optional", scope: "client", secret: false, group: "legal", without: "Wie VITE_LEGAL_REPRESENTATIVE." }),
+  v({ name: "VITE_LEGAL_RESPONSIBLE", purpose: "Impressum: Verantwortlicher für den Inhalt (§ 18 MStV, je Inhalt)", need: "optional", scope: "client", secret: false, group: "legal", without: "Wie VITE_LEGAL_REPRESENTATIVE." }),
+  v({ name: "VITE_LEGAL_IMPRESSUM_URL", purpose: "Eigene Impressum-Seite (https oder Pfad dieser Site; ersetzt die In-App-Seite und die Pflicht für Betreiber/Anschrift/E-Mail)", need: "optional", scope: "client", secret: false, group: "legal", without: "In-App-Impressum aus den Betreiberdaten." }),
+  v({ name: "VITE_LEGAL_DATENSCHUTZ_URL", purpose: "Eigene Datenschutzerklärung (Pflicht zum Verkaufen)", need: "optional", scope: "client", secret: false, group: "legal", without: "Der Entwurf aus docs/RECHT/datenschutz.md, markiert „Entwurf – Prüfung durch Anwalt nötig“, plus Hinweis auf die Variable; Kaufstrecke gesperrt." }),
+  v({ name: "VITE_LEGAL_AGB_URL", purpose: "Eigene AGB (Pflicht zum Verkaufen)", need: "optional", scope: "client", secret: false, group: "legal", without: "Entwurf docs/RECHT/agb.md, markiert; Kaufstrecke gesperrt." }),
+  v({ name: "VITE_LEGAL_WIDERRUF_URL", purpose: "Eigene Widerrufsbelehrung", need: "optional", scope: "client", secret: false, group: "legal", without: "Steht sie in den AGB (AGB-URL gesetzt): Hinweis darauf; sonst Entwurf docs/RECHT/widerruf.md, markiert." }),
+  v({ name: "VITE_LEGAL_DRAFTS_REVIEWED", purpose: "`true` = der Betreiber erklärt, dass ein Anwalt die In-App-Entwürfe (docs/RECHT/) geprüft hat; blendet die Entwurfs-Leiste aus. Die App prüft die Erklärung nicht", need: "optional", scope: "client", secret: false, group: "legal", without: "Die Leiste „Entwurf – Prüfung durch Anwalt nötig“ steht über jedem Entwurf." }),
+  // ── Partner links (client, public)
+  v({ name: "VITE_PARTNER_TRADINGVIEW_REF", purpose: "Vollständiger https-Link des TradingView-Partnerprogramms (öffentlich, KEIN Geheimnis; Einrichtung und Kennzeichnung in docs/PARTNERLINKS.md). Heute leer lassen: der Betreiber hat noch keine Partnerkonten", need: "optional", scope: "client", secret: false, group: "partner", without: "Kein Partnerlink, der Dialog sieht aus wie ohne." }),
+  v({ name: "VITE_PARTNER_BINANCE_REF", purpose: "Dasselbe für Binance", need: "optional", scope: "client", secret: false, group: "partner", without: "Wie oben." }),
+  v({ name: "VITE_PARTNER_BITUNIX_REF", purpose: "Dasselbe für Bitunix", need: "optional", scope: "client", secret: false, group: "partner", without: "Wie oben." }),
   // ── Listed in .env.example, not read by code yet
   v({ name: "HYBLOCK_API_KEY", purpose: "Hyblock (optional, derzeit nicht gelesen)", need: "optional", scope: "functions", secret: true, group: "legal", without: "Hyblock-Werte werden von Hand eingetragen.", planned: true }),
   v({ name: "HYBLOCK_BASE_URL", purpose: "Hyblock (optional, derzeit nicht gelesen)", need: "optional", scope: "functions", secret: false, group: "legal", without: "Wie HYBLOCK_API_KEY.", planned: true }),
@@ -123,7 +141,14 @@ export const ENV_SPEC: readonly EnvVar[] = [
 ];
 
 /** Group ids that exist only in the spec's tail (no setup state of their own). */
-export const GROUP_LABELS: Readonly<Record<string, string>> = { switches: "Notfall-Schalter", legal: "Rechtliches & Sonstiges (Client)", ...Object.fromEntries(ENV_GROUPS.map((g) => [g.id, g.label])) };
+export const GROUP_LABELS: Readonly<Record<string, string>> = {
+  alerts: "Vier Alarme: Zeitplan & Kostenbremse",
+  binance: "Binance-Anbindung (alles optional)",
+  partner: "Partnerlinks (Client, öffentlich)",
+  switches: "Notfall-Schalter",
+  legal: "Rechtliches & Sonstiges (Client)",
+  ...Object.fromEntries(ENV_GROUPS.map((g) => [g.id, g.label])),
+};
 
 /** Function files and what each needs – the answer to "which function works with which variable?". */
 export interface FunctionEnv {
@@ -149,6 +174,7 @@ export const FUNCTION_ENV: readonly FunctionEnv[] = [
   { fn: "billing-portal", route: "/api/v1/billing/portal", groups: ["supabase", "billing"] },
   { fn: "billing-code", route: "/api/v1/billing/code", groups: ["supabase", "billing"] },
   { fn: "billing-referral", route: "/api/v1/billing/referral", groups: ["supabase", "billing"] },
+  { fn: "billing-contract", route: "/api/v1/billing/contract (+ /confirm)", groups: ["supabase", "mail", "site"] },
   { fn: "stripe-webhook", route: "/api/v1/stripe/webhook", groups: ["supabase", "billing"] },
   { fn: "exchange-connect", route: "/api/v1/exchange/connect", groups: ["supabase", "exchange"], switch: "sync" },
   { fn: "exchange-disconnect", route: "/api/v1/exchange/disconnect", groups: ["supabase", "exchange"] },
@@ -158,6 +184,13 @@ export const FUNCTION_ENV: readonly FunctionEnv[] = [
   { fn: "exchange-sync-cron", route: "(alle 30 Min)", groups: ["supabase", "exchange"], switch: "sync" },
   { fn: "alert-watch-cron", route: "(alle 5 Min)", groups: ["supabase", "mail", "site"] },
   { fn: "alert-test", route: "/api/v1/alerts/test", groups: ["supabase", "mail"] },
+  // the four alarms (C2). `alerts-cron` also dials calls (stopped by KILL_CALLS: those deliveries are logged "übersprungen: Notschalter", e-mail goes on)
+  { fn: "alerts-cron", route: "(alle 5 Min)", groups: ["supabase", "mail", "site"] },
+  { fn: "alerts-prefs", route: "/api/v1/alerts/prefs", groups: ["supabase"] },
+  { fn: "alerts-feed", route: "/api/v1/alerts/feed", groups: ["supabase"] },
+  { fn: "alerts-email-test", route: "/api/v1/alerts/email-test", groups: ["supabase", "mail"] },
+  { fn: "alerts-phone", route: "/api/v1/alerts/phone", groups: ["supabase", "phone", "exchange"], switch: "calls" },
+  { fn: "alerts-twilio-status", route: "/api/v1/alerts/twilio/status", groups: ["supabase", "phone", "site"] },
   { fn: "coach-ask", route: "/api/v1/coach/ask", groups: ["supabase", "ai"], switch: "ai" },
   { fn: "shot-extract", route: "/api/v1/shot-extract", groups: ["supabase", "ai"], switch: "ai" },
   { fn: "strategy-compile", route: "/api/v1/strategy/compile", groups: ["supabase", "ai"], switch: "ai" },
@@ -165,6 +198,9 @@ export const FUNCTION_ENV: readonly FunctionEnv[] = [
   { fn: "sec-facts", route: "/api/v1/sec/facts", groups: ["supabase", "sec"] },
   { fn: "sec-filings", route: "/api/v1/sec/filings", groups: ["supabase", "sec"] },
   { fn: "hooks-tradingview", route: "/api/v1/hooks/tradingview/:token", groups: ["supabase"] },
+  { fn: "signals-receive", route: "/api/v1/signals/:token", groups: ["supabase"] },
+  { fn: "connections-tradingview", route: "/api/v1/connections/tradingview", groups: ["supabase", "site"] },
+  { fn: "connections-tradingview-mcp", route: "/api/v1/connections/tradingview/mcp", groups: ["supabase", "tvmcp", "site", "exchange"] },
   { fn: "trades-api", route: "/api/v1/trades", groups: ["supabase"] },
   { fn: "social-share", route: "/api/v1/social/share", groups: ["supabase"] },
   { fn: "social-shared", route: "/api/v1/social/shared/:token", groups: ["supabase"] },

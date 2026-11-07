@@ -38,7 +38,6 @@ export interface SignInOptions {
 export async function signInViaSheet(page: Page, o: SignInOptions = {}): Promise<void> {
   const email = o.email ?? SIGN_IN_EMAIL;
   const password = o.password ?? SIGN_IN_PASSWORD;
-  const timeout = o.timeout ?? 45_000;
   const sheet = page.getByRole("dialog", { name: "Anmelden" });
   if (o.fromPill !== false) {
     const pill = page.locator('[data-cloud-pill="signin"]');
@@ -62,11 +61,27 @@ export async function signInViaSheet(page: Page, o: SignInOptions = {}): Promise
   }).toPass({ timeout: 20_000 });
   await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
   if (o.stopAfterSubmit) return;
+  await completeSignIn(page, o);
+}
+
+/**
+ * Everything after "Anmelden" was pressed (also used by specs that press it themselves, e.g. after a wrong password): the
+ * end of the login is the takeover question (B1: local data on this device, `takeover-choose`) or the welcome view.
+ *
+ * The welcome view can show BEFORE the question: the first sync reads both sides first, and only then knows whether it
+ * has to ask. So with `synced` the end is the question or the text "Alles synchron." (never the bare welcome view), and
+ * without `synced` the welcome view is given a short grace period to be replaced by the question before it is closed.
+ */
+export async function completeSignIn(page: Page, o: Pick<SignInOptions, "synced" | "expectNext" | "timeout" | "choice"> = {}): Promise<void> {
+  const timeout = o.timeout ?? 45_000;
   const question = page.getByTestId("takeover-choose");
   const welcomeView = page.locator('[data-auth-view="welcome"]');
-  await expect(question.or(welcomeView)).toBeVisible({ timeout });
+  const syncedText = page.getByText("Alles synchron.", { exact: false });
+  const end = o.synced ? syncedText.first() : welcomeView;
+  await expect.poll(async () => ((await question.isVisible()) ? "question" : (await end.isVisible()) ? "end" : "waiting"), { timeout, message: "neither the takeover question nor the end of the login appeared" }).not.toBe("waiting");
+  if (!o.synced && !(await question.isVisible())) await question.waitFor({ state: "visible", timeout: 1_500 }).catch(() => undefined);
   if (await question.isVisible()) {
-    // local and cloud data both exist: answer the takeover question, then the sheet closes (the welcome view is skipped)
+    // data on this device: answer the question, then the sheet closes (the welcome view is skipped)
     if (o.choice) await question.getByTestId(`takeover-${o.choice}`).check();
     await question.getByTestId("takeover-apply").click();
     if (o.choice !== "keep") {
@@ -75,7 +90,6 @@ export async function signInViaSheet(page: Page, o: SignInOptions = {}): Promise
       await done.getByRole("button", { name: "Schließen" }).click();
     }
   } else {
-    if (o.synced) await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout });
     await page.getByRole("button", { name: "Los geht’s" }).click();
   }
   if (o.expectNext) await expect(page.getByRole("dialog", { name: "Willkommen" })).toHaveCount(0);

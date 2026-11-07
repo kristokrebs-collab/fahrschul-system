@@ -111,6 +111,17 @@ export const EXPORT_TABLES: ExportTable[] = [
   { table: "case_hypotheses", userColumn: "user_id", columns: "case_id,direction,confidence,reason,created_at" },
   // A3 (0011_simulations): the saved simulations of the Zeitmaschine (figures and hashes, never the heavy paths)
   { table: "simulations", userColumn: "user_id", columns: "id,trade_id,symbol,interval,seed,model_version,data_hash,data_bars,data_from,data_to,source,runs,horizon,plan,costs,metrics,result_hash,client_created_at,created_at,updated_at" },
+  // 0012 (connections) / 0013 (signals) / 0014 (alerts): received signals and webhook receipts, alert settings, the phone's
+  // status (the number itself is encrypted and only masked here), events, deliveries; the MCP connection WITHOUT its tokens
+  { table: "webhook_receipts", userColumn: "user_id", columns: "id,source,kind,via,symbol,detail,received_at" },
+  { table: "signals", userColumn: "user_id", columns: "id,source,signal_id,kind,status,reason,schema_id,strategy,market,symbol,direction,signal_time,data,via,received_at" },
+  { table: "tv_mcp_connections", userColumn: "user_id", columns: "user_id,client_id,scope,resource,expires_at,status,last_error,last_test_at,last_test_ok,created_at,updated_at" },
+  { table: "alert_prefs", userColumn: "user_id", columns: "user_id,prefs,updated_at" },
+  { table: "alert_phones", userColumn: "user_id", columns: "user_id,status,masked,consent_at,consent_version,verified_at,revoked_at,updated_at" },
+  { table: "alert_events", userColumn: "user_id", columns: "id,source,market_key,market,event,value,detail,suppressed,occurred_at,created_at" },
+  { table: "alert_deliveries", userColumn: "user_id", columns: "id,event_id,kind,channel,status,reason,attempts,not_before,dialed_at,created_at,updated_at" },
+  { table: "consents", userColumn: "user_id", columns: "id,order_id,kind,text_hash,text_version,consent_text,plan,interval,seats,checkout_session_id,given_at" },
+  { table: "contract_requests", userColumn: "user_id", columns: "id,kind,declared_name,contract_hint,status,received_at,executed_at,ends_at" },
 ];
 
 const SECRET_KEY = /secret|password|passphrase|token|api[-_]?key|authorization|cookie|jwt|_enc$/i;

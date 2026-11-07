@@ -12,7 +12,7 @@
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed, stored, toast } from "./helpers";
 import { mockSupabase, TOTP_CODE, type MockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, completeSignIn, signInViaSheet } from "./cloudSignIn";
 
 const KONTO_URL = process.env.PW_KONTO_URL ?? cloudUrl("konto");
 const SHOTS = process.env.P09_SHOTS_DIR;
@@ -91,11 +91,11 @@ test.describe("Konto & Cloud", () => {
 
     await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
     await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-    const welcome = page.getByRole("dialog", { name: "Willkommen" });
-    await expect(welcome).toBeVisible();
-    await expect(welcome.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-    await shot(page, info, "welcome");
-    await welcome.getByRole("button", { name: "Los geht’s" }).click();
+    // this device has a journal and the account is empty: the takeover question (B1) comes first, the recommended answer
+    // ("Lokale Daten übernehmen") uploads it; the welcome view is skipped
+    await expect(page.getByTestId("takeover-choose")).toBeVisible({ timeout: 20_000 });
+    await shot(page, info, "takeover-question");
+    await completeSignIn(page, { synced: true, timeout: 20_000 });
 
     // every local trade is in the cloud, the settings row too; a safety snapshot was written before the merge
     await expect.poll(() => [...sb.rows.values()].filter((r) => r.kind === "trade").length).toBe(FIXTURE_TRADES.length);

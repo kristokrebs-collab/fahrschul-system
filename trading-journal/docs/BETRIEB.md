@@ -77,7 +77,7 @@ Die Kosten entstehen an drei Stellen. Grenzen, die im Code stehen:
 | --- | --- | --- |
 | KI (Anthropic) | je Tarif pro Tag: Coach/Strategie/Assistent teilen `coachAiPerDay` (Free 0, Pro 0, Premium 50, Team 50), Screenshot-Import `shotExtractPerDay` (0/0/20/20); je Nutzer 10 Anfragen / 10 Min; Körper ≤ 8 KiB; ohne Schlüssel: aus | `src/billing/plans.ts`, `coach-ask`, `shot-extract`, `strategy-compile`, `assistant-route` |
 | E-Mail (Resend) | höchstens eine Mail je Konto und Lauf, `maxPerDay` 3/6/12/24 je Konto, 10 Min Abstand, Backoff nach Fehlern; Testmail 3 / 10 Min und 10 / Tag | `alert-watch-cron`, `alert-test` |
-| Telefon (Twilio) | Konzept: Tageslimit global per Env, Monatslimit je Tarif (0/0/30/60) – **kommt mit Paket C2, in diesem Stand nicht vorhanden**; der Notfall-Schalter `KILL_CALLS` ist vorbereitet | – |
+| Telefon (Twilio) | Tageslimit global `ALERT_PHONE_DAILY_MAX` (Standard 50), je Konto `ALERT_PHONE_USER_DAILY_MAX` (Standard 5), Monatslimit je Tarif (0/0/30/60, `src/billing/plans.ts`); ein Anruf wird VOR dem Wählen festgeschrieben. Notfall-Schalter `KILL_CALLS` (siehe unten) | `alerts-cron`, `alerts-phone` |
 | Supabase / Netlify | Rate-Limits je Funktion (`rate_hit`), Screenshots ≤ 5 MB je Bild, 14 Tage Backups | Funktionen, Migration 0007 |
 
 Empfehlung: in Anthropic, Resend, Twilio und Stripe **eigene Ausgabenlimits** setzen – der Code begrenzt Anfragen, keine Euro. Dort
@@ -90,7 +90,7 @@ Vier Umgebungsvariablen in Netlify (Site configuration → Environment variables
 | Variable | Wirkt auf | Nutzer sehen |
 | --- | --- | --- |
 | `KILL_SYNC` | Börsen-Verbindung, manueller Sync, Positionen, Backfill, Cron; **und** der Cloud-Sync des Browsers (`/api/v1/flags`) | „Der Sync ist gerade abgeschaltet. Dein Journal bleibt in diesem Browser.“ – die App läuft lokal weiter, nichts geht verloren |
-| `KILL_CALLS` | jeden Anruf (Twilio) – Schalter ist da, der Anruf-Pfad folgt mit C2 | „Anrufe sind gerade abgeschaltet.“ |
+| `KILL_CALLS` | jeden Anruf (Twilio): `alerts-phone` (SMS-Code der Nummernprüfung, Testanruf) antwortet 503 `switched_off`; im Anruf-Pfad der Alarme wird die Zustellung als „Übersprungen: Notschalter (Anrufe) des Betreibers ist an“ protokolliert, ohne Budget zu verbrauchen und ohne Wiederholung; zusätzlich prüft `createCall` ihn als letzten Schritt vor Twilio. E-Mail und Browser laufen weiter, die Abmeldung der Nummer bleibt möglich, Status-Rückmeldungen laufender Anrufe werden weiter angenommen | „Anrufe sind gerade abgeschaltet.“ |
 | `KILL_AI` | Coach-Formulierung, Screenshot-Import per KI, Strategie-Übersetzer, Assistent | KI-Knöpfe verschwinden, Antworten 503 „abgeschaltet“; alles lokal Gerechnete bleibt |
 | `KILL_CHECKOUT` | **neue** Käufe (`billing-checkout`) | „Neue Käufe sind gerade pausiert.“ Bestehende Abos, Kundenportal, Kündigung und Webhook laufen weiter |
 
@@ -108,7 +108,7 @@ Abschalten **gelöscht** nichts. Kündigen und Konto löschen bleiben immer mög
 **Zwei-Faktor verloren**
 - Der Nutzer hat 8 Wiederherstellungscodes (Konto → Sicherheit, einmal angezeigt, nur Hashes gespeichert). Mit Passwort-Anmeldung + einem Code wird der Faktor entfernt, danach 2FA neu einrichten.
 - Ohne Codes: **keine automatische Umgehung**. Identität des Nutzers außerhalb der App prüfen (z. B. Antwort auf die Kontomail plus Nachweis, was nur der Inhaber weiß), dann im Supabase-Dashboard → Authentication → Users → Nutzer → „Remove MFA factor“. Das ist eine bewusste Handarbeit; die App kann Identität nicht prüfen.
-- Ablage der Codes: `app_config`-Zeile `mfa-recovery:<user-id>` (nur Service-Rolle). Eine eigene Tabelle wäre sauberer; dafür wäre eine neue Migrationsnummer nötig (offene Frage an das Merge).
+- Ablage der Codes: Tabelle `mfa_recovery_codes` (Migration `0015_mfa_recovery.sql`: eine Zeile je Nutzer, nur HMAC-Hashes, Kaskade auf `auth.users`, RLS an und **kein** Client-Recht). Sätze, die vor der Migration entstanden sind (`app_config`-Zeile `mfa-recovery:<user-id>`), werden weiter angenommen und dort verbraucht; ein NEUER Satz landet immer in der Tabelle und entfernt die alte Zeile. Ohne die Migration schreiben die Functions weiter nach `app_config` (nichts bricht, solange sie aussteht).
 
 ## 8. Datenschutz-Löschfristen (Ist-Stand, ehrlich)
 

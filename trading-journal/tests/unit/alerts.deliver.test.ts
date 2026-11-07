@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultAlertPrefs, type AlertPrefs } from "@/domain/alerts/config";
 import { LEASE_SEC } from "@/domain/alerts/delivery";
 import { reconcileCalls, runWorker, emptyWorkerSummary, type DeliverDeps } from "../../netlify/functions/_lib/alerts/deliver";
-import { setTwilioFetchForTests, twilioSignature, validTwilioSignature, type TwilioConfig } from "../../netlify/functions/_lib/alerts/twilio";
+import { createCall, setTwilioFetchForTests, twilioSignature, validTwilioSignature, verifyStart, type TwilioConfig } from "../../netlify/functions/_lib/alerts/twilio";
 import * as fx from "./alerts.watch.fixtures";
 import { memoryStore, MIN, twilioFake, type MemoryStore, type TwilioFake } from "./alerts.fakes";
 
@@ -407,6 +407,34 @@ describe("phone", () => {
     await runWorker(deps());
     expect(tw.calls).toHaveLength(0);
     expect(dlv("phone")).toMatchObject({ status: "skipped", reason: "phone_opted_out" });
+  });
+
+  it("KILL_CALLS (emergency switch): no call, no budget used, the log says 'Notschalter' – and the job is done, not retried; e-mail still goes", async () => {
+    setup();
+    await fire(["phone", "email"]);
+    vi.stubEnv("KILL_CALLS", "true");
+    const t = await runWorker(deps());
+    vi.unstubAllEnvs();
+    expect(tw.calls).toHaveLength(0);
+    expect(dlv("phone")).toMatchObject({ status: "skipped", reason: "calls_off", dialedAt: null });
+    expect(job("phone").status).toBe("done");
+    expect(dlv("email")).toMatchObject({ status: "sent" });
+    expect(t.skipped).toBe(1);
+    // switched on again: a NEW alarm is dialed as usual (the skipped one is not made up for)
+    await fire(["phone"], { key: "k-after" });
+    await runWorker(deps());
+    expect(tw.calls).toHaveLength(1);
+  });
+
+  it("KILL_CALLS is also checked at the last step before Twilio (createCall): no request leaves even if a path forgot the check", async () => {
+    vi.stubEnv("KILL_CALLS", "true");
+    const res = await createCall(TW, { to: NUMBER, twiml: "<Response/>", statusCallback: null });
+    const v = await verifyStart(TW, NUMBER, "de");
+    vi.unstubAllEnvs();
+    expect(res).toMatchObject({ ok: false, reason: "calls_off", retryable: false });
+    expect(v).toEqual({ ok: false, code: "switched_off" });
+    expect(tw.calls).toHaveLength(0);
+    expect(tw.verifications).toHaveLength(0);
   });
 
   it("the phone events switched off after the job was queued: skipped", async () => {

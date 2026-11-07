@@ -59,7 +59,7 @@ Prüfbefehle (dieselben wie in der CI): `npm run typecheck && npm run lint && np
    - **Publishable key** (`sb_publishable_…`) → `VITE_SUPABASE_PUBLISHABLE_KEY` (öffentlich, landet im Bundle)
    - **Secret key** (`sb_secret_…`) → `SUPABASE_SECRET_KEY` (**nur** für die Functions, niemals mit `VITE_`-Präfix)
 
-### 2.1 Migrationen 0001 → 0016
+### 2.1 Migrationen 0001 → 0017
 
 Die Dateien liegen in `trading-journal/supabase/migrations/` und werden **genau einmal, in dieser Reihenfolge**
 ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als neue Datei):
@@ -80,10 +80,12 @@ ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als n
 | `0012_connections.sql` | Verbindungen: Empfangsprotokoll des TradingView-Webhooks (`webhook_receipts`, höchstens 30 Zeilen je Nutzer, ohne Alarmtext, Token und IP). Binance braucht keine Schema-Änderung. Ohne sie zeigt der Assistent keinen Empfangsbeleg |
 | `0013_signals.sql` | TradingView-Signal-Empfänger (B3): Tabelle `signals` (jede Zustellung mit Ausgang verarbeitet / doppelt / abgelehnt samt Grund, nur eigene Zeilen lesbar, eindeutiger Schlüssel je Nutzer + Quelle + Signal-ID gegen Doppelte, ohne Rohtext, Token und IP) sowie `tv_mcp_states` und `tv_mcp_connections` für die OAuth-Verbindung zum offiziellen TradingView-MCP (Tokens verschlüsselt, für Clients gar nicht lesbar). Ohne sie antwortet `/api/v1/signals/:token` mit 503 „nicht eingerichtet“ und nimmt nichts an; die Karte zeigt dann den Empfangsbeleg aus 0012 |
 | `0014_alerts.sql` | Vier Alarme + Zustellung (C2): Alarm-Einstellungen (`alert_prefs`), Telefon-Einwilligung und -Status ohne Nummer (`alert_phones`), die verschlüsselte Nummer (`alert_phone_secrets`, kein Zugriff für Clients), Gedächtnis der Alarm-Engine (`alert_state`), Ereignisse mit eindeutigem Dedup-Schlüssel (`alert_events`), Zustellprotokoll (`alert_deliveries`) und die Job-Warteschlange mit Lease, Wiederholung und Dead-Letter (`jobs`), dazu die Server-Funktionen `alert_enqueue`, `jobs_claim`, `alert_phone_reserve` (Anruf wird VOR dem Wählen festgeschrieben) u. a. Clients dürfen nur eigene Zeilen lesen, schreiben nur die Functions. Läuft nach 0001, 0005 und 0008 (0011–0013 gehören anderen Paketen und sind unabhängig). Ohne sie meldet `alerts-cron` „migration“ und tut nichts; `supabase/tests/0014_alerts.test.sql` prüft die Regeln gegen eine Scratch-Datenbank |
+| `0015_mfa_recovery.sql` | Wiederherstellungscodes der 2FA (B1): eigene Tabelle `mfa_recovery_codes` (nur HMAC-Hashes, je Nutzer eine Zeile, Kaskade auf `auth.users`, RLS an, **kein** Client-Recht), dazu eine Korrektur zu 0014: `jobs` ist für den Browser nicht lesbar (Lease-Token). Bestehende Sätze in `app_config` (`mfa-recovery:<id>`) funktionieren weiter, neue Sätze landen in der Tabelle. Ohne die Migration schreiben die Functions weiter nach `app_config` |
 | `0016_consents.sql` | Kaufstrecke: Zustimmungsnachweis (`consents`: wer, wann, welcher Wortlaut + Hash je Bestellung – geschrieben VOR der Stripe-Sitzung, nur eigene Zeilen lesbar, 2FA-Regel) und Kündigungs-/Widerrufserklärungen ohne Login (`contract_requests`, Adresse nur als gesalzener Hash). **Ohne sie bleibt die Kaufstrecke gesperrt** („Zustimmung kann nicht gespeichert werden“) – nie ein Kauf ohne Nachweis |
+| `0017_contract_grants.sql` | Korrektur zu 0016: der Browser liest von `contract_requests` keine Hash-Spalten (`email_hash`, `token_hash`) mehr; gelesen wird dort ohnehin nur in den Functions. Richtlinien und Schreibwege bleiben, ohne sie läuft alles weiter (nur das Recht wäre weiter als nötig) |
 
 **Variante A – SQL-Editor (ohne CLI):** Supabase → **SQL Editor → New query** → Inhalt von `0001_core.sql` einfügen →
-**Run** → „Success“ abwarten. Dann `0002` bis `0016` (die Nummern dazwischen, die es gibt) genauso.
+**Run** → „Success“ abwarten. Dann `0002` bis `0017` (die Nummern dazwischen, die es gibt) genauso.
 
 **Variante B – CLI:**
 

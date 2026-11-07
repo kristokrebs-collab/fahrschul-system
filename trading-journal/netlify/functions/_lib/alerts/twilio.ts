@@ -20,6 +20,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { DeliveryReason } from "../../../../src/domain/alerts/delivery";
 import { isE164 } from "../../../../src/domain/alerts/phone";
 import { envOptional } from "../env";
+import { killed } from "../killswitch";
 
 export interface TwilioConfig {
   sid: string;
@@ -110,6 +111,8 @@ export function failureOfCall(res: { status: number; body: Record<string, unknow
 
 /** Starts ONE call. Never throws; the number is only in the request body. */
 export async function createCall(cfg: TwilioConfig, c: CallInput): Promise<CallResult> {
+  // the emergency switch (C4) is also checked here, at the last step before Twilio: whatever path led here, no request goes out
+  if (killed("calls")) return { ok: false, reason: "calls_off", retryable: false, httpStatus: null };
   const form = new URLSearchParams();
   form.set("To", c.to);
   form.set("From", cfg.from);
@@ -138,11 +141,12 @@ export async function getCall(cfg: TwilioConfig, sid: string): Promise<string | 
 
 // ------------------------------------------------------------------------------------------ Verify
 
-export type VerifyStartResult = { ok: true } | { ok: false; code: "not_configured" | "invalid_number" | "rate" | "unreachable" | "failed" };
+export type VerifyStartResult = { ok: true } | { ok: false; code: "not_configured" | "invalid_number" | "rate" | "unreachable" | "failed" | "switched_off" };
 export type VerifyCheckResult = { ok: true } | { ok: false; code: "not_configured" | "wrong" | "expired" | "rate" | "unreachable" | "failed" };
 
 /** Sends the code by SMS (Twilio's text, in the user's language). */
 export async function verifyStart(cfg: TwilioConfig, to: string, lang: "de" | "en"): Promise<VerifyStartResult> {
+  if (killed("calls")) return { ok: false, code: "switched_off" };
   if (!cfg.verifySid) return { ok: false, code: "not_configured" };
   const form = new URLSearchParams({ To: to, Channel: "sms", Locale: lang });
   const res = await post(cfg, `https://verify.twilio.com/v2/Services/${cfg.verifySid}/Verifications`, form);

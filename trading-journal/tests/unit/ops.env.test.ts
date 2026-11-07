@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ENV_GROUPS, ENV_SPEC, evaluateEnv, FUNCTION_ENV, groupStatus } from "../../netlify/functions/_lib/envSpec";
+import { ENV_GROUPS, ENV_SPEC, evaluateEnv, FUNCTION_ENV, GROUP_LABELS, groupStatus } from "../../netlify/functions/_lib/envSpec";
 
 const root = join(__dirname, "../..");
 const read = (p: string) => readFileSync(join(root, p), "utf8");
@@ -23,7 +23,7 @@ describe("the variable list", () => {
 
   it("has no duplicates, every group exists, every function group exists", () => {
     expect(new Set(names).size).toBe(names.length);
-    const groups = new Set([...ENV_GROUPS.map((g) => g.id), "switches", "legal"]);
+    const groups = new Set([...ENV_GROUPS.map((g) => g.id), ...Object.keys(GROUP_LABELS)]);
     for (const e of ENV_SPEC) expect(groups.has(e.group), `${e.name}: unknown group ${e.group}`).toBe(true);
     for (const f of FUNCTION_ENV) for (const g of f.groups) expect(ENV_GROUPS.some((x) => x.id === g), `${f.fn}: unknown group ${g}`).toBe(true);
     for (const g of ENV_GROUPS) for (const n of [...g.all, ...(g.anyOf ?? []).flat()]) expect(names, `${g.id}: ${n} not in the list`).toContain(n);
@@ -60,7 +60,7 @@ describe("the variable list", () => {
   it(".env.example lists exactly the entries that are not planned-only, SETUP.md mentions each", () => {
     const listed = new Set([...read(".env.example").matchAll(/^([A-Z][A-Z0-9_]+)=/gm)].map((m) => m[1]!));
     const setup = read("SETUP.md");
-    const missing = ENV_SPEC.filter((e) => !listed.has(e.name) && !(e.planned && e.group === "phone")).map((e) => e.name);
+    const missing = ENV_SPEC.filter((e) => !listed.has(e.name) && !e.planned).map((e) => e.name);
     expect(missing, "in envSpec.ts but not in .env.example").toEqual([]);
     const extra = [...listed].filter((n) => !names.includes(n));
     expect(extra, "in .env.example but not in envSpec.ts").toEqual([]);

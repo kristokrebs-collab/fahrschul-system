@@ -4,8 +4,10 @@
  *
  * - `generate` (needs a session with the code step done, aal2): 8 single-use codes of 10 characters (alphabet without
  *   I, O, 0, 1; 50 bits each), shown ONCE. Only HMAC-SHA-256 hashes are stored (key = server secret + user id), in
- *   `app_config` under `mfa-recovery:<user id>` – a table only the service role reaches (migration 0007: RLS on, all
- *   rights revoked). A new set replaces the old one.
+ *   `mfa_recovery_codes` (migration 0015: cascade to auth.users, RLS on, no client right at all). Sets made before 0015
+ *   live in `app_config` under `mfa-recovery:<user id>` and are still accepted; a NEW set always goes to the table and
+ *   removes the old row (without the migration the old row is written – nothing breaks while it is pending). A new set
+ *   replaces the old one.
  * - `redeem` (needs only the password session, aal1 – the user cannot give the code step): a matching unused code is
  *   consumed atomically (optimistic write on `updated_at`), every TOTP factor of the user is removed, the rest of the set
  *   is deleted, the event is audited. The account then works with the password alone until the user sets 2FA up again.
@@ -36,10 +38,14 @@ interface RecoveryValue {
   createdAt: string;
   codes: CodeEntry[];
 }
+/** Where a set lives: its own table (migration 0015) or, for sets made before it, the `app_config` row (still accepted). */
 interface Row {
   value: RecoveryValue;
   updated_at: string;
+  where: "table" | "legacy";
 }
+
+const TABLE = "mfa_recovery_codes";
 
 const keyOf = (userId: string): string => `mfa-recovery:${userId}`;
 
@@ -72,7 +78,20 @@ function unavailable(): HttpError {
   return new HttpError(503, "recovery_unavailable", "Wiederherstellungscodes sind gerade nicht verfügbar.");
 }
 
-async function readRow(userId: string, sb: SupabaseClient): Promise<Row | null> {
+/** Is the table of migration 0015 there? (`false` while the migration is pending – the functions then use `app_config` only.) */
+async function readTable(userId: string, sb: SupabaseClient): Promise<Row | null | "no-table"> {
+  const { data, error } = await sb.from(TABLE).select("codes, created_at, updated_at").eq("user_id", userId).maybeSingle();
+  if (error) {
+    if (isMissingTable(error)) return "no-table";
+    console.error("[fn] recovery read failed", error.code);
+    throw unavailable();
+  }
+  const row = data as { codes?: unknown; created_at?: unknown; updated_at?: unknown } | null;
+  if (!row || !Array.isArray(row.codes)) return null;
+  return { value: { v: 1, createdAt: String(row.created_at ?? ""), codes: row.codes as CodeEntry[] }, updated_at: String(row.updated_at ?? ""), where: "table" };
+}
+
+async function readLegacy(userId: string, sb: SupabaseClient): Promise<Row | null> {
   const { data, error } = await sb.from("app_config").select("value, updated_at").eq("key", keyOf(userId)).maybeSingle();
   if (error) {
     if (!isMissingTable(error)) console.error("[fn] recovery read failed", error.code);
@@ -81,7 +100,29 @@ async function readRow(userId: string, sb: SupabaseClient): Promise<Row | null> 
   const row = data as { value?: unknown; updated_at?: unknown } | null;
   const value = row?.value as Partial<RecoveryValue> | undefined;
   if (!row || !value || value.v !== 1 || !Array.isArray(value.codes)) return null;
-  return { value: value as RecoveryValue, updated_at: String(row.updated_at ?? "") };
+  return { value: value as RecoveryValue, updated_at: String(row.updated_at ?? ""), where: "legacy" };
+}
+
+/** The table row wins; a user with only the old `app_config` row keeps working. */
+async function readRow(userId: string, sb: SupabaseClient): Promise<Row | null> {
+  const t = await readTable(userId, sb);
+  if (t && t !== "no-table") return t;
+  return readLegacy(userId, sb);
+}
+
+/** Writes `next` back where the row came from. Resolves the number of rows written (0 = lost the optimistic race). */
+async function writeBack(userId: string, row: Row, next: RecoveryValue, nowIso: string | null, sb: SupabaseClient): Promise<number> {
+  const q =
+    row.where === "table"
+      ? sb.from(TABLE).update({ codes: next.codes, ...(nowIso ? { updated_at: nowIso } : {}) }).eq("user_id", userId)
+      : sb.from("app_config").update({ value: next, ...(nowIso ? { updated_at: nowIso } : {}) }).eq("key", keyOf(userId));
+  const guarded = nowIso ? q.eq("updated_at", row.updated_at) : q;
+  const { data, error } = await guarded.select(row.where === "table" ? "user_id" : "key");
+  if (error) {
+    console.error("[fn] recovery write failed", error.code);
+    throw unavailable();
+  }
+  return Array.isArray(data) ? data.length : 0;
 }
 
 export interface RecoveryStatus {
@@ -100,17 +141,28 @@ export async function recoveryStatus(userId: string, sb: SupabaseClient = supaba
 export async function generateRecovery(userId: string, now: Date = new Date(), sb: SupabaseClient = supabaseAdmin()): Promise<{ codes: string[]; createdAt: string }> {
   const plain = newCodes();
   const value: RecoveryValue = { v: 1, createdAt: now.toISOString(), codes: plain.map((c) => ({ h: hashCode(userId, c), usedAt: null })) };
-  const { error } = await sb.from("app_config").upsert({ key: keyOf(userId), value, updated_at: now.toISOString() }, { onConflict: "key" });
-  if (error) {
-    console.error("[fn] recovery write failed", error.code);
+  // the table of migration 0015; while it is pending the old app_config row is written (and nothing breaks)
+  const t = await sb.from(TABLE).upsert({ user_id: userId, codes: value.codes, created_at: value.createdAt, updated_at: value.createdAt }, { onConflict: "user_id" });
+  if (t.error && isMissingTable(t.error)) {
+    const { error } = await sb.from("app_config").upsert({ key: keyOf(userId), value, updated_at: now.toISOString() }, { onConflict: "key" });
+    if (error) {
+      console.error("[fn] recovery write failed", error.code);
+      throw unavailable();
+    }
+  } else if (t.error) {
+    console.error("[fn] recovery write failed", t.error.code);
     throw unavailable();
+  } else {
+    // migrated: a set made before the table existed is replaced by this one
+    await sb.from("app_config").delete().eq("key", keyOf(userId));
   }
   return { codes: plain.map(formatCode), createdAt: value.createdAt };
 }
 
-/** Removes the user's recovery row (account deletion, 2FA reset). Best effort, never throws. */
+/** Removes the user's recovery rows – the table row and a legacy one (account deletion, 2FA reset). Best effort, never throws. */
 export async function removeRecovery(userId: string, sb: SupabaseClient = supabaseAdmin()): Promise<void> {
   try {
+    await sb.from(TABLE).delete().eq("user_id", userId);
     await sb.from("app_config").delete().eq("key", keyOf(userId));
   } catch {
     console.error("[fn] recovery delete failed");
@@ -135,12 +187,7 @@ export async function consumeRecovery(userId: string, input: string, now: Date =
   });
   if (!row || hit < 0) return false;
   const next: RecoveryValue = { ...row.value, codes: row.value.codes.map((c, i) => (i === hit ? { ...c, usedAt: now.toISOString() } : c)) };
-  const { data, error } = await sb.from("app_config").update({ value: next, updated_at: now.toISOString() }).eq("key", keyOf(userId)).eq("updated_at", row.updated_at).select("key");
-  if (error) {
-    console.error("[fn] recovery consume failed", error.code);
-    throw unavailable();
-  }
-  return Array.isArray(data) && data.length === 1;
+  return (await writeBack(userId, row, next, now.toISOString(), sb)) === 1;
 }
 
 /** Puts a consumed code back (the factor removal that should have followed failed). Best effort. */
@@ -151,7 +198,7 @@ export async function restoreRecovery(userId: string, input: string, sb: Supabas
     if (!code || !row) return;
     const h = hashCode(userId, code);
     const next: RecoveryValue = { ...row.value, codes: row.value.codes.map((c) => (c.h === h ? { ...c, usedAt: null } : c)) };
-    await sb.from("app_config").update({ value: next }).eq("key", keyOf(userId));
+    await writeBack(userId, row, next, null, sb);
   } catch {
     console.error("[fn] recovery restore failed");
   }
