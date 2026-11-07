@@ -35,7 +35,7 @@ function rows(): Row[] {
 }
 
 const NAME = (id: "free" | "pro" | "premium" | "team"): string => PLAN_CATALOG[id].name;
-const PLANNED = new Set(["tvConnections", "alertChannels", "phoneCallsPerMonth", "simulationsPerDay"]);
+const PLANNED = new Set(["tvConnections", "simulationsPerDay"]);
 
 const tarifOf = (fid: string): string => {
   const t = FUNCTION_TARIFF.find((x) => x.fid === fid)!;
