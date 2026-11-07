@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { celebrateRecord } from "@/motion/fx/celebrate";
-import { DotMatrix } from "@/motion/DotMatrix";
+import { ThinkingOrb } from "@/motion/ThinkingOrb";
 import { AsciiCascade } from "@/motion/pulse/AsciiCascade";
 import { FullscreenWipe, WipeItem } from "@/motion/pulse/FullscreenWipe";
 import { formatDay } from "../format";
@@ -90,7 +90,7 @@ export function CheckoutReturn() {
             <div className="grid gap-5">
               <span aria-hidden="true">
                 {/* busy indicator: plays only while confirming, unmounts with the confirmation */}
-                <DotMatrix preset="wave" size={6} gap={3} tone="fg" />
+                <ThinkingOrb variant="plan" size={44} />
               </span>
               <h2 className="text-[clamp(30px,6vw,56px)] font-medium leading-[1] tracking-[-0.03em] text-fg">{RETURN.confirming}</h2>
             </div>

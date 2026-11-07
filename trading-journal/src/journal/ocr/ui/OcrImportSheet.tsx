@@ -3,6 +3,7 @@ import type { AccountId } from "@/domain/types";
 import { newId } from "@/lib/ids";
 import { cn } from "@/lib/cn";
 import { Sheet, StaggerItem } from "@/motion/Sheet";
+import { ThinkingOrb } from "@/motion/ThinkingOrb";
 import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
 import { inputClass } from "@/primitives/Input";
@@ -509,7 +510,7 @@ export default function OcrImportSheet() {
           <StaggerItem>
             <div role="status" aria-live="polite" className="grid gap-2.5 rounded-xl border border-line bg-ink-950/40 px-3.5 py-3 text-[13px] text-mute" data-testid="ocr-busy">
               <span className="flex items-center gap-3">
-                <span aria-hidden="true" className="size-2 shrink-0 animate-pulse rounded-full bg-signal" />
+                <ThinkingOrb variant="calc" size={20} className="text-mute" />
                 {progress.text}
               </span>
               <span aria-hidden="true" className="h-[3px] overflow-hidden rounded-full bg-white/[0.06]">
