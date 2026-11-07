@@ -7,10 +7,10 @@
 import type { Config } from "@netlify/functions";
 import { requireUser } from "./_lib/auth";
 import { handler, json, requireMethod } from "./_lib/http";
-import { requireFeature } from "./_lib/plan";
+import { requireExchangeAccess } from "./_lib/exchanges/api";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { mapOpenPosition, type LivePosition } from "./_lib/exchanges/mapping";
-import { adapterFor } from "./_lib/exchanges/registry";
+import { adapterFor, adapterOptionsOf } from "./_lib/exchanges/registry";
 import { credentialsOf, listConnections, loadConnection, rotateIfNeeded } from "./_lib/exchanges/store";
 import { syncErrorMessage } from "./_lib/exchanges/sync";
 
@@ -18,7 +18,7 @@ export default handler(async (req) => {
   requireMethod(req, "GET");
   const user = await requireUser(req, { aal2: "ifEnrolled" });
   await enforceRateLimit(rateKey("exchange-positions", user.id), 120, 600);
-  await requireFeature(user.id, "exchangeSync");
+  await requireExchangeAccess(user.id);
   const positions: LivePosition[] = [];
   const errors: { connectionId: string; code: string; message: string }[] = [];
   for (const meta of await listConnections(user.id)) {
@@ -27,7 +27,7 @@ export default handler(async (req) => {
       const row = await loadConnection(user.id, meta.id);
       if (!row) continue;
       const creds = credentialsOf(row);
-      const adapter = adapterFor(row.exchange, creds);
+      const adapter = adapterFor(row.exchange, creds, adapterOptionsOf(row));
       const open = await adapter.fetchOpenPositions();
       await rotateIfNeeded(row, creds); // review KEY-01: the key worked → newest key version
       const tickers = open.length ? await adapter.fetchTickers(open.map((p) => p.symbol)).catch(() => []) : [];

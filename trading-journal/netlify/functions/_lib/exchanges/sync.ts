@@ -15,9 +15,9 @@
 import { HttpError } from "../http";
 import { supabaseAdmin } from "../supabase";
 import { detectPnlConvention, mapClosedPosition, safeTz, type MappedPosition, type PnlConvention, type PositionCheck, type SyncedTrade } from "./mapping";
-import { adapterFor } from "./registry";
-import { credentialsOf, finishRun, getCursor, rotateIfNeeded, setCursor, startRun, updateConnection, upsertSyncedTrades, type ConnectionRow, type RunCounts, type RunKind, type RunStatus } from "./store";
-import { ExchangeError, type ExchangeAdapter, type VenueClosedPosition, type VenueFill, type VenueTpSl } from "./types";
+import { adapterFor, adapterOptionsOf } from "./registry";
+import { connectionExists, credentialsOf, finishRun, getCursor, progressRun, rotateIfNeeded, setCursor, startRun, updateConnection, upsertSyncedTrades, type ConnectionRow, type RunCounts, type RunKind, type RunStatus } from "./store";
+import { ExchangeError, type AdapterNotes, type ExchangeAdapter, type VenueClosedPosition, type VenueFill, type VenueTpSl } from "./types";
 
 export const DAY_MS = 86_400_000;
 /** Read window per request batch. */
@@ -64,6 +64,8 @@ export interface SyncOutcome {
   /** Positions whose fills were not read (budget). */
   fillsSkipped: number;
   requests: number;
+  /** Adapters that rebuild positions from fills: what could not become a trade (orphan fills, unconvertible fees). */
+  notes?: AdapterNotes;
 }
 
 interface CursorMeta {
@@ -111,7 +113,8 @@ async function readPositions(
     const res = await adapter.fetchClosedPositions({ startTime: sliceStart, endTime: sliceEnd }, { skip, deadline });
     requests += res.requests;
     positions.push(...res.items);
-    if (!res.complete) return { positions, resume: { from: sliceStart, to, skip: Math.max(0, res.nextSkip - 100) }, requests };
+    // Bitunix re-reads its last page (offset − 100); an adapter that pages by symbol says where to resume itself
+    if (!res.complete) return { positions, resume: { from: sliceStart, to, skip: res.resumeSkip ?? Math.max(0, res.nextSkip - 100) }, requests };
     sliceStart = sliceEnd + 1;
     skip = 0;
   }
@@ -153,7 +156,8 @@ export async function runSync(req: SyncRequest): Promise<SyncOutcome> {
   let windowTo = now;
   try {
     const creds = credentialsOf(conn);
-    const adapter = adapterFor(conn.exchange, creds);
+    const adapterOpts = adapterOptionsOf(conn);
+    const adapter = adapterFor(conn.exchange, creds, adapterOpts);
     const cursor = req.from === undefined ? await getCursor(conn.id, STREAM) : null;
     const meta = (cursor?.meta ?? {}) as CursorMeta;
     const connMeta = (conn.meta ?? {}) as { feesIncluded?: boolean | null };
@@ -180,6 +184,7 @@ export async function runSync(req: SyncRequest): Promise<SyncOutcome> {
     for (const p of read.positions) byId.set(p.positionId, p);
     const positions = [...byId.values()].sort((a, b) => b.closedAt - a.closedAt);
     counts.fetched = positions.length;
+    if (!req.dryRun) await progressRun(req.userId, runId, counts.fetched); // the first import shows "N Trades gefunden" while it writes
 
     const tp = await readTpSl(adapter, positions, req.deadline);
     requests += tp.requests;
@@ -216,11 +221,13 @@ export async function runSync(req: SyncRequest): Promise<SyncOutcome> {
         feesIncluded,
         tpsl: tp.orders,
         fills: fills.get(p.positionId) ?? null,
+        market: adapterOpts.market === "spot" ? "spot" : "perp",
       }),
     );
 
     const more = read.resume !== null;
     const convention = { ...detected, feesIncluded, used: detected.feesIncluded !== null };
+    const notes = adapter.notes?.();
 
     if (req.dryRun) {
       const states = await journalStates(req.userId, mapped.slice(0, CHECKS_MAX).map((m) => m.trade.id));
@@ -229,11 +236,13 @@ export async function runSync(req: SyncRequest): Promise<SyncOutcome> {
       await finishRun(req.userId, runId, more ? "partial" : "ok", counts, {
         windowFrom,
         windowTo,
-        meta: { dryRun: true, more, requests, feesIncluded, samples: detected.samples },
+        meta: { dryRun: true, more, requests, feesIncluded, samples: detected.samples, ...(notes ? { notes } : {}) },
       });
-      return { runId, status: more ? "partial" : "ok", counts, more, window: { from: windowFrom, to: windowTo }, dryRun: true, trades: mapped.map((m) => m.trade), checks, convention, fillsSkipped, requests };
+      return { runId, status: more ? "partial" : "ok", counts, more, window: { from: windowFrom, to: windowTo }, dryRun: true, trades: mapped.map((m) => m.trade), checks, convention, fillsSkipped, requests, notes };
     }
 
+    // "Trennen stoppt Jobs": a disconnect while this job runs deletes the connection (and its key) – nothing is written after it
+    if (!(await connectionExists(req.userId, conn.id))) throw new HttpError(409, "connection_gone", "Die Verbindung wurde getrennt. Der Import wurde gestoppt.");
     const results = await upsertSyncedTrades(req.userId, mapped.map((m) => m.item));
     for (const r of Object.values(results)) {
       if (r === "inserted") counts.inserted++;
@@ -256,6 +265,7 @@ export async function runSync(req: SyncRequest): Promise<SyncOutcome> {
       }
     }
     const nextMeta: CursorMeta = more ? { resume: read.resume ?? undefined, oldestOpenMs: meta.oldestOpenMs ?? null } : { oldestOpenMs };
+    if (!(await connectionExists(req.userId, conn.id))) throw new HttpError(409, "connection_gone", "Die Verbindung wurde getrennt. Der Import wurde gestoppt.");
     await setCursor(req.userId, conn.id, STREAM, more ? (cursor?.cursor_ms ?? null) : windowTo, nextMeta as Record<string, unknown>);
     const connPatch: Parameters<typeof updateConnection>[2] = { last_sync_at: nowIso, last_error: null, status: "active" };
     if (detected.feesIncluded !== null && detected.feesIncluded !== connMeta.feesIncluded) connPatch.meta = { ...(conn.meta ?? {}), feesIncluded: detected.feesIncluded };
@@ -264,8 +274,8 @@ export async function runSync(req: SyncRequest): Promise<SyncOutcome> {
     await rotateIfNeeded(conn, creds);
 
     const status: RunStatus = more ? "partial" : "ok";
-    await finishRun(req.userId, runId, status, counts, { windowFrom, windowTo, meta: { more, requests, feesIncluded, fillsSkipped } });
-    return { runId, status, counts, more, window: { from: windowFrom, to: windowTo }, dryRun: false, trades: [], checks: [], convention, fillsSkipped, requests };
+    await finishRun(req.userId, runId, status, counts, { windowFrom, windowTo, meta: { more, requests, feesIncluded, fillsSkipped, ...(notes ? { notes } : {}) } });
+    return { runId, status, counts, more, window: { from: windowFrom, to: windowTo }, dryRun: false, trades: [], checks: [], convention, fillsSkipped, requests, notes };
   } catch (e) {
     const err = syncErrorMessage(e);
     await finishRun(req.userId, runId, "error", counts, { error: err.message, windowFrom, windowTo, meta: { code: err.code } });

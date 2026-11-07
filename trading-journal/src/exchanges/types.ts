@@ -20,6 +20,10 @@ export interface ExchangeConnection {
   journalAccount: JournalAccount;
   syncEnabled: boolean;
   createdAt: string;
+  /** Binance only: `spot` or `futures` (two separate connections). */
+  market?: "spot" | "futures" | null;
+  /** Binance spot: extra pairs read in addition to the coins held now. */
+  symbols?: string[];
 }
 
 export type RunKind = "manual" | "cron" | "backfill" | "dry_run";
@@ -51,6 +55,8 @@ export interface ExchangePlan {
   entitled: boolean;
   /** Allowed connections, `null` = unlimited. */
   limit: number | null;
+  /** The plan includes the automatic background sync (older servers omit it). */
+  autoSync?: boolean;
   gated: boolean;
 }
 
@@ -61,6 +67,8 @@ export interface ExchangeStatus {
   plan: ExchangePlan;
   connections: ExchangeConnection[];
   runs: SyncRun[];
+  /** Binance: the fixed outgoing server address for the key's IP whitelist, when the operator set one. */
+  binance?: { egressIp: string | null };
 }
 
 export interface PositionCheck {
@@ -115,6 +123,12 @@ export interface ConnectInput {
   label?: string;
   journalAccount: JournalAccount;
   readOnlyConfirmed: true;
+  /** Binance: which API this key reads (required for Binance). */
+  market?: "spot" | "futures";
+  /** Binance spot: further pairs to read. */
+  symbols?: string[];
+  /** Binance: the user confirmed the warnings of the rights check (e.g. Futures access). */
+  acceptWarnings?: boolean;
 }
 
 export interface ConnectResult {

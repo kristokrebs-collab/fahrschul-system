@@ -1,7 +1,7 @@
 /**
  * Exchange sync (P11).
  *
- * GET  /api/v1/exchange/sync → status: `{ configured, cron, plan, connections, runs }` (no secrets – key last 4 only).
+ * GET  /api/v1/exchange/sync → status: `{ configured, cron, plan, connections, runs, binance }` (no secrets – key last 4 only).
  * GET  /api/v1/exchange/sync?since=<ISO | next>|&pull=1 → `{ trades: [{ id, data, updatedAt }], more, next, serverAt }`:
  *      trades the server wrote (sync, webhook, REST) changed after `since` – signed-in devices WITHOUT cloud sync merge
  *      them locally and keep `next` (a keyset cursor over (updated_at, id)) as their pull mark.
@@ -13,10 +13,10 @@
 import type { Config } from "@netlify/functions";
 import { z } from "zod";
 import { requireUser } from "./_lib/auth";
+import { envOptional } from "./_lib/env";
 import { handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
-import { requireFeature } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
-import { clientTz, CRON_EVERY_MIN, cronEnabled, exchangePlanState, nextCronAt, SYNC_BUDGET_MS } from "./_lib/exchanges/api";
+import { clientTz, CRON_EVERY_MIN, cronEnabled, exchangePlanState, nextCronAt, requireExchangeAccess, SYNC_BUDGET_MS } from "./_lib/exchanges/api";
 import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
 import { connectionInfo, encryptionConfigured, listConnections, loadConnection, parseCursor, profileTz, pullSyncedTrades, recentRuns, runningRun } from "./_lib/exchanges/store";
 import { runSync } from "./_lib/exchanges/sync";
@@ -26,6 +26,12 @@ const Body = z.object({
   tz: z.string().max(64).optional(),
   from: z.string().datetime({ offset: true }).optional(),
 });
+
+/** `BINANCE_EGRESS_IP` when it looks like an IPv4 / IPv6 address, else null (the dialog then explains the no-whitelist route). */
+function egressIp(): string | null {
+  const v = envOptional("BINANCE_EGRESS_IP")?.trim();
+  return v && /^[0-9a-fA-F:.]{3,45}$/.test(v) && (v.includes(".") || v.includes(":")) ? v : null;
+}
 
 /** A sync of the same connection that started less than this ago blocks a second one. */
 const RUNNING_GUARD_MS = 2 * 60_000;
@@ -52,13 +58,15 @@ export default handler(async (req) => {
       plan,
       connections: rows.map(connectionInfo),
       runs,
+      // Binance: the fixed outgoing address to put on the key's IP whitelist (`BINANCE_EGRESS_IP`, set by the operator; none → "key without IP binding")
+      binance: { egressIp: egressIp() },
     });
   }
 
   await enforceRateLimit(rateKey("exchange-sync", user.id), 30, 600);
   const dryRun = url.searchParams.get("dryRun") === "1";
   const body = req.headers.get("content-type")?.startsWith("application/json") ? await readJson(req, Body, { maxBytes: 1024 }) : {};
-  await requireFeature(user.id, "exchangeSync");
+  await requireExchangeAccess(user.id);
 
   const rows = await listConnections(user.id);
   const meta = body.connectionId ? rows.find((r) => r.id === body.connectionId) : rows.find((r) => r.status !== "revoked");

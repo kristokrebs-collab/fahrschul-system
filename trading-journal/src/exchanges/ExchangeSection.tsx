@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useCloudSession } from "@/cloud/session";
+import { ConnectSlot } from "@/connect/ConnectSlot";
 import { Reveal } from "@/motion/Reveal";
 import { useJournal } from "@/store/journalStore";
 import { ExchangeHost } from "./ExchangeHost";
@@ -47,6 +48,14 @@ export function ExchangeSection({ startIndex = 5, withHost = true }: ExchangeSec
       <Cell index={startIndex} span="lg:col-span-12" section="konto-boerse">
         <ExchangeConnectionsCard />
       </Cell>
+      {signedIn && (
+        <Cell index={startIndex + 4} span="lg:col-span-12" section="konto-binance">
+          <div className="grid gap-2 lg:grid-cols-2" data-testid="konto-connect-slots">
+            <ConnectSlot service="binance-spot" />
+            <ConnectSlot service="binance-futures" />
+          </div>
+        </Cell>
+      )}
       {showInbox && (
         <Cell index={startIndex + 1} span={showRecon ? "lg:col-span-7 lg:self-start" : "lg:col-span-12"}>
           <SyncInbox columns={showRecon ? 2 : 3} />

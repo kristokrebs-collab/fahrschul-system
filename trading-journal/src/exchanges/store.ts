@@ -52,6 +52,8 @@ export interface ExchangeState {
   actionError: UiError | null;
   outcome: SyncOutcome | null;
   dryRun: SyncResult | null;
+  /** The connection the open dry run belongs to (the sheet's "Jetzt importieren" syncs that one). */
+  dryConnectionId: string | null;
   dryOpen: boolean;
   connectOpen: boolean;
   /** Reconnect of an invalid connection: the sheet replaces it after a successful connect. */
@@ -68,6 +70,7 @@ const INITIAL: ExchangeState = {
   actionError: null,
   outcome: null,
   dryRun: null,
+  dryConnectionId: null,
   dryOpen: false,
   connectOpen: false,
   replaceId: null,
@@ -123,7 +126,8 @@ export async function loadExchangeStatus(): Promise<void> {
 
 /** The connection a card shows (first non-revoked). */
 export function primaryConnection(status: ExchangeStatus | null): ExchangeConnection | null {
-  return status?.connections.find((c) => c.status !== "revoked") ?? null;
+  // this card (and the reconciliation / dry run next to it) is the Bitunix one; Binance connections live in `@/connect`
+  return status?.connections.find((c) => c.status !== "revoked" && c.exchange !== "binance") ?? null;
 }
 
 /* ------------------------------------------------------------------ connect */
@@ -222,7 +226,7 @@ export async function runDryRun(connectionId: string): Promise<SyncResult | null
   useExchange.setState({ busy: "dry", actionError: null });
   try {
     const res = await runExchangeSync({ connectionId, dryRun: true });
-    useExchange.setState({ dryRun: res, dryOpen: true });
+    useExchange.setState({ dryRun: res, dryConnectionId: connectionId, dryOpen: true });
     void loadExchangeStatus();
     return res;
   } catch (e) {

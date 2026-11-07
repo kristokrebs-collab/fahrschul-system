@@ -11,6 +11,7 @@ import { Button } from "@/primitives/Button";
 import { CopyButton } from "@/primitives/CopyButton";
 import { Card } from "@/primitives/Card";
 import { Collapse } from "@/primitives/Expander";
+import { ConnectSlot } from "@/connect/ConnectSlot";
 import { download } from "@/store/download";
 import { useUi } from "@/store/uiStore";
 import { CardNote } from "../ui";
@@ -33,6 +34,14 @@ export function PineCard() {
         <p className="rounded-xl border border-warn/30 bg-warn/[0.06] p-3 text-[12.5px] leading-relaxed text-fg" role="note" data-testid="branchen-pine-honest">
           {P.honest}
         </p>
+
+        {/* Verbindungen: the user's own TradingView address (no OAuth); only its arrival is checked here */}
+        <div className="grid gap-1.5">
+          <ConnectSlot service="tradingview" />
+          <p className="max-w-[80ch] text-[11.5px] leading-snug text-faint" data-testid="branchen-pine-connect-note">
+            Die Zieladresse nimmt Signale an und zeigt, ob sie ankommen. Das Branchen-Signal (branchen-trend/1) wertet sie noch nicht aus – es legt keine Position an.
+          </p>
+        </div>
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-4">
           <Button variant="ghost" size="sm" aria-expanded={shown} onClick={() => setShown((v) => !v)} data-testid="branchen-pine-toggle">

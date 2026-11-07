@@ -29,12 +29,14 @@
  * | `ForwardMount` | F23 | the forward test's catch-up of the virtual accounts – its own chunk, fetched only while an account is running / paused / being wound up, only while the app is open |
  * | `ArchiveMount` | F26 | the data archive's collector (public Binance numbers + analysis states into this browser's IndexedDB) – its own chunk, fetched only while the user has switched the archive on (default off), only while the app is open |
  * | `SqueezeMount` | F07 | the squeeze observation's alert (toast, only after the explicit switch `settings.squeeze.alerts`) – its own chunk, fetched only then |
+ * | `ConnectMount` | Verbindungen | the connection dialog (TradingView assistant, Binance wizard, hand-offs) – its own chunk, fetched the first time a `ConnectSlot` was clicked |
  * | `DemoMount` | F58 | the interactive demo with marked example data (import, rule draft, test, demo account, alarm) – its own chunk, fetched the first time it is opened; its state is a session in memory that is gone when it closes |
  */
 import { lazy, Suspense, type ReactNode } from "react";
 import { installE2eHooks } from "@/app/e2eHooks";
 import { HostSlot } from "@/app/HostSlot";
 import { useAssistantOpen } from "@/assistant/open";
+import { useConnectUi } from "@/connect/open";
 import { useEntitlement } from "@/billing/entitlements";
 import type { Feature } from "@/billing/types";
 import { BillingHost } from "@/billing/ui/BillingHost";
@@ -72,6 +74,7 @@ const ForwardHost = lazy(() => import("@/views/labor/forward/ForwardHost"));
 const ArchiveHost = lazy(() => import("@/market/archive/host"));
 const SqueezeHost = lazy(() => import("@/market/squeeze/host"));
 const DemoHost = lazy(() => import("@/views/demo/DemoHost"));
+const ConnectHost = lazy(() => import("@/connect/ConnectHost"));
 
 /** The assistant sheet: its chunk is fetched the first time it is opened and then stays mounted (close animation). */
 function AssistantMount() {
@@ -140,6 +143,16 @@ function SqueezeMount() {
   return alerts && archiveOn ? (
     <Suspense fallback={null}>
       <SqueezeHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Connection dialog (Verbindungen): same pattern – nothing of it loads before the first click on a placeholder. */
+function ConnectMount() {
+  const used = useConnectUi((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <ConnectHost />
     </Suspense>
   ) : null;
 }
@@ -254,6 +267,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Demo">
         <DemoMount />
+      </HostSlot>
+      <HostSlot name="Verbindungen">
+        <ConnectMount />
       </HostSlot>
     </>
   );

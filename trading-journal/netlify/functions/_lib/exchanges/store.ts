@@ -6,10 +6,10 @@
 import { decrypt, encrypt, keyringFromEnv, last4, needsReencrypt, secretAad, type Keyring } from "../crypto";
 import { HttpError } from "../http";
 import { supabaseAdmin } from "../supabase";
-import type { ExchangeCredentials, ExchangeId } from "./types";
+import { isExchangeMarket, type ExchangeCredentials, type ExchangeId, type ExchangeMarket } from "./types";
 
 export const CONNECTION_COLUMNS =
-  "id,user_id,exchange,label,key_last4,key_version,permissions,status,last_sync_at,last_error,created_at,updated_at,journal_account,sync_enabled";
+  "id,user_id,exchange,label,key_last4,key_version,permissions,status,last_sync_at,last_error,created_at,updated_at,journal_account,sync_enabled,meta";
 
 /** What the client may see of a connection. */
 export interface ConnectionInfo {
@@ -24,6 +24,10 @@ export interface ConnectionInfo {
   journalAccount: "makro" | "scalp";
   syncEnabled: boolean;
   createdAt: string;
+  /** Binance only: which of the two APIs this connection reads. */
+  market: ExchangeMarket | null;
+  /** Binance spot: extra pairs to read (a fully sold coin leaves no balance to find them by). */
+  symbols: string[];
 }
 
 export interface ConnectionRow {
@@ -60,6 +64,8 @@ export function connectionInfo(r: ConnectionRow): ConnectionInfo {
     journalAccount: r.journal_account === "makro" ? "makro" : "scalp",
     syncEnabled: r.sync_enabled !== false,
     createdAt: r.created_at,
+    market: isExchangeMarket(r.meta?.market) ? r.meta.market : null,
+    symbols: Array.isArray(r.meta?.symbols) ? (r.meta.symbols as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 30) : [],
   };
 }
 
@@ -88,7 +94,7 @@ export async function listConnections(userId: string): Promise<ConnectionRow[]> 
 export async function loadConnection(userId: string, connectionId: string): Promise<ConnectionRow | null> {
   const { data, error } = await supabaseAdmin()
     .from("exchange_connections")
-    .select(`${CONNECTION_COLUMNS},api_key_enc,secret_enc,passphrase_enc,meta`)
+    .select(`${CONNECTION_COLUMNS},api_key_enc,secret_enc,passphrase_enc`)
     .eq("user_id", userId)
     .eq("id", connectionId)
     .maybeSingle();
@@ -188,6 +194,8 @@ export interface NewConnection {
   journalAccount: "makro" | "scalp";
   permissions: string[];
   id?: string;
+  /** Server bookkeeping stored with the row (`market`, `symbols`). */
+  meta?: Record<string, unknown>;
 }
 
 /** Encrypts and stores a new connection; the id is generated BEFORE encryption (it is part of the AAD). */
@@ -207,6 +215,7 @@ export async function insertConnection(c: NewConnection, ring: Keyring = keyring
     status: "active",
     journal_account: c.journalAccount,
     sync_enabled: true,
+    ...(c.meta ? { meta: c.meta } : {}),
   };
   const { data, error } = await supabaseAdmin().from("exchange_connections").insert(row).select(CONNECTION_COLUMNS).single();
   if (error) {
@@ -221,6 +230,24 @@ export async function updateConnection(userId: string, id: string, patch: Partia
   if (typeof clean.last_error === "string") clean.last_error = (clean.last_error as string).slice(0, 300);
   const { error } = await supabaseAdmin().from("exchange_connections").update(clean).eq("user_id", userId).eq("id", id);
   if (error) throw dbFail("update", error.code);
+}
+
+/** Marks every running import of a connection as stopped (called before the connection is deleted). */
+export async function stopRuns(userId: string, connectionId: string): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("sync_runs")
+    .update({ status: "error", finished_at: new Date().toISOString(), error: "Getrennt – der Import wurde gestoppt." })
+    .eq("user_id", userId)
+    .eq("connection_id", connectionId)
+    .eq("status", "running");
+  if (error) console.error("[fn] exchange stop runs failed", error.code);
+}
+
+/** The connection still exists (a disconnect during a running import stops the job at its next write). */
+export async function connectionExists(userId: string, id: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin().from("exchange_connections").select("id,status").eq("user_id", userId).eq("id", id).maybeSingle();
+  if (error) throw dbFail("exists", error.code);
+  return !!data && (data as { status?: string }).status !== "revoked";
 }
 
 export async function deleteConnection(userId: string, id: string): Promise<boolean> {
@@ -323,6 +350,12 @@ export async function finishRun(
   if (extra.meta) patch.meta = extra.meta;
   const { error } = await supabaseAdmin().from("sync_runs").update(patch).eq("user_id", userId).eq("id", id);
   if (error) console.error("[fn] exchange run finish failed", error.code);
+}
+
+/** Progress of a running import: how many trades were found so far (the card shows it while the run is `running`). Best effort. */
+export async function progressRun(userId: string, id: string, fetched: number): Promise<void> {
+  const { error } = await supabaseAdmin().from("sync_runs").update({ fetched }).eq("user_id", userId).eq("id", id).eq("status", "running");
+  if (error) console.error("[fn] exchange run progress failed", error.code);
 }
 
 export async function recentRuns(userId: string, limit = 10): Promise<RunInfo[]> {

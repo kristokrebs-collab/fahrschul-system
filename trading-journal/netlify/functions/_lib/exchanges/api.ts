@@ -29,8 +29,10 @@ export function exchangeHttpError(e: unknown): unknown {
 
 export interface ExchangePlanState {
   plan: string;
-  /** The plan includes the automatic sync (or payments are not set up yet – then nothing is gated). */
+  /** The plan allows at least one connection (read-only, manual sync) – or payments are not set up yet (nothing gated). */
   entitled: boolean;
+  /** The plan includes the automatic background sync (`exchangeSync`). */
+  autoSync: boolean;
   /** Connections the plan allows (`null` = unlimited). */
   limit: number | null;
   gated: boolean;
@@ -40,7 +42,18 @@ export async function exchangePlanState(userId: string): Promise<ExchangePlanSta
   const info = await planOf(userId);
   const gated = paymentsConfigured();
   const limit = gated ? limitOf(info.plan, "exchangeConnections") : Infinity;
-  return { plan: info.plan, entitled: !gated || planIncludes(info.plan, "exchangeSync"), limit: Number.isFinite(limit) ? limit : null, gated };
+  const autoSync = !gated || planIncludes(info.plan, "exchangeSync");
+  return { plan: info.plan, entitled: autoSync || limit > 0, autoSync, limit: Number.isFinite(limit) ? limit : null, gated };
+}
+
+/**
+ * 402 unless the plan may hold a connection at all: the automatic sync feature OR a connection limit above 0 (the free
+ * plan's one manual, read-only connection – read from `src/billing/plans.ts`, never hard-coded). Not gated without payments.
+ */
+export async function requireExchangeAccess(userId: string): Promise<ExchangePlanState> {
+  const st = await exchangePlanState(userId);
+  if (st.entitled) return st;
+  throw new HttpError(402, "plan_required", "Börsen-Verbindungen sind in deinem Tarif nicht enthalten.", { feature: "exchangeSync", required: "pro", plan: st.plan });
 }
 
 export function cronEnabled(): boolean {

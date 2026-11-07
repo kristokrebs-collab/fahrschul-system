@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState, type ChangeEvent } from "react";
+import { ConnectSlot } from "@/connect/ConnectSlot";
 import { backupShotInfo, restoreShotsFromBackup } from "@/journal/screenshots/backupShots";
 import { fmt } from "@/lib/format";
 import { openScreenshotImport } from "@/journal/ocr/store";
@@ -39,6 +40,7 @@ export const IMPORT_STRINGS = {
   readError: "Datei konnte nicht gelesen werden",
   csvLead: "Trades aus einer Tabelle oder einem Börsen-Export (Bitunix, Binance, Bybit, OKX …)?",
   csv: "CSV importieren",
+  autoLead: "Oder lieber automatisch? Verbinde deine Börse, dann holt das Journal die Trades selbst (nur Lesen).",
   shotLead: "Oder ein Screenshot deiner Order- / Positionshistorie? Die Texterkennung läuft nur auf deinem Gerät.",
   shot: "Screenshot importieren",
 } as const;
@@ -206,6 +208,12 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
           >
             {IMPORT_STRINGS.csv}
           </Button>
+        </StaggerItem>
+
+        <StaggerItem className="grid gap-2" data-testid="import-connect">
+          <span className="text-[12.5px] text-mute">{IMPORT_STRINGS.autoLead}</span>
+          <ConnectSlot service="binance-futures" onBeforeOpen={onClose} />
+          <ConnectSlot service="bitunix" onBeforeOpen={onClose} />
         </StaggerItem>
 
         <StaggerItem className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-ink-950/40 px-3.5 py-2.5">
