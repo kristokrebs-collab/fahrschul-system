@@ -50,6 +50,7 @@ import { PlanClockHost } from "@/market/plan/clock";
 import { PresenceHost } from "@/market/presence";
 import { SocialHost } from "@/social/ui/SocialHost";
 import { hasActiveForward } from "@/domain/forward/active";
+import { useBrowserAlertsOn } from "@/views/settings/alerts/browserFlag";
 import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { ReportReadyHost } from "@/views/berichte/ReportReady";
@@ -71,6 +72,7 @@ const TrainingHost = lazy(() => import("@/views/ueben/TrainingHost"));
 const ForwardHost = lazy(() => import("@/views/labor/forward/ForwardHost"));
 const ArchiveHost = lazy(() => import("@/market/archive/host"));
 const SqueezeHost = lazy(() => import("@/market/squeeze/host"));
+const AlertFeedHost = lazy(() => import("@/views/settings/alerts/AlertFeedHost"));
 const DemoHost = lazy(() => import("@/views/demo/DemoHost"));
 
 /** The assistant sheet: its chunk is fetched the first time it is opened and then stays mounted (close animation). */
@@ -129,6 +131,16 @@ function ArchiveMount() {
   return on ? (
     <Suspense fallback={null}>
       <ArchiveHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Browser channel of the four alarms (C2): the host that picks up waiting browser alerts is fetched only while this browser has the channel switched on (flag set by the alarm settings). */
+function AlertFeedMount() {
+  const on = useBrowserAlertsOn();
+  return on ? (
+    <Suspense fallback={null}>
+      <AlertFeedHost />
     </Suspense>
   ) : null;
 }
@@ -248,6 +260,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Datenarchiv">
         <ArchiveMount />
+      </HostSlot>
+      <HostSlot name="Alarme (Browser-Kanal)">
+        <AlertFeedMount />
       </HostSlot>
       <HostSlot name="Squeeze-Beobachtung">
         <SqueezeMount />

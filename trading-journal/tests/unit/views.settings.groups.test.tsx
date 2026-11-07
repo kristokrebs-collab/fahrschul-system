@@ -12,7 +12,9 @@ import { MoreInfo } from "@/views/settings/MoreInfo";
 import { SettingsView } from "@/views/settings";
 import { seedV0 } from "./store.fixture";
 
-const GROUPS = ["s-grundlagen", "s-maerkte", "s-regeln-gruppe", "s-sichern", "s-aussehen"];
+// C2: the sixth group (the four alarms) sits below the form – it has its own save button, and a form inside the form is invalid
+const FORM_GROUPS = ["s-grundlagen", "s-maerkte", "s-regeln-gruppe", "s-sichern", "s-aussehen"];
+const GROUPS = [...FORM_GROUPS, "s-alarme"];
 /** headings of the cards the register points to (`anchor.heading` of `src/app/features.ts`) */
 const CARD_HEADINGS = ["Konten", "Backtest-Referenz", "Chart-Level", "Live-Daten", "Einstiegs-Check", "Lage-Ampel", "Hyblock-Connector", "Daten", "Fehler-Tags", "Grundregeln", "Disziplin-Grenzen", "Darstellung", "Einführung & Hilfe", "Weitere Einstellungen", "Version & Speicher"];
 
@@ -24,7 +26,7 @@ describe("SettingsView groups", () => {
     useUi.setState({ toasts: [] });
   });
 
-  it("five groups in a fixed order, each with a title and a lead, and every card inside one", () => {
+  it("six groups in a fixed order (five in the form, the alarms below it), each with a title and a lead, and every card inside one", () => {
     const { container } = render(<SettingsView />);
     const groups = Array.from(container.querySelectorAll<HTMLElement>("section[data-section]"));
     expect(groups.map((g) => g.dataset.section)).toEqual(GROUPS);
@@ -50,7 +52,7 @@ describe("SettingsView groups", () => {
     const { container } = render(<SettingsView />);
     const form = container.querySelector("form");
     expect(form).not.toBeNull();
-    expect(form!.querySelectorAll("section[data-section]")).toHaveLength(GROUPS.length);
+    expect(Array.from(form!.querySelectorAll<HTMLElement>("section[data-section]")).map((g) => g.dataset.section)).toEqual(FORM_GROUPS);
   });
 });
 

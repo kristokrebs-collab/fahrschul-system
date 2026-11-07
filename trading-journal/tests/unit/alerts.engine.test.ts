@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { phaseOf, stepAlerts, type StepOptions } from "@/domain/alerts/engine";
-import type { AlertMemoryMap, AlertReading, SourceParams } from "@/domain/alerts/types";
+import type { AlertFire, AlertMemoryMap, AlertReading, SourceParams } from "@/domain/alerts/types";
 
 const P: SourceParams = { warn: 2, confirm: 0, hyst: 0.5 };
 const WHALE: SourceParams = { warn: 3, confirm: 2, hyst: 1 };
@@ -22,7 +22,7 @@ function reading(over: Partial<AlertReading> = {}): AlertReading {
 /** Feeds readings one after the other (each at its own minute) and collects every fire. */
 function run(rs: Partial<AlertReading>[], o: Partial<StepOptions> = {}, start: AlertMemoryMap = {}) {
   let mem = start;
-  const fires = [];
+  const fires: AlertFire[] = [];
   rs.forEach((r, i) => {
     const now = T0 + i * 5 * MIN;
     const s = stepAlerts(mem, [reading({ asOf: now, ...r })], opts({ now, ...o }));

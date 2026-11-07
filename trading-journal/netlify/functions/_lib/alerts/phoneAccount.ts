@@ -10,12 +10,7 @@ import { CryptoError, decrypt, encrypt, keyringFromEnv } from "../crypto";
 import { supabaseAdmin } from "../supabase";
 import { phoneAad } from "./deliver";
 
-/** Version of the consent text below: stored with the consent, a changed text means a new version and a new consent. */
-export const CONSENT_VERSION = "2026-11-v1";
-
-/** What the person agrees to – shown next to the check box and stored (by version) with the consent. */
-export const CONSENT_TEXT =
-  "Ich bin einverstanden, dass die App mich unter dieser Nummer automatisch anruft, wenn ein Alarm auslöst, den ich eingeschaltet habe, und dass dafür eine Ansage mit dem Namen des Alarms abgespielt wird. Ich kann das jederzeit hier abschalten; dann wird die Nummer gelöscht. Der Anruf ist keine Beratung.";
+export { CONSENT_TEXT, CONSENT_VERSION } from "../../../../src/domain/alerts/phone";
 
 export type PhoneStatus = "none" | "pending" | "verified" | "revoked";
 
