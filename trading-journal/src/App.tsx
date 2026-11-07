@@ -12,6 +12,7 @@ import { Sidebar } from "@/app/Sidebar";
 import { HostSlot } from "@/app/HostSlot";
 import { useLayerDiagOpen } from "@/app/layerDiag";
 import { LocalModeBanner, useLocalBannerOpen } from "@/app/LocalModeBanner";
+import { MotionTierHost } from "@/app/MotionTierHost";
 import { SetupEditor, TradeDetail } from "@/app/overlays";
 import { PageHost } from "@/app/PageHost";
 import { PageSkeleton } from "@/app/PageSkeleton";
@@ -290,6 +291,7 @@ function Shell() {
     <MorphDialogProvider>
       <ScenarioWatcher />
       <IdlePreload />
+      <MotionTierHost />
       {/* `overflow-x-clip` (no scroll container, sticky bars keep working): a page that scales / slides in or out reaches a few px
           past the screen edge for a moment (its full-bleed rows, the needles of the bias bar) – never a wider document */}
       <div className="relative min-h-dvh overflow-x-clip">

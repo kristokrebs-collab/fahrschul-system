@@ -1,33 +1,39 @@
 /**
  * Sidebar from 768 px (Etappe 1a): the four groups – Erfassen, Prüfen, Auswerten, Konto & Rechtliches – with all 19 pages, the
- * primary action „Trade eintragen“ on top and a collapse button at the foot. Below 768 px the bottom bar (`Dock.tsx`) and the
- * menu behind „Mehr“ carry the same groups; the two never exist together (`useMediaQuery(WIDE_QUERY)`).
+ * primary action „Trade eintragen“ and the search on top, the night-mode switch, the user card and the pin at the foot. Below 768 px the
+ * floating bar (`Dock.tsx`) and the menu behind „Mehr“ carry the same groups; the two never exist together (`useMediaQuery(WIDE_QUERY)`).
  *
- * Wide (≥ 1624 px, or when the reader pinned it open): 256 px – group titles, page names with their plain-word hint. Narrow rail
- * (768 – 1623 px by default, or when the reader closed it): 64 px – icons, names as `aria-label`. The choice is kept
- * (`uiStore.sidebar`: auto | open | closed, stored in `tj2-ui`). The rail's width never costs a page its room: `auto` collapses
- * exactly where the pages need it.
+ * Runde 11 – COMPACT on every desktop width (it used to open by itself from 1,624 px): a narrow glass rail of 64 px – icons, names as
+ * `aria-label` – that opens over the page to the full 256 px panel, and „Anheften“ (the pin at the foot) as the reader's choice to keep the
+ * panel open and let the page make room. The choice is kept (`uiStore.sidebar`: `open` = pinned; `auto` = compact; the old `closed` is read as
+ * `auto`). Pinned or not, the page never loses room it was laid out with unless the reader pins.
  *
- * Runde 10 – the rail "peeks": while the pointer rests on it, keyboard focus is inside it, or after a touch (the foot button, a long
- * press on a row) it opens over the page to the full 256 px – an OVERLAY, the page keeps the 64 px it reserved and does not move
- * (`useSidebarPeek`). The panel is always laid out at 256 px and clipped to the rail's 64 (`clip-path`, `shell-motion.css`); opening
- * moves three things on ONE spring written as a CSS `linear()` curve – the clip, the edge line and the cast shade (the last two are
- * transforms) – so they never disagree. The rows, the marker and the dividers are 48 px wide at rest and as wide as the panel once it
- * is open (a box is its hit area), and the labels slide and fade in one after the other, top to bottom (`--i`). Nothing is laid out
- * per frame, no JS runs per frame, no custom property is animated (an inherited one restyles the whole sidebar every frame – measured).
- * Pinned open, nothing is clipped and the group titles (44 px buttons) fold their rows on the same spring.
+ * The rail "peeks": while the pointer rests on it, keyboard focus is inside it, or after a touch (the foot button, a long press on a row, a tap
+ * on the search) it opens over the page – an OVERLAY, the page keeps the 64 px it reserved and does not move (`useSidebarPeek`). The panel is
+ * always laid out at 256 px and clipped to the rail's 64 (`clip-path`, `shell-motion.css`); opening moves three things on ONE spring written
+ * as a CSS `linear()` curve – the clip, the edge line and the cast shade (the last two are transforms) – so they never disagree. The rows, the
+ * marker, the search and the dividers are 48 px wide at rest and as wide as the panel once it is open (a box is its hit area), and the labels
+ * slide and fade in one after the other, top to bottom (`--i`). Nothing is laid out per frame, no JS runs per frame, no custom property is
+ * animated (an inherited one restyles the whole sidebar every frame – measured). Pinned open, nothing is clipped and the group titles (44 px
+ * buttons) fold their rows on the same spring; the sections of Einstellungen then show as nested entries under their row.
+ *
+ * Material: frosted glass from the existing tokens (`ink-900` at 90 %, blur only while the panel is open – at rest nothing moves under the rail), solid
+ * where `backdrop-filter` is missing or the safe-effects flag is set. The plan's motion profile (`html[data-motion-tier]`, `motion/tier.ts`) deepens it.
  *
  * Marker: one plate behind the active row glides from row to row (`spring.layout`, a transform written by `animate`, no layout
- * projection) and stretches a little while it travels; the red dot rides on it. First load: the icons draw themselves, row by
- * row from the top, stroke after stroke (`stroke-dashoffset`, once per session, `shellFx.ts`); reduced motion: all at once.
- * Each row preloads its page chunk on intent. Rows are 44 px tall and never overlap.
+ * projection) and stretches a little while it travels; the red dot rides on it; Premium and Team plans get one border-beam lap on it whenever the
+ * panel opens. First load: the rows wave in from the top, row by row (45–60 ms apart, 300 ms each, 10 px, opacity) while the icons draw
+ * themselves (`stroke-dashoffset`, once per session, `shellFx.ts`); reduced motion: all at once. Keys: ↑ ↓ Home End move between rows, Esc closes the
+ * peek. Each row preloads its page chunk on intent. Rows are 44 px tall and never overlap.
  */
 import { animate, motion, useMotionValue, useTransform, useVelocity } from "motion/react";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
+import { NEW_PAGES, readVisitedPages } from "@/app/CommandNav";
 import { groupOfPage, NAV_GROUPS, NAV_GROUP_ICON, PAGE_HINT, PAGE_ICON, PAGE_LABELS, WIDE_QUERY } from "@/app/navGroups";
 import { NEW_TRADE_LABEL, NewTradeButton } from "@/app/NewTradeButton";
 import { preloadPage } from "@/app/pages";
 import { DRAW_MS, drawSeen, markDrawSeen, prepareStrokes, SB_VARS } from "@/app/shellFx";
+import { FootButton, NightRow, ROW_TAIL, SettingsEntries, showSettingsEntries, SidebarSearch, SIDEBAR_PART_STRINGS, UserCard } from "@/app/SidebarParts";
 import { useSidebarPeek } from "@/app/useSidebarPeek";
 import { useIntroPhase } from "@/intro/introStore";
 import { LEGAL_LABEL, legalConfig, legalShown, type LegalDoc } from "@/legal/config";
@@ -35,21 +41,18 @@ import { LegalLinks } from "@/legal/LegalLinks";
 import { openLegal } from "@/legal/store";
 import { cn } from "@/lib/cn";
 import { spring } from "@/motion/tokens";
+import { useMotionTier } from "@/motion/tier";
 import { useCanHover, useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { BorderBeam } from "@/primitives/BorderBeam";
 import { Icon } from "@/primitives/icons";
+import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { NAV_GROUP_IDS, useUi, type NavGroupId, type Page } from "@/store/uiStore";
 
 export const SIDEBAR_WIDTH = { wide: 256, rail: 64 } as const;
-/**
- * From this width `auto` shows the wide sidebar; below it the rail. 1624 = the page column's 1320 px + its 48 px gutters + the 256 px sidebar:
- * up to there the rail leaves the pages the width they were laid out and reserved for (the Markt page grew 87 px after the first picture
- * beside the wide sidebar at 1440 px – `layout-shift.spec.ts`); whoever opens the wide sidebar below it chooses that trade-off.
- */
-export const SIDEBAR_AUTO_QUERY = "(min-width: 1624px)";
 export const SIDEBAR_LABEL = "Hauptnavigation";
-export const SIDEBAR_STRINGS = { collapse: "Seitenleiste einklappen", expand: "Seitenleiste ausklappen", legal: "Rechtliches", fold: "Einklappen", unfold: "Ausklappen" } as const;
+export const SIDEBAR_STRINGS = { unpin: "Seitenleiste lösen", pin: "Seitenleiste anheften", legal: "Rechtliches", unpinWord: "Lösen", pinWord: "Anheften" } as const;
 
 /** Below this screen height the wide sidebar folds every group but the current one until the reader chooses (19 rows of 44 px do not fit). */
 export const SIDEBAR_SHORT_QUERY = "(max-height: 1299px)";
@@ -63,14 +66,18 @@ export function closedGroups(stored: readonly NavGroupId[] | null, short: boolea
   return short ? NAV_GROUP_IDS.filter((g) => g !== current && FOLD_WHEN_SHORT.includes(g)) : [];
 }
 
-/** Pure: is the sidebar wide? `open` / `closed` are the reader's choice; `auto` follows the screen width. */
-export function sidebarExpanded(pref: "auto" | "open" | "closed", autoWide: boolean): boolean {
-  return pref === "open" || (pref === "auto" && autoWide);
+/** Pure: is the sidebar pinned open (and the page makes room for it)? Only the reader's `open`; `auto` – and the old `closed` – are the compact rail. */
+export function sidebarExpanded(pref: "auto" | "open" | "closed"): boolean {
+  return pref === "open";
 }
 
-const ROW_TAIL = "outline-none transition-colors duration-200 hover:bg-white/[0.05] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white";
+/** What a row can carry besides its name: the count of entries on Trades (honest: the journal's own number) and the „Neu“ tag of a page of the last release. */
+interface RowBadge {
+  count?: number;
+  fresh?: boolean;
+}
 
-function Row({ page, current, expanded, onGo }: { page: Page; current: boolean; expanded: boolean; onGo: (p: Page, e: MouseEvent<HTMLAnchorElement>) => void }) {
+function Row({ page, current, expanded, badge, onGo }: { page: Page; current: boolean; expanded: boolean; badge: RowBadge; onGo: (p: Page, e: MouseEvent<HTMLAnchorElement>) => void }) {
   const label = PAGE_LABELS[page];
   return (
     <a
@@ -79,6 +86,7 @@ function Row({ page, current, expanded, onGo }: { page: Page; current: boolean; 
       aria-current={current ? "page" : undefined}
       // the rail has no room for words: the name is the accessible name (the words are there, clipped, for the peek)
       aria-label={expanded ? undefined : label}
+      aria-description={badge.fresh ? SIDEBAR_PART_STRINGS.fresh : badge.count !== undefined ? `${badge.count} Einträge` : undefined}
       onClick={(e) => onGo(page, e)}
       onPointerEnter={() => preloadPage(page)}
       onFocus={() => preloadPage(page)}
@@ -87,24 +95,24 @@ function Row({ page, current, expanded, onGo }: { page: Page; current: boolean; 
     >
       <span aria-hidden="true" className="sb-ico relative grid size-7 shrink-0 place-items-center [&>svg]:size-[18px]">
         <Icon name={PAGE_ICON[page]} />
+        {/* the rail's tag: a red dot on the icon; the open panel says „Neu“ in words instead */}
+        {badge.fresh && <span className="absolute right-0 top-0.5 size-1.5 rounded-full bg-signal group-data-[open]/sb:hidden" />}
       </span>
       <span className="sb-lbl grid min-w-0 flex-1">
         <span className={cn("truncate text-[13.5px] leading-tight", current ? "font-semibold text-fg" : "font-medium")}>{label}</span>
         <span className="truncate text-[11px] leading-tight text-mute">{PAGE_HINT[page]}</span>
       </span>
+      {badge.fresh && (
+        <span aria-hidden="true" className="sb-tag shrink-0 rounded-full bg-signal px-1.5 text-[10px] font-semibold uppercase leading-4 tracking-[0.06em] text-(--color-on-fill)">
+          {SIDEBAR_PART_STRINGS.fresh}
+        </span>
+      )}
+      {badge.count !== undefined && (
+        <span aria-hidden="true" className="sb-tag shrink-0 rounded-full border border-line-2 bg-white/[0.05] px-1.5 font-mono text-[10.5px] leading-[18px] text-mute">
+          {badge.count > 999 ? "999+" : badge.count}
+        </span>
+      )}
     </a>
-  );
-}
-
-/** A foot button of the rail (Rechtliches, Ein-/Ausklappen): the icon stays where the rail's icons are, the word comes with the peek. */
-function FootButton({ index, icon, word, ...props }: { index: number; icon: ReactNode; word: string } & ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button type="button" {...props} className={cn("sb-row flex h-11 items-center gap-3 rounded-xl px-2.5 text-mute hover:text-fg", ROW_TAIL, props.className)}>
-      {icon}
-      <span aria-hidden="true" className="sb-lbl truncate text-[12.5px] font-medium" style={{ "--i": index } as CSSProperties}>
-        {word}
-      </span>
-    </button>
   );
 }
 
@@ -136,11 +144,17 @@ function SidebarPanel() {
   const page = useUi((s) => s.page);
   const pref = useUi((s) => s.sidebar);
   const setPref = useUi((s) => s.setPref);
-  const autoWide = useMediaQuery(SIDEBAR_AUTO_QUERY, false);
   const short = useMediaQuery(SIDEBAR_SHORT_QUERY, false);
   const canHover = useCanHover();
   const storedClosed = useUi((s) => s.sidebarClosed);
-  const expanded = sidebarExpanded(pref, autoWide);
+  const expanded = sidebarExpanded(pref);
+  const tier = useMotionTier();
+  const tradeCount = useJournal((st) => st.trades.length);
+  // pages of the last release carry „Neu“ until they were opened once; the page you are on is not new to you
+  const fresh = useMemo(() => {
+    const seen = readVisitedPages();
+    return new Set(NEW_PAGES.filter((p) => !seen.includes(p) && p !== page));
+  }, [page]);
   const currentGroup = groupOfPage(page);
   const closed = closedGroups(storedClosed, short, currentGroup);
   // the rail has no group titles: every row is there
@@ -203,11 +217,16 @@ function SidebarPanel() {
     return () => c.stop();
   }, [page, expanded, reduced, y, markerOpacity, currentOpen]);
 
-  // the sidebar scrolls on a short screen: the page you are on is always in view
+  // the sidebar scrolls on a short screen: the page you are on is always in view – also while its group is still unfolding (the box grows on the spring:
+  // the resize observer below looks again until `keepInView` is over)
+  const keepInView = useRef(0);
+  // with the nested sections showing (pinned, on Einstellungen) the row goes to the top so its sections follow it into view
+  const rowAt: ScrollLogicalPosition = showSettingsEntries(page, expanded) ? "start" : "nearest";
   useLayoutEffect(() => {
     const el = nav.current?.querySelector<HTMLElement>(`[data-nav-page="${page}"]`);
-    if (el && currentOpen) el.scrollIntoView?.({ block: "nearest", behavior: "instant" });
-  }, [page, currentOpen]);
+    keepInView.current = performance.now() + 900;
+    if (el && currentOpen) el.scrollIntoView?.({ block: rowAt, behavior: "instant" });
+  }, [page, currentOpen, rowAt]);
 
   // a group folds / unfolds (its rows grow and shrink with the spring) or the font changes the rows: the marker stays on its row
   useEffect(() => {
@@ -216,10 +235,11 @@ function SidebarPanel() {
     const ro = new ResizeObserver(() => {
       const el = box.querySelector<HTMLElement>(`[data-nav-page="${page}"]`);
       if (el) y.jump(el.offsetTop);
+      if (el && performance.now() < keepInView.current) el.scrollIntoView?.({ block: rowAt, behavior: "instant" });
     });
     for (const child of Array.from(box.children)) if (child !== box.querySelector("[data-sidebar-marker]")) ro.observe(child);
     return () => ro.disconnect();
-  }, [page, y]);
+  }, [page, y, rowAt]);
 
   // a page that lives in a folded group opens it (a link, a key, the search): you never land on a hidden row
   useEffect(() => {
@@ -257,14 +277,26 @@ function SidebarPanel() {
     [reduced, takeLongPress],
   );
 
-  // the foot button: pins the sidebar open / closed. On a touch screen (no hover to peek with) the first tap on the rail opens the
-  // names over the page, the next one pins it
+  // the pin at the foot: keeps the panel open (the page makes room) / lets go. On a touch screen (no hover to peek with) the first tap on the
+  // rail opens the names over the page, the next one pins it
   const onToggle = () => {
-    if (expanded) setPref("sidebar", "closed");
+    if (expanded) setPref("sidebar", "auto");
     else if (!canHover && !peek.open) peek.hold();
     else setPref("sidebar", "open");
   };
-  const toggle = expanded ? SIDEBAR_STRINGS.collapse : SIDEBAR_STRINGS.expand;
+  const toggle = expanded ? SIDEBAR_STRINGS.unpin : SIDEBAR_STRINGS.pin;
+
+  // ↑ ↓ Home End move between the rows, the group titles and the nested entries (Tab still walks them all; the search keeps its own arrows)
+  const onNavKey = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("a[data-nav-page], [data-testid='sidebar-group-toggle'], [data-sub]")).filter((el) => !el.closest("[inert]"));
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    if (at < 0 || items.length === 0) return;
+    e.preventDefault();
+    const to = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : Math.max(0, Math.min(items.length - 1, at + (e.key === "ArrowDown" ? 1 : -1)));
+    items[to]?.focus();
+  };
   const rows = NAV_GROUPS.reduce((n, g) => n + g.pages.length, 0);
   let rowIndex = 0;
   return (
@@ -277,23 +309,28 @@ function SidebarPanel() {
         data-peek={peek.open ? "" : undefined}
         data-draw={draw ?? undefined}
         style={SB_VARS}
-        className="sb pointer-events-none sticky top-[calc(4rem+env(safe-area-inset-top,0px))] z-30 h-[calc(100dvh-4rem-env(safe-area-inset-top,0px))] w-64 data-[open]:z-[46]"
+        className="sb group/sb pointer-events-none sticky top-[calc(4rem+env(safe-area-inset-top,0px))] z-30 h-[calc(100dvh-4rem-env(safe-area-inset-top,0px))] w-64 data-[open]:z-[46]"
       >
         <aside
           data-layer="Seitenleiste"
           data-expanded={expanded ? "" : undefined}
           data-open={open ? "" : undefined}
           aria-label={SIDEBAR_LABEL}
-          className="sb-aside pointer-events-auto absolute inset-0 flex flex-col bg-ink-900"
+          className="sb-aside pointer-events-auto absolute inset-0 flex flex-col"
           {...peek.bind}
         >
           <div className={cn("shrink-0 pb-1 pt-4", expanded ? "px-3" : "pl-2.5")}>
             {expanded ? <NewTradeButton wrapClassName="flex w-full" className="min-h-tap w-full justify-center" /> : <NewTradeButton className="!size-11 !justify-center !p-0" labelClassName="sr-only" />}
           </div>
-          <nav ref={nav} id={id} aria-label={SIDEBAR_LABEL} className={cn("relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3", expanded ? "pt-3" : "pt-0")}>
+          <div className="shrink-0 px-2 pb-1">
+            <SidebarSearch />
+          </div>
+          <nav ref={nav} id={id} aria-label={SIDEBAR_LABEL} onKeyDown={onNavKey} className={cn("relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3", expanded ? "pt-3" : "pt-2.5")}>
             {/* the marker: one rounded plate behind the active row, travelling on `spring.layout` (transform only); the dot rides on it */}
             <motion.span aria-hidden="true" data-sidebar-marker="" className="sb-mark pointer-events-none absolute left-2 top-0 h-11 rounded-xl bg-white/[0.07]" style={{ y, opacity: markerOpacity, scaleY: stretch }}>
               <span className="sb-dot absolute right-2.5 top-[19px] size-1.5 rounded-full bg-signal" />
+              {/* Premium and Team: one border-beam lap on the plate each time the panel opens (the plan's motion profile, `motion/tier.ts`) */}
+              {(tier === "premium" || tier === "team") && !reduced && <BorderBeam size={60} borderWidth={1} fire={open ? "open" : 0} />}
             </motion.span>
             {NAV_GROUPS.map((g, i) => {
               const first = rowIndex;
@@ -324,7 +361,7 @@ function SidebarPanel() {
                     // the rail's divider; with the peek the group's name sits on it (a passive label – the group has its aria-label)
                     <div aria-hidden="true" className={cn("relative mx-3 h-px", i === 0 ? "my-1.5" : "mb-2")} style={{ "--i": first } as CSSProperties}>
                       <span className={cn("sb-line absolute inset-y-0 left-0 bg-line-2", i === 0 && "opacity-0")} />
-                      <span className="sb-lbl absolute -left-0.5 top-1/2 -translate-y-1/2 whitespace-nowrap bg-ink-900 pr-2 font-mono text-[10px] font-semibold uppercase leading-3 tracking-[0.16em] text-mute">{g.label}</span>
+                      <span className="sb-lbl absolute -left-0.5 top-1/2 -translate-y-1/2 whitespace-nowrap font-mono text-[10px] font-semibold uppercase leading-3 tracking-[0.16em] text-mute">{g.label}</span>
                     </div>
                   )}
                   {/* a folded group keeps its rows in the DOM (inert, 0 high) so the marker and the page reach them without a remount */}
@@ -337,7 +374,8 @@ function SidebarPanel() {
                     <ul className="sb-rows grid min-h-0 gap-0.5 overflow-hidden">
                       {groupRows.map(({ p, index }, j) => (
                         <li key={p} style={{ "--i": index, "--j": j } as CSSProperties}>
-                          <Row page={p} current={page === p} expanded={expanded} onGo={onGo} />
+                          <Row page={p} current={page === p} expanded={expanded} badge={{ fresh: fresh.has(p) || undefined, count: p === "trades" && tradeCount > 0 ? tradeCount : undefined }} onGo={onGo} />
+                          {p === "settings" && <SettingsEntries visible={showSettingsEntries(page, expanded)} />}
                         </li>
                       ))}
                     </ul>
@@ -348,17 +386,19 @@ function SidebarPanel() {
           </nav>
           <div className="shrink-0 border-t border-line px-2 py-2">
             <LegalRow expanded={expanded} index={rows} />
+            <NightRow index={rows + 1} />
+            <UserCard index={rows + 2} current={page === "konto"} />
             <FootButton
-              index={rows + 1}
-              word={expanded ? SIDEBAR_STRINGS.fold : SIDEBAR_STRINGS.unfold}
+              index={rows + 3}
+              word={expanded ? SIDEBAR_STRINGS.unpinWord : SIDEBAR_STRINGS.pinWord}
               icon={
-                <span aria-hidden="true" className={cn("grid size-7 shrink-0 place-items-center transition-transform duration-300 ease-out [&>svg]:size-[18px]", !expanded && "rotate-180")}>
-                  <Icon name="chevron-left" />
+                <span aria-hidden="true" className={cn("grid size-7 shrink-0 place-items-center transition-[rotate,opacity] duration-300 ease-out [&>svg]:size-[18px]", expanded ? "rotate-0 text-fg" : "-rotate-45")}>
+                  <Icon name="pin" />
                 </span>
               }
               onClick={onToggle}
               aria-label={toggle}
-              aria-expanded={expanded}
+              aria-pressed={expanded}
               aria-controls={id}
               data-testid="sidebar-toggle"
             />

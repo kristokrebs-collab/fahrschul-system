@@ -35,7 +35,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { EmptyState } from "@/primitives/EmptyState";
 import { Icon } from "@/primitives/icons";
-import { Input } from "@/primitives/Input";
+import { SearchField } from "@/primitives/SearchField";
 import { Label } from "@/primitives/Label";
 import { useSearch } from "@/search/searchStore";
 import { useJournal } from "@/store/journalStore";
@@ -82,7 +82,6 @@ export function FunktionenView({ className }: { className?: string }) {
   const groupHead = useRef<HTMLHeadingElement>(null);
   const groupTop = useRef<HTMLElement>(null);
   const tileFocus = useRef<FeatureGroupId | null>(null);
-  const field = useRef<HTMLInputElement>(null);
 
   const interests = useMemo(() => memoryOf(settings).interests, [settings]);
   const shelf = useMemo(() => shelfOf(settings), [settings]);
@@ -137,16 +136,6 @@ export function FunktionenView({ className }: { className?: string }) {
     tileFocus.current = groupId;
     setGroupId(null);
   };
-  const onKey = (e: KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === "Enter" && query && shown[0]) {
-      e.preventDefault();
-      open(shown[0].entry.id);
-    }
-    if (e.key === "Escape" && q) {
-      e.preventDefault();
-      setQ("");
-    }
-  };
   const onPageKey = (e: KeyboardEvent<HTMLDivElement>): void => {
     if (e.key === "Escape" && !q && groupId && !(e.target instanceof HTMLInputElement)) back();
   };
@@ -156,46 +145,19 @@ export function FunktionenView({ className }: { className?: string }) {
       <PageHeader ghost="Finden" title={FUNKTIONEN.title} lead={FUNKTIONEN.lead} leadFill={FUNKTIONEN_LEAD_FILL} count={FEATURE_COUNT} countUnit={FUNKTIONEN.unit} />
 
       <Reveal index={0} className="grid min-w-0 gap-2.5" role="search">
-        <label htmlFor={inputId} className="text-[15px] font-medium text-fg">
-          {FUNKTIONEN.search.label}
-        </label>
-        <div className="relative">
-          <span aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-mute [&>svg]:size-[18px]">
-            <Icon name="search" />
-          </span>
-          <Input
-            ref={field}
-            id={inputId}
-            type="search"
-            clearable={false}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={onKey}
-            placeholder={FUNKTIONEN.search.placeholder}
-            autoComplete="off"
-            spellCheck={false}
-            enterKeyHint="search"
-            data-testid="feature-search"
-            className="h-14 pl-11 pr-12 text-[16px] [&::-webkit-search-cancel-button]:hidden"
-          />
-          {q && (
-            <button
-              type="button"
-              onClick={() => {
-                setQ("");
-                field.current?.focus();
-              }}
-              aria-label={FUNKTIONEN.search.clear}
-              data-testid="feature-search-clear"
-              className="absolute right-1.5 top-1/2 z-10 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-mute outline-none transition-colors hover:text-fg [&>svg]:size-4"
-            >
-              <Icon name="x" />
-            </button>
-          )}
-        </div>
-        <p className="min-h-[18px] text-[12px] text-mute" role="status" aria-live="polite" data-testid="feature-results">
-          {query ? (shown.length ? `${weak ? FUNKTIONEN.results.weak(shown.length) : FUNKTIONEN.results.some(hits.length)}${hits.length > shown.length ? ` · ${FUNKTIONEN.results.more(shown.length)}` : ""} · ${FUNKTIONEN.search.hint}` : "") : ""}
-        </p>
+        {/* the shared clay field (`SearchField`, A6): the results are the page's own rows below, so the field is the plain mode (no answer list of its own);
+            Enter opens the best hit, Escape clears, the status line says how many were found */}
+        <SearchField
+          testId="feature-search"
+          size="lg"
+          label={FUNKTIONEN.search.label}
+          placeholder={FUNKTIONEN.search.placeholder}
+          value={q}
+          onChange={setQ}
+          clearLabel={FUNKTIONEN.search.clear}
+          onSubmit={() => shown[0] && open(shown[0].entry.id)}
+          status={query && shown.length ? `${weak ? FUNKTIONEN.results.weak(shown.length) : FUNKTIONEN.results.some(hits.length)}${hits.length > shown.length ? ` · ${FUNKTIONEN.results.more(shown.length)}` : ""} · ${FUNKTIONEN.search.hint}` : ""}
+        />
       </Reveal>
 
       {view === "search" &&

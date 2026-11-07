@@ -148,8 +148,8 @@ describe("Funktionen page", () => {
     expect(view()).toBe("search");
     expect(tiles()).toHaveLength(0);
     expect(rows().map((r) => r.getAttribute("data-feature")).slice(0, 3)).toContain("leaks-edges");
-    expect(screen.getByTestId("feature-results")).toHaveTextContent(/Treffer/);
-    expect(screen.getByTestId("feature-results")).toHaveTextContent("Enter öffnet den ersten Treffer");
+    expect(screen.getByTestId("feature-search-status")).toHaveTextContent(/Treffer/);
+    expect(screen.getByTestId("feature-search-status")).toHaveTextContent("Enter öffnet den ersten Treffer");
     // the row names the group it lives in
     expect(rows()[0]).toHaveTextContent("Aus Fehlern lernen");
     const first = rows()[0]!.getAttribute("data-feature")!;

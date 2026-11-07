@@ -180,8 +180,9 @@ describe("sidebar: the rail peeks over the page", () => {
     expect(frame().style.getPropertyValue("--sb-ms")).toMatch(/^\d+ms$/);
   });
 
-  it("pinned open: no clip, the group titles fold their rows, nothing peeks", () => {
+  it("pinned open (the reader's „Anheften“): no clip, the group titles fold their rows, nothing peeks", () => {
     screen_(1700);
+    useUi.setState({ sidebar: "open" });
     mount();
     expect(aside().hasAttribute("data-expanded")).toBe(true);
     expect(frame().hasAttribute("data-open")).toBe(true);

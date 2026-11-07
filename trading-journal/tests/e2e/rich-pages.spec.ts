@@ -116,7 +116,7 @@ test.describe("reiche Seiten", () => {
 
   test("Funktionen: Treffer gleiten, die Liste zeigt genau die Treffer", async ({ page }) => {
     await open(page, "funktionen");
-    const field = page.getByTestId("feature-search");
+    const field = page.getByTestId("feature-search-input");
     await field.fill("risiko");
     const results = page.getByTestId("funktionen-results");
     await expect(results).toBeVisible();

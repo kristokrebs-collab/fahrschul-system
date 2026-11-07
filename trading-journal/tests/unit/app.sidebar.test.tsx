@@ -1,6 +1,6 @@
 /**
  * Etappe 1a: the sidebar (from 768 px) and the bottom bar (below) are never both there; the sidebar holds the four groups with all
- * 19 pages, the primary action on top, and remembers open / closed.
+ * 19 pages, the primary action on top, and remembers whether it is pinned. Runde 11: compact on every width; „Anheften“ (`sidebar: "open"`) is the choice.
  */
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -8,7 +8,7 @@ import { Dock } from "@/app/Dock";
 import { NAV_GROUPS, PAGE_LABELS } from "@/app/navGroups";
 import { closedGroups, Sidebar, SIDEBAR_WIDTH, sidebarExpanded } from "@/app/Sidebar";
 import { MotionRoot } from "@/motion/MotionRoot";
-import { PAGES, useUi } from "@/store/uiStore";
+import { loadPrefs, PAGES, useUi } from "@/store/uiStore";
 
 const realMatchMedia = window.matchMedia;
 /** A `matchMedia` of a screen `width` px wide (min-width / max-width queries only). */
@@ -52,6 +52,7 @@ describe("sidebar vs bottom bar", () => {
 
   it("from 768 px: the sidebar with four groups and all 19 pages, no bottom bar", () => {
     screenOf(1700);
+    useUi.setState({ sidebar: "open" });
     mount();
     expect(screen.queryByRole("toolbar", { name: "Navigation" })).toBeNull();
     const groups = screen.getAllByTestId("sidebar-group");
@@ -70,6 +71,7 @@ describe("sidebar vs bottom bar", () => {
 
   it("a click on a page navigates; the page you are on again does not break", () => {
     screenOf(1700);
+    useUi.setState({ sidebar: "open" });
     mount();
     fireEvent.click(screen.getByRole("link", { name: /^Trades/ }));
     expect(useUi.getState().page).toBe("trades");
@@ -77,19 +79,24 @@ describe("sidebar vs bottom bar", () => {
     expect(screen.getByRole("link", { name: /^Trades/ })).toHaveAttribute("aria-current", "page");
   });
 
-  it("collapses to the rail, keeps the choice in `tj2-ui`, and the rail names every page by `aria-label`", () => {
+  it("unpins to the rail, keeps the choice in `tj2-ui`, and the rail names every page by `aria-label`", () => {
     screenOf(1700);
+    useUi.setState({ sidebar: "open" });
     mount();
-    fireEvent.click(screen.getByTestId("sidebar-toggle"));
-    expect(useUi.getState().sidebar).toBe("closed");
-    expect(JSON.parse(localStorage.getItem("tj2-ui") ?? "{}").sidebar).toBe("closed");
     const aside = screen.getByRole("complementary", { name: "Hauptnavigation" });
+    expect(aside.hasAttribute("data-expanded")).toBe(true);
+    expect(screen.getByTestId("sidebar-toggle")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByTestId("sidebar-toggle"));
+    expect(useUi.getState().sidebar).toBe("auto");
+    expect(JSON.parse(localStorage.getItem("tj2-ui") ?? "{}").sidebar).toBe("auto");
     expect(aside.hasAttribute("data-expanded")).toBe(false);
     expect(document.documentElement.style.getPropertyValue("--sidebar-w")).toBe(`${SIDEBAR_WIDTH.rail}px`);
     for (const p of PAGES) expect(within(aside).getByRole("link", { name: PAGE_LABELS[p] })).toBeInTheDocument();
-    expect(screen.getByTestId("sidebar-toggle")).toHaveAttribute("aria-label", "Seitenleiste ausklappen");
+    expect(screen.getByTestId("sidebar-toggle")).toHaveAttribute("aria-label", "Seitenleiste anheften");
+    expect(screen.getByTestId("sidebar-toggle")).toHaveAttribute("aria-pressed", "false");
     act(() => useUi.getState().setPref("sidebar", "open"));
     expect(aside.hasAttribute("data-expanded")).toBe(true);
+    expect(screen.getByTestId("sidebar-toggle")).toHaveAttribute("aria-label", "Seitenleiste lösen");
   });
 
   it("a group folds and unfolds; the choice is stored; a short screen folds Auswerten and Konto (unless current) until the reader chooses", () => {
@@ -98,6 +105,7 @@ describe("sidebar vs bottom bar", () => {
     expect(closedGroups(null, true, "auswerten")).toEqual(["konto"]);
     expect(closedGroups(["konto"], true, "pruefen")).toEqual(["konto"]);
     screenOf(1700);
+    useUi.setState({ sidebar: "open" });
     mount();
     const toggles = screen.getAllByTestId("sidebar-group-toggle");
     expect(toggles).toHaveLength(4);
@@ -111,13 +119,60 @@ describe("sidebar vs bottom bar", () => {
     expect(useUi.getState().sidebarClosed).toEqual([]);
   });
 
-  it("`auto` is a rail below 1624 px and wide from there; the reader's choice wins", () => {
-    expect(sidebarExpanded("auto", false)).toBe(false);
-    expect(sidebarExpanded("auto", true)).toBe(true);
-    expect(sidebarExpanded("open", false)).toBe(true);
-    expect(sidebarExpanded("closed", true)).toBe(false);
-    screenOf(1024);
+  it("compact is the default at EVERY width (no auto-open from 1624 px); only the reader's pin opens it, the old `closed` reads as the rail", () => {
+    expect(sidebarExpanded("auto")).toBe(false);
+    expect(sidebarExpanded("closed")).toBe(false);
+    expect(sidebarExpanded("open")).toBe(true);
+    for (const width of [1024, 1440, 1700, 2560]) {
+      screenOf(width);
+      const { unmount } = mount();
+      expect(screen.getByRole("complementary", { name: "Hauptnavigation" }).hasAttribute("data-expanded")).toBe(false);
+      expect(document.documentElement.style.getPropertyValue("--sidebar-w")).toBe(`${SIDEBAR_WIDTH.rail}px`);
+      unmount();
+    }
+  });
+
+  it("migration: a stored `closed` or `auto` loads as `auto`, `open` stays pinned", () => {
+    for (const [stored, want] of [["closed", "auto"], ["auto", "auto"], ["open", "open"], ["x", "auto"], [undefined, "auto"]] as const) {
+      localStorage.setItem("tj2-ui", JSON.stringify({ sidebar: stored }));
+      expect(loadPrefs().sidebar).toBe(want);
+    }
+  });
+
+  it("the search sits on top as the shared field (a combobox), the foot has the night switch, the user card and the pin; Trades carries its count", () => {
+    screenOf(1700);
+    useUi.setState({ sidebar: "open" });
     mount();
-    expect(screen.getByRole("complementary", { name: "Hauptnavigation" }).hasAttribute("data-expanded")).toBe(false);
+    const aside = screen.getByRole("complementary", { name: "Hauptnavigation" });
+    expect(within(aside).getByRole("combobox", { name: "Seiten und Funktionen suchen" })).toBeInTheDocument();
+    expect(within(aside).getByRole("switch", { name: "Nachtmodus" })).toBeInTheDocument();
+    expect(within(aside).getByTestId("sidebar-user")).toHaveAccessibleName(/^Konto: Dieses Gerät, Nur auf diesem Gerät$/);
+    expect(within(aside).getByTestId("sidebar-toggle")).toBeInTheDocument();
+  });
+
+  it("the arrow keys move between the rows, Home and End jump", () => {
+    screenOf(1700);
+    useUi.setState({ sidebar: "open" });
+    mount();
+    const links = screen.getAllByRole("link").filter((l) => l.hasAttribute("data-nav-page"));
+    act(() => links[0]!.focus());
+    fireEvent.keyDown(links[0]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(links[1]);
+    fireEvent.keyDown(links[1]!, { key: "End" });
+    expect(document.activeElement?.getAttribute("data-nav-page")).toBe(links[links.length - 1]!.getAttribute("data-nav-page"));
+    // Home: the first stop is the title of the first group
+    fireEvent.keyDown(document.activeElement!, { key: "Home" });
+    expect(document.activeElement?.getAttribute("data-testid")).toBe("sidebar-group-toggle");
+  });
+
+  it("the sections of Einstellungen nest under its row, only while pinned and on that page", () => {
+    screenOf(1700);
+    useUi.setState({ sidebar: "open", page: "settings" });
+    mount();
+    const sub = screen.getByTestId("sidebar-sub");
+    expect(sub.querySelectorAll("[data-sub]")).toHaveLength(7);
+    expect(sub.querySelector("ul")!.hasAttribute("inert")).toBe(false);
+    act(() => useUi.getState().setPage("trades"));
+    expect(screen.getByTestId("sidebar-sub").querySelector("ul")!.hasAttribute("inert")).toBe(true);
   });
 });

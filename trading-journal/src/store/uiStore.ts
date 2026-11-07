@@ -151,7 +151,7 @@ export const CELEBRATION_TTL_MS = 4000;
 export interface UiPrefs {
   theme: "dark" | "light";
   hideLocalBanner: boolean;
-  /** Sidebar (md+): `auto` follows the width (rail below 1280 px), `open` / `closed` is the reader's own choice. */
+  /** Sidebar (md+): `auto` = the compact rail at every width (it peeks open over the page), `open` = pinned open (the page makes room). `closed` is the old „rail“ choice and is read as `auto` (`loadPrefs`). */
   sidebar: "auto" | "open" | "closed";
   /** Groups the reader folded in the wide sidebar; `null` = not chosen yet (short screens fold every group but the current one). */
   sidebarClosed: NavGroupId[] | null;
@@ -308,7 +308,8 @@ export function loadPrefs(): UiPrefs {
   return {
     theme: raw.theme === "light" ? "light" : "dark",
     hideLocalBanner: raw.hideLocalBanner === true,
-    sidebar: raw.sidebar === "open" || raw.sidebar === "closed" ? raw.sidebar : "auto",
+    // Runde 11: compact is the default everywhere; the old „closed“ and „auto“ both mean the rail, only „open“ (pinned) stays a choice
+    sidebar: raw.sidebar === "open" ? "open" : "auto",
     sidebarClosed: Array.isArray(raw.sidebarClosed) ? raw.sidebarClosed.filter((g): g is NavGroupId => (NAV_GROUP_IDS as readonly string[]).includes(g)) : null,
     sparkline: raw.sparkline === "live" ? "live" : "readings",
     topTraderBase: raw.topTraderBase === "positions" ? "positions" : "accounts",
