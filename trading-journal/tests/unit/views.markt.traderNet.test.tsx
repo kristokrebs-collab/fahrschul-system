@@ -118,7 +118,8 @@ describe("TraderNetCard states", () => {
     expect(screen.getByText("zu wenig Verlauf", { selector: "span" })).toBeInTheDocument();
     expect(screen.queryByTestId("trader-net-plot")).toBeNull();
     expect(screen.getByTestId("trader-net-empty")).toBeInTheDocument();
-    expect(screen.queryByRole("radiogroup")).toBeNull();
+    // the range switch is not offered (only the series switch is there)
+    expect(screen.queryByRole("radiogroup", { name: "Zeitraum" })).toBeNull();
   });
 
   it("keine Daten (Bybit/OKX source, blocked region, offline): the reason in the card, no plot, no invented numbers", () => {
@@ -161,11 +162,12 @@ describe("TraderNetCard states", () => {
     expect(screen.getByTestId("trader-net-legend")).toHaveTextContent("BTC-Preislinie (Skala rechts)");
   });
 
-  it("the range switch offers 7 Tage, 14 Tage and Alles with the real length, and the plot follows", async () => {
+  it("the range switch offers 7 / 30 / 90 Tage and Alles with the real length (a range the history does not fill is shown but disabled), and the plot follows", async () => {
     wrap(net(TWO));
     const group = screen.getByRole("radiogroup", { name: "Zeitraum" });
     const radios = within(group).getAllByRole("radio");
-    expect(radios.map((r) => r.textContent)).toEqual(["7 Tage", "14 Tage", "Alles · 24 Tage"]);
+    expect(radios.map((r) => r.textContent)).toEqual(["7 Tage", "30 Tage", "90 Tage", "Alles · 24 Tage"]);
+    expect(radios.map((r) => (r as HTMLButtonElement).disabled)).toEqual([false, true, true, false]);
     const plot = await screen.findByTestId("trader-net-plot");
     expect(plot).toHaveAttribute("data-points", "100");
     fireEvent.click(within(group).getByRole("radio", { name: "7 Tage" }));
@@ -177,7 +179,7 @@ describe("TraderNetCard states", () => {
     expect(screen.getByTestId("trader-net-plot")).toHaveAttribute("data-points", "100");
   });
 
-  it("a history shorter than a week offers only Alles (no second switch)", () => {
+  it("a history shorter than a week: every range is disabled, only Alles can be taken", () => {
     const short = Array.from({ length: 20 }, (_, i) => (i < 10 ? 8 : -8));
     live.net = { ...net(short), view: buildTraderNet(pts(short, H), bars(20, H), T0 + 20 * H, H), stepMs: H };
     render(
@@ -185,15 +187,18 @@ describe("TraderNetCard states", () => {
         <TraderNetCard />
       </MotionRoot>,
     );
-    expect(screen.queryByRole("radiogroup")).toBeNull();
-    expect(screen.getByTestId("trader-net-range-fixed")).toHaveTextContent("Alles · 19 Std.");
+    const group = screen.getByRole("radiogroup", { name: "Zeitraum" });
+    const radios = within(group).getAllByRole("radio");
+    expect(radios.map((r) => r.textContent)).toEqual(["7 Tage", "30 Tage", "90 Tage", "Alles · 19 Std."]);
+    expect(radios.map((r) => (r as HTMLButtonElement).disabled)).toEqual([true, true, true, false]);
+    expect(radios[3]).toBeChecked();
   });
 
   it("the plot is a named group; the arrow keys move the crosshair readout (announced politely), Escape and blur close it", async () => {
     wrap(net(TWO));
     const plot = await screen.findByTestId("trader-net-plot");
     expect(plot).toHaveAttribute("role", "group");
-    expect(plot).toHaveAccessibleName(/^Top-Trader \(Binance\) netto, 100 Punkte von 01\.10\. bis 25\.10\.: zuletzt −10,0 Pkt\., letzter Umschlag zu Short am 20\.10\.\.$/);
+    expect(plot).toHaveAccessibleName(/^Top-Trader \(Binance\) netto, 100 Punkte von 01\.10\. bis 25\.10\.: zuletzt −10,0 Pkt\., letzter Umschlag zu Short am 20\.10\.\.(?: Marken der Alarm-Regel: .+\.)?$/);
     await waitFor(() => expect(plot.querySelector("canvas")!.width).toBeGreaterThan(0));
     plot.focus();
     const tip = screen.getByTestId("trader-net-tip");
@@ -294,12 +299,16 @@ describe("the plot painter", () => {
 describe("model: ranges, ticks, placement, texts", () => {
   const v = net(TWO).view!;
 
-  it("rangeChoices follow the real span: 7 / 14 Tage only when the history is clearly longer, Alles always with its length", () => {
-    expect(rangeChoices(24.75 * DAY).map((c) => c.label)).toEqual(["7 Tage", "14 Tage", "Alles · 24 Tage"]);
-    expect(rangeChoices(10 * DAY).map((c) => c.label)).toEqual(["7 Tage", "Alles · 10 Tage"]);
-    expect(rangeChoices(7.5 * DAY).map((c) => c.label)).toEqual(["Alles · 7 Tage"]);
-    expect(rangeChoices(36 * H).map((c) => c.label)).toEqual(["Alles · 36 Std."]);
-    expect(rangeChoices(2 * 60_000).map((c) => c.label)).toEqual(["Alles · unter 5 Min."]);
+  it("rangeChoices follow the real span: 7 / 30 / 90 Tage are taken only when the history is clearly longer (else shown disabled), Alles always with its length", () => {
+    const on = (spanMs: number) => rangeChoices(spanMs).filter((c) => !c.disabled).map((c) => c.label);
+    expect(rangeChoices(24.75 * DAY).map((c) => c.label)).toEqual(["7 Tage", "30 Tage", "90 Tage", "Alles · 24 Tage"]);
+    expect(on(24.75 * DAY)).toEqual(["7 Tage", "Alles · 24 Tage"]);
+    expect(on(40 * DAY)).toEqual(["7 Tage", "30 Tage", "Alles · 40 Tage"]);
+    expect(on(120 * DAY)).toEqual(["7 Tage", "30 Tage", "90 Tage", "Alles · 120 Tage"]);
+    expect(on(10 * DAY)).toEqual(["7 Tage", "Alles · 10 Tage"]);
+    expect(on(7.5 * DAY)).toEqual(["Alles · 7 Tage"]);
+    expect(on(36 * H)).toEqual(["Alles · 36 Std."]);
+    expect(on(2 * 60_000)).toEqual(["Alles · unter 5 Min."]);
     expect(rangeChoices(20 * DAY).at(-1)).toMatchObject({ id: "all", days: null, label: "Alles · 20 Tage" });
     expect(lengthLabel(20.8 * DAY)).toBe("20 Tage");
     expect(lengthLabel(60_000)).toBe("unter 5 Min.");

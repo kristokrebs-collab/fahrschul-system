@@ -254,8 +254,8 @@ export function useNetArchive({ series, symbol, live, stepMs }: NetArchiveInput)
       await db.clear();
       setRows([]);
       setRev((r) => r + 1);
-    } catch {
-      setStatus("error");
+    } catch (e) {
+      setStatus(e instanceof NetArchiveUnavailable ? "unavailable" : "error");
     }
   }, []);
 

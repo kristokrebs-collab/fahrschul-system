@@ -115,7 +115,7 @@ export default function TraderNetCard() {
   const state = waiting && wal.state !== "none" && wal.state !== "short" ? "loading" : wal.state;
   const ok = state === "ok" || state === "stale" || state === "archive";
   const stale = state === "stale";
-  const title = netTitle(ok ? v : null, info.who);
+  const title = netTitle(ok || state === "short" ? v : null, info.who);
   const choices = useMemo(() => rangeChoices(ok && v ? (wal.points.length > 1 ? wal.points[wal.points.length - 1]!.t - wal.points[0]!.t : 0) : 0), [ok, v, wal.points]);
   const [rangeId, setRangeId] = useState("all");
   const range = choices.find((c) => c.id === rangeId && !c.disabled) ?? choices[choices.length - 1]!;
