@@ -3,6 +3,7 @@
  * barrel). Re-exported by `@/cloud`.
  */
 import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
+import { checkPublicKey } from "./publicKey";
 
 // P09's extra build variables, merged into the shared `ImportMetaEnv` (`src/env.d.ts`) from here so that file stays as is.
 declare global {
@@ -30,11 +31,13 @@ const BUILD_ENV: CloudEnv = {
   VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
 };
 
-/** Supabase config of this build, or `null` when either variable is missing / not an http(s) URL. */
+/** Supabase config of this build, or `null` when either variable is missing, the URL is no http(s) URL or the key is not a public one. */
 export function cloudConfig(env: CloudEnv = BUILD_ENV): CloudConfig | null {
   const url = env.VITE_SUPABASE_URL?.trim() ?? "";
   const publishableKey = env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "";
   if (!/^https?:\/\/[^/\s]+/i.test(url) || !publishableKey) return null;
+  // a secret / service_role key in this variable never reaches `createClient` (the build refuses it as well: `scripts/secretGuard.ts`)
+  if (!checkPublicKey(publishableKey).ok) return null;
   return { url: url.replace(/\/+$/, ""), publishableKey };
 }
 

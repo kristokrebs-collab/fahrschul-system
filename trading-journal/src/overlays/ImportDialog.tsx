@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState, type ChangeEvent } from "react";
 import { ConnectSlot } from "@/connect/ConnectSlot";
-import { backupShotInfo, restoreShotsFromBackup } from "@/journal/screenshots/backupShots";
+import { backupShotInfo, restoreShotsFromBackupReport } from "@/journal/screenshots/backupShots";
 import type { ZipBackup } from "@/journal/screenshots/backupZip";
 import { fmt } from "@/lib/format";
 import { openScreenshotImport } from "@/journal/ocr/store";
@@ -40,6 +40,7 @@ export const IMPORT_STRINGS = {
   readings: "Ablesungen",
   exportedAt: "exportiert am",
   readError: "Datei konnte nicht gelesen werden",
+  tooBig: (mb: number) => `Die Datei ist größer als ${mb} MB – das ist kein Backup dieses Journals.`,
   csvLead: "Trades aus einer Tabelle oder einem Börsen-Export (Bitunix, Binance, Bybit, OKX …)?",
   csv: "CSV importieren",
   autoLead: "Oder lieber automatisch? Verbinde deine Börse, dann holt das Journal die Trades selbst (nur Lesen).",
@@ -64,8 +65,12 @@ export const IMPORT_SHOT_STRINGS = {
     `${n === 1 ? "1 Screenshot ist" : `${n} Screenshots sind`} nicht enthalten – nur Verweise. Die Bilder liegen auf dem Gerät, von dem das Backup stammt („Backup mit Bildern“ unter Einstellungen → Daten nimmt sie mit).`,
   /** A ZIP lists the pictures it could not carry. */
   zipMissing: (n: number) => `${n === 1 ? "1 Screenshot war" : `${n} Screenshots waren`} beim Export nicht erreichbar und ${n === 1 ? "fehlt" : "fehlen"} im ZIP.`,
-  zipEmbedded: (n: number) => `inkl. ${n === 1 ? "1 Screenshot" : `${n} Screenshots`} als Original – jede Datei wird vor dem Speichern gegen den Hash im Manifest geprüft.`,
+  zipEmbedded: (n: number) =>
+    `inkl. ${n === 1 ? "1 Screenshot" : `${n} Screenshots`} als Original – jede Datei wird vor dem Speichern gegen die Prüfsumme im Manifest sowie auf Bildformat und Größe geprüft. Das zeigt, dass die Dateien unversehrt sind, nicht dass das Backup von dir stammt: importiere nur Backups, die du selbst erstellt hast. Vorhandene Screenshots werden nicht überschrieben.`,
 } as const;
+
+/** Largest JSON backup the import reads into memory (old ones carry base64 pictures); a ZIP's manifest and journal have their own caps (`backupZip.ts`). */
+export const IMPORT_MAX_JSON_BYTES = 200 * 1024 * 1024;
 
 type Parsed = { ok: true; text: string; preview: ImportPreview; shots: { embedded: number; missing: number }; zip?: ZipBackup } | { ok: false; error: string };
 
@@ -120,6 +125,10 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
     setFileName(file.name);
     setConfirm(false);
     try {
+      if (!isZipName(file) && file.size > IMPORT_MAX_JSON_BYTES) {
+        setParsed({ ok: false, error: IMPORT_STRINGS.tooBig(Math.round(IMPORT_MAX_JSON_BYTES / (1024 * 1024))) });
+        return;
+      }
       if (isZipName(file)) {
         // „Backup mit Bildern“ (ZIP): manifest + journal + original files (lazy chunk)
         const m = await import("@/journal/screenshots/backupZip");
@@ -153,7 +162,10 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
         const m = await import("@/journal/screenshots/backupZip");
         const told = m.restoreSummary(await m.restoreShotsFromZip(parsed.zip));
         if (told) pushToast({ ...told, duration: 9000 });
-      } else if (result.ok && shots.embedded > 0) await restoreShotsFromBackup(parsed.text);
+      } else if (result.ok && shots.embedded > 0) {
+        const told = (await import("@/journal/screenshots/restoreGuard")).restoreSummary(await restoreShotsFromBackupReport(parsed.text));
+        if (told && told.kind === "error") pushToast({ ...told, duration: 9000 });
+      }
       clearInterval(tick);
       setProgress(100);
       if (result.ok) {

@@ -5,7 +5,8 @@
  *
  * - `exportJsonWithShots()` – the same backup plus `screenshots: { [key]: { mime, data } }` (base64) for every LOCAL
  *   blob a trade references (`store: "idb"`, and the offline copy of cloud pictures). Old importers ignore the key.
- * - `restoreShotsFromBackup(text)` – after an import, writes those blobs back into this device's store.
+ * - `restoreShotsFromBackup(text)` – after an import, writes those blobs back into this device's store (checked, see
+ *   `restoreShotsFromBackupReport`).
  * - `localShotCount(trades)` / `backupShotInfo(text)` – the honest lines in Daten and in the import preview.
  * Cloud pictures need no copy: they come back with the account.
  */
@@ -13,7 +14,9 @@ import { toJsonBackup } from "@/domain/csv";
 import type { JsonBackup, ScreenshotRef, Trade } from "@/domain/types";
 import { download } from "@/store/download";
 import { getEnriched, useJournal } from "@/store/journalStore";
-import { getShotBlob, putShotBlob } from "./store";
+import { parseJsonSafe } from "@/lib/unsafeKeys";
+import type { RestoreReport } from "./restoreGuard";
+import { getShotBlob, putShotBlobChecked } from "./store";
 
 export interface BackupShot {
   mime: string;
@@ -99,24 +102,62 @@ export function backupShotInfo(text: string): { embedded: number; missing: numbe
   }
 }
 
-/** After an import: writes the pictures of the file into this device's store. Resolves the number written. */
-export async function restoreShotsFromBackup(text: string): Promise<number> {
+/**
+ * After an import: writes the pictures of the file into this device's store, with the same entry checks as the ZIP
+ * restore (`restoreGuard.ts`): real image bytes of sane size and measures, at most `RESTORE_MAX_FILES` pictures, and
+ * never over a picture this device already holds under the same key. This old format carries no hashes at all, so the
+ * only thing a restore can promise is that the bytes are an image of the stated size.
+ */
+export async function restoreShotsFromBackupReport(text: string): Promise<RestoreReport> {
+  const guard = await import("./restoreGuard");
+  const out = guard.emptyReport();
   let shots: Record<string, unknown> = {};
   try {
-    const json = JSON.parse(text) as { screenshots?: unknown };
+    const json = parseJsonSafe(text) as { screenshots?: unknown } | null;
     if (json && typeof json.screenshots === "object" && json.screenshots) shots = json.screenshots as Record<string, unknown>;
   } catch {
-    return 0;
+    return out;
   }
-  let n = 0;
+  let seen = 0;
   for (const [key, v] of Object.entries(shots)) {
-    if (!/^[A-Za-z0-9_-]{1,80}$/.test(key) || !isShot(v)) continue;
+    if (!guard.SHOT_KEY_RE.test(key) || !isShot(v)) continue;
+    seen += 1;
+    if (seen > guard.RESTORE_MAX_FILES) {
+      out.rejected.push({ key, reason: "size" });
+      continue;
+    }
+    // base64 is 4 characters per 3 bytes: refuse an oversized one before decoding it into memory
+    if (v.data.length > guard.MAX_BASE64_CHARS) {
+      out.rejected.push({ key, reason: "size" });
+      continue;
+    }
     try {
-      await putShotBlob(fromBase64(v.data, v.mime), key);
-      n += 1;
+      const raw = fromBase64(v.data, v.mime);
+      const looked = await guard.inspectRestoredImage(raw);
+      if (!looked.ok) {
+        out.rejected.push({ key, reason: looked.reason });
+        continue;
+      }
+      const state = await guard.keyState(key, await guard.sha256Of(raw));
+      if (state === "same") {
+        out.alreadyThere += 1;
+        continue;
+      }
+      if (state === "taken") {
+        out.kept.push(key);
+        continue;
+      }
+      const put = await putShotBlobChecked(raw.type === looked.mime ? raw : new Blob([raw], { type: looked.mime }), key);
+      out.written += 1;
+      if (put.where === "ram") out.notSaved += 1;
     } catch {
-      /* a broken entry is skipped */
+      out.corrupt.push(key); // undecodable base64
     }
   }
-  return n;
+  return out;
+}
+
+/** `restoreShotsFromBackupReport`, reduced to the number of pictures written. */
+export async function restoreShotsFromBackup(text: string): Promise<number> {
+  return (await restoreShotsFromBackupReport(text)).written;
 }

@@ -11,7 +11,12 @@ import { MotionRoot } from "@/motion/MotionRoot";
 import { ImportDialog } from "@/overlays/ImportDialog";
 import { mkTrade } from "./domain.fixtures";
 
-const png = (n = 16) => new Blob([new Uint8Array(Array.from({ length: n }, (_, i) => i))], { type: "image/png" });
+/** A real PNG header (signature + IHDR 16 × 16), then the bytes 24, 25, … – the restore refuses anything that is no image. */
+const png = (n = 40) => {
+  const u = new Uint8Array(Array.from({ length: n }, (_, i) => i));
+  u.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 16, 0, 0, 0, 16]);
+  return new Blob([u], { type: "image/png" });
+};
 const withShots = (id: string, shots: ScreenshotRef[]): Trade => ({ ...mkTrade({ id, date: "2026-03-01T10:00", entry: 1, exit: 2, size: 1 }), screenshots: shots });
 
 afterEach(() => resetShotStoreForTests());
@@ -24,7 +29,7 @@ describe("backup with pictures", () => {
     ];
     expect(localShotCount(trades)).toBe(1);
     await putShotBlob(png(), "shot_a1");
-    await putShotBlob(png(8), "shot_c3");
+    await putShotBlob(png(30), "shot_c3");
     const shots = await collectBackupShots(trades);
     expect(Object.keys(shots).sort()).toEqual(["shot_a1", "shot_c3"]);
     expect(shots.shot_a1!.mime).toBe("image/png");
@@ -35,8 +40,8 @@ describe("backup with pictures", () => {
     expect(backupShotInfo(text)).toEqual({ embedded: 2, missing: 0 });
     expect(await restoreShotsFromBackup(text)).toBe(2);
     const back = await getShotBlob("shot_a1");
-    expect(back?.size).toBe(16);
-    expect(new Uint8Array(await back!.arrayBuffer())[5]).toBe(5);
+    expect(back?.size).toBe(40);
+    expect(new Uint8Array(await back!.arrayBuffer())[30]).toBe(30);
   });
 
   it("a plain backup with local references says what is missing; hostile keys and non-images are skipped", async () => {

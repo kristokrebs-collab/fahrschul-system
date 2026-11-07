@@ -3,6 +3,7 @@
  * separated, decimal point, times in UTC (ISO 8601) plus the epoch in ms, one row per point, the field keys of the series
  * table as header. JSON: the points plus the gaps found in them and where the numbers come from. Pure.
  */
+import { neutralizeFormula } from "@/lib/csvSafe";
 import { seriesDef } from "./series";
 import type { ArchivePoint, Cell, Gap, SeriesId } from "./types";
 
@@ -13,7 +14,9 @@ export const ARCHIVE_FORMAT = "tj-archive";
 const csvCell = (v: Cell | undefined): string => {
   if (v === null || v === undefined) return "";
   if (typeof v === "number") return Number.isFinite(v) ? String(v) : "";
-  return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  // a word (symbol, state) that starts like a formula is written as text; numbers above keep their minus sign
+  const t = neutralizeFormula(v);
+  return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
 };
 
 /** `2026-10-26T01:40:00.000Z` – never the viewer's zone. */

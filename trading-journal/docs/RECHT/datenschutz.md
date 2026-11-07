@@ -33,7 +33,7 @@ Die App speichert Daten auf deinem Gerät: im Local Storage (Journal, Einstellun
 
 Kurse, Kerzen und Kennzahlen ruft dein Browser direkt von öffentlichen Schnittstellen ab (zuerst Binance Futures, bei Ausfall Bybit, dann OKX; ersatzweise über unseren eigenen Weiterleitungs-Server). Dabei erhält der jeweilige Anbieter technisch zwingend deine IP-Adresse und Verbindungsdaten. Es werden keine Konto- oder Journal-Daten übermittelt. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung der von dir genutzten Live-Daten) bzw. lit. f (berechtigtes Interesse an einer funktionierenden Kursanzeige). Die Anbieter sitzen außerhalb der EU ({{TODO: Sitz und Rechtsgrundlage der Übermittlung je Anbieter prüfen}}). In den Einstellungen (Live-Daten) kannst du den Weg über unseren Weiterleitungs-Server wählen; dann sehen die Börsen nur den Server.
 
-> **[ANWALT]** Die Verbindung zu Binance wird beim Laden der Seite vorbereitet und die Marktdaten werden beim Start abgerufen – ohne vorherige Auswahl. Bitte prüfen, ob eine Information genügt (berechtigtes Interesse) oder eine Voreinstellung über den eigenen Server nötig ist.
+> **[ANWALT]** Die Marktdaten werden beim Start der App direkt bei Binance abgerufen – ohne vorherige Auswahl (die frühere Verbindungsvorbereitung beim bloßen Laden der Seite ist entfernt). Bitte prüfen, ob eine Information genügt (berechtigtes Interesse) oder eine Voreinstellung über den eigenen Server nötig ist.
 
 Aktien- und Branchendaten (Yahoo Finance, Nasdaq Trader, SEC EDGAR, Datenbibliothek von Kenneth French, House Clerk) holen unsere Server-Funktionen ab; dorthin gehen nur Börsenkürzel, nie Personendaten. Der Branchen-Trend und weitere Tabellen liegen als Dateien auf unserem Server.
 

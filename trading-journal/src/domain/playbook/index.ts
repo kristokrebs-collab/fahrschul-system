@@ -14,6 +14,7 @@
 import { BLOCKS, isBlockId } from "../lab/rules/blocks";
 import { customKey, MAX_CHILDREN, MAX_DEPTH, MAX_LEAVES_PER_SIDE, sanitizeCustom, validateCustom } from "../lab/rules/tree";
 import { CUSTOM_VERSION, EXEC_TFS, TF_IDS, type CustomConfig } from "../lab/rules/types";
+import { UNSAFE_KEYS } from "../../lib/unsafeKeys";
 import { PLAYBOOK_ID_RE } from "./update";
 
 export const PLAYBOOK_FORMAT = "tj-playbook" as const;
@@ -36,7 +37,7 @@ export const MAX_REV = 9999;
 const MAX_NODES = 8_000;
 const MAX_JSON_DEPTH = 18;
 const MAX_STRING = 2_000;
-const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+const FORBIDDEN_KEYS = UNSAFE_KEYS;
 const ROOT_KEYS = new Set(["format", "version", "title", "description", "author", "symbol", "idea", "key", "id", "rev", "changes", "checklist"]);
 
 export interface Playbook {

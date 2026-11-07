@@ -114,7 +114,14 @@ instant under reduced motion); a tap selects, `Zeichnung löschen` removes. Save
   could not be reached) + `journal.json` + `shots/<key>.<ext>`. Every picture is read from the device, else (signed in) from
   the cloud; references of pictures that were only in the cloud get an offline key in the exported copy. **Restore** (Backup
   importieren accepts the ZIP) checks the journal's hash and then EVERY file against the manifest before it is written back –
-  a file that differs is not restored and is named. Old JSON backups with base64 pictures (`backupShots.ts`) are still read.
+  a file that differs is not restored and is named. The hashes (and the archive's CRC-32) only show that a file is UNDAMAGED
+  („unversehrt“): the manifest sits in the same archive, so a forged backup carries matching hashes – the UI never says
+  „echt“. Therefore a restore also runs the entry checks of `restoreGuard.ts` (real PNG / JPEG / GIF / WebP / BMP / AVIF bytes
+  whatever the manifest says – no SVG; ≤ 25 MB; measures readable and ≤ 100 million pixels / 30,000 px per side; ≤ 20,000
+  pictures; one manifest row per key and per `shots/<name>` file) and NEVER replaces a picture the device already holds under
+  the same key (the same bytes are „schon auf diesem Gerät“, different bytes are listed as „nicht überschrieben“). The import
+  dialog refuses a JSON file over 200 MB; `manifest.json` is capped at 16 MB and `journal.json` at 64 MB. Old JSON backups with
+  base64 pictures (`backupShots.ts`) are still read, with the same entry checks.
 - **„Bild-Hashes (CSV)“** (`hashList.ts`): one row per picture – trade, picture, file name, type, bytes, SHA-256, size, where it
   lives, Original / Version (verkleinert), a note.
 - Display: `ShotThumb` (`NotchedFrame`, badges Lokal / Cloud / Nur Sitzung / verkleinert), `ShotReel` (one picture: thumbnail;

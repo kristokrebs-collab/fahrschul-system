@@ -2,6 +2,7 @@
  * Exports – bundle `K$` (50236–50344): CSV (BOM, ";", de decimals) and JSON backup (Plan 8.4).
  */
 import type { EnrichedTrade, HyblockReading, JsonBackup, Settings, Trade } from "./types";
+import { neutralizeFormula } from "@/lib/csvSafe";
 import { tradeTime } from "@/lib/dates";
 import { RESULT_LABELS } from "./defaults";
 import { holdMs } from "./excursion";
@@ -70,9 +71,6 @@ export function csvCell(h: unknown): string {
   return /[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 
-/** Characters a spreadsheet interprets as the start of a formula (`=`, `+`, `-`, `@`, tab, CR). */
-const FORMULA_LEAD = /^[=+\-@\t\r]/;
-
 /**
  * `csvCell` for free-text columns: a value starting with a formula character is prefixed with `'` so
  * Excel / Sheets / Numbers show it as text (CSV formula injection). Numeric columns keep `csvCell` because
@@ -80,7 +78,7 @@ const FORMULA_LEAD = /^[=+\-@\t\r]/;
  */
 export function csvTextCell(h: unknown): string {
   const v = h == null ? "" : String(h);
-  return csvCell(FORMULA_LEAD.test(v) ? `'${v}` : v);
+  return csvCell(neutralizeFormula(v));
 }
 
 export type CsvColumnKind = "text" | "value";
