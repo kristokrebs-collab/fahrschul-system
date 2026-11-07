@@ -12,7 +12,7 @@ import { openAuthSheet, useCloudSession } from "@/cloud/session";
 import { legalConfig } from "@/legal/config";
 import { ConsentCheck } from "@/legal/ConsentCheck";
 import { LegalLink } from "@/legal/LegalLinks";
-import { TERMS_PARTS } from "@/legal/consentRecord";
+import { TERMS_CONSENT } from "@/legal/consentRecord";
 import { IMMEDIATE_START_CONSENT } from "@/legal/consentTexts";
 import { Sheet, StaggerItem } from "@/motion/Sheet";
 import { Button } from "@/primitives/Button";
@@ -204,14 +204,18 @@ export function OrderSheet() {
           <StaggerItem className="grid gap-3" data-testid="order-consents">
             <div className="grid gap-1.5">
               <ConsentCheck checked={form.terms} onChange={setTerms} invalid={form.tried} testId="order-terms">
-                {TERMS_PARTS.pre}
-                <LegalLink doc="agb" />
-                {TERMS_PARTS.mid}
-                <LegalLink doc="widerruf">{TERMS_PARTS.widerruf}</LegalLink>
-                {TERMS_PARTS.mid2}
-                <LegalLink doc="datenschutz">{TERMS_PARTS.datenschutz}</LegalLink>
-                {TERMS_PARTS.post}
+                {TERMS_CONSENT}
               </ConsentCheck>
+              {/* the documents as their own 44-px links: inside the running sentence they could not be tapped on a phone */}
+              <nav aria-label="Rechtstexte lesen" className="-mx-2.5 flex flex-wrap items-center text-[12px] text-mute" data-testid="order-legal-links">
+                <LegalLink doc="agb" className="inline-flex min-h-tap items-center px-2.5 text-fg underline" />
+                <LegalLink doc="widerruf" className="inline-flex min-h-tap items-center px-2.5 text-fg underline">
+                  Widerrufsbelehrung
+                </LegalLink>
+                <LegalLink doc="datenschutz" className="inline-flex min-h-tap items-center px-2.5 text-fg underline">
+                  Datenschutzerklärung
+                </LegalLink>
+              </nav>
               {form.tried && !form.terms && (
                 <p role="alert" className="text-[12px] text-loss">
                   {ORDER.termsMissing}

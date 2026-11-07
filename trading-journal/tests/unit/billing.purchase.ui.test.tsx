@@ -93,7 +93,7 @@ async function openTheOrder(draft: OrderDraft = { plan: "pro", interval: "year",
   useBilling.setState({ config });
   wrap();
   act(() => openOrder(draft));
-  return screen.findByTestId("order-sheet");
+  return screen.findByTestId("order-sheet", {}, { timeout: 10_000 }); // the first import of the lazy purchase chunk is slow in jsdom
 }
 
 describe("order summary (§ 312j Abs. 2 BGB: everything in front of the order)", () => {
@@ -144,6 +144,7 @@ describe("the two boxes and the button", () => {
     expect(immediate).not.toBeChecked();
     expect(screen.getByTestId("order-immediate")).toHaveTextContent("Ich verlange ausdrücklich, dass der Anbieter vor Ablauf der Widerrufsfrist mit der Bereitstellung meines Tarifs beginnt.");
     expect(screen.getByTestId("order-terms")).toHaveTextContent("Ich akzeptiere die AGB des Betreibers");
+    expect(screen.getByTestId("order-legal-links")).toHaveTextContent("AGBWiderrufsbelehrungDatenschutzerklärung");
     expect(document.body).not.toHaveTextContent(/Tage gratis testen|Jetzt abonnieren/);
   });
 

@@ -169,7 +169,7 @@ test.describe("Preise & Abo", () => {
     const wipe = page.getByRole("dialog", { name: "Bestellung" });
     await expect(wipe).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("order-result")).toHaveAttribute("data-state", "confirmed", { timeout: 20_000 });
-    await expect(wipe.getByText("Dein Abo ist aktiv")).toBeAttached();
+    await expect(wipe.getByText("Dein Abo ist aktiv").first()).toBeAttached();
     await expect(wipe.getByText("Deine Testphase läuft bis", { exact: false })).toBeVisible();
     expect(page.url()).not.toContain("billing=");
     expect(page.url()).not.toContain("session_id");

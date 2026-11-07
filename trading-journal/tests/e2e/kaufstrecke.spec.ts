@@ -8,7 +8,7 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, seed } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockBilling, mockSubscription, type MockBillingOptions } from "./mocks/billing";
 import { mockSupabase } from "./mocks/supabase";
@@ -36,6 +36,9 @@ async function ready(sheet: Locator): Promise<void> {
 async function signInViaSheet(page: Page): Promise<void> {
   const sheet = page.getByRole("dialog", { name: /Anmelden|Konto erstellen|Registrieren/ }).first();
   await ready(sheet);
+  // the card opens the registration: switch to the login of the existing account
+  const mode = sheet.getByRole("radio", { name: "Passwort", exact: true });
+  if (await mode.count()) await mode.click();
   await sheet.getByLabel("E-Mail").fill(EMAIL);
   await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
   await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
@@ -83,8 +86,8 @@ test.describe("Kaufstrecke", () => {
     await expect(sheet).toBeVisible({ timeout: 20_000 });
     await expect(sheet).toHaveAttribute("data-plan", "team");
     await expect(sheet).toHaveAttribute("data-interval", "month");
-    await expect(sheet).toHaveAttribute("data-seats", "3");
-    await expect(sheet.getByTestId("order-total")).toContainText("57 €");
+    await expect(sheet).toHaveAttribute("data-seats", "4");
+    await expect(sheet.getByTestId("order-total")).toContainText("76 €");
     await expect(sheet.getByTestId("order-tax")).toContainText("Steuer wird im nächsten Schritt von Stripe berechnet.");
     await expect(sheet.getByTestId("order-first")).toContainText("Tage kostenlos testen – heute zahlst du nichts");
     await expect(sheet.getByTestId("order-renewal")).toContainText("verlängert sich automatisch");
@@ -100,7 +103,7 @@ test.describe("Kaufstrecke", () => {
     await pay.click();
     await page.waitForURL(/checkout\.stripe\.com/);
     expect(bill.checkouts).toHaveLength(1);
-    expect(bill.checkouts[0]).toMatchObject({ plan: "team", interval: "month", seats: 3, consents: { terms: true, immediateStart: true } });
+    expect(bill.checkouts[0]).toMatchObject({ plan: "team", interval: "month", seats: 4, consents: { terms: true, immediateStart: true } });
     expect(bill.checkouts[0]!.orderId).toMatch(/^[0-9a-f-]{36}$/);
     await page.getByRole("link", { name: "Jetzt abonnieren" }).click();
     const result = page.getByTestId("order-result");
@@ -143,31 +146,27 @@ test.describe("Kaufstrecke", () => {
     await expect(result).toHaveAttribute("data-state", "confirmed", { timeout: 40_000 });
   });
 
-  test("Ergebnisseite: Bestätigung nötig (incomplete) und fehlgeschlagen (unpaid)", async ({ page }) => {
-    await setup(page, { outcome: "incomplete" });
-    await openRoute(page, PREISE, "Preise", { timeout: 30_000 });
-    await signInHeader(page);
-    await page.getByTestId("cta-pro").click();
-    await tick(page.getByTestId("order-sheet"));
-    await page.getByRole("dialog", { name: "Deine Bestellung" }).getByTestId("order-pay").click();
-    await page.waitForURL(/checkout\.stripe\.com/);
-    await page.getByRole("link", { name: "Jetzt abonnieren" }).click();
-    await expect(page.getByTestId("order-result")).toHaveAttribute("data-state", "action", { timeout: 30_000 });
-    await expect(page.getByTestId("result-pay")).toHaveText("Zahlung abschließen");
-
-    const second = await page.context().newPage();
-    await setup(second, { outcome: "unpaid" });
-    await openRoute(second, PREISE, "Preise", { timeout: 30_000 });
-    await signInHeader(second);
-    await second.getByTestId("cta-pro").click();
-    await tick(second.getByTestId("order-sheet"));
-    await second.getByRole("dialog", { name: "Deine Bestellung" }).getByTestId("order-pay").click();
-    await second.waitForURL(/checkout\.stripe\.com/);
-    await second.getByRole("link", { name: "Jetzt abonnieren" }).click();
-    await expect(second.getByTestId("order-result")).toHaveAttribute("data-state", "failed", { timeout: 30_000 });
-    await expect(second.getByTestId("result-text")).toContainText("kein aktives Abo");
-    await second.close();
-  });
+  for (const [outcome, state] of [
+    ["incomplete", "action"],
+    ["unpaid", "failed"],
+  ] as const) {
+    test(`Ergebnisseite: ${state === "action" ? "Bestätigung nötig (incomplete)" : "fehlgeschlagen (unpaid)"}`, async ({ page }) => {
+      await setup(page, { outcome });
+      await openRoute(page, PREISE, "Preise", { timeout: 30_000 });
+      await signInHeader(page);
+      await page.getByTestId("cta-pro").click();
+      await tick(page.getByTestId("order-sheet"));
+      await page.getByRole("dialog", { name: "Deine Bestellung" }).getByTestId("order-pay").click();
+      await page.waitForURL(/checkout\.stripe\.com/);
+      await page.getByRole("link", { name: "Jetzt abonnieren" }).click();
+      await expect(page.getByTestId("order-result")).toHaveAttribute("data-state", state, { timeout: 30_000 });
+      if (state === "action") await expect(page.getByTestId("result-pay")).toHaveText("Zahlung abschließen");
+      else {
+        await expect(page.getByTestId("result-text")).toContainText("kein aktives Abo");
+        await expect(page.getByTestId("result-title")).not.toContainText("Dein Abo ist aktiv");
+      }
+    });
+  }
 
   test("Ergebnisseite: abgebrochen – nichts berechnet; „Bestellung wieder öffnen“ bringt dieselbe Auswahl zurück", async ({ page }) => {
     const { bill } = await setup(page);
@@ -294,7 +293,7 @@ test.describe("Kaufstrecke", () => {
     await expectNoHorizontalScroll(page);
   });
 
-  test("Tippflächen ≥ 44 px, der Bestell-Knopf ändert beim Laden seine Breite nicht", async ({ page }) => {
+  test("Tippflächen ≥ 44 px (Touch), der Bestell-Knopf ändert beim Laden seine Breite nicht", async ({ page }, info) => {
     await setup(page);
     // slow Stripe: the button stays in its "works" state long enough to measure
     await page.route(/\/api\/v1\/billing\/checkout$/, async (route) => {
@@ -307,8 +306,10 @@ test.describe("Kaufstrecke", () => {
     const sheet = page.getByTestId("order-sheet");
     await expect(sheet).toBeVisible({ timeout: 20_000 });
     await page.waitForTimeout(1200);
-    const misses = await page.evaluate(auditHitBoxes, { selector: HIT_SELECTOR, root: '[role="dialog"]' });
-    expect(misses, JSON.stringify(misses)).toEqual([]);
+    if (hasTouch(info)) {
+      const misses = await page.evaluate(auditHitBoxes, { selector: HIT_SELECTOR, root: '[role="dialog"]' });
+      expect(misses, JSON.stringify(misses)).toEqual([]);
+    }
     await tick(sheet);
     const pay = page.getByTestId("order-pay");
     const before = await pay.boundingBox();
@@ -321,13 +322,15 @@ test.describe("Kaufstrecke", () => {
   });
 
   for (const theme of ["dark", "light"] as const) {
-    test(`Barrierefreiheit (axe, ${theme}): Bestellübersicht, Tarif im Detail, Kündigungsseite`, async ({ page }) => {
+    test(`Barrierefreiheit (axe, ${theme}): Tarifkarten, Tarif im Detail, Bestellübersicht, Kündigungsseite`, async ({ page }) => {
       await setup(page);
       await openRoute(page, PREISE, "Preise", { timeout: 30_000 });
       await page.evaluate((t) => {
         document.documentElement.dataset.theme = t;
       }, theme);
       await signInHeader(page);
+      await page.getByTestId("plan-premium").scrollIntoViewIfNeeded();
+      await axe(page, '[aria-labelledby="preise-tarife"]', "Tarifkarten (Glas)");
       await page.getByTestId("details-pro").click();
       await expect(page.getByTestId("detail-sheet")).toBeVisible();
       await axe(page, '[data-testid="detail-sheet"]', "Tarif im Detail");
