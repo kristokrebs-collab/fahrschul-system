@@ -94,6 +94,18 @@ Geprüft per Code-Suche am 07.11.2026 (`src/`, `index.html`, `public/`, `netlify
 7. Checkout sperren, solange `legalComplete(legalConfig())` falsch ist (Betreiberentscheidung).
 8. Vertragsbestätigung (AGB, Widerrufsbelehrung) per E-Mail auf dauerhaftem Datenträger (§ 312f BGB).
 
+### Stand nach Paket B4 (Kaufstrecke) – was die Mechanik jetzt tut (alles weiter Entwurf, Anwalt prüft)
+
+| Nr. oben | Stand | Beleg (Test) |
+|---|---|---|
+| 1 Bestell-Button | Mechanik: genau „Zahlungspflichtig bestellen“ (`BUTTON_LABELS.order`); Karten/Dialog führen mit „Weiter zur Bestellung“ hin, nirgends „N Tage gratis testen“/„Jetzt abonnieren“ als Bestell-Button. Stripe: `submit_type: pay` + `custom_text.submit` – der Stripe-Button selbst bleibt „Zahlen“/„Testversion starten“ (**Anwalt**, Frage 7) | `billing.purchase.ui.test.tsx`, `purchase.functions.test.ts` |
+| 2 Pflichtangaben | Mechanik: Bestellübersicht zeigt Merkmale, Gesamtpreis, Preis **nach** der Testphase mit Datum, Verlängerung mit Datum, Kündigung (keine Frist), Steuer | `billing.purchase.ui.test.tsx`, `billing.purchase.order.test.ts` |
+| 3 Zustimmung sofortiger Beginn | Mechanik: eigenes Kästchen, serverseitiger Nachweis (`consents`, Hash + Wortlaut + Konto + Zeit, auch in den Stripe-Metadaten), Checkout erst danach, fail-closed | `purchase.functions.test.ts`, `supabase.consents.test.ts` |
+| 4 Widerrufsfunktion | Mechanik: `/?widerruf` ohne Login (E-Mail-Weg), Schaltfläche in „Abo verwalten“; Erstattung/Wertersatz **nicht** automatisch | `purchase.functions.test.ts`, `kuendigung-widerruf.md` |
+| 5 Kündigung | Mechanik: `/?kuendigen` ohne Login, Menü/Konto/Preise/Fußbereich (nicht Übersicht/Cockpit), Bestätigung per Mail (wenn Resend eingerichtet, sonst ehrlich „nicht eingerichtet“), kein Grund/Angebot vor der Bestätigung | `purchase.functions.test.ts`, `billing.ui.test.tsx` |
+| 6 PAngV/Steuer | Mechanik: `PRICE_TAX_NOTE` an Preisen und in der Bestellübersicht; „Jährlich −X %“ nur aus den gezeigten Preisen berechnet; Steuer-Satz je nach `STRIPE_AUTOMATIC_TAX` ehrlich; Kaufstrecke gesperrt ohne Stripe **oder** ohne Rechtstexte (`legalComplete` auf dem Server) | `purchase.functions.test.ts` |
+| 7 Vertragsbestätigung § 312f | **offen:** Stripe-Beleg + Ergebnisseite, aber keine eigene Mail mit AGB/Widerrufsbelehrung als Vertragsinhalt | – |
+
 ## 7. Quellen
 
 Selbst abgerufen am 07.11.2026 (Inhalt gelesen):

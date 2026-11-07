@@ -41,7 +41,22 @@ export interface BillingConfig {
    * "KI-Coach" (Review F06); absent (older server / no functions) counts as off.
    */
   coachAi?: boolean;
+  /**
+   * The purchase flow may start (B4): Stripe is set up AND the operator's legal texts are complete (`legalReady`). The SERVER
+   * decides (`netlify/functions/_lib/purchase.ts`); absent (older server) counts as locked – never an invented "open".
+   */
+  purchaseOpen?: boolean;
+  /** Why it is locked (`stripe`: no secret key / price; `legal`: Impressum / AGB / Datenschutz of the operator missing). */
+  purchaseBlockedBy?: PurchaseBlock[];
+  /** Stripe Tax is on (`STRIPE_AUTOMATIC_TAX`): the checkout shows the tax; off = the amounts are the list prices, tax is the operator's matter. */
+  automaticTax?: boolean;
+  /** SHA-256 of the consent wordings the server knows (`src/legal/consentRecord.ts`) – the order sheet compares it with its own. */
+  consentHash?: string;
+  /** Contract e-mails (Resend + sender) are set up: the cancel / withdraw confirmation can be sent. */
+  mailReady?: boolean;
 }
+
+export type PurchaseBlock = "stripe" | "legal";
 
 export interface SubscriptionSummary {
   id: string;
@@ -60,6 +75,8 @@ export interface SubscriptionSummary {
   /** Cents per period (all seats), null when unknown. */
   amount: number | null;
   currency: string | null;
+  /** ISO time the contract was concluded (the subscription row was created) – the withdrawal period (14 days) counts from it; null when unknown. */
+  startedAt?: string | null;
   /** A payment method is on file (false during a card-less trial). */
   hasPaymentMethod: boolean | null;
 }
@@ -108,6 +125,12 @@ export interface CheckoutRequest {
   ref?: string;
   /** Same-origin path (+ hash) to return to, e.g. `/#preise`. */
   returnTo?: string;
+  /** One UUID per order (made when the order sheet opens): the idempotency key – a double click never makes two sessions. */
+  orderId: string;
+  /** Both boxes of the order sheet, ticked (§ 312j / § 356 BGB). The server refuses anything else. */
+  consents: { terms: boolean; immediateStart: boolean };
+  /** SHA-256 of the consent wordings the person was SHOWN (`consentSetHash`). */
+  consentHash: string;
 }
 
 export interface CheckoutResponse {
@@ -115,10 +138,48 @@ export interface CheckoutResponse {
   sessionId: string;
 }
 
+/* ------------------------------------------------------------------ cancel / withdraw without a login (§ 312k, § 356a BGB) */
+
+export const CONTRACT_KINDS = ["cancel", "withdraw"] as const;
+export type ContractKind = (typeof CONTRACT_KINDS)[number];
+
+/**
+ * POST /api/v1/billing/contract – the declaration (no login needed; with a login of the same address it runs at once).
+ * The answer is the same whether or not a contract exists for the address (nobody can probe who has one).
+ */
+export interface ContractDeclaration {
+  kind: ContractKind;
+  email: string;
+  /** Withdrawal: name of the consumer (§ 356a: name, contract, way of contact). */
+  name?: string;
+  /** Withdrawal / cancel: free text naming the contract (plan, order date). */
+  contract?: string;
+}
+
+export interface ContractReceipt {
+  kind: ContractKind;
+  /** ISO time the declaration was received (server clock) – shown to the person and written in the mail. */
+  receivedAt: string;
+  /** `sent`: the confirmation mail is on its way; `unavailable`: the operator has not set up mail yet (the declaration is stored, the page says so). */
+  mail: "sent" | "unavailable";
+  /** `done`: executed at once (signed in as this address); `check`: waits for the link in the mail. */
+  next: "done" | "check";
+}
+
+/** POST /api/v1/billing/contract/confirm `{ token }` – the link of the mail. */
+export interface ContractConfirmResponse {
+  kind: ContractKind;
+  /** `done` ended / scheduled; `none` no running contract; `expired` link too old; `late` (withdraw) the 14 days are over. */
+  status: "done" | "none" | "expired" | "late";
+  /** ISO time the contract ends (cancel: period end; withdraw: now). */
+  endsAt: string | null;
+  confirmedAt: string;
+}
+
 export const PORTAL_FLOWS = ["manage", "cancel", "update", "payment"] as const;
 export type PortalFlow = (typeof PORTAL_FLOWS)[number];
 
-export const PORTAL_ACTIONS = ["cancel", "resume", "pause"] as const;
+export const PORTAL_ACTIONS = ["cancel", "resume", "pause", "feedback"] as const;
 export type PortalAction = (typeof PORTAL_ACTIONS)[number];
 
 /** Stripe's `cancellation_details.feedback` values. */
@@ -150,6 +211,8 @@ export interface PortalResponse {
   url?: string;
   subscription?: SubscriptionSummary | null;
   plan?: PlanInfo;
+  /** In-app cancel: the confirmation mail (§ 312k Abs. 4 BGB) went out (`sent`) or mail is not set up (`unavailable`). */
+  mail?: "sent" | "unavailable";
 }
 
 export interface CodeLookup {

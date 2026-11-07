@@ -3,10 +3,11 @@ import { LegalLinks } from "@/legal/LegalLinks";
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { openAuthSheet, useCloudSession } from "@/cloud/session";
-import { displayPrice } from "@/billing/format";
-import { PLAN_CATALOG, yearlySavingsPct } from "@/billing/plans";
-import { openCancel, setBillingInterval, useBilling, useBillingMode, useEffectivePlan } from "@/billing/store";
+import { useCloudSession } from "@/cloud/session";
+import { openContract } from "@/billing/contractStore";
+import { PLAN_CATALOG } from "@/billing/plans";
+import { planSaving } from "@/billing/purchase/order";
+import { setBillingInterval, useBilling, useBillingMode, useEffectivePlan } from "@/billing/store";
 import type { BillingInterval } from "@/billing/types";
 import { ClosedNotice } from "@/billing/ui/parts";
 import { SpotlightSweep } from "@/motion/fx/SpotlightSweep";
@@ -15,7 +16,6 @@ import { Reveal } from "@/motion/Reveal";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Segmented } from "@/primitives/Segmented";
-import { pushToast } from "@/store/uiStore";
 import { storageKey } from "@/store/storage";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { CodeField } from "./CodeField";
@@ -36,7 +36,7 @@ export interface PreiseViewProps {
 function IntervalToggle() {
   const interval = useBilling((s) => s.interval);
   const config = useBilling((s) => s.config);
-  const savings = yearlySavingsPct(displayPrice("pro", "month", config?.prices).amount, displayPrice("pro", "year", config?.prices).amount);
+  const savings = planSaving("pro", config?.prices).pct;
   return (
     <Segmented<BillingInterval>
       aria-label={PREISE.interval}
@@ -73,20 +73,10 @@ function RefBanner() {
   );
 }
 
-/** "Verträge hier kündigen" (§ 312k BGB) – always reachable from the pricing page. */
+/** "Verträge hier kündigen" (§ 312k BGB) – always reachable from the pricing page, WITHOUT a login (the public page). */
 function LegalLine() {
-  const phase = useCloudSession((s) => s.phase);
-  const sub = useBilling((s) => s.account?.subscription ?? null);
   const mode = useBillingMode();
   if (mode === "off") return null;
-  const cancel = () => {
-    if (phase !== "signedIn") {
-      openAuthSheet("signin", "card");
-      return;
-    }
-    if (sub && !sub.cancelAtPeriodEnd && sub.status !== "canceled" && sub.status !== "incomplete_expired") openCancel();
-    else pushToast({ kind: "info", title: PREISE.legalNoContract });
-  };
   return (
     <footer className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line pt-4 text-[12.5px] text-faint">
       <span className="flex max-w-[70ch] flex-wrap items-center gap-x-2 gap-y-1">
@@ -95,7 +85,7 @@ function LegalLine() {
       </span>
       <button
         type="button"
-        onClick={cancel}
+        onClick={() => openContract("cancel")}
         className="touch-hit font-semibold text-fg underline decoration-line-2 underline-offset-4 hover:decoration-fg"
         data-testid="legal-cancel"
       >

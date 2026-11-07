@@ -59,7 +59,7 @@ Prüfbefehle (dieselben wie in der CI): `npm run typecheck && npm run lint && np
    - **Publishable key** (`sb_publishable_…`) → `VITE_SUPABASE_PUBLISHABLE_KEY` (öffentlich, landet im Bundle)
    - **Secret key** (`sb_secret_…`) → `SUPABASE_SECRET_KEY` (**nur** für die Functions, niemals mit `VITE_`-Präfix)
 
-### 2.1 Migrationen 0001 → 0014
+### 2.1 Migrationen 0001 → 0016
 
 Die Dateien liegen in `trading-journal/supabase/migrations/` und werden **genau einmal, in dieser Reihenfolge**
 ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als neue Datei):
@@ -80,9 +80,10 @@ ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als n
 | `0012_connections.sql` | Verbindungen: Empfangsprotokoll des TradingView-Webhooks (`webhook_receipts`, höchstens 30 Zeilen je Nutzer, ohne Alarmtext, Token und IP). Binance braucht keine Schema-Änderung. Ohne sie zeigt der Assistent keinen Empfangsbeleg |
 | `0013_signals.sql` | TradingView-Signal-Empfänger (B3): Tabelle `signals` (jede Zustellung mit Ausgang verarbeitet / doppelt / abgelehnt samt Grund, nur eigene Zeilen lesbar, eindeutiger Schlüssel je Nutzer + Quelle + Signal-ID gegen Doppelte, ohne Rohtext, Token und IP) sowie `tv_mcp_states` und `tv_mcp_connections` für die OAuth-Verbindung zum offiziellen TradingView-MCP (Tokens verschlüsselt, für Clients gar nicht lesbar). Ohne sie antwortet `/api/v1/signals/:token` mit 503 „nicht eingerichtet“ und nimmt nichts an; die Karte zeigt dann den Empfangsbeleg aus 0012 |
 | `0014_alerts.sql` | Vier Alarme + Zustellung (C2): Alarm-Einstellungen (`alert_prefs`), Telefon-Einwilligung und -Status ohne Nummer (`alert_phones`), die verschlüsselte Nummer (`alert_phone_secrets`, kein Zugriff für Clients), Gedächtnis der Alarm-Engine (`alert_state`), Ereignisse mit eindeutigem Dedup-Schlüssel (`alert_events`), Zustellprotokoll (`alert_deliveries`) und die Job-Warteschlange mit Lease, Wiederholung und Dead-Letter (`jobs`), dazu die Server-Funktionen `alert_enqueue`, `jobs_claim`, `alert_phone_reserve` (Anruf wird VOR dem Wählen festgeschrieben) u. a. Clients dürfen nur eigene Zeilen lesen, schreiben nur die Functions. Läuft nach 0001, 0005 und 0008 (0011–0013 gehören anderen Paketen und sind unabhängig). Ohne sie meldet `alerts-cron` „migration“ und tut nichts; `supabase/tests/0014_alerts.test.sql` prüft die Regeln gegen eine Scratch-Datenbank |
+| `0016_consents.sql` | Kaufstrecke: Zustimmungsnachweis (`consents`: wer, wann, welcher Wortlaut + Hash je Bestellung – geschrieben VOR der Stripe-Sitzung, nur eigene Zeilen lesbar, 2FA-Regel) und Kündigungs-/Widerrufserklärungen ohne Login (`contract_requests`, Adresse nur als gesalzener Hash). **Ohne sie bleibt die Kaufstrecke gesperrt** („Zustimmung kann nicht gespeichert werden“) – nie ein Kauf ohne Nachweis |
 
 **Variante A – SQL-Editor (ohne CLI):** Supabase → **SQL Editor → New query** → Inhalt von `0001_core.sql` einfügen →
-**Run** → „Success“ abwarten. Dann `0002` bis `0011` genauso.
+**Run** → „Success“ abwarten. Dann `0002` bis `0016` (die Nummern dazwischen, die es gibt) genauso.
 
 **Variante B – CLI:**
 
@@ -149,7 +150,7 @@ Netlify → **Site configuration → Environment variables → Add a variable**.
 | `STRIPE_PRICE_TEAM_MONTHLY` / `_YEARLY` | `price_…` (pro Platz) | Functions |
 | `TRIAL_DAYS` | optional, Standard `14` | Functions |
 | `STRIPE_TRIAL_CARDLESS` | optional `true` = Testphase ohne Karte (Standard `false`) | Functions |
-| `STRIPE_AUTOMATIC_TAX` | optional `true` = Stripe Tax im Checkout (Standard `false`) | Functions |
+| `STRIPE_AUTOMATIC_TAX` | optional `true` = Stripe Tax im Checkout (Standard `false`). Die Bestellübersicht sagt ehrlich, welcher Fall gilt: an = „Steuer wird im nächsten Schritt von Stripe berechnet“, aus = „Stripe berechnet keine Steuer zusätzlich“ | Functions |
 | `REFERRAL_TRIAL_DAYS` | optional, Standard `30` | Functions |
 | `REFERRAL_REWARD_CENTS` | optional, Standard `1000` (10 €) | Functions |
 | `EXCHANGE_ENC_KEY_V1` | `openssl rand -base64 32` (Schritt 5) | Functions, secret |
@@ -218,7 +219,9 @@ Upgrade-Karte).
    `STRIPE_AUTOMATIC_TAX=true`), Rechnungseinstellungen (deutsche Rechnungen, Firmendaten).
 7. Variablen in Netlify eintragen (Schritt 3) und neu deployen.
 
-**Test:** In der App **Preise** → bei Pro **14 Tage gratis testen** → Stripe-Checkout mit Testkarte `4242 4242 4242 4242`,
+**Kaufstrecke gesperrt, bis alles da ist:** Bestellt werden kann erst, wenn Stripe (Secret Key + mindestens ein Preis) **und** die Rechtstexte des Betreibers eingerichtet sind: Impressum (`VITE_LEGAL_IMPRESSUM_URL` oder `VITE_LEGAL_OPERATOR` + `VITE_LEGAL_ADDRESS` + `VITE_LEGAL_EMAIL`), `VITE_LEGAL_DATENSCHUTZ_URL` und `VITE_LEGAL_AGB_URL`. Die `VITE_LEGAL_*`-Variablen müssen in Netlify für **Builds und Functions** gelten (die Functions prüfen dieselbe Regel wie der Browser). Fehlt etwas, sagt die App „Bestellung noch nicht möglich“ und der Server antwortet `purchase_closed` – kein Fake-Kauf. Die Bestätigungs-Mails zu Kündigung und Widerruf brauchen `RESEND_API_KEY` und `ALERT_FROM` (Abschnitt 6.1); ohne sie sagt die Seite ehrlich „nicht eingerichtet“.
+
+**Test:** In der App **Preise** → bei Pro **Weiter zur Bestellung** → beide Kästchen ankreuzen → **Zahlungspflichtig bestellen** → Stripe-Checkout mit Testkarte `4242 4242 4242 4242`,
 beliebiges künftiges Datum, beliebige Prüfziffer. Zurück in der App zeigt **Konto** den Plan Pro mit laufender Testphase. Im
 Stripe-Dashboard hat der Webhook mit **200** geantwortet; in Supabase steht das Abo in `subscriptions`, der Plan in
 `profiles.plan`.

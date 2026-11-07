@@ -142,27 +142,31 @@ test.describe("Preise & Abo", () => {
     await expect(page.getByTestId("current-plan")).toContainText("Free");
     await page.getByTestId("plan-pro").scrollIntoViewIfNeeded();
     await page.getByTestId("cta-pro").click();
-    // the operator's AGB / Widerruf / Datenschutz first (Review F07): the upgrade sheet asks, its button continues
-    const sheet = page.getByTestId("upgrade-sheet");
+    // B4: the card leads to the order summary; the order is placed there, with both boxes and the exact button text
+    const sheet = page.getByTestId("order-sheet");
     await expect(sheet).toBeVisible();
-    await page.getByTestId("upgrade-cta").click();
+    await expect(sheet).toHaveAttribute("data-plan", "pro");
+    const pay = page.getByRole("button", { name: "Zahlungspflichtig bestellen" });
+    await pay.click();
     await expect(page.getByText("Bitte bestätige zuerst die AGB.")).toBeVisible();
-    await page.getByTestId("upgrade-consent").getByRole("checkbox").check();
-    await page.getByTestId("upgrade-cta").click();
+    expect(bill.checkouts).toHaveLength(0);
+    await page.getByTestId("order-terms").getByRole("checkbox").check();
+    await page.getByTestId("order-immediate").getByRole("checkbox").check();
+    await pay.click();
     // left the app for (the fake) Stripe Checkout
     await page.waitForURL(/checkout\.stripe\.com/);
-    expect(bill.checkouts[0]).toMatchObject({ plan: "pro", interval: "year", ref: "FRIEND30", returnTo: expect.stringMatching(/^\/(#preise)?$/) });
+    expect(bill.checkouts[0]).toMatchObject({ plan: "pro", interval: "year", ref: "FRIEND30", consents: { terms: true, immediateStart: true }, returnTo: expect.stringMatching(/^\/(#preise)?$/) });
     await page.getByRole("link", { name: "Jetzt abonnieren" }).click();
-    // back in the journal: the wipe confirms the plan, the URL is clean
-    const wipe = page.getByRole("dialog", { name: "Abo gestartet" });
+    // back in the journal: the result page asks the SERVER and shows the plan; the URL is clean
+    const wipe = page.getByRole("dialog", { name: "Bestellung" });
     await expect(wipe).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("checkout-return")).toHaveAttribute("data-confirmed", "", { timeout: 15_000 });
-    await expect(wipe.getByText("Willkommen bei Pro")).toBeAttached();
+    await expect(page.getByTestId("order-result")).toHaveAttribute("data-state", "confirmed", { timeout: 20_000 });
+    await expect(wipe.getByText("Dein Abo ist aktiv").first()).toBeAttached();
     await expect(wipe.getByText("Deine Testphase läuft bis", { exact: false })).toBeVisible();
     expect(page.url()).not.toContain("billing=");
     expect(page.url()).not.toContain("session_id");
     await shot(page, info, "checkout-return");
-    await wipe.getByRole("button", { name: "Los geht’s" }).click();
+    await wipe.getByTestId("result-close").click();
     await expect(wipe).toHaveCount(0);
     await expect(page.getByTestId("current-plan")).toContainText("Pro");
     await expect(page.getByTestId("plan-pro")).toHaveAttribute("data-current", "");
@@ -204,19 +208,21 @@ test.describe("Preise & Abo", () => {
     await expect(page.getByTestId("upgrade-teaser")).toHaveCount(0);
     await goTo(page, "#konto", "Konto");
 
-    // § 312k: the button is there, the flow is reason → offer → confirm → done
+    // § 312k: the button is there; the FIRST page is the confirmation (no reason, no offer in front), the reason comes after
     await card.getByTestId("cancel-contract").click();
     const sheet = page.getByRole("dialog", { name: "Abo kündigen" });
     await ready(sheet);
-    await sheet.getByRole("radio", { name: "Zu teuer" }).click();
-    await sheet.getByRole("button", { name: "Weiter zur Kündigung" }).click();
-    await expect(sheet.getByText("1 Monat pausieren").first()).toBeVisible();
-    await sheet.getByRole("button", { name: "Weiter zur Kündigung" }).click();
+    await expect(sheet.getByRole("radio")).toHaveCount(0);
     await expect(sheet.getByText("Dein Abo endet am", { exact: false })).toBeVisible();
     await shot(page, info, "cancel-confirm");
     await sheet.getByTestId("cancel-now").click();
     await expect(sheet.getByText("Gekündigt", { exact: true })).toBeVisible();
-    expect(bill.portals.at(-1)).toMatchObject({ action: "cancel", reason: "too_expensive" });
+    expect(bill.portals.at(-1)).toMatchObject({ action: "cancel" });
+    await expect(sheet.getByTestId("cancel-mail")).toContainText("per E-Mail geschickt");
+    await sheet.getByRole("radio", { name: "Zu teuer" }).click();
+    await sheet.getByTestId("cancel-feedback").click();
+    await expect(sheet.getByText("Danke – das hilft uns weiter.")).toBeVisible();
+    expect(bill.portals.at(-1)).toMatchObject({ action: "feedback", reason: "too_expensive" });
     await sheet.getByRole("button", { name: "Fertig" }).click();
     await expect(sheet).toHaveCount(0);
     await expect(card.getByText("Gekündigt", { exact: true })).toBeVisible();
@@ -227,6 +233,9 @@ test.describe("Preise & Abo", () => {
 
     // the Customer Portal is a redirect there and back
     await card.getByRole("button", { name: "Abo verwalten" }).click();
+    const manage = page.getByTestId("manage-sheet");
+    await expect(manage).toBeVisible();
+    await manage.getByTestId("manage-portal").click();
     await page.waitForURL(/billing\.stripe\.com/);
     await page.getByRole("link", { name: "Zurück zum Journal" }).click();
     await expect(toast(page).getByText("Zurück aus dem Kundenportal")).toBeVisible({ timeout: 30_000 });
@@ -250,7 +259,7 @@ test.describe("Preise & Abo", () => {
     const sheet = page.getByRole("dialog", { name: "Freischalten" });
     await ready(sheet);
     await expect(sheet.getByTestId("upgrade-sheet")).toContainText("Enthalten in Pro");
-    await expect(sheet.getByTestId("upgrade-cta")).toHaveText("Anmelden und testen");
+    await expect(sheet.getByTestId("upgrade-cta")).toHaveText("Weiter zur Bestellung");
     await shot(page, info, "upgrade-sheet");
     await sheet.getByRole("button", { name: "Schließen" }).first().click();
     await expect(sheet).toHaveCount(0);

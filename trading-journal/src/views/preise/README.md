@@ -29,3 +29,7 @@ dev server; e2e `tests/e2e/preise.spec.ts` (`PW_PREISE_URL=/#preise`, `PW_KONTO_
 ## Runde 10 (Agent 7)
 
 Die Pillen „Empfohlen“, „Aktueller Tarif“ und „Dein Tarif“ schweben 2 px (`Float`, pausiert ausserhalb des Bildschirms). Geisterwort „Wahl“. Hero, Deal, Prisma, Randlicht und Zaehler waren schon da und bleiben.
+
+## Kaufstrecke (B4)
+
+`PlanGrid` (glass cards; „Weiter zur Bestellung“ and „Tarif im Detail“ – never an order button), `PricingHero`, `PreiseView` (toggle label „Jährlich −X %“ only from the shown prices, `PRICE_TAX_NOTE` in the legal line, „Verträge hier kündigen“ opens the public page without a login) and `ResultView.tsx` (the five states after Stripe, mounted by `src/billing/purchase/PurchaseHost`). The order itself: `src/billing/purchase/` (see the billing README).

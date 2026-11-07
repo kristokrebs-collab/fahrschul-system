@@ -2,18 +2,18 @@ import { motion } from "motion/react";
 import { useRef } from "react";
 import { cn } from "@/lib/cn";
 import { themePaint } from "@/lib/themePaint";
+import { planSaving, savingLabel } from "@/billing/purchase/order";
+import "@/billing/purchase/purchase.css";
 import { openAuthSheet, useCloudSession } from "@/cloud/session";
 import type { CodeLookup } from "@/billing/contract";
 import { displayPrice, formatMoney, priceDigits, withCoupon, type DisplayPrice } from "@/billing/format";
-import { highlightsFor, PLAN_CATALOG, yearlySavingsPct, type PaidPlanId } from "@/billing/plans";
-import { openPortal, setSeats, startCheckout, useBilling, useBillingMode, useEffectivePlan, useOffer, useTrialDays } from "@/billing/store";
+import { highlightsFor, PLAN_CATALOG, type PaidPlanId } from "@/billing/plans";
+import { openDetail, openPortal, requestOrder, setSeats, useBilling, useBillingMode, useEffectivePlan, useOffer, usePurchaseGate } from "@/billing/store";
 import { Mark, PriceDigits } from "@/billing/ui/parts";
 import type { PlanId } from "@/billing/types";
-import { DotMatrixText } from "@/motion/fx/DotMatrixText";
 import { Float } from "@/motion/rich/Float";
 import { useFirstInView } from "@/motion/inView";
 import { CardSpread } from "@/motion/pulse/CardSpread";
-import { NotchedFrame } from "@/motion/pulse/NotchedFrame";
 import { TextPrism } from "@/motion/pulse/TextPrism";
 import { TextScramble } from "@/motion/TextScramble";
 import { spring, tween } from "@/motion/tokens";
@@ -26,37 +26,15 @@ import { Stepper } from "@/primitives/Stepper";
 import { PREISE } from "./strings";
 
 const ORDER: readonly PlanId[] = ["free", "pro", "premium", "team"];
-const NOTCH = 48;
-
-/** Art in the card's media slot (grey at rest, colour on hover – NotchedFrame). */
-function PlanArt({ plan }: { plan: PlanId }) {
-  const cat = PLAN_CATALOG[plan];
-  const wash =
-    plan === "pro"
-      ? "rgb(229 32 46 / 0.32)"
-      : plan === "premium"
-        ? "rgb(61 220 132 / 0.22)"
-        : plan === "team"
-          ? "rgb(255 176 32 / 0.2)"
-          : "rgb(var(--veil-rgb, 255 255 255) / 0.08)";
-  return (
-    <div
-      aria-hidden="true"
-      className="relative grid h-20 place-items-start overflow-hidden rounded-t-[16px] px-5 pt-4"
-      style={{ background: `radial-gradient(120% 140% at 0% 0%, ${wash}, transparent 62%)` }}
-    >
-      <DotMatrixText text={cat.glyph} size={3} gap={1} tone="fg" decorative />
-    </div>
-  );
-}
+/** The plan that carries the one border-beam lap (the flagship); "Beliebt" stays with the catalog's recommended plan. */
+const BEAM_PLAN: PlanId = "premium";
 
 function PriceBlock({ plan, price, base, promo }: { plan: PaidPlanId; price: DisplayPrice; base: DisplayPrice; promo: CodeLookup | null }) {
   const cat = PLAN_CATALOG[plan];
   const interval = price.interval;
   const yearly = interval === "year";
-  const monthly = displayPrice(plan, "month", null);
-  const savings = yearlySavingsPct(monthly.amount, displayPrice(plan, "year", null).amount);
-  const months = Math.round((savings / 100) * 12);
+  const saving = planSaving(plan, useBilling.getState().config?.prices);
+  const months = saving.monthsFree ?? 0;
   const discounted = price.amount !== base.amount;
   const digits = priceDigits(price.perMonth);
   return (
@@ -83,6 +61,7 @@ function PriceBlock({ plan, price, base, promo }: { plan: PaidPlanId; price: Dis
         {cat.perSeat ? PREISE.perSeatMonth : PREISE.perMonth}
         {" · "}
         {yearly ? PREISE.yearlyNote(formatMoney(price.amount, price.currency), months) : PREISE.monthlyNote}
+        {yearly && saving.cents > 0 ? ` · spart ${formatMoney(saving.cents, price.currency)} gegenüber 12 Monatszahlungen${savingLabel(saving) ? ` (${savingLabel(saving)})` : ""}` : ""}
       </span>
       {discounted && promo?.message && (
         <span className="text-[12px] font-semibold text-win">
@@ -116,7 +95,7 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
   const subscription = useBilling((s) => s.account?.subscription ?? null);
   const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const current = useEffectivePlan();
-  const trial = useTrialDays();
+  const gate = usePurchaseGate();
   const cat = PLAN_CATALOG[plan];
   const highlights = highlightsFor(plan, useOffer());
   const isCurrent = mode === "open" && signedIn && current.plan === plan;
@@ -131,6 +110,7 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
   let cta: { label: string; run: () => void; variant: "primary" | "secondary"; testId: string } | null = null;
   let note: string | null = null;
   if (mode !== "open") note = paid ? PREISE.ctaSoon : PREISE.closedCta;
+  else if (paid && !gate.open && !isCurrent && !(subscription && current.plan !== "free")) note = PREISE.ctaLocked;
   else if (!paid) {
     if (!signedIn) cta = { label: PREISE.ctaFree, run: () => openAuthSheet("signup", "card"), variant: "secondary", testId: "cta-free" };
     else note = isCurrent ? PREISE.current : PREISE.ctaFreeSignedIn;
@@ -142,33 +122,23 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
   else if (!available) note = PREISE.ctaSoon;
   else
     cta = {
-      label: PREISE.ctaTrial(trial),
-      run: () => void startCheckout({ plan: plan as PaidPlanId, interval, ...(plan === "team" ? { seats } : {}) }),
+      label: PREISE.ctaOrder,
+      run: () => requestOrder({ plan: plan as PaidPlanId, interval, ...(plan === "team" ? { seats } : {}) }),
       variant: cat.recommended ? "primary" : "secondary",
       testId: `cta-${plan}`,
     };
 
   return (
     <article ref={ref} className="relative h-full" aria-labelledby={`plan-${plan}-name`} data-testid={`plan-${plan}`} data-current={isCurrent ? "" : undefined}>
-      {/* the recommended plan: ONE lap once the card is in view */}
-      {cat.recommended && seen && !reduced && (
+      {/* the flagship plan: ONE lap once the card is in view */}
+      {plan === BEAM_PLAN && seen && !reduced && (
         // the beam's disc is larger than the card: clip it here (a mask clips the paint, not the scroll overflow)
-        <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-[16px]">
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-[22px]">
           <BorderBeam fire={1} colorFrom={themePaint("#e5202e")} colorTo="var(--color-white, #ffffff)" />
         </span>
       )}
-      <NotchedFrame
-        radius={16}
-        notchSize={NOTCH}
-        active={isCurrent || undefined}
-        outline={cat.recommended ? "rgb(229 32 46 / 0.55)" : isCurrent ? "rgb(var(--fg-rgb, 242 242 242) / 0.5)" : "var(--color-line-2, #2c2c2c)"}
-        wrapperClassName="h-full"
-        className={cn("flex h-full flex-col", cat.recommended ? "bg-ink-850" : "bg-ink-900")}
-        media={<PlanArt plan={plan} />}
-        // the disc is the card's CTA when it has one, and plainly decorative when it has none (review F5)
-        disc={cta ? { label: cta.label, onClick: cta.run, disabled: !!busy, testId: `disc-${plan}` } : "quiet"}
-      >
-        <div className="flex flex-1 flex-col gap-4 px-5 pb-6 pt-4">
+      <div className={cn("pay-glass flex h-full flex-col", isCurrent && "ring-1 ring-white/30")} data-tone={cat.recommended ? "hot" : undefined}>
+        <div className="flex flex-1 flex-col gap-4 px-5 pb-5 pt-5">
           <header className="grid gap-1.5">
             <div className="flex flex-wrap items-center gap-2">
               <h3 id={`plan-${plan}-name`} className="text-[19px] font-semibold tracking-tight">
@@ -229,19 +199,24 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
             ))}
           </ul>
 
-          <div className="mt-auto pr-12" style={{ minHeight: NOTCH - 8 }}>
+          <div className="mt-auto grid gap-2" style={{ minHeight: 40 }}>
             {cta ? (
               <Button variant={cta.variant} fx={false} disabled={!!busy} onClick={cta.run} className="w-full" data-testid={cta.testId}>
-                {busy === "checkout" && cta.variant === "primary" ? "Weiter zu Stripe …" : cta.label}
+                {cta.label}
               </Button>
             ) : note ? (
               <span className="inline-flex h-9 items-center text-[13px] text-mute" data-testid={`note-${plan}`}>
                 {note}
               </span>
             ) : null}
+            {paid && (
+              <Button variant="ghost" size="sm" className="w-full" onClick={() => openDetail(plan as PaidPlanId)} data-testid={`details-${plan}`}>
+                {PREISE.details}
+              </Button>
+            )}
           </div>
         </div>
-      </NotchedFrame>
+      </div>
     </article>
   );
 }

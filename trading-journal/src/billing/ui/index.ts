@@ -7,6 +7,6 @@ export { ReferralCard } from "./ReferralCard";
 export { UpgradeTeaser, type UpgradeTeaserProps } from "./UpgradeTeaser";
 export { UpgradeSheet, type UpgradeSheetProps } from "./UpgradeSheet";
 export { CancelSheet } from "./CancelSheet";
-export { CheckoutReturn } from "./CheckoutReturn";
+export { ContractHost } from "./ContractHost";
 export { LimitMeter, type LimitMeterProps } from "./LimitMeter";
 export { ClosedNotice, PriceDigits, Mark, LockGlyph } from "./parts";
