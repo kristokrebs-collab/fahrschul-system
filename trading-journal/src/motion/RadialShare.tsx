@@ -171,7 +171,7 @@ export function RadialShare({ targets, label = "Teilen", icon, size = "sm", clas
               <div key="layer" data-radial-share="" data-layer="Teilen-Fächer" className="fixed inset-0 z-[96]" onKeyDown={onMenuKey}>
                 {/* a press anywhere else closes the fan; the layer itself takes no other input */}
                 <div className="absolute inset-0" onPointerDown={() => close(false)} aria-hidden="true" />
-                <div id={menuId} role="menu" aria-label={`${label} über`} aria-orientation="horizontal" className="pointer-events-none absolute" style={{ left: fan.ox, top: fan.oy }} data-testid="radial-menu">
+                <div id={menuId} role="menu" aria-label={`${label} über`} aria-orientation="horizontal" className="pointer-events-none absolute size-px" style={{ left: fan.ox, top: fan.oy }} data-testid="radial-menu">
                   {active >= 0 && fan.offsets[active] && (
                     <motion.span
                       aria-hidden="true"
