@@ -388,7 +388,9 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
   const drawings = useSaveMorph();
   const runDrawings = drawings.run;
   const latest = useRef(e);
-  latest.current = e;
+  useEffect(() => {
+    latest.current = e;
+  });
   // Journal v3: chart drawings are saved with the trade as they change (they never touch P&L / R)
   const saveAnnotations = useCallback(
     (next: Annotation[]) => {

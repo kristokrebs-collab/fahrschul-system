@@ -1,7 +1,7 @@
 import { legalShown } from "@/legal/config";
 import { ConsentCheck } from "@/legal/ConsentCheck";
 import { LegalLink } from "@/legal/LegalLinks";
-import { AnimatePresence, motion, type Variants } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { celebrateFrom } from "@/motion/Celebrate";
@@ -10,7 +10,7 @@ import { HoldConfirm } from "@/motion/HoldConfirm";
 import { AsciiCascade } from "@/motion/pulse/AsciiCascade";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { Sheet } from "@/motion/Sheet";
-import { StaggerItem, STAGGER_HIDDEN, STAGGER_SHOWN, withSectionStagger } from "@/motion/Stagger";
+import { StaggerItem } from "@/motion/Stagger";
 import { StatusPill } from "@/motion/StatusPill";
 import { TextRoll } from "@/motion/TextRoll";
 import { TextScramble } from "@/motion/TextScramble";
@@ -27,20 +27,10 @@ import { ensureCloud } from "../runtime";
 import { closeAuthSheet, setAuthEmail, setAuthView, useCloudSession } from "../session";
 import { useSyncStatus } from "../sync/status";
 import type { AuthView } from "../types";
+import { AuthMorph, MorphItem, slideDir } from "./AuthMorph";
 import { CODE_LENGTH, CodeSlots } from "./CodeSlots";
 import { AUTH_LAYOUT_ID, syncPill } from "./pill";
 import { AUTH } from "./strings";
-
-/** A view slides in from its side (x ±16 on `spring.enter`, fade `tween.fade`) and cascades its sections. */
-function viewVariants(dir: number, reduced: boolean): Variants {
-  return {
-    [STAGGER_HIDDEN]: reduced ? { opacity: 0 } : { opacity: 0, x: 16 * dir },
-    [STAGGER_SHOWN]: { opacity: 1, x: 0, transitionEnd: { transform: "none" }, transition: withSectionStagger({ x: spring.enter, opacity: tween.fade }) },
-  };
-}
-
-/** Order of the three entry modes (slide direction of a view switch). */
-const MODE_ORDER: Record<string, number> = { signin: 0, magic: 1, signup: 2, reset: 3, sent: 4, mfa: 5, newPassword: 6, welcome: 7, account: 8 };
 
 export interface AuthSheetProps {
   /** Opens the Konto page (the integrator passes `() => navigate("konto")`); hidden when absent. */
@@ -53,16 +43,17 @@ export interface AuthSheetProps {
  * welcome with the first sync. One `Sheet` (540 px; bottom sheet on phones); opened from the header pill it morphs out
  * of it (`layoutId="auth-sheet"`), from anywhere else it slides in.
  *
- * Motion: views slide sideways in their order (x ±16 → 0 on `spring.enter`, crossfade `tween.fade`, exits on
- * `tween.exit`), sections cascade (`StaggerItem`), a wrong field shakes with its loss ring (`Field invalidKey`), the
+ * Motion (`AuthMorph.tsx`): the card is ONE card – Anmelden · Link · Registrieren keep one mounted form whose fields glide and
+ * whose mode-only blocks slide in / out (the card's height springs, no jump); the other steps (2FA, sent, reset …) cross over
+ * inside the same height-following box (x ±16 → 0 on `spring.enter`, exits on `tween.exit`), sections cascade
+ * (`StaggerItem`), a wrong field shakes with its loss ring and takes the focus (`Field invalidKey`), the
  * submit label morphs (`TextRoll`), the 2FA code rolls in per slot (`CodeSlots`). Success: the `AsciiCascade`
  * wordmark decodes, a `DotMatrix` wave runs while the first sync uploads (progress on `RollingDigits`), a drawn ✓ and a
  * confetti burst (`celebrateFrom`) when it is live. Reduced motion: static end states.
  */
 export function AuthSheet({ onOpenAccount }: AuthSheetProps) {
   const sheet = useCloudSession((s) => s.sheet);
-  const reduced = useReducedFx();
-  const dir = (MODE_ORDER[sheet.view] ?? 0) >= (MODE_ORDER[sheet.prev] ?? 0) ? 1 : -1;
+  const dir = slideDir(sheet.view, sheet.prev);
   // warm the Supabase chunk while the user types (idempotent)
   useEffect(() => {
     void ensureCloud().catch(() => undefined);
@@ -82,19 +73,10 @@ export function AuthSheet({ onOpenAccount }: AuthSheetProps) {
             <p className="rounded-xl border border-line bg-ink-950/50 px-3 py-2 text-[12.5px] text-mute">{sheet.notice}</p>
           </StaggerItem>
         )}
-        <AnimatePresence mode="wait" initial={false} custom={dir}>
-          {/* variant labels (not objects): the sheet body's hidden → shown reaches this view's `StaggerItem`s, also
-              for a view that mounts later (a switch) – an object `animate` here would cut the propagation */}
-          <motion.div
-            key={sheet.view}
-            custom={dir}
-            variants={viewVariants(dir, reduced)}
-            exit={reduced ? { opacity: 0, transition: tween.exit } : { opacity: 0, x: -12 * dir, transition: tween.exit }}
-            className="grid gap-4"
-          >
-            <ViewBody view={sheet.view} onOpenAccount={onOpenAccount} />
-          </motion.div>
-        </AnimatePresence>
+        {/* R11: one card that morphs – the modes of the entry step keep their form (AuthMorph), the other steps cross over in one height-following box */}
+        <AuthMorph view={sheet.view} dir={dir}>
+          <ViewBody view={sheet.view} onOpenAccount={onOpenAccount} />
+        </AuthMorph>
       </div>
     </Sheet>
   );
@@ -133,12 +115,13 @@ let errorSeq = 0;
 const errorOf = (field: AuthField, message: string): FieldError => ({ field, message, key: ++errorSeq });
 
 /** Password input with a show / hide toggle. */
-function PasswordInput({ id, value, onChange, autoComplete, invalid, describedBy }: { id: string; value: string; onChange: (v: string) => void; autoComplete: string; invalid?: boolean; describedBy?: string }) {
+function PasswordInput({ id, name = "password", value, onChange, autoComplete, invalid, describedBy }: { id: string; name?: string; value: string; onChange: (v: string) => void; autoComplete: string; invalid?: boolean; describedBy?: string }) {
   const [show, setShow] = useState(false);
   return (
     <span className="relative grid">
       <Input
         id={id}
+        name={name}
         type={show ? "text" : "password"}
         autoComplete={autoComplete}
         value={value}
@@ -245,16 +228,35 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
   const providers = oauthProviders();
   const emailId = `${ids}-email`;
   const pwId = `${ids}-pw`;
+  const form = useRef<HTMLFormElement>(null);
+
+  /** Shows the error at its field AND moves the focus there (the field that needs the next keystroke), then the screen reader hears it by the field's `aria-describedby`. */
+  const fail = (e: FieldError) => {
+    setErr(e);
+    const target = e.field === "email" ? emailId : e.field === "password" ? pwId : null;
+    if (target) requestAnimationFrame(() => document.getElementById(target)?.focus());
+  };
+
+  // the mode changes while the form stays mounted: a stale error of the other mode goes, and a focus that sat in a field the
+  // new mode no longer has (the password in "Link per E-Mail") moves to the e-mail field instead of falling out of the card
+  const modeSeen = useRef(mode);
+  useEffect(() => {
+    if (modeSeen.current === mode) return;
+    modeSeen.current = mode;
+    setErr(null);
+    setConsentMissing(false);
+    if (mode === "magic" && document.activeElement === document.getElementById(pwId)) document.getElementById(emailId)?.focus({ preventScroll: true });
+  }, [mode, pwId, emailId]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
     setAuthEmail(email.trim());
     const ep = emailProblem(email);
-    if (ep) return setErr(errorOf("email", ep));
+    if (ep) return fail(errorOf("email", ep));
     if (mode !== "magic") {
       const pp = mode === "signup" ? passwordProblem(password) : password ? null : "Bitte gib dein Passwort ein.";
-      if (pp) return setErr(errorOf("password", pp));
+      if (pp) return fail(errorOf("password", pp));
     }
     // registration: the operator's AGB and privacy policy first (Review F07)
     if (mode === "signup" && consentNeeded && !consent) {
@@ -271,17 +273,17 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
     if (mode === "signin") {
       const r = await m.signInPassword(email, password);
       setBusy(false);
-      if (!r.ok) return setErr(errorOf(r.field, r.message));
+      if (!r.ok) return fail(errorOf(r.field, r.message));
       setAuthView(r.value.mfa ? "mfa" : "welcome");
     } else if (mode === "magic") {
       const r = await m.sendMagicLink(email);
       setBusy(false);
-      if (!r.ok) return setErr(errorOf(r.field, r.message));
+      if (!r.ok) return fail(errorOf(r.field, r.message));
       setAuthView("sent", { notice: null, sent: "magic" });
     } else {
       const r = await m.signUp(email, password);
       setBusy(false);
-      if (!r.ok) return setErr(errorOf(r.field, r.message));
+      if (!r.ok) return fail(errorOf(r.field, r.message));
       setAuthView(r.value.confirm ? "sent" : "welcome", { sent: "confirm" });
     }
   }
@@ -301,15 +303,16 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
   }
 
   return (
-    <form className="grid gap-4" noValidate onSubmit={(e) => void submit(e)}>
-      <StaggerItem>
+    // `relative`: a block that leaves (`MorphItem`, popLayout) is taken out of the flow at once, the others glide up (`layout="position"`)
+    <form ref={form} className="relative grid gap-4" noValidate method="post" onSubmit={(e) => void submit(e)} data-auth-mode={mode}>
+      <StaggerItem layout="position">
         <Segmented options={MODE_OPTIONS} value={mode} onChange={(v) => setAuthView(v)} aria-label="Anmeldeart" className="w-full" />
       </StaggerItem>
-      <StaggerItem>
+      <MorphItem itemKey={`lead-${mode}`}>
         <p className="text-[13px] leading-relaxed text-mute">{AUTH.lead[mode]}</p>
-      </StaggerItem>
-      {providers.length > 0 && mode !== "magic" && (
-        <StaggerItem className="grid gap-2">
+      </MorphItem>
+      {providers.length > 0 && (
+        <MorphItem show={mode !== "magic"} itemKey="oauth" className="grid gap-2">
           {providers.map((p) => (
             <Button key={p} onClick={() => void oauth(p)} disabled={busy} className="w-full">
               {AUTH.oauth(AUTH.oauthNames[p] ?? p)}
@@ -320,15 +323,20 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
             {AUTH.or}
             <span className="h-px flex-1 bg-line" />
           </div>
-        </StaggerItem>
+        </MorphItem>
       )}
-      <StaggerItem>
+      <StaggerItem layout="position">
         <Field label={AUTH.email} htmlFor={emailId} error={err?.field === "email" ? err.message : undefined} invalidKey={err?.field === "email" ? err.key : null}>
           <Input
             id={emailId}
+            name="email"
             type="email"
-            autoComplete="email"
+            // the password manager reads the pair: the identifier of a login is the "username", of a registration the "email"
+            autoComplete={mode === "signin" ? "username" : "email"}
             inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             value={email}
             invalid={err?.field === "email"}
             aria-describedby={err?.field === "email" ? `${emailId}-error` : undefined}
@@ -336,23 +344,23 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
           />
         </Field>
       </StaggerItem>
-      {mode !== "magic" && (
-        <StaggerItem className="grid gap-2">
-          <Field label={AUTH.password} htmlFor={pwId} error={err?.field === "password" ? err.message : undefined} invalidKey={err?.field === "password" ? err.key : null}>
-            <PasswordInput
-              id={pwId}
-              value={password}
-              onChange={setPassword}
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              invalid={err?.field === "password"}
-              describedBy={err?.field === "password" ? `${pwId}-error` : undefined}
-            />
-          </Field>
-          {mode === "signup" && <StrengthMeter password={password} />}
-        </StaggerItem>
-      )}
-      {mode === "signup" && consentNeeded && (
-        <StaggerItem>
+      <MorphItem show={mode !== "magic"} itemKey="password" className="relative grid gap-2">
+        <Field label={AUTH.password} htmlFor={pwId} error={err?.field === "password" ? err.message : undefined} invalidKey={err?.field === "password" ? err.key : null}>
+          <PasswordInput
+            id={pwId}
+            value={password}
+            onChange={setPassword}
+            autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            invalid={err?.field === "password"}
+            describedBy={err?.field === "password" ? `${pwId}-error` : undefined}
+          />
+        </Field>
+        <MorphItem show={mode === "signup"} itemKey="strength">
+          <StrengthMeter password={password} />
+        </MorphItem>
+      </MorphItem>
+      {consentNeeded && (
+        <MorphItem show={mode === "signup"} itemKey="consent">
           <ConsentCheck
             checked={consent}
             onChange={(v) => {
@@ -371,24 +379,25 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
             <LegalLink doc="datenschutz">{AUTH_LEGAL.datenschutz}</LegalLink>
             {AUTH_LEGAL.consentPost}
           </ConsentCheck>
-        </StaggerItem>
+        </MorphItem>
       )}
       {err && err.field === null && (
-        <motion.p role="alert" className="text-[12.5px] text-loss" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} transition={tween.fade} key={err.key}>
+        <motion.p role="alert" layout="position" className="text-[12.5px] text-loss" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} transition={tween.fade} key={err.key}>
           {err.message}
         </motion.p>
       )}
-      <StaggerItem className="flex flex-wrap items-center justify-between gap-3">
-        {mode === "signin" ? <LinkButton onClick={() => setAuthView("reset")}>{AUTH.forgot}</LinkButton> : <span />}
+      <StaggerItem layout="position" className="flex flex-wrap items-center justify-between gap-3">
+        {/* the "forgot" link keeps its place and fades with the mode, so the submit button never moves sideways */}
+        <span className={cn("transition-opacity duration-200", mode !== "signin" && "pointer-events-none opacity-0")} aria-hidden={mode !== "signin" || undefined} inert={mode !== "signin" || undefined}>
+          <LinkButton onClick={() => setAuthView("reset")}>{AUTH.forgot}</LinkButton>
+        </span>
         <SubmitButton busy={busy} idle={AUTH.submit[mode]} busyLabel={AUTH.busy[mode]} />
       </StaggerItem>
-      {mode === "signup" && (
-        <StaggerItem>
-          <p className="text-[11.5px] leading-relaxed text-faint">{AUTH.euNote}</p>
-        </StaggerItem>
-      )}
-      {mode !== "signup" && consentNeeded && (
-        <StaggerItem>
+      <MorphItem show={mode === "signup"} itemKey="eu">
+        <p className="text-[11.5px] leading-relaxed text-faint">{AUTH.euNote}</p>
+      </MorphItem>
+      {consentNeeded && (
+        <MorphItem show={mode !== "signup"} itemKey="legal">
           <p className="text-[11.5px] leading-relaxed text-faint" data-testid="auth-legal-note">
             {AUTH_LEGAL.notePre}
             <LegalLink doc="agb" className="text-mute underline" />
@@ -398,7 +407,7 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
             </LegalLink>
             {AUTH_LEGAL.notePost}
           </p>
-        </StaggerItem>
+        </MorphItem>
       )}
     </form>
   );

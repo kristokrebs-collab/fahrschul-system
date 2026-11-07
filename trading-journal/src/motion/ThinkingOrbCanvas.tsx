@@ -44,7 +44,6 @@ export default function ThinkingOrbCanvas({ variant, size, active, className }: 
   const ref = useRef<HTMLCanvasElement>(null);
   const loopRef = useRef<ReturnType<typeof createOrbLoop> | null>(null);
   const activeRef = useRef(active);
-  activeRef.current = active;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -77,6 +76,7 @@ export default function ThinkingOrbCanvas({ variant, size, active, className }: 
   }, [variant, size]);
 
   useEffect(() => {
+    activeRef.current = active;
     loopRef.current?.set({ active });
   }, [active]);
 
