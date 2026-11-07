@@ -152,20 +152,20 @@ test.describe("Seiten A: Feinschliff", () => {
     await expect(links.getByRole("button", { name: /Berichte/ })).toBeVisible();
   });
 
-  test("einstellungen: fünf Gruppen, die Leiste führt dorthin, das Kleingedruckte klappt auf und bleibt lesbar", async ({ page }, info) => {
+  test("einstellungen: sechs Gruppen (mit „Verbindungen“), die Leiste führt dorthin, das Kleingedruckte klappt auf und bleibt lesbar", async ({ page }, info) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await seed(page);
     await page.goto("/#settings");
     const view = layer(page, "settings");
     await expect(view.locator("h1").first()).toBeVisible({ timeout: 30_000 });
     const groups = view.locator("section[data-section]");
-    await expect(groups).toHaveCount(5);
+    await expect(groups).toHaveCount(6);
     await expect(groups.locator("h2").first()).toHaveText("Grundlagen");
     const nav = view.getByTestId("section-nav");
     await expect(nav).toBeVisible({ timeout: 20_000 });
-    await expect(nav.locator("[data-section-chip]")).toHaveCount(5);
+    await expect(nav.locator("[data-section-chip]")).toHaveCount(6);
     await nav.locator('[data-section-chip="s-sichern"]').click();
-    await expect.poll(async () => groups.nth(3).evaluate((el) => Math.round(el.getBoundingClientRect().top)), { timeout: 8000 }).toBeLessThan(260);
+    await expect.poll(async () => groups.nth(4).evaluate((el) => Math.round(el.getBoundingClientRect().top)), { timeout: 8000 }).toBeLessThan(260);
     // the archive: its small print is one tap away – in the DOM closed, readable open
     const card = view.getByTestId("settings-archive-card");
     await card.scrollIntoViewIfNeeded();
