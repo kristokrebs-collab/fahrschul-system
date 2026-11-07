@@ -18,6 +18,7 @@ class FakeCtx implements PaintContext {
   lineWidth = 0;
   strokeStyle: string | CanvasGradient | CanvasPattern = "";
   globalAlpha = 1;
+  globalCompositeOperation: GlobalCompositeOperation = "source-over";
   lineJoin: CanvasLineJoin = "miter";
   lineCap: CanvasLineCap = "butt";
   alphaAtStroke: number[] = [];
@@ -123,6 +124,18 @@ describe("gebündelte Zeichenaufrufe", () => {
     // full batches use the picture's transparency, a short last batch less of it (so fewer paths do not pile up)
     expect(ctx.alphaAtStroke[0]).toBe(alphaFor(40));
     expect(ctx.alphaAtStroke.every((a) => a <= alphaFor(40) && a >= 0.008)).toBe(true);
+  });
+
+  it("auf dunklem Grund addieren sich die Striche („lighter“), auf Papier überlagern sie sich; am Ende ist beides zurückgesetzt", () => {
+    const dark = new FakeCtx();
+    const pd = new PathPainter(dark, data(20), geo, { ...style, additive: true }, sampleOf(20, 20), 1);
+    expect(dark.globalCompositeOperation).toBe("lighter");
+    pd.step(Infinity);
+    expect(dark.globalCompositeOperation).toBe("source-over");
+    const paper = new FakeCtx();
+    const pp = new PathPainter(paper, data(20), geo, style, sampleOf(20, 20), 1);
+    expect(paper.globalCompositeOperation).toBe("source-over");
+    pp.step(Infinity);
   });
 
   it("zeichnet in CSS-Pixeln mit dem Gerätefaktor als Transformation", () => {

@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { count, rPlain, rr, TM_INTERVAL_TEXT, type TmPaths, type TmResult } from "@/domain/timemachine";
-import { ink, subscribeInk } from "@/chart/ink";
+import { ink, inkIsPaper, subscribeInk } from "@/chart/ink";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Segmented } from "@/primitives/Segmented";
 import { readJson, storageKey, writeJson } from "@/store/storage";
@@ -110,7 +110,7 @@ export function PathsCanvas({ result, paths, failed, onNeedPaths, prefer }: Path
       engine
         .draw({
           geo: { w: geo.w, h: geo.h, box: geo.box, steps: result.sim.fan.steps.length - 1, lo: geo.lo, hi: geo.hi, targetR: result.targetR },
-          style: { ink: ink.fg, lineWidth: 1 },
+          style: { ink: ink.fg, lineWidth: 1, additive: !inkIsPaper() },
           plan,
           dpr,
           paths,

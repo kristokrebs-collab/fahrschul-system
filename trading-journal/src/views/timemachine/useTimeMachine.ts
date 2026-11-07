@@ -98,7 +98,9 @@ export function useTimeMachine(props: TimeMachineProps): TimeMachineRun {
   const start = useCallback(() => {
     const { prepared: p, key: k, source: src, fetchedAt: at, tradeId: tid, persist: keep } = latest.current;
     ctl.current?.abort();
+    // the paths of the old result are no longer wanted: forget the request so its late answer is ignored
     pathsCtl.current?.abort();
+    pathsCtl.current = null;
     if (!p.ok) {
       ctl.current = null;
       setState((s) => ({ ...s, status: "idle", progress: 0, phase: null, runningKey: null }));

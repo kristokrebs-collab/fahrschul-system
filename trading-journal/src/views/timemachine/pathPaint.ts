@@ -3,8 +3,9 @@
  * (a `CanvasRenderingContext2D` or an `OffscreenCanvasRenderingContext2D`; tests pass a fake), so the SAME code runs in a worker on
  * an `OffscreenCanvas` and, where there is none, on the page.
  *
- * - **Alpha overlay**: every stroke is thin and nearly transparent, so where many paths run together the picture gets brighter; one
- *   lonely path stays faint. Nothing is averaged away – every drawn path is a real simulated session.
+ * - **Alpha, additive**: every stroke is thin and nearly transparent and the strokes ADD up (`lighter` on a dark theme, a plain overlay on
+ *   paper), so where many paths run together the picture gets brighter; one lonely path stays faint. Nothing is averaged away –
+ *   every drawn path is a real simulated session.
  * - **Bundled draw calls**: `BATCH` paths share one `beginPath() … stroke()`, so 10 000 paths are ~600 strokes, not 10 000.
  * - **Time slices**: `step(deadline)` draws batches until the deadline and returns; `runPaint` calls it in slices of a few
  *   milliseconds and gives the thread back in between, so no task runs anywhere near 50 ms. A batch is sized to FIT the time left in
@@ -31,6 +32,7 @@ export interface PaintContext {
   lineWidth: number;
   strokeStyle: string | CanvasGradient | CanvasPattern;
   globalAlpha: number;
+  globalCompositeOperation: GlobalCompositeOperation;
   lineJoin: CanvasLineJoin;
   lineCap: CanvasLineCap;
 }
@@ -52,6 +54,8 @@ export interface PaintStyle {
   /** CSS colour of the strokes (opaque); the transparency is `alpha` */
   ink: string;
   lineWidth: number;
+  /** light on dark: the strokes ADD up (`lighter`); on paper they overlay (`source-over`) */
+  additive?: boolean;
 }
 
 /** The data the painter reads (a `TmPaths` is one; so is its copy in the worker). */
@@ -142,6 +146,7 @@ export class PathPainter {
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     ctx.strokeStyle = style.ink;
+    ctx.globalCompositeOperation = style.additive ? "lighter" : "source-over";
     ctx.globalAlpha = this.alpha;
   }
 
@@ -216,6 +221,7 @@ export class PathPainter {
     this.finished = true;
     this.ctx.restore();
     this.ctx.globalAlpha = 1;
+    this.ctx.globalCompositeOperation = "source-over";
   }
 
   /** Stops drawing (the clip and alpha are given back). */
