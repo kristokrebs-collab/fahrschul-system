@@ -81,4 +81,85 @@ test.describe("data reliability", () => {
     await expect.poll(() => req.log.filter((r) => r.at >= back).length, { timeout: 20_000, message: "REST polls resume after `online`" }).toBeGreaterThan(0);
     expect(errors.filter((e) => !/ERR_INTERNET_DISCONNECTED|net::ERR/.test(e)), errors.join("\n")).toEqual([]);
   });
+
+  /**
+   * Budget-Schnitt follow-up: the idle preload (editor, detail, tabs …) and every lazy page are chunks. In CI the idle slot
+   * is early, so the offline window of the test above hit a chunk that was still on its way ("Unable to preload CSS for
+   * …/facts-….css" as page errors). Here every lazy chunk answers slowly, so the window hits the preload on purpose.
+   */
+  const slowChunks = async (page: Page, ms: number): Promise<void> => {
+    await page.route(/\/assets\/[^/]+\.(js|css)(\?.*)?$/, async (route) => {
+      // the first-load files (entry, vendor chunks) at normal speed – only what loads later is slow
+      if (/\/assets\/(index|react|motion|recharts|rolldown-runtime)-/.test(route.request().url())) return route.continue();
+      await new Promise((r) => setTimeout(r, ms));
+      await route.continue().catch(() => undefined);
+    });
+  };
+  const noNetErrors = (errors: string[]): string[] => errors.filter((e) => !/ERR_INTERNET_DISCONNECTED|net::ERR/.test(e));
+
+  /** Resolves once no asset (chunk) was requested for `quietMs` – the idle chain has finished. */
+  const assetsQuiet = async (page: Page, quietMs = 2500): Promise<void> => {
+    let last = Date.now();
+    page.on("request", (r) => {
+      if (/\/assets\//.test(r.url())) last = Date.now();
+    });
+    while (Date.now() - last < quietMs) await page.waitForTimeout(250);
+  };
+
+  test("offline while the idle preload downloads: no page error, the chain resumes, the editor still opens (or says honestly why not)", async ({ page, context }) => {
+    const errors = collectErrors(page);
+    await seed(page);
+    await slowChunks(page, 1800);
+    const after: string[] = [];
+    let isOnlineAgain = false;
+    page.on("request", (r) => {
+      if (isOnlineAgain && /\/assets\//.test(r.url())) after.push(r.url());
+    });
+    await page.goto("/#overview");
+    await expect(page.getByTestId("market-panel")).toBeVisible();
+    // the idle chain has started (editor first) and its chunks are still in flight when the network goes away
+    await page.waitForTimeout(700);
+    await context.setOffline(true);
+    await page.waitForTimeout(4500);
+    expect(noNetErrors(errors), errors.join("\n")).toEqual([]);
+    isOnlineAgain = true;
+    await context.setOffline(false);
+    // the chain goes on by itself with the steps it had not started yet
+    await expect.poll(() => after.length, { timeout: 30_000, message: "chunk requests resume after `online`" }).toBeGreaterThan(0);
+    expect(noNetErrors(errors), errors.join("\n")).toEqual([]);
+    // A module whose request was cut off by the drop stays failed for the rest of the document (the browser keeps the failure),
+    // so the editor either opens or the app says so ("Neu laden" is the way out) – never a silent tap.
+    await page.getByRole("button", { name: "Trade eintragen" }).first().click();
+    const dialog = page.getByRole("dialog", { name: "Trade eintragen" });
+    const said = page.getByText("Der Editor konnte nicht geladen werden");
+    await expect(dialog.or(said)).toBeVisible({ timeout: 30_000 });
+    if (await said.isVisible()) {
+      await page.reload();
+      await page.getByRole("button", { name: "Trade eintragen" }).first().click();
+      await expect(dialog).toBeVisible({ timeout: 30_000 });
+    }
+    expect(await dialog.evaluate((el) => getComputedStyle(el.closest(".fixed") ?? el).position), "stylesheet of the chunk applied").toBe("fixed");
+  });
+
+  test("a page that is not loaded yet, opened offline: an honest placeholder, no error, and it loads once online", async ({ page, context }) => {
+    const errors = collectErrors(page);
+    await seed(page);
+    await page.goto("/#overview");
+    await expect(page.getByTestId("market-panel")).toBeVisible();
+    // no request may be cut off by the drop: wait until the idle chain has loaded what it loads (Analyse is not part of it)
+    await assetsQuiet(page);
+    await context.setOffline(true);
+    await page.evaluate(() => {
+      location.hash = "#analyse";
+    });
+    const wait = page.locator('[data-page-skeleton="analyse"]');
+    await expect(wait).toBeVisible({ timeout: 15_000 });
+    await expect(wait).toContainText("Du bist offline");
+    await expect(wait.getByRole("button", { name: "Wiederholen" })).toBeVisible();
+    expect(noNetErrors(errors), errors.join("\n")).toEqual([]);
+    await context.setOffline(false);
+    await expect(page.locator('[data-page="analyse"][data-page-role="current"] h1').first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("[data-page-skeleton]")).toHaveCount(0);
+    expect(noNetErrors(errors), errors.join("\n")).toEqual([]);
+  });
 });

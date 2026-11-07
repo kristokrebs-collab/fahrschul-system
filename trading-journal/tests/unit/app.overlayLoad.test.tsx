@@ -21,6 +21,21 @@ vi.mock("@/app/SettingsPage", () => {
   loads.settings += 1;
   return { SettingsPage: () => <div data-testid="settings-stub" /> };
 });
+// the downloads go through `loadChunk` (waits for the network, retries once): here a download can be made to fail
+const chunk = vi.hoisted(() => ({ fail: 0 }));
+vi.mock("@/lib/chunkLoad", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/chunkLoad")>();
+  return {
+    ...actual,
+    loadChunk: <T,>(load: () => Promise<T>): Promise<T> => {
+      if (chunk.fail > 0) {
+        chunk.fail -= 1;
+        return Promise.reject(new TypeError("Failed to fetch dynamically imported module"));
+      }
+      return actual.loadChunk(load);
+    },
+  };
+});
 // the overview is a static export of `pages.ts`; its weight is irrelevant here
 vi.mock("@/views/overview", () => ({ OverviewView: () => null }));
 
@@ -103,6 +118,18 @@ describe("overlay loading (Budget-Schnitt)", () => {
     );
     // `getBy`, not `findBy`: it is in the tree after the first synchronous render
     expect(screen.getByTestId("editor-stub")).toBeInTheDocument();
+  });
+
+  it("a failed chunk download is swallowed by the preload (no unhandled rejection), leaves the overlay unarmed and is fetched again later", async () => {
+    chunk.fail = 1;
+    await act(async () => {
+      await preloadOverlay("setup");
+    });
+    expect(isOverlayArmed("setup")).toBe(false);
+    await act(async () => {
+      await preloadOverlay("setup");
+    });
+    expect(isOverlayArmed("setup")).toBe(true);
   });
 
   it("the tabs that left the first load are chunks of their own: not feature pages, fetched once on intent", async () => {
