@@ -143,18 +143,31 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    pops in late. They are deliberately not `paused`: a paused animation would freeze on its first keyframe, which is
    often invisible (opacity 0). */
 @media (prefers-reduced-motion: reduce) {
-  html {
+  html:not([data-motion="full"]) {
     scroll-behavior: auto !important;
   }
-  *,
-  *::before,
-  *::after {
+  html:not([data-motion="full"]) *,
+  html:not([data-motion="full"]) *::before,
+  html:not([data-motion="full"]) *::after {
     transition-duration: 0.001ms !important;
     transition-delay: 0s !important;
     animation-duration: 0.001ms !important;
     animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
   }
+}
+/* the reader's own choice „Reduziert“ (Einstellungen › Darstellung › Bewegung) does the same, whatever the device says */
+html[data-motion="reduced"] {
+  scroll-behavior: auto !important;
+}
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  transition-duration: 0.001ms !important;
+  transition-delay: 0s !important;
+  animation-duration: 0.001ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
 }
 
 /* Command navigation (pack immersive-full-screen-navigation): hovering one link dims the others to 45 % */

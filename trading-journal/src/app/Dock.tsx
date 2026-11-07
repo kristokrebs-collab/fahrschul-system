@@ -48,7 +48,7 @@ export const DOCK_CONFIG = {
 } as const;
 
 /** Items rest at `base`; the item under the pointer magnifies to `magnification` (px); the bell ends at `distance`. */
-export const DOCK = { magnification: 44 * (1 + DOCK_CONFIG.magnify), distance: 140, panelHeight: 74, base: 44, sigma: DOCK_CONFIG.sigma } as const;
+export const DOCK = { magnification: 44 * (1 + DOCK_CONFIG.magnify), distance: 140, panelHeight: 78, base: 44, sigma: DOCK_CONFIG.sigma } as const;
 
 const TIP_IN = expoCurve(DOCK_CONFIG.tipInTauMs);
 const TIP_OUT = expoCurve(DOCK_CONFIG.tipOutTauMs);
@@ -107,9 +107,6 @@ export function flickHop(speed: number): HopTransition {
 }
 /** Entrance: icons start popping once the tray has risen about halfway (s), then follow `stagger.cards`. */
 const ICON_INTRO_DELAY = 0.14;
-/** Tray caps: width of the rounded end pieces and how far the stretchable middle reaches under them (px). */
-const CAP = 24;
-const CAP_OVERLAP = 8;
 /** FAB ring: pings `tween.pingFew` times when the FAB (re)appears, then rests – no endless loop on an idle page. */
 const FAB_PING_STYLE = {
   "--fx-ping-opacity": "0.35",
@@ -333,7 +330,7 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
         {tab && <span className="absolute inset-0 rounded-full bg-white/[0.05]" />}
         {/* pack hover pill: fades in 25 ms after the label (τ 40 ms), out a little slower (τ 45 ms) */}
         <span className="absolute inset-0 rounded-full bg-line-2 opacity-0 [transition:var(--dock-pill-out)] group-hover/dock:opacity-100 group-hover/dock:[transition:var(--dock-pill-in)] group-focus-visible/dock:opacity-100 group-focus-visible/dock:[transition:var(--dock-pill-in)] group-data-[scrub]/dock:opacity-100 group-data-[scrub]/dock:[transition:var(--dock-pill-in)]" />
-        {tab && active && <DockMarker kind="bg" className="absolute inset-0 rounded-full bg-white" style={MARKER_BG_STYLE} />}
+        {tab && active && <DockMarker kind="bg" className="dock-plate absolute inset-0 rounded-full" style={MARKER_BG_STYLE} />}
         {layer}
         <motion.span
           className="absolute inset-0 grid place-items-center"
@@ -351,7 +348,7 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
       </motion.span>
       {tab && active && !caption && <DockMarker kind="dot" className="absolute -bottom-1.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-signal" style={MARKER_BG_STYLE} />}
       {caption && (
-        <span aria-hidden="true" data-dock-caption="" className={cn("absolute left-1/2 top-full mt-[3px] -translate-x-1/2 whitespace-nowrap text-[10px] font-medium leading-3 tracking-[0.01em] transition-colors duration-200", active ? "text-fg" : "text-mute group-hover/dock:text-fg")}>
+        <span aria-hidden="true" data-dock-caption="" className={cn("absolute left-1/2 top-full mt-[3px] -translate-x-1/2 whitespace-nowrap text-[10px] font-medium leading-3 tracking-[0.01em] transition-colors duration-200", active ? "font-semibold text-fg" : "text-mute group-hover/dock:text-fg")}>
           {caption}
         </span>
       )}
@@ -395,20 +392,19 @@ const SCALABLE: readonly boolean[] = Array.from({ length: SLOT_COUNT }, () => tr
 interface Geometry {
   /** resting slot centres (client px, minus any shift still in flight) */
   centres: number[];
-  /** resting width of the stretchable tray middle (px) */
+  /** resting width of the pill (px) */
   mid: number;
 }
 
 /**
- * Stretchable tray behind the items (aria-hidden): two rounded caps that slide out by `∓W/2` and a flat middle that
- * scales by `1 + W / mid`, so the tray widens with the magnified row while its corners keep their radius.
+ * The glass pill behind the items (aria-hidden; `.dock-glass`, `shell-motion.css`): ONE rounded body that widens with the magnified row by `scaleX`
+ * (at most ~12 %, so the ends stay round to the eye). Frosted glass from the existing tokens with a solid fallback; the plan's motion profile
+ * deepens its shadow.
  */
-function DockTray({ left, right, mid }: { left: MotionValue<number>; right: MotionValue<number>; mid: MotionValue<number> }) {
+function DockTray({ mid }: { mid: MotionValue<number> }) {
   return (
     <span aria-hidden="true" className="pointer-events-none absolute inset-0">
-      <motion.span className="absolute inset-y-0 border-y border-line-2 bg-ink-850 shadow-dock will-change-transform" style={{ left: CAP - CAP_OVERLAP, right: CAP - CAP_OVERLAP, scaleX: mid }} />
-      <motion.span className="absolute inset-y-0 left-0 rounded-l-2xl border border-r-0 border-line-2 bg-ink-850 will-change-transform" style={{ width: CAP, x: left }} />
-      <motion.span className="absolute inset-y-0 right-0 rounded-r-2xl border border-l-0 border-line-2 bg-ink-850 will-change-transform" style={{ width: CAP, x: right }} />
+      <motion.span className="dock-glass absolute inset-0 will-change-transform" style={{ scaleX: mid }} />
     </span>
   );
 }
@@ -443,12 +439,43 @@ export function dockEntrance(phase: IntroPhase, sessionIntro: boolean, reduced: 
   return { initial: false, animate: { y: 0, opacity: 1 }, transition: { y: spring.reveal, opacity: tween.fade } };
 }
 
+/** Pure: is the on-screen keyboard open over a text field? The visual viewport lost more than 140 px at the bottom and the focus is in an editable element. */
+export function keyboardOpen(layoutHeight: number, vv: { height: number; offsetTop: number } | null, editable: boolean): boolean {
+  return !!vv && editable && layoutHeight - (vv.height + vv.offsetTop) > 140;
+}
+
+/** True while the on-screen keyboard covers the bottom of the page and a text field has the focus (event driven: `visualViewport` + focus changes). */
+function useKeyboardOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const check = () => {
+      const a = document.activeElement;
+      const editable = a instanceof HTMLElement && (a.isContentEditable || a.matches("input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']), textarea"));
+      setOpen(keyboardOpen(window.innerHeight, vv, editable));
+    };
+    vv.addEventListener("resize", check);
+    document.addEventListener("focusin", check);
+    document.addEventListener("focusout", check);
+    return () => {
+      vv.removeEventListener("resize", check);
+      document.removeEventListener("focusin", check);
+      document.removeEventListener("focusout", check);
+    };
+  }, []);
+  return open;
+}
+
 /**
- * macOS-style dock (Bundle `i2`, Plan 2.5 "Dock", 6.6): four tabs + divider + FAB, `role="toolbar"
+ * Floating glass bar (Runde 11; before: macOS-style dock, Bundle `i2`, Plan 2.5 "Dock", 6.6): four tabs + divider + FAB, `role="toolbar"
  * aria-label="Navigation"`. Magnification (mouse pointers only, never under reduced motion) is compositor-only: slot
  * centres are measured once per `pointerenter` in `frame.read`, one smoothed pointer and one smoothed amount
- * (pointer `spring.dock`, amount on the pack's 400/20 spring) drive a windowed Gaussian bell, and each frame writes item `x` / `scale` and the tray's caps and middle –
- * no width, height or layout read per move. Once per session the dock rises in (`spring.sheet`, blur, icon pop), and
+ * (pointer `spring.dock`, amount on the pack's 400/20 spring) drive a windowed Gaussian bell, and each frame writes item `x` / `scale` and the pill's `scaleX` –
+ * no width, height or layout read per move. The body is ONE frosted-glass pill (`.dock-glass`: existing ink tokens, a solid fallback without
+ * `backdrop-filter`); the active tab sits on a glass plate with a soft glow that glides from tab to tab (the FLIP marker below, a compositor
+ * transform), its caption is the one in full ink. The bar keeps `bottom: 12px + safe area`, every tab is a 44 px target, the footer reserves 112 px plus the
+ * safe area under the page (`Footer.tsx`), and the bar steps down while the on-screen keyboard covers a text field (`keyboardOpen`). Once per session the dock rises in (`spring.sheet`, blur, icon pop), and
  * the FAB pings a red ring three times whenever it (re)appears with the editor closed (hover devices, not under
  * reduced motion), then rests. The `new-trade-{fabCycle}` disc morphs one way into the editor sheet; on the way back
  * it remounts under a fresh id and acknowledges the return with a `spring.pop` scale (never a sheet-sized red blob).
@@ -476,7 +503,7 @@ export function Dock() {
   }, []);
 
   const [slots] = useState<DockSlotFx[]>(() => Array.from({ length: SLOT_COUNT }, () => ({ x: motionValue(0), scale: motionValue(1), bump: motionValue(1) })));
-  const [tray] = useState(() => ({ left: motionValue(0), right: motionValue(0), mid: motionValue(1) }));
+  const [tray] = useState(() => ({ mid: motionValue(1) }));
   const slotEls = useRef<(HTMLElement | null)[]>([]);
   const [slotRefs] = useState(() =>
     Array.from({ length: SLOT_COUNT }, (_, k) => (el: HTMLElement | null) => {
@@ -503,8 +530,6 @@ export function Dock() {
         s.scale.set(scale[k] ?? 1);
         s.x.set(shift[k] ?? 0);
       });
-      tray.left.set(-spread / 2);
-      tray.right.set(spread / 2);
       tray.mid.set(1 + spread / g.mid);
     };
     const schedule = () => frame.preRender(apply);
@@ -539,7 +564,7 @@ export function Dock() {
       const r = el.getBoundingClientRect();
       return r.left + r.width / 2 - s.x.get();
     });
-    geometry.current = { centres, mid: Math.max(1, panel.getBoundingClientRect().width - 2 * (CAP - CAP_OVERLAP)) };
+    geometry.current = { centres, mid: Math.max(1, panel.getBoundingClientRect().width) };
   };
 
   const track = (clientX: number) => {
@@ -763,6 +788,7 @@ export function Dock() {
   // now and then the centre button breathes out a halo and a light passes over it: a round every 22 s (the first after 6 s), eight at most
   // per page load, only while the editor and the menu are closed and the tab is seen – the button itself keeps its look and its action
   const glint = useIdleCycle({ active: !wide && fabVisible && !editor.open && !moreOpen && phase !== "stage", firstMs: 6000, everyMs: 22000, max: 8 }, reduced);
+  const keyboard = useKeyboardOpen();
   // from 768 px the sidebar is the navigation; all hooks above have run, so the switch never changes their order
   if (wide) return null;
 
@@ -772,9 +798,11 @@ export function Dock() {
     <motion.nav
       layoutRoot
       // grey-bar fix: above the taskbar safe area AND any host UI laid over the page bottom (`--safe-bottom`, base.css)
-      className="pointer-events-none fixed inset-x-0 bottom-[calc(12px+var(--safe-bottom,env(safe-area-inset-bottom,0px)))] z-50 flex justify-center"
+      className="dock-kb pointer-events-none fixed inset-x-0 bottom-[calc(12px+var(--safe-bottom,env(safe-area-inset-bottom,0px)))] z-50 flex justify-center"
       aria-label="Navigation"
       data-layer="Dock"
+      // the on-screen keyboard is open over a text field: the pill steps down and out of the way (`.dock-kb`, a CSS translate – the entrance owns `transform`)
+      data-kb={keyboard ? "" : undefined}
       style={DOCK_FX_VARS}
     >
       <motion.div
@@ -804,7 +832,7 @@ export function Dock() {
         style={{ ...drag.style, height: DOCK.panelHeight }}
         className="pointer-events-auto relative mx-2 flex max-w-full items-end gap-2.5 px-3 pb-[22px] [-webkit-touch-callout:none] min-[360px]:gap-3.5"
       >
-        <DockTray left={tray.left} right={tray.right} mid={tray.mid} />
+        <DockTray mid={tray.mid} />
         {SLOTS.map((slot, k) => {
           if (slot.kind === "fab")
             return (
@@ -859,7 +887,7 @@ export function Dock() {
                 // „Mehr“ lights up on every page that is not a tab: you always see where you are
                 active={moreActive}
                 onClick={() => openCommandNav()}
-                className={moreActive ? "text-ink-950" : "text-mute hover:text-fg"}
+                className={moreActive ? "text-fg" : "text-mute hover:text-fg"}
               >
                 <Icon name="more" />
               </DockItem>
@@ -879,7 +907,7 @@ export function Dock() {
               caption={PAGE_LABELS[p]}
               active={page === p}
               onClick={onTabClick(k)}
-              className={page === p ? "text-ink-950" : "text-mute hover:text-fg"}
+              className={page === p ? "text-fg" : "text-mute hover:text-fg"}
             >
               <Icon name={PAGE_ICON[p]} />
             </DockItem>

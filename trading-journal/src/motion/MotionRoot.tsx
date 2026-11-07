@@ -1,6 +1,7 @@
 import { MotionConfig } from "motion/react";
 import type { ReactNode } from "react";
 import { useTempoProbe } from "@/motion/physics";
+import { useMotionPref } from "@/motion/profile";
 import { spring } from "@/motion/tokens";
 
 /**
@@ -15,8 +16,10 @@ import { spring } from "@/motion/tokens";
  */
 export function MotionRoot({ children }: { children: ReactNode }) {
   useTempoProbe();
+  // the reader's setting (`profile.ts`): „Wie das Gerät“ = `user`, „Reduziert“ = `always`, „Volles Profil“ = `never`
+  const mode = useMotionPref((s) => s.mode);
   return (
-    <MotionConfig reducedMotion="user" transition={spring.smooth}>
+    <MotionConfig reducedMotion={mode === "reduced" ? "always" : mode === "full" ? "never" : "user"} transition={spring.smooth}>
       {children}
     </MotionConfig>
   );

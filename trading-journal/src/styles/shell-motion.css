@@ -1,8 +1,127 @@
-/* Shell motion (Runde 10): sidebar reveal, stroke draw-in, burger morph, FAB glint, finder hits.
+/* Shell motion (Runde 10, 11): sidebar reveal + glass, row wave, stroke draw-in, floating glass bar, burger morph, FAB glint, finder hits.
    Only transform / opacity / clip-path run; the springs are `linear()` curves written by `src/app/shellFx.ts` (`--sb-ms`,
    `--sb-ease`). Reduced motion needs no rule here: base.css zeroes every transition and animation. */
 
+/* Frosted glass from the existing tokens (Runde 11): light from the top (`--gl-hi`), edges and shade in the ink of the theme (`--gl-ink` / `--gl-lo`). The plan's motion
+   profile (`motion/tier.ts`) sets `--mt-d`: 0 calm (Free), 1 more depth (Pro), 1.6 (Premium, Team). Light mode: slate edges and shade instead of white ones. */
+:root {
+  --gl-hi: 255 255 255;
+  --gl-ink: 255 255 255;
+  --gl-lo: 0 0 0;
+}
+:root[data-theme="light"] {
+  --gl-ink: 15 23 42;
+  --gl-lo: 15 23 42;
+}
+html[data-motion-tier="pro"] {
+  --mt-d: 1;
+}
+html[data-motion-tier="premium"],
+html[data-motion-tier="team"] {
+  --mt-d: 1.6;
+}
+
 @layer components {
+  /* The aside's material: solid ink with a soft light from the top and a faint signal glow at the foot; only while the panel peeks over the page it is glass
+     (84 % ink + blur) – at rest and pinned nothing moves beneath it, so no blur is paid for. Without `backdrop-filter` (and under the safe-effects flag) it stays solid. */
+  .sb-aside {
+    background:
+      linear-gradient(180deg, rgb(var(--gl-hi) / calc(0.045 + var(--mt-d, 0) * 0.02)), transparent 40%),
+      radial-gradient(120% 45% at 0 100%, color-mix(in srgb, var(--color-signal) 9%, transparent), transparent),
+      var(--color-ink-900);
+    box-shadow: inset 0 1px 0 rgb(var(--gl-hi) / 0.1);
+  }
+  .sb[data-peek] .sb-aside {
+    background:
+      linear-gradient(180deg, rgb(var(--gl-hi) / calc(0.06 + var(--mt-d, 0) * 0.02)), transparent 40%),
+      radial-gradient(120% 45% at 0 100%, color-mix(in srgb, var(--color-signal) 9%, transparent), transparent),
+      color-mix(in srgb, var(--color-ink-900) 84%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+    backdrop-filter: blur(18px) saturate(1.35);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .sb[data-peek] .sb-aside {
+      background-color: var(--color-ink-900);
+    }
+  }
+  html[data-safe-fx] .sb[data-peek] .sb-aside {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: var(--color-ink-900);
+  }
+  /* the search: the shared SearchField (size sm) – a 48 px glass tile with the magnifier in the rail, the full field in the panel; its status line is for screen readers only */
+  .sb .sf {
+    gap: 0;
+  }
+  .sb .sf-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  @media (pointer: fine) {
+    .sb .sf-input {
+      font-size: 14px;
+    }
+  }
+  /* First load: the rows wave in from the top, one after the other (45–60 ms apart, 300 ms each, 10 px, opacity); held back while the intro's stage covers
+     the app. Fill `backwards` only: afterwards the rows' own rules (a folded group's hidden rows) apply again. */
+  [data-draw="wait"] .sb-rows > li {
+    opacity: 0;
+  }
+  [data-draw="run"] .sb-rows > li {
+    animation: sb-wave 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 52ms);
+  }
+  /* The floating bar (phones): one glass pill, a plate with a soft glow under the active tab, and a step down while the keyboard is up */
+  .dock-glass {
+    border-radius: 9999px;
+    background:
+      linear-gradient(180deg, rgb(var(--gl-hi) / calc(0.12 + var(--mt-d, 0) * 0.03)), rgb(var(--gl-hi) / 0.02)),
+      color-mix(in srgb, var(--color-ink-850) 76%, transparent);
+    border: 1px solid rgb(var(--gl-ink) / 0.14);
+    box-shadow:
+      inset 0 1px 0 rgb(var(--gl-hi) / 0.16),
+      0 12px 32px rgb(var(--gl-lo) / calc(0.28 + var(--mt-d, 0) * 0.08)),
+      0 2px 6px rgb(var(--gl-lo) / 0.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.5);
+    backdrop-filter: blur(14px) saturate(1.5);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .dock-glass {
+      background: linear-gradient(180deg, rgb(var(--gl-hi) / 0.1), transparent), var(--color-ink-850);
+    }
+  }
+  html[data-safe-fx] .dock-glass {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: linear-gradient(180deg, rgb(var(--gl-hi) / 0.1), transparent), var(--color-ink-850);
+  }
+  .dock-plate {
+    background: linear-gradient(160deg, rgb(var(--gl-ink) / 0.3), rgb(var(--gl-ink) / 0.08));
+    box-shadow:
+      inset 0 1px 0 rgb(var(--gl-hi) / 0.35),
+      0 0 0 1px rgb(var(--gl-ink) / 0.16),
+      0 6px 16px color-mix(in srgb, var(--color-signal) 30%, transparent);
+  }
+  .dock-kb {
+    transition:
+      translate 260ms var(--ease-out-quint),
+      opacity 160ms,
+      visibility 0s;
+  }
+  .dock-kb[data-kb] {
+    translate: 0 140%;
+    opacity: 0;
+    visibility: hidden;
+    transition-delay: 0s, 0s, 260ms;
+  }
+  /* A real plan change: a ring of light runs once through the bar and the sidebar (`motion/tier.ts`, ~1 s) */
+  html[data-motion-intro] :is(.dock-glass, .sb-aside) {
+    animation: mt-in 1100ms ease-out;
+  }
   /* The sidebar is laid out at 256 px and clipped to the rail's 64: three things move on ONE spring – the aside's clip, the edge line
      and the cast shade (the last two are transforms, i.e. the compositor's). No custom property is animated: an inherited one would
      restyle the whole sidebar on every frame. 192 = 256 − 64. */
@@ -42,10 +161,12 @@
   /* A row is as wide as it can be hit: the rail's 48 px at rest (its box is its hit area – what a click, a voice command or a test
      aimed at the centre of the box reaches), the full row the moment the panel opens; the clip above reveals it on the spring.
      Closing narrows it at once: the words go with it, the plate follows on the spring. The marker and the divider do the same. */
-  .sb-row {
+  .sb-row,
+  .sb-search {
     width: 3rem;
   }
-  .sb[data-open] .sb-row {
+  .sb[data-open] .sb-row,
+  .sb[data-open] .sb-search {
     width: 100%;
   }
   .sb-mark {
@@ -126,6 +247,19 @@
   }
   to {
     filter: drop-shadow(0 0 0 transparent);
+  }
+}
+@keyframes sb-wave {
+  from {
+    opacity: 0;
+    translate: 0 -10px;
+  }
+}
+@keyframes mt-in {
+  30% {
+    box-shadow:
+      inset 0 0 0 1.5px color-mix(in srgb, var(--color-signal) 70%, transparent),
+      inset 0 0 28px color-mix(in srgb, var(--color-signal) 25%, transparent);
   }
 }
 [data-draw] .sb-ico :is(path, circle, rect, line, polyline, ellipse) {

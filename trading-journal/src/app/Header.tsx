@@ -7,6 +7,7 @@ import { FullscreenButton } from "@/app/DisplayActions";
 import { AssistantButton } from "@/assistant/AssistantButton";
 import { HeaderTicker } from "@/app/HeaderTicker";
 import { LocalModeBadge } from "@/app/LocalModeBadge";
+import { LogoMark } from "@/app/LogoMark";
 import { NewTradeButton } from "@/app/NewTradeButton";
 import { useLocalBadgeOpen } from "@/app/LocalModeBanner";
 import { cloudEnabled } from "@/cloud/env";
@@ -271,11 +272,11 @@ export function Header() {
             style={{ transformPerspective: 600 }}
             className="relative size-9 shrink-0 [transform-style:preserve-3d]"
           >
-            <span className="absolute inset-0 grid place-items-center rounded-xl border border-line-2 bg-gradient-to-br from-ink-700 to-ink-900 font-mono text-[15px] font-semibold text-fg [backface-visibility:hidden]">
-              ₿
+            <span className="absolute inset-0 grid place-items-center rounded-xl border border-line-2 bg-gradient-to-br from-ink-700 to-ink-900 text-fg [backface-visibility:hidden]">
+              <LogoMark />
             </span>
-            <span className="absolute inset-0 grid place-items-center rounded-xl border border-white/80 bg-fg font-mono text-[15px] font-semibold text-ink-950 [backface-visibility:hidden] [transform:rotateY(180deg)]">
-              ₿
+            <span className="absolute inset-0 grid place-items-center rounded-xl border border-white/80 bg-fg text-ink-950 [backface-visibility:hidden] [transform:rotateY(180deg)]">
+              <LogoMark still />
               <span className="absolute right-1.5 top-1.5 size-1 rounded-full bg-signal" />
             </span>
           </motion.span>

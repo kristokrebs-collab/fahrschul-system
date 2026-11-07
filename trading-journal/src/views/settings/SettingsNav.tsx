@@ -3,20 +3,13 @@
  * meanwhile (`SECTION_NAV_BOX`).
  */
 import { lazy, Suspense } from "react";
+import { SETTINGS_SECTIONS } from "@/app/navGroups";
 import type { SectionNavItem } from "@/primitives/SectionNav";
 import { SECTION_NAV_BOX } from "@/primitives/sectionNavBox";
 
 const SectionNav = lazy(() => import("@/primitives/SectionNav").then((m) => ({ default: m.SectionNav })));
 
-const NAV: readonly SectionNavItem[] = [
-  { id: "s-grundlagen", label: "Grundlagen" },
-  { id: "s-maerkte", label: "Märkte und Signale" },
-  { id: "s-verbindungen", label: "Verbindungen" },
-  { id: "s-regeln-gruppe", label: "Regeln" },
-  { id: "s-sichern", label: "Sichern" },
-  { id: "s-aussehen", label: "Aussehen und Hilfe" },
-  { id: "s-alarme", label: "Benachrichtigungen" },
-];
+const NAV: readonly SectionNavItem[] = SETTINGS_SECTIONS;
 
 export function SettingsNav() {
   return (

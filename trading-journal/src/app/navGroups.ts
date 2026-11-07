@@ -121,3 +121,17 @@ export const NAV_GROUP_ICON: Record<NavGroupId, IconName> = {
   auswerten: "chart",
   konto: "user",
 };
+
+/**
+ * The groups of cards on the page Einstellungen, in page order (`data-section` ids). The page's "Inhalt" strip (`SettingsNav`) and the
+ * pinned sidebar's nested entries under „Einstellungen“ read this one list.
+ */
+export const SETTINGS_SECTIONS: readonly { id: string; label: string }[] = [
+  { id: "s-grundlagen", label: "Grundlagen" },
+  { id: "s-maerkte", label: "Märkte und Signale" },
+  { id: "s-verbindungen", label: "Verbindungen" },
+  { id: "s-regeln-gruppe", label: "Regeln" },
+  { id: "s-sichern", label: "Sichern" },
+  { id: "s-aussehen", label: "Aussehen und Hilfe" },
+  { id: "s-alarme", label: "Benachrichtigungen" },
+];

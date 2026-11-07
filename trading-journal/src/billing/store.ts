@@ -183,6 +183,13 @@ export function useEffectivePlan(): PlanInfo {
   return effectivePlanOf(mode, userId, account, cached, restoring);
 }
 
+/** The same answer as `useEffectivePlan`, without a hook (timers, the motion tier's source – `src/motion/tier.ts`). */
+export function effectivePlanNow(): PlanInfo {
+  const restoring = (useCloudSession.getState().phase === "idle" || useCloudSession.getState().phase === "loading") && hasStoredSession();
+  const b = useBilling.getState();
+  return effectivePlanOf(currentMode(), sessionUserId(), b.account, b.cached, restoring);
+}
+
 /** Trial days the next checkout gets (none after a used trial; longer via a valid referral). */
 export function useTrialDays(): number {
   const config = useBilling((s) => s.config);

@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, type CSSProperties, type KeyboardEvent, type MouseEvent, type Ref } from "react";
+import { MotionSection } from "@/app/MotionSection";
 import { cn } from "@/lib/cn";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -233,6 +234,8 @@ export function ThemeCard({ className }: ThemeCardProps) {
           </div>
           <p className="text-[12px] text-mute">{THEME_STRINGS.accentHelp}</p>
         </div>
+
+        <MotionSection />
       </div>
     </Card>
   );

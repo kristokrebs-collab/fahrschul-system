@@ -29,7 +29,10 @@ export type IconName =
   // navigation (Etappe 1a)
   | "more"
   | "chevron-left"
-  | "doc";
+  | "doc"
+  // Runde 11: sidebar foot
+  | "moon"
+  | "pin";
 
 type SvgProps = Omit<SVGProps<SVGSVGElement>, "children">;
 
@@ -219,6 +222,19 @@ export function Icon({ name, className, ...props }: { name: IconName } & SvgProp
         <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
           <path d="M6 3h8l4 4v14H6z" />
           <path d="M14 3v4h4M9 12h6M9 16h6" />
+        </svg>
+      );
+    case "moon":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M20 14.2A8 8 0 0 1 9.8 4a8 8 0 1 0 10.2 10.2z" />
+        </svg>
+      );
+    case "pin":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M9 4h6l-1 5.5 3 3H7l3-3z" />
+          <path d="M12 12.5V20" />
         </svg>
       );
   }
