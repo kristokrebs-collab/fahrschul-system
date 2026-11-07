@@ -39,4 +39,4 @@ export default async (req: Request): Promise<Response> => {
   }
 };
 
-export const config: Config = { path: STATUS_PATH, method: ["POST"] };
+export const config: Config = { path: "/api/v1/alerts/twilio/status", method: ["POST"] };
