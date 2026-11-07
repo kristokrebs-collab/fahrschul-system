@@ -123,7 +123,7 @@ const SIZE = {
   theme: { base: 393, sm: 433, lg: 443 },
   tour: { base: 529, sm: 415, lg: 443 },
   more: { base: 361, sm: 266, lg: 266 },
-  connect: { base: 880, sm: 880, lg: 560 },
+  connect: { base: 972, sm: 880, lg: 690 },
 } as const satisfies Record<string, ReserveHeight>;
 
 function LateCard({ size, className, children }: { size: ReserveHeight; className?: string; children: ReactNode }) {

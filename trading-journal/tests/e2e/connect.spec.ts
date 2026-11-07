@@ -203,6 +203,26 @@ test.describe("Verbindungen · Standard-Ausgabe (kein Cloud-Konto im Build)", ()
     expect(errors.filter((e) => !/favicon|ERR_|Failed to load resource/.test(e))).toEqual([]);
   });
 
+  test("Einstellungen: die Verbindungen-Karte bringt ihren Platz mit – sie wächst nach dem ersten Bild um weniger als 60 px", async ({ page }) => {
+    await seed(page);
+    await page.goto("/#settings");
+    await expect(page.locator('[data-page="settings"][data-page-role="current"] h1').first()).toBeAttached({ timeout: 40_000 });
+    const wrap = page.locator('[data-section="s-verbindungen"] > div').last();
+    await wrap.scrollIntoViewIfNeeded();
+    // the box exists (reserved) before the card is there; remember its height at the first look and again once the rows are in
+    const heightOfBox = () => wrap.evaluate((el) => el.getBoundingClientRect().height);
+    const first = await heightOfBox();
+    await expect(page.getByTestId("connect-slot-cloud")).toBeVisible({ timeout: 40_000 });
+    await page.waitForTimeout(2500);
+    const last = await heightOfBox();
+    expect(last - first, `die Karte wuchs von ${first} auf ${last} px`).toBeLessThan(60);
+    // the placeholders swap the same-size outline for the row: the rows do not move once they are there
+    const tops = () => page.locator('[data-testid^="connect-slot-"]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top - (e.closest('[data-section]') as HTMLElement).getBoundingClientRect().top)));
+    const t1 = await tops();
+    await page.waitForTimeout(1500);
+    expect(await tops()).toEqual(t1);
+  });
+
   test("Telefon-Alarm im Alarm-Bereich der Markt-Seite sagt ehrlich, dass es ihn noch nicht gibt", async ({ page }) => {
     await seed(page);
     await openRoute(page, "/#markt", "Markt");
