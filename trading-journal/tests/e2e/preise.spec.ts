@@ -108,10 +108,10 @@ test.describe("Preise & Abo", () => {
     // a promotion code: invalid shakes with the reason, a valid one decodes the discounted price
     const code = page.getByLabel("Rabattcode");
     await code.fill("nope");
-    await page.getByRole("button", { name: "Prüfen" }).click();
+    await page.getByRole("button", { name: "Prüfen", exact: true }).click();
     await expect(page.getByText("Dieser Code ist ungültig oder abgelaufen.")).toBeVisible();
     await code.fill("trader20");
-    await page.getByRole("button", { name: "Prüfen" }).click();
+    await page.getByRole("button", { name: "Prüfen", exact: true }).click();
     await expect(page.getByText("Code aktiv")).toBeVisible();
     await expect(page.getByTestId("price-pro")).toContainText("9,60");
     await expect(page.getByTestId("price-pro")).toContainText("TRADER20: −20 % für 3 Monate");
