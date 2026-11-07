@@ -173,6 +173,7 @@ function fakeAdmin(state: State): SupabaseClient {
   return {
     auth: {
       getClaims: vi.fn(async () => (state.claims ? { data: { claims: state.claims }, error: null } : { data: null, error: { message: "bad" } })),
+      getUser: vi.fn(async () => (state.claims ? { data: { user: { id: String(state.claims.sub) } }, error: null } : { data: null, error: { message: "bad" } })),
       admin: { mfa: { listFactors: vi.fn(async () => ({ data: { factors: [] }, error: null })) } },
     },
     rpc: vi.fn(async (fn: string, args: Row) => {

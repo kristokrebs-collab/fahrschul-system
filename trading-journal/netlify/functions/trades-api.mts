@@ -35,7 +35,8 @@ const TokenBody = z.object({
 const BASE = "/api/v1/trades";
 
 async function tokenRoutes(req: Request, rest: string[], ip: string | null): Promise<Response> {
-  const user = await requireUser(req, { aal2: "ifEnrolled" });
+  // creating a token hands out lasting access: the Auth server must confirm the session is alive (Runde 11)
+  const user = await requireUser(req, { aal2: "ifEnrolled", live: req.method.toUpperCase() === "POST" });
   await enforceRateLimit(rateKey("api-tokens", user.id), 60, 600);
   const method = req.method.toUpperCase();
   if (rest.length === 1 && method === "GET") return json({ tokens: await listTokens(user.id) });

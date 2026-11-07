@@ -58,6 +58,7 @@ for (const g of report.groups) {
   if (required.includes(g.id) && g.state !== "eingerichtet") failures.push(`Verlangter Bereich „${g.label}“ ist ${g.state}`);
 }
 for (const u of report.unknown) failures.push(`Unbekannter Name ${u} – Tippfehler? (steht in keiner Liste)`);
+for (const x of report.production ?? []) failures.push(x);
 const ok = failures.length === 0;
 
 if (flag("--json")) {

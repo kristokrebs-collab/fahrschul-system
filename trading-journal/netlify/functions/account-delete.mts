@@ -15,30 +15,36 @@
  * 6. delete the user's files in the private buckets (`screenshots/<id>/…`, `backups/<id>/…`) and READ BOTH BUCKETS AGAIN:
  *    anything left is removed once more, and if files remain the account is NOT deleted (502 `storage_cleanup_incomplete` –
  *    the user can simply retry; nothing half-erased is reported as done);
- * 7. recovery codes of the second factor, then `auth.admin.deleteUser` (cascades profiles, journal_docs,
- *    exchange_connections and every per-user table – a static test keeps that list complete);
- * 8. `verifyErased` reads the per-user tables once more; the answer lists what is left (`leftovers`, empty when complete).
+ * 7. Runde 11 – what would outlive the account: the TradingView-MCP tokens are REVOKED at TradingView (`disconnectTvMcp`), the keyed hash of
+ *    the address is remembered when the account had a trial (`recordTrialTombstone`: no second trial after delete + re-register), the user's
+ *    `audit_log` rows are deleted and the free text of their contract requests blanked (`erasePersonalTrails`);
+ * 8. `auth.admin.deleteUser` (cascades profiles, journal_docs, exchange_connections and every per-user table – a static test keeps that
+ *    list complete); only AFTER it the recovery codes (a failing deleteUser used to leave an account with 2FA and no codes) and the Stripe
+ *    customers are anonymised (`anonymizeBillingCustomers`: e-mail, name, address emptied; invoices stay, retention duty);
+ * 9. `verifyErased` reads the per-user tables once more; the answer lists what is left (`leftovers`, empty when complete).
  * The `customer.subscription.deleted` webhook that follows is acknowledged as `ignored` (the user no longer exists).
  * The browser keeps its local journal (local-first: never deleted automatically). Invoices stay at Stripe (retention duty).
  */
 import type { Config } from "@netlify/functions";
 import { z } from "zod";
 import { DELETE_CONFIRM_WORD, removeUserFiles, USER_BUCKETS } from "./_lib/account";
-import { deletionPlan, leftoverFiles, verifyErased } from "./_lib/accountDeletion";
+import { deletionPlan, erasePersonalTrails, leftoverFiles, verifyErased } from "./_lib/accountDeletion";
 import { audit } from "./_lib/audit";
 import { requireUser } from "./_lib/auth";
-import { cancelBillingForUser } from "./_lib/billingCleanup";
+import { anonymizeBillingCustomers, cancelBillingForUser } from "./_lib/billingCleanup";
 import { clientIp, handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
 import { removeRecovery } from "./_lib/mfaRecovery";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
-import { releaseOwnedSeats } from "./_lib/stripe";
+import { recordTrialTombstone, releaseOwnedSeats } from "./_lib/stripe";
 import { supabaseAdmin } from "./_lib/supabase";
+import { disconnectTvMcp } from "./_lib/tvmcp/disconnect";
 
 const Body = z.object({ confirm: z.string().max(40), acknowledgeSubscription: z.boolean().optional() });
 
 export default handler(async (req, ctx) => {
   requireMethod(req, "GET", "POST");
-  const user = await requireUser(req, { aal2: "ifEnrolled" });
+  // the deletion itself asks the Auth server whether this session is still alive (a stolen, already signed-out token must not delete the account)
+  const user = await requireUser(req, { aal2: "ifEnrolled", live: req.method.toUpperCase() === "POST" });
 
   if (req.method.toUpperCase() === "GET") {
     await enforceRateLimit(rateKey("account-delete-plan", user.id), 30, 3600);
@@ -73,17 +79,25 @@ export default handler(async (req, ctx) => {
     }
   }
 
-  await removeRecovery(user.id);
+  // everything that can still say "no" is behind us: now what would otherwise outlive the account (Runde 11)
+  const tv = await disconnectTvMcp(user.id); // the OAuth tokens at TradingView are revoked, ours deleted
+  const trial = await recordTrialTombstone(user.id, user.email); // this address already had its trial (keyed hash only)
+  const trails = await erasePersonalTrails(user.id); // audit rows of the user, free text of the contract requests
+
   const { error } = await supabaseAdmin().auth.admin.deleteUser(user.id);
   if (error) {
     console.error("[fn] deleteUser failed", error.status ?? "");
     await audit(user.id, "account.delete", { step: "failed" }, ip);
     throw new HttpError(502, "delete_failed", "Das Konto konnte gerade nicht gelöscht werden. Bitte versuche es später erneut.");
   }
+  // the recovery codes go AFTER the user (before, a failing deleteUser left an account with 2FA and no way back)
+  await removeRecovery(user.id);
+  // the Stripe customers lose their personal data now that the account is gone (invoices stay: retention duty)
+  const stripeCustomers = await anonymizeBillingCustomers(billing.customerIds);
   const leftovers = await verifyErased(user.id);
   if (Object.keys(leftovers).length) console.error("[fn] account delete: rows left", JSON.stringify(leftovers));
   await audit(null, "account.delete", { step: "done", files, leftovers: Object.keys(leftovers).length }, ip);
-  return json({ deleted: true, canceledSubscriptions: billing.canceled, releasedSeats, files, leftovers });
+  return json({ deleted: true, canceledSubscriptions: billing.canceled, releasedSeats, files, leftovers, tradingView: { revoked: tv.revoked }, trialRemembered: trial, trails, stripeCustomers });
 });
 
 export const config: Config = { path: "/api/v1/account/delete", method: ["GET", "POST"] };

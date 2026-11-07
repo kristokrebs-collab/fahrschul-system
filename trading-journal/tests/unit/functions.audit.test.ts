@@ -52,13 +52,14 @@ const OWN_LIMITER: Record<string, { pattern: RegExp; why: string }> = {
   "ops-flags": { pattern: /slots\.get\(key\)/, why: "per-instance counter; four booleans, no database" },
   "stripe-webhook": { pattern: /verifyWebhook\(/, why: "the Stripe signature is the gate; events are idempotent (`stripe_events`), body ≤ 1 MB" },
   "signals-receive": { pattern: /receiveRateLimits\(/, why: "per token hash AND per address (`_lib/signals/receive.ts`), checked before the token is even looked up" },
+  "hooks-tradingview": { pattern: /receiveRateLimits\(/, why: "per token hash AND per address like signals-receive (Runde 11), checked before the token is even looked up" },
 };
 
 /** Functions that read the raw body themselves (everything else goes through `readJson` + a schema). */
 const RAW_BODY: Record<string, string> = {
   "stripe-webhook": "the signature covers the exact bytes; size-limited before and after reading",
-  "hooks-tradingview": "TradingView sends free text / JSON without headers; parsed by `parseTvAlert`, size-limited (MAX_BYTES)",
-  "alerts-twilio-status": "Twilio posts a form (not JSON) and signs its fields; the signature check needs the parsed fields, size-limited (MAX_BYTES) before parsing",
+  "hooks-tradingview": "TradingView sends free text / JSON without headers; parsed by `parseTvAlert`, read with a cap (`readBodyLimited`, MAX_BYTES)",
+  "alerts-twilio-status": "Twilio posts a form (not JSON) and signs its fields; the signature check needs the parsed fields, read with a cap (`readBodyLimited`, MAX_BYTES) before parsing",
 };
 
 /** Public functions: what keeps them from being an open relay. */
@@ -148,8 +149,13 @@ describe("class public / token / webhook / cron", () => {
   it("token functions compare by hash or constant time and never log the token", () => {
     const ops = src("ops-status.mts");
     expect(ops).toMatch(/timingSafeEqual\(digest\(presented\), digest\(token\)\)/);
+    // Runde 11: the TradingView webhook uses the receiver's checks – the token is compared by hash (`_lib/signals/receive.ts`), ONE uniform 401
     const hook = src("hooks-tradingview.mts");
-    expect(hook).toMatch(/hashToken\(token\)/);
+    expect(hook).toMatch(/resolveSignalOwner\(token\)/);
+    expect(hook).not.toMatch(/resolveToken\(/);
+    expect(hook.indexOf("receiveRateLimits(")).toBeLessThan(hook.indexOf("resolveSignalOwner("));
+    expect(hook.indexOf("resolveSignalOwner(")).toBeLessThan(hook.indexOf("readBodyLimited("));
+    expect(hook).not.toMatch(/req\.text\(\)/);
     for (const f of ["ops-status.mts", "hooks-tradingview.mts", "trades-api.mts"]) expect(src(f), f).not.toMatch(/console\.\w+\([^)]*\btoken\b[^"')]*\)/);
   });
 
@@ -157,7 +163,10 @@ describe("class public / token / webhook / cron", () => {
     const s = src("alerts-twilio-status.mts");
     expect(s.indexOf("validTwilioSignature(")).toBeGreaterThan(0);
     expect(s.indexOf("validTwilioSignature(")).toBeLessThan(s.indexOf("advanceByRef("));
-    expect(s).toMatch(/payload_too_large/);
+    // Runde 11: the signature comes BEFORE the shared limiter counts (anonymous calls must not use up Twilio's budget); the body is read with a cap
+    expect(s.indexOf("validTwilioSignature(")).toBeLessThan(s.indexOf("enforceRateLimit(rateKey"));
+    expect(s).toMatch(/readBodyLimited\(req, MAX_BYTES\)/);
+    expect(s).not.toMatch(/req\.text\(\)/);
     expect(s).toMatch(/phone_unavailable/); // no auth token → 503, never "accepted"
   });
 

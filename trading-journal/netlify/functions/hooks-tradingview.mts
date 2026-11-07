@@ -19,19 +19,18 @@
  * signal/1 + branchen-trend/1 → the same address also takes the signal formats of the receiver (`signals-receive.mts`, `_lib/signals`):
  *        no journal trade, no plan gate (a signal has no size and sends no order), ≤ 8 KiB, de-duplicated; every other message of this
  *        function (test, accepted open / close) is ALSO written to the signal list, best effort, so the card shows one list.
- * Re-delivered alerts change nothing. 60 per minute per token; plan feature `apiAccess` for open / close. Every call is
+ * Re-delivered alerts change nothing. 60 per minute per token and 300 per minute per calling address; every wrong token gets the same 401; the body is read with a 16 KiB cap; plan feature `apiAccess` for open / close. Every call is
  * written to the receipt log (kind, symbol, short reason – no alert text). Always JSON, never echoes the token.
  */
 import type { Config, Context } from "@netlify/functions";
-import { handler, HttpError, json, requireMethod } from "./_lib/http";
+import { clientIp, handler, HttpError, json, requireMethod } from "./_lib/http";
 import { requireFeature } from "./_lib/plan";
-import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { supabaseAdmin } from "./_lib/supabase";
 import { parseTvAlert, tvCloseFill, tvCloseSet, tvCloseSide, tvOpenItem, tvSymbolToPair, tvTestPing, tvTradeId, type SetupRef } from "./_lib/exchanges/inbound";
 import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
 import { profileTz, upsertSyncedTrades } from "./_lib/exchanges/store";
-import { hashToken, resolveToken } from "./_lib/exchanges/tokens";
 import { recordReceipt } from "./_lib/connections/receipts";
+import { readBodyLimited, receiveRateLimits, resolveSignalOwner } from "./_lib/signals/receive";
 import { MAX_SIGNAL_BYTES, isSignalSchemaBody, parseSignalBody } from "./_lib/signals/schema";
 import { ingest } from "./_lib/signals/store";
 
@@ -72,10 +71,11 @@ async function webhookTradesByKey(userId: string, key: string): Promise<OpenRow[
 export default handler(async (req, ctx) => {
   requireMethod(req, "POST");
   const token = tokenOf(req, ctx);
-  await enforceRateLimit(rateKey("hook-tv", hashToken(token).slice(0, 24)), 60, 60);
-  const owner = await resolveToken(token, "webhook:tradingview");
-  const text = await req.text();
-  if (new TextEncoder().encode(text).length > MAX_BYTES) throw new HttpError(413, "payload_too_large");
+  // same order and same checks as `signals-receive` (Runde 11): limit per presented token AND per calling address (a flood of
+  // random tokens is limited too) → token (ONE uniform 401 for every wrong token, never a 403) → body read with a cap
+  await receiveRateLimits(token, clientIp(req, ctx));
+  const owner = await resolveSignalOwner(token);
+  const text = await readBodyLimited(req, MAX_BYTES);
   // the assistant's test signal: recorded, no trade, no plan gate (connecting must be testable before anything else)
   const ping = tvTestPing(text);
   if (ping) {

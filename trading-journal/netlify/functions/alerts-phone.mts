@@ -11,6 +11,11 @@
  *   DELETE                           → opt-out at once: the number is deleted, calls not yet dialed are cancelled, the phone events in the
  *        settings are switched off → `{ status: "revoked" }`.
  *
+ * Abuse guards (Runde 11, SMS pumping / toll fraud): only the countries of `PHONE_ALLOWED_COUNTRIES` (default: DACH, EU / EEA, UK, USA / Canada), no
+ * premium-rate or "Caribbean" ranges, the verification SMS needs a REAL paid plan (never the "payments off" mode, never a subscription in
+ * dunning), a server-wide SMS budget per day (`ALERT_SMS_DAILY_MAX`), a per-number limit, and the answer to "start" is the same whether the
+ * number is already verified in another account or not (no number oracle; in that case no SMS is sent).
+ *
  * Guards: signed in (aal2 if 2FA), the plan has calls (`phoneCallsPerMonth` > 0 – Premium and Team), rate limits per account (fail-closed),
  * the emergency switch `KILL_CALLS` off (start and test answer 503 `switched_off`; opt-out always works), `TWILIO_*` and `EXCHANGE_ENC_KEY_V1` configured (else 503 `phone_unavailable`, German "Einrichtung nötig"). The number is stored only encrypted
  * (+ a keyed hash), never logged, never returned (only the masked form).
@@ -20,16 +25,18 @@ import { z } from "zod";
 import { alertPrefsOf } from "../../src/domain/alerts/config";
 import { reasonText } from "../../src/domain/alerts/delivery";
 import { maskPhone, parsePhone, PHONE_PROBLEM_TEXT } from "../../src/domain/alerts/phone";
+import { limitOf } from "../../src/billing/plans";
 import { requireUser } from "./_lib/auth";
+import { enforceBudget } from "./_lib/budget";
 import { CryptoError } from "./_lib/crypto";
 import { defaultDeliverDeps, runWorker } from "./_lib/alerts/deliver";
-import { alertLimits } from "./_lib/alerts/limits";
-import { CONSENT_VERSION, numberHash, openNumber, phoneState, sealNumber } from "./_lib/alerts/phoneAccount";
+import { alertLimits, phoneAllowedCountries } from "./_lib/alerts/limits";
+import { CONSENT_VERSION, numberHash, numberHashes, openNumber, phoneState, sealNumber } from "./_lib/alerts/phoneAccount";
 import { supabaseAlertStore } from "./_lib/alerts/store";
 import { twilioConfig, verifyCheck, verifyStart } from "./_lib/alerts/twilio";
 import { handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
 import { assertRunning } from "./_lib/killswitch";
-import { planOf } from "./_lib/plan";
+import { costPlanOf } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { supabaseAdmin } from "./_lib/supabase";
 
@@ -67,9 +74,15 @@ export default handler(async (req) => {
   const body = await readJson(req, Body, { maxBytes: 2 * 1024 });
   const tw = twilioConfig();
   if (!tw) unavailable();
-  const plan = await planOf(user.id);
+  // a subscription in dunning (past_due) counts as Free for everything that costs money per use (SMS, calls)
+  const plan = await costPlanOf(user.id);
   if (!(alertLimits(plan.plan).phoneCallsPerMonth > 0)) {
     throw new HttpError(402, "plan_required", "Anrufe sind in deinem Tarif nicht enthalten.", { feature: "phoneCallsPerMonth", required: "premium", plan: plan.plan });
+  }
+  // the verification SMS costs money at once and is the target of SMS pumping: it needs a REAL plan with calls – "payments off" and the
+  // open development gates (`gatesOpen`) do not count as one
+  if (body.action === "start" && !(limitOf(plan.plan, "phoneCallsPerMonth") > 0)) {
+    throw new HttpError(402, "plan_required", "Die Nummernprüfung per SMS gibt es mit Premium und Team.", { feature: "phoneCallsPerMonth", required: "premium", plan: plan.plan });
   }
 
   // KILL_CALLS: no SMS code (Twilio Verify) and no test call while the operator has the phone switched off. Opting out (DELETE, above) stays possible.
@@ -79,19 +92,30 @@ export default handler(async (req) => {
     if (!tw.verifySid) throw new HttpError(503, "verify_unavailable", "Die Nummernprüfung ist auf diesem Server nicht eingerichtet (Einrichtung nötig).");
     await enforceRateLimit(rateKey("alerts-phone-start", user.id), 3, 600, { failClosed: true });
     await enforceRateLimit(rateKey("alerts-phone-start-day", user.id), 6, 86_400, { failClosed: true });
-    const parsed = parsePhone(body.number);
+    const parsed = parsePhone(body.number, { countries: phoneAllowedCountries() });
     if (!parsed.ok) throw new HttpError(422, "invalid_number", PHONE_PROBLEM_TEXT[parsed.problem], { problem: parsed.problem });
     let hash: string;
+    let hashes: string[];
     let blob: string;
     try {
       hash = numberHash(parsed.e164);
+      hashes = numberHashes(parsed.e164);
       blob = sealNumber(user.id, parsed.e164);
     } catch (e) {
       if (e instanceof CryptoError) unavailable();
       throw e;
     }
-    const taken = await sb.from("alert_phone_secrets").select("user_id").eq("number_hash", hash).eq("verified", true).neq("user_id", user.id).limit(1);
-    if (taken.data && taken.data.length > 0) throw new HttpError(409, "number_in_use", "Diese Nummer kann nicht verwendet werden.");
+    // the same number is not texted again and again, whoever asks (a victim's phone, a pumping target): 3 codes per number and day
+    await enforceRateLimit(rateKey("alerts-sms-number", hash.slice(0, 32)), 3, 86_400, { failClosed: true });
+    // already verified in ANOTHER account? Then no SMS goes out, but the answer is exactly the same as for a free number – nobody can
+    // find out through this form which numbers are registered here (the code simply never arrives; the check then fails like a wrong code)
+    let inUse = false;
+    for (const h of hashes) {
+      const taken = await sb.from("alert_phone_secrets").select("user_id").eq("number_hash", h).eq("verified", true).neq("user_id", user.id).limit(1);
+      if (taken.data && taken.data.length > 0) inUse = true;
+    }
+    // the server-wide SMS budget of the day (counted only when an SMS really goes out)
+    if (!inUse) await enforceBudget("sms");
     const secrets = await sb.from("alert_phone_secrets").upsert({ user_id: user.id, number_enc: blob, number_hash: hash, verified: false }, { onConflict: "user_id" });
     if (secrets.error) throw new HttpError(500, "internal");
     const masked = maskPhone(parsed.e164);
@@ -99,6 +123,7 @@ export default handler(async (req) => {
       .from("alert_phones")
       .upsert({ user_id: user.id, status: "pending", masked, consent_at: new Date().toISOString(), consent_version: body.consentVersion, verified_at: null, revoked_at: null }, { onConflict: "user_id" });
     if (phones.error) throw new HttpError(500, "internal");
+    if (inUse) return json({ status: "pending", masked });
     const prefs = await sb.from("alert_prefs").select("prefs").eq("user_id", user.id).maybeSingle();
     const sent = await verifyStart(tw, parsed.e164, alertPrefsOf((prefs.data as { prefs?: unknown } | null)?.prefs).lang);
     if (!sent.ok) {

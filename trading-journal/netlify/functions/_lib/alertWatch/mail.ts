@@ -16,6 +16,7 @@ import { STAGE_LABEL } from "../../../../src/domain/keylevels/alerts";
 import { MAIL_ITEMS_MAX, type OutboxItem, type ServerAlertsCfg } from "../../../../src/domain/keylevels/serverAlerts";
 import { tfLabel } from "../../../../src/domain/keylevels/timeframes";
 import { envOptional } from "../env";
+import { killed } from "../killswitch";
 import { formatLocal } from "./clock";
 
 const RESEND_URL = "https://api.resend.com/emails";
@@ -123,7 +124,8 @@ export function mailConfig(): MailConfig | null {
   return { apiKey, from };
 }
 
-export type SendCode = "resend_auth" | "resend_invalid" | "resend_rate" | "resend_busy" | "resend_5xx" | "resend_network";
+/** `mail_off`: the operator's emergency switch `KILL_MAIL` is on – nothing was sent. */
+export type SendCode = "resend_auth" | "resend_invalid" | "resend_rate" | "resend_busy" | "resend_5xx" | "resend_network" | "mail_off";
 export type SendResult = { ok: true; id: string | null; duplicate?: boolean } | { ok: false; code: SendCode; status: number | null };
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
@@ -145,6 +147,8 @@ export function sendCodeOf(status: number): SendCode {
  * return the first result instead of mailing twice (Resend keeps keys for 24 h). Never throws; failures are codes.
  */
 export async function sendMail(cfg: MailConfig, msg: { to: string; subject: string; text: string; idempotencyKey?: string }, fetchImpl?: FetchFn): Promise<SendResult> {
+  // the emergency switch is checked HERE, in the one place every outgoing mail passes (Runde 11, KILL_MAIL)
+  if (killed("mail")) return { ok: false, code: "mail_off", status: null };
   const f = fetchImpl ?? fetchOverride ?? ((i, n) => fetch(i, n));
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8_000);
@@ -179,4 +183,5 @@ export const SEND_MESSAGE: Readonly<Record<SendCode, string>> = {
   resend_busy: "Der Versanddienst bearbeitet gerade dieselbe Anfrage – bitte gleich noch einmal.",
   resend_5xx: "Der Versanddienst antwortet gerade nicht.",
   resend_network: "Der Versanddienst ist nicht erreichbar.",
+  mail_off: "Der Mail-Versand ist vom Betreiber gerade abgeschaltet.",
 };

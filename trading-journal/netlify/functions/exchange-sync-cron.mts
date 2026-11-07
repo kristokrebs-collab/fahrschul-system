@@ -12,16 +12,18 @@
  *
  * Key rotation (review KEY-01): after the syncs, up to 50 connections still encrypted with an older
  * `EXCHANGE_ENC_KEY_V<n>` are re-encrypted with the newest one (also invalid or switched-off ones); the logged summary
- * (`keys.remaining`) says when the old key can be removed.
+ * (`keys.remaining`) says when the old key can be removed. Since Runde 11 the sweep also covers the encrypted phone numbers and the TradingView-MCP
+ * tokens (same key family, `_lib/keyRotation.ts`) – `remaining = 0` now really means that nothing needs the old key any more.
  */
 import type { Config } from "@netlify/functions";
-import { autoSyncAllowed } from "../../src/billing/plans";
+import { autoSyncAllowed, limitOf } from "../../src/billing/plans";
 import { errorFrom, json } from "./_lib/http";
-import { paymentsConfigured, planOf } from "./_lib/plan";
+import { gatesOpen, planOf } from "./_lib/plan";
 import { supabaseAdmin } from "./_lib/supabase";
 import { cronEnabled } from "./_lib/exchanges/api";
 import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
-import { CONNECTION_COLUMNS, loadConnection, profileTz, rotateStaleConnections, runningRun, type ConnectionRow, type RotationSweep } from "./_lib/exchanges/store";
+import { CONNECTION_COLUMNS, listConnections, loadConnection, profileTz, runningRun, type ConnectionRow, type RotationSweep } from "./_lib/exchanges/store";
+import { rotateAllStaleSecrets } from "./_lib/keyRotation";
 import { runSync } from "./_lib/exchanges/sync";
 import { killed } from "./_lib/killswitch";
 
@@ -80,6 +82,17 @@ async function dueConnections(): Promise<{ rows: CronRow[]; scheduled: boolean }
   return { rows: (legacy.data ?? []) as unknown as CronRow[], scheduled: false };
 }
 
+/**
+ * The ids of the connections a plan syncs in the BACKGROUND (`backgroundSyncConnections`: Pro 1, Premium / Team 5): the oldest active ones
+ * with the automatic sync switched on, up to the plan's number. The cron used to check only "may this plan sync at all", so a Pro account
+ * with several connections (a race at connect, a downgrade) had them all synced (Runde 11, Linse 1 #4).
+ */
+async function backgroundAllowedIds(userId: string, limit: number): Promise<Set<string>> {
+  const rows = (await listConnections(userId)).filter((c) => c.status === "active" && c.sync_enabled !== false);
+  rows.sort((a, b) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")) || a.id.localeCompare(b.id));
+  return new Set(rows.slice(0, Math.max(0, limit)).map((c) => c.id));
+}
+
 /** Writes the connection's next turn (best effort: a failed write only costs fairness, never the run). */
 async function schedule(row: CronRow, nextAt: number, failures: number): Promise<void> {
   const { error } = await supabaseAdmin()
@@ -96,7 +109,7 @@ export async function runExchangeCron(now = Date.now()): Promise<CronSummary> {
   const end = now + CRON_TOTAL_MS;
   const { rows, scheduled } = await dueConnections();
   const plan = scheduled ? schedule : async () => undefined;
-  const gated = paymentsConfigured();
+  const gated = !gatesOpen();
   for (const meta of rows) {
     if (Date.now() >= end - 1_000) break;
     summary.considered++;
@@ -112,10 +125,15 @@ export async function runExchangeCron(now = Date.now()): Promise<CronSummary> {
         await plan(meta, Date.parse(meta.last_sync_at) + CRON_MIN_GAP_MS, failures);
         continue;
       }
-      if (gated && !autoSyncAllowed((await planOf(meta.user_id)).plan)) {
-        summary.skipped++;
-        await plan(meta, now + CRON_PLAN_RECHECK_MS, failures);
-        continue;
+      if (gated) {
+        const info = await planOf(meta.user_id);
+        // the plan has no background sync, or this connection is beyond the number the plan allows
+        const allowed = autoSyncAllowed(info.plan) && (await backgroundAllowedIds(meta.user_id, limitOf(info.plan, "backgroundSyncConnections"))).has(meta.id);
+        if (!allowed) {
+          summary.skipped++;
+          await plan(meta, now + CRON_PLAN_RECHECK_MS, failures);
+          continue;
+        }
       }
       if (await runningRun(meta.user_id, meta.id, 2 * 60_000)) {
         summary.skipped++;
@@ -139,7 +157,7 @@ export async function runExchangeCron(now = Date.now()): Promise<CronSummary> {
   }
   // key rotation (review KEY-01): connections still on an older EXCHANGE_ENC_KEY_V<n> – also invalid or switched-off
   // ones that never sync again – move to the newest key; the log shows how many are left (0 → the old key can go)
-  if (Date.now() < end) summary.keys = await rotateStaleConnections(CRON_ROTATE_BATCH);
+  if (Date.now() < end) summary.keys = await rotateAllStaleSecrets(CRON_ROTATE_BATCH);
   return summary;
 }
 

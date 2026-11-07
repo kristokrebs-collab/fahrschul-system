@@ -143,6 +143,7 @@ export function fakeAdmin(state: AdminState) {
   const client = {
     auth: {
       getClaims: vi.fn(async () => (state.claims ? { data: { claims: state.claims }, error: null } : { data: null, error: { message: "bad" } })),
+      getUser: vi.fn(async () => (state.claims ? { data: { user: { id: String((state.claims as { sub?: unknown }).sub) } }, error: null } : { data: null, error: { message: "bad" } })),
       admin: {
         mfa: {
           listFactors: vi.fn(async () => ({ data: { factors: state.factors }, error: null })),

@@ -78,6 +78,8 @@ export const ENV_SPEC: readonly EnvVar[] = [
   v({ name: "STRIPE_AUTOMATIC_TAX", purpose: "Stripe Tax im Checkout (true/false, Standard false; Betreiberentscheidung mit dem Steuerberater, docs/RECHT/preisangaben.md): Anschrift Pflicht, Steuer-ID abfragbar", need: "optional", scope: "functions", secret: false, group: "billing", without: "Die Bestellübersicht sagt „Stripe Tax ist beim Betreiber nicht eingeschaltet“; mit `true`: „Steuer wird im nächsten Schritt von Stripe berechnet“. Nie ein erfundener Betrag." }),
   v({ name: "REFERRAL_TRIAL_DAYS", purpose: "Testphase über einen Einladungslink in Tagen (Standard 30)", need: "optional", scope: "functions", secret: false, group: "billing", without: "30 Tage." }),
   v({ name: "REFERRAL_REWARD_CENTS", purpose: "Gutschrift je zahlendem Geworbenen in Cent (Standard 1000)", need: "optional", scope: "functions", secret: false, group: "billing", without: "1000 Cent." }),
+  v({ name: "REFERRAL_HOLD_DAYS", purpose: "Tage, die eine Empfehlungs-Gutschrift wartet, bevor sie auf das Stripe-Guthaben kommt (Standard 14): in dieser Zeit kommt eine Erstattung oder Rückbuchung der ersten Zahlung noch an; danach schreibt `billing-reconcile` sie gut. Eine Gutschrift gibt es nur für eine echte Zahlung mindestens in Höhe der Gutschrift", need: "optional", scope: "functions", secret: false, group: "billing", without: "14 Tage." }),
+  v({ name: "ALLOW_UNGATED", purpose: "`true` = in PRODUKTION dürfen alle Funktionen ohne Stripe-Einrichtung frei laufen (Telefon, SMS, KI, Hintergrund-Sync, Teams). Ohne diese Variable sperrt eine Produktion ohne Stripe-Schlüssel oder Preis-IDs ZU (jedes Konto zählt als Free) – statt für alle kostenlos zu werden. Nur für Betreiber, die bewusst gar nichts verkaufen und die Kosten selbst tragen; in Vorschau-Deploys und lokal ist alles ohnehin frei", need: "optional", scope: "functions", secret: false, group: "billing", without: "Produktion ohne Stripe: geschlossen (Free-Rechte für alle); `ops-status` meldet es." }),
   // ── Exchange
   v({ name: "EXCHANGE_ENC_KEY_V1", purpose: "AES-256-Schlüssel (base64, 32 Byte, `openssl rand -base64 32`): verschlüsselt die Börsen-API-Schlüssel (Bitunix und Binance; je Nutzer und Verbindung gebunden), die Telefonnummer des Telefon-Alarms (AES-GCM) und die Token der TradingView-MCP-Verbindung; weitere Versionen V2… für die Rotation (höhere Versionsnummer)", need: "feature", scope: "functions", secret: true, group: "exchange", without: "503 „Der Börsen-Sync ist auf diesem Server noch nicht eingerichtet.“ – es wird kein Börsen-Schlüssel gespeichert; das Telefon ist nicht möglich (503 phone_unavailable); die TradingView-MCP-Verbindung scheitert mit „nicht eingerichtet“." }),
   v({ name: "SYNC_CRON_ENABLED", purpose: "Geplanter Börsen-Sync alle 30 Minuten an/aus (`false` stoppt ihn)", need: "optional", scope: "functions", secret: false, group: "exchange", without: "An (sofern ein Tarif den Abgleich enthält)." }),
@@ -95,6 +97,10 @@ export const ENV_SPEC: readonly EnvVar[] = [
   v({ name: "TWILIO_VERIFY_SERVICE_SID", purpose: "Twilio-Verify-Dienst (VA…): schickt und prüft den SMS-Code der Nummernprüfung", need: "feature", scope: "functions", secret: false, group: "phone", without: "Keine Nummer lässt sich bestätigen, also wird nie angerufen („Einrichtung nötig“)." }),
   v({ name: "ALERT_PHONE_DAILY_MAX", purpose: "Kostenbremse: Anrufe pro Tag über ALLE Konten (Standard 50)", need: "optional", scope: "functions", secret: false, group: "alerts", without: "50; danach „Kostenbremse des Servers für heute erreicht“ im Zustellprotokoll." }),
   v({ name: "ALERT_PHONE_USER_DAILY_MAX", purpose: "Anrufe pro Konto und Tag, Testanrufe eingerechnet (Standard 5)", need: "optional", scope: "functions", secret: false, group: "alerts", without: "5." }),
+  v({ name: "ALERT_SMS_DAILY_MAX", purpose: "Kostenbremse: Bestätigungs-SMS (Twilio Verify) pro Tag über ALLE Konten (Standard 100); schützt vor SMS-Pumping", need: "optional", scope: "functions", secret: false, group: "alerts", without: "100; danach „Für heute sind keine weiteren Bestätigungs-SMS mehr möglich“." }),
+  v({ name: "PHONE_ALLOWED_COUNTRIES", purpose: "Länder-Vorwahlen, an die Codes und Anrufe gehen (Komma-Liste, z. B. `49,43,41`); Premium- und Sondernummern sind immer gesperrt", need: "optional", scope: "functions", secret: false, group: "phone", without: "Standardliste: Deutschland, Österreich, Schweiz, übrige EU / EWR, Vereinigtes Königreich, USA und Kanada (+1 ohne die Karibik-Vorwahlen)." }),
+  v({ name: "PHONE_HASH_KEY", purpose: "Eigener, NIE gedrehter Schlüssel (`openssl rand -base64 32`) für den Hash der Telefonnummer („eine bestätigte Nummer pro Nummer“). Setzen, BEVOR ein alter `EXCHANGE_ENC_KEY_V<n>` entfernt wird: bisher hing der Hash am ältesten Verschlüsselungsschlüssel", need: "optional", scope: "functions", secret: true, group: "phone", without: "Der Hash nutzt den ältesten `EXCHANGE_ENC_KEY_V<n>` (altes Verhalten); wird der entfernt, ändern sich alle Hashes." }),
+  v({ name: "AI_DAILY_MAX", purpose: "Kostenbremse: KI-Aufrufe (Coach, Screenshot-Import, Strategie-Übersetzer, Assistent) pro Tag über ALLE Konten (Standard 2000)", need: "optional", scope: "functions", secret: false, group: "alerts", without: "2000; danach „Die KI hat heute ihr Tageskontingent erreicht“." }),
   // ── TradingView MCP (B3)
   v({ name: "TV_MCP_CLIENT_ID", purpose: "OAuth-Client-ID der App bei TradingView (Betreiber-Einrichtung; ob ein Betreiber dort für dieses Produkt registrieren darf, ist nicht belegt – siehe Hinweise unten)", need: "feature", scope: "functions", secret: false, group: "tvmcp", without: "Die Karte zeigt „Einrichtung nötig (Betreiber)“, nichts wird gestartet." }),
   v({ name: "TV_MCP_CLIENT_SECRET", purpose: "Nur für einen vertraulichen OAuth-Client", need: "optional", scope: "functions", secret: true, group: "tvmcp", without: "Öffentlicher Client mit PKCE." }),
@@ -109,13 +115,15 @@ export const ENV_SPEC: readonly EnvVar[] = [
   v({ name: "SEC_USER_AGENT", purpose: "Kontakt im User-Agent („Name kontakt@domain“) – die SEC verlangt ihn", need: "feature", scope: "functions", secret: false, group: "sec", without: "Die SEC-Funktionen melden „Einrichtung nötig“ und rufen die SEC nicht auf." }),
   // ── Ops / tuning
   v({ name: "OPS_TOKEN", purpose: "Betreiber-Token für /api/v1/ops/status (mindestens 24 Zeichen, zufällig)", need: "feature", scope: "functions", secret: true, group: "ops", without: "Die Statusseite antwortet 503 „nicht eingerichtet“ und gibt nichts preis." }),
-  v({ name: "IP_HASH_PEPPER", purpose: "Geheimer Schlüssel für IP-Pseudonyme in Audit-Log und Raten-Begrenzung und für den gesalzenen Hash der E-Mail-Adresse in `contract_requests` (openssl rand -base64 32; empfohlen)", need: "optional", scope: "functions", secret: true, group: "supabase", without: "Der Schlüssel wird aus SUPABASE_SECRET_KEY abgeleitet." }),
+  v({ name: "IP_HASH_PEPPER", purpose: "Geheimer Schlüssel (Version 1) für IP-Pseudonyme in Audit-Log und Raten-Begrenzung, für den gesalzenen Hash der E-Mail-Adresse in `contract_requests`, für die Wiederherstellungscodes der Zwei-Faktor-Anmeldung und für die Testphasen-Sperre (openssl rand -base64 32). PFLICHT in Produktion: ohne ihn gibt es dort keine neuen Wiederherstellungscodes, und `ops-status` meldet „unvollständig“", need: "must", scope: "functions", secret: true, group: "supabase", without: "Der Schlüssel wird aus SUPABASE_SECRET_KEY abgeleitet (nur zum Prüfen alter Codes); in Produktion gibt es keine neuen Wiederherstellungscodes." }),
+  v({ name: "IP_HASH_PEPPER_V2", purpose: "Zweite Version des Pepper-Schlüssels (Rotation; `…_V3` bis `…_V9` ebenso): neue Hashes und Codes nutzen die höchste vorhandene Version, ältere bleiben zum Prüfen gültig – die alte Version erst entfernen, wenn kein Wiederherstellungscode und keine Testphasen-Sperre damit mehr gebraucht wird", need: "optional", scope: "functions", secret: true, group: "supabase", without: "Version 1 (`IP_HASH_PEPPER`) bleibt der Schlüssel." }),
   v({ name: "LOG_SAMPLE_RATE", purpose: "Anteil gespeicherter Fehlerberichte, 0–1 (Standard 1)", need: "optional", scope: "functions", secret: false, group: "supabase", without: "Alle Berichte (nur mit Einwilligung des Nutzers)." }),
   // ── Emergency switches (C4)
   v({ name: "KILL_SYNC", purpose: "Notfall-Schalter: Cloud-Sync und Börsen-Sync aus (true)", need: "optional", scope: "functions", secret: false, group: "switches", without: "Aus (Sync läuft)." }),
   v({ name: "KILL_CALLS", purpose: "Notfall-Schalter: keine Telefon-Anrufe (true)", need: "optional", scope: "functions", secret: false, group: "switches", without: "Aus (Anrufe erlaubt, sobald Twilio eingerichtet ist)." }),
   v({ name: "KILL_AI", purpose: "Notfall-Schalter: keine KI-Aufrufe (true)", need: "optional", scope: "functions", secret: false, group: "switches", without: "Aus (KI läuft, sobald ein Schlüssel da ist)." }),
   v({ name: "KILL_CHECKOUT", purpose: "Notfall-Schalter: Kaufstrecke zu (true) – neue Käufe gehen nicht, bestehende Abos und das Kundenportal bleiben", need: "optional", scope: "functions", secret: false, group: "switches", without: "Aus (Kauf läuft, sobald Stripe eingerichtet ist)." }),
+  v({ name: "KILL_MAIL", purpose: "Notfall-Schalter: kein E-Mail-Versand (true) – Alarm-Mails, Test-Mails und die Bestätigungs-Mails zu Kündigung und Widerruf", need: "optional", scope: "functions", secret: false, group: "switches", without: "Aus (Mails gehen, sobald Resend eingerichtet ist)." }),
   // ── Legal (client)
   v({ name: "VITE_LEGAL_OPERATOR", purpose: "Impressum: Name/Firma des Anbieters (öffentlich, landet im Bundle; auch für die Functions der Kaufstrecke in Netlify setzen: Scope Builds UND Functions)", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter „[Platzhalter: VITE_LEGAL_OPERATOR]“, nichts wird erfunden; ohne Betreiber + Anschrift + E-Mail (oder eine Impressum-URL) bleibt die Kaufstrecke gesperrt (`purchase_closed`)." }),
   v({ name: "VITE_LEGAL_ADDRESS", purpose: "Impressum: Anschrift (Zeilen mit | getrennt)", need: "optional", scope: "client", secret: false, group: "legal", without: "Markierter Platzhalter; Kaufstrecke gesperrt (siehe VITE_LEGAL_OPERATOR)." }),
@@ -158,7 +166,7 @@ export interface FunctionEnv {
   /** Group ids that must be "eingerichtet" for the function to do its job (`supabase` is implied for everything with a login). */
   groups: string[];
   /** Emergency switch that stops it. */
-  switch?: "sync" | "calls" | "ai" | "checkout";
+  switch?: "sync" | "calls" | "ai" | "checkout" | "mail";
 }
 
 export const FUNCTION_ENV: readonly FunctionEnv[] = [
@@ -169,12 +177,13 @@ export const FUNCTION_ENV: readonly FunctionEnv[] = [
   { fn: "audit", route: "/api/v1/audit", groups: ["supabase"] },
   { fn: "log", route: "/api/v1/log", groups: ["supabase"] },
   { fn: "backup-nightly", route: "(täglich)", groups: ["supabase"] },
+  { fn: "billing-reconcile", route: "(täglich)", groups: ["supabase", "billing"] },
   { fn: "billing-status", route: "/api/v1/billing/status", groups: ["supabase"] },
   { fn: "billing-checkout", route: "/api/v1/billing/checkout", groups: ["supabase", "billing", "site"], switch: "checkout" },
   { fn: "billing-portal", route: "/api/v1/billing/portal", groups: ["supabase", "billing"] },
   { fn: "billing-code", route: "/api/v1/billing/code", groups: ["supabase", "billing"] },
   { fn: "billing-referral", route: "/api/v1/billing/referral", groups: ["supabase", "billing"] },
-  { fn: "billing-contract", route: "/api/v1/billing/contract (+ /confirm)", groups: ["supabase", "mail", "site"] },
+  { fn: "billing-contract", route: "/api/v1/billing/contract (+ /confirm)", groups: ["supabase", "mail", "site"], switch: "mail" },
   { fn: "stripe-webhook", route: "/api/v1/stripe/webhook", groups: ["supabase", "billing"] },
   { fn: "exchange-connect", route: "/api/v1/exchange/connect", groups: ["supabase", "exchange"], switch: "sync" },
   { fn: "exchange-disconnect", route: "/api/v1/exchange/disconnect", groups: ["supabase", "exchange"] },
@@ -182,13 +191,13 @@ export const FUNCTION_ENV: readonly FunctionEnv[] = [
   { fn: "exchange-positions", route: "/api/v1/exchange/positions", groups: ["supabase", "exchange"], switch: "sync" },
   { fn: "exchange-backfill-background", route: "/api/v1/exchange/backfill", groups: ["supabase", "exchange"], switch: "sync" },
   { fn: "exchange-sync-cron", route: "(alle 30 Min)", groups: ["supabase", "exchange"], switch: "sync" },
-  { fn: "alert-watch-cron", route: "(alle 5 Min)", groups: ["supabase", "mail", "site"] },
-  { fn: "alert-test", route: "/api/v1/alerts/test", groups: ["supabase", "mail"] },
+  { fn: "alert-watch-cron", route: "(alle 5 Min)", groups: ["supabase", "mail", "site"], switch: "mail" },
+  { fn: "alert-test", route: "/api/v1/alerts/test", groups: ["supabase", "mail"], switch: "mail" },
   // the four alarms (C2). `alerts-cron` also dials calls (stopped by KILL_CALLS: those deliveries are logged "übersprungen: Notschalter", e-mail goes on)
-  { fn: "alerts-cron", route: "(alle 5 Min)", groups: ["supabase", "mail", "site"] },
+  { fn: "alerts-cron", route: "(alle 5 Min)", groups: ["supabase", "mail", "site"], switch: "mail" },
   { fn: "alerts-prefs", route: "/api/v1/alerts/prefs", groups: ["supabase"] },
   { fn: "alerts-feed", route: "/api/v1/alerts/feed", groups: ["supabase"] },
-  { fn: "alerts-email-test", route: "/api/v1/alerts/email-test", groups: ["supabase", "mail"] },
+  { fn: "alerts-email-test", route: "/api/v1/alerts/email-test", groups: ["supabase", "mail"], switch: "mail" },
   { fn: "alerts-phone", route: "/api/v1/alerts/phone", groups: ["supabase", "phone", "exchange"], switch: "calls" },
   { fn: "alerts-twilio-status", route: "/api/v1/alerts/twilio/status", groups: ["supabase", "phone", "site"] },
   { fn: "coach-ask", route: "/api/v1/coach/ask", groups: ["supabase", "ai"], switch: "ai" },
@@ -266,9 +275,11 @@ export interface EnvReport {
   groups: GroupStatus[];
   functions: FunctionStatus[];
   /** Emergency switches that are ON. */
-  switches: Record<"sync" | "calls" | "ai" | "checkout", boolean>;
+  switches: Record<"sync" | "calls" | "ai" | "checkout" | "mail", boolean>;
   /** Names set in the environment that the spec does not know (typos like STRIPE_SECRET_KY). Names only. */
   unknown: string[];
+  /** Problems of a PRODUCTION deploy (`CONTEXT=production`) that are no missing group but a wrong state – German sentences, names only. Never "bereit" while one stands. */
+  production: string[];
 }
 
 const truthy = (x: string | undefined): boolean => ["1", "true", "yes", "on"].includes((x ?? "").trim().toLowerCase());
@@ -301,7 +312,7 @@ function looksLikeTypo(name: string, known: readonly string[]): boolean {
 export function evaluateEnv(get: (name: string) => string | undefined, present: readonly string[] = []): EnvReport {
   const groups = ENV_GROUPS.map((g) => groupStatus(g, get));
   const byId = new Map(groups.map((g) => [g.id, g]));
-  const switches = { sync: truthy(get("KILL_SYNC")), calls: truthy(get("KILL_CALLS")), ai: truthy(get("KILL_AI")), checkout: truthy(get("KILL_CHECKOUT")) };
+  const switches = { sync: truthy(get("KILL_SYNC")), calls: truthy(get("KILL_CALLS")), ai: truthy(get("KILL_AI")), checkout: truthy(get("KILL_CHECKOUT")), mail: truthy(get("KILL_MAIL")) };
   const functions: FunctionStatus[] = FUNCTION_ENV.map((f) => {
     const blockedBy = f.groups.filter((id) => byId.get(id)?.state !== "eingerichtet");
     const state: SetupState = blockedBy.length === 0 ? "eingerichtet" : blockedBy.length === f.groups.length ? "nicht eingerichtet" : "teilweise";
@@ -312,8 +323,19 @@ export function evaluateEnv(get: (name: string) => string | undefined, present: 
   const coreNone = core.every((g) => g.state === "nicht eingerichtet");
   // a half-set group (one Stripe key without the webhook secret) is a mistake, not "off": it is never "bereit"
   const partial = groups.some((g) => g.state === "teilweise");
-  const verdict: Verdict = coreOk && !partial ? "bereit" : coreNone && !partial ? "nicht eingerichtet" : "unvollständig";
+  // Runde 11: states of a PRODUCTION deploy that are never fine – the app would run open (no Stripe) or without the one long-lived secret
+  const production: string[] = [];
+  if (get("CONTEXT") === "production") {
+    const billing = byId.get("billing");
+    if (billing && billing.state !== "eingerichtet" && !truthy(get("ALLOW_UNGATED"))) {
+      production.push("Zahlungen sind in Produktion nicht (vollständig) eingerichtet: die Server-Funktionen laufen GESCHLOSSEN (jedes Konto zählt als Free; Telefon, SMS, KI und Hintergrund-Sync sind zu). Stripe einrichten – oder bewusst `ALLOW_UNGATED=true` setzen.");
+    }
+    if (!nonEmpty(get, "IP_HASH_PEPPER") && ![2, 3, 4, 5, 6, 7, 8, 9].some((v) => nonEmpty(get, `IP_HASH_PEPPER_V${v}`))) {
+      production.push("IP_HASH_PEPPER fehlt: ohne ihn gibt es in Produktion keine neuen Wiederherstellungscodes für die Zwei-Faktor-Anmeldung.");
+    }
+  }
+  const verdict: Verdict = coreOk && !partial && !production.length ? "bereit" : coreNone && !partial && !production.length ? "nicht eingerichtet" : "unvollständig";
   const names = ENV_SPEC.map((e) => e.name);
   const unknown = present.filter((n) => looksLikeTypo(n, names)).sort();
-  return { verdict, groups, functions, switches, unknown };
+  return { verdict, groups, functions, switches, unknown, production };
 }

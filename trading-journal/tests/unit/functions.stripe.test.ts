@@ -11,7 +11,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { consentSetHash, newOrderId } from "../../src/legal/consentRecord";
 import { setSupabaseAdminForTests } from "../../netlify/functions/_lib/supabase";
-import { paymentsConfigured, requireFeature, requireLimit, resetPaymentsReportForTests } from "../../netlify/functions/_lib/plan";
+import { failsClosed, gatesOpen, paymentsConfigured, requireAutoSync, requireExchangeAccess, requireFeature, requireLimit, resetPaymentsReportForTests } from "../../netlify/functions/_lib/plan";
+import { reconcileBilling } from "../../netlify/functions/_lib/billingReconcile";
 import { EXPORT_TABLES } from "../../netlify/functions/_lib/account";
 import {
   assignSeat,
@@ -20,9 +21,14 @@ import {
   newRefCode,
   pickCurrent,
   planOfPrice,
+  recomputeMembers,
+  recomputePlan,
+  recordTrialTombstone,
   releaseSeat,
   rowFromSubscription,
   setStripeApiForTests,
+  trialEmailKey,
+  trialTombstoned,
   type StripeApi,
   type SubscriptionRow,
 } from "../../netlify/functions/_lib/stripe";
@@ -53,6 +59,7 @@ const UNIQUE: Record<string, string[][]> = {
   stripe_events: [["id"]],
   team_seats: [["member_id"]],
   consents: [["user_id", "order_id", "kind"]],
+  trial_tombstones: [["email_hash"]],
 };
 
 /** Foreign keys to auth.users per table (0002): a write for a deleted user fails with 23503, like Postgres. */
@@ -75,6 +82,8 @@ interface Db {
   noSeatFn?: boolean;
   /** Users with a verified TOTP factor (`auth.admin.mfa.listFactors`). */
   mfa: Set<string>;
+  /** Called once, right before the first write to `profiles` (a concurrent webhook changes the facts in between). */
+  beforeProfileWrite?: (() => void) | null;
 }
 
 function query(db: Db, table: string) {
@@ -114,6 +123,11 @@ function query(db: Db, table: string) {
     }
     const hits = rows.filter((r) => filters.every((f) => f(r)));
     if (op === "update") {
+      if (table === "profiles" && db.beforeProfileWrite) {
+        const hook = db.beforeProfileWrite;
+        db.beforeProfileWrite = null;
+        hook();
+      }
       for (const r of hits) Object.assign(r, payload, { updated_at: new Date(Date.now() + ++db.seq).toISOString() });
       return { data: null, error: null };
     }
@@ -134,6 +148,8 @@ function query(db: Db, table: string) {
     select: (_cols?: string, o?: { head?: boolean; count?: string }) => ((head = !!o?.head), q),
     eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
     neq: (c: string, v: unknown) => (filters.push((r) => r[c] !== v), q),
+    lte: (c: string, v: unknown) => (filters.push((r) => r[c] === undefined || r[c] === null || String(r[c]) <= String(v)), q),
+    in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), q),
     order: (col: string, o?: { ascending?: boolean }) => ((orderBy = { col, asc: o?.ascending !== false }), q),
     limit: (n: number) => ((limitN = n), q),
     range: () => q,
@@ -165,6 +181,7 @@ function fakeDb(): Db {
       audit_log: [],
       app_config: [],
       consents: [],
+      trial_tombstones: [],
     },
     seq: 0,
     rpcHits: 0,
@@ -274,6 +291,10 @@ interface FakeStripe {
   updates: { id: string; params: Stripe.SubscriptionUpdateParams }[];
   canceled: string[];
   retrieveFails: boolean;
+  /** PaymentIntent id → the invoice ids it paid (`invoicePayments.list`). */
+  paymentInvoices: Record<string, string[]>;
+  /** Customers anonymised / updated. */
+  customerUpdates: { id: string; params: Record<string, unknown> }[];
 }
 
 function fakeStripe(): FakeStripe {
@@ -287,6 +308,8 @@ function fakeStripe(): FakeStripe {
     updates: [],
     canceled: [],
     retrieveFails: false,
+    paymentInvoices: {},
+    customerUpdates: [],
   };
   let n = 0;
   f.api = {
@@ -344,6 +367,9 @@ function fakeStripe(): FakeStripe {
         f.subs.set(id, s);
         return s;
       },
+    },
+    invoicePayments: {
+      list: async (params) => ({ data: (f.paymentInvoices[params.payment?.payment_intent ?? ""] ?? []).map((invoice) => ({ invoice })) as unknown as Stripe.InvoicePayment[] }),
     },
     invoices: {
       list: async () => ({
@@ -419,6 +445,8 @@ const ENV: Record<string, string> = {
   STRIPE_PRICE_PREMIUM_MONTHLY: "price_prem_m",
   STRIPE_PRICE_TEAM_MONTHLY: "price_team_m",
   SITE_ORIGIN: "https://journal.example",
+  // the hold of a referral credit (default 14 days) is switched off for the tests that book it at once; the hold has its own tests
+  REFERRAL_HOLD_DAYS: "0",
   // B4: the purchase flow is locked until the operator's legal texts are there (the same rule as the browser's legalComplete)
   VITE_LEGAL_OPERATOR: "Beispiel Trading UG",
   VITE_LEGAL_ADDRESS: "Beispielweg 1 | 10115 Berlin",
@@ -434,6 +462,7 @@ const OPTIONAL_ENV = [
   "REFERRAL_REWARD_CENTS",
   "STRIPE_PRICE_PREMIUM_YEARLY",
   "STRIPE_PRICE_TEAM_YEARLY",
+  "REFERRAL_HOLD_DAYS",
 ];
 
 function setEnv(on: boolean): void {
@@ -1128,5 +1157,292 @@ describe("server-side feature gates", () => {
     expect(await cancelSubscription(U1)).toBe(1);
     expect(stripe.canceled).toEqual(["sub_1"]);
     expect(await cancelSubscription(U3)).toBe(0);
+  });
+});
+
+/* ------------------------------------------------------------------ Runde 11 (Sicherheits-Fixpaket, Paket A) */
+
+describe("team seats follow the owner's subscription on EVERY event (Linse 1 #1)", () => {
+  const seats = (...members: string[]) => members.map((m, i) => ({ owner_id: U1, member_id: m, created_at: `2026-10-0${i + 1}T10:00:00.000Z` }));
+  const teamSub = (quantity: number, price = "price_team_m") => stripeSub("sub_t", { customer: "cus_t", user: U1, price, quantity, status: "active", trialEnd: null });
+
+  it("a switch from Team to Pro in the Customer Portal takes the Team plan from the members at once – before the fix they kept it for good", async () => {
+    stripe.subs.set("sub_t", teamSub(3));
+    await deliver(event("customer.subscription.created", stripe.subs.get("sub_t")));
+    db.tables.team_seats!.push(...seats(U2, U3));
+    await recomputeMembers(U1);
+    expect(profile(db, U2)).toMatchObject({ plan: "team" });
+    expect(profile(db, U3)).toMatchObject({ plan: "team" });
+    // the owner changes to Pro in the portal: Stripe reports the same subscription with the Pro price
+    stripe.subs.set("sub_t", teamSub(1, "price_pro_m"));
+    const r = await deliver(event("customer.subscription.updated", stripe.subs.get("sub_t"), NOW + 10));
+    expect(r.body.result).toBe("processed");
+    expect(profile(db, U1)).toMatchObject({ plan: "pro" });
+    expect(profile(db, U2)).toMatchObject({ plan: "free" });
+    expect(profile(db, U3)).toMatchObject({ plan: "free" });
+  });
+
+  it("fewer seats in the portal: the newest members lose their seat (and the plan), the paid ones keep both", async () => {
+    stripe.subs.set("sub_t", teamSub(4)); // the owner + 3 members
+    await deliver(event("customer.subscription.created", stripe.subs.get("sub_t")));
+    const U4 = "44444444-4444-4444-8444-444444444444";
+    db.tables.profiles!.push({ id: U4, plan: "free", plan_status: "none", trial_end: null });
+    db.tables.team_seats!.push(...seats(U2, U3, U4));
+    await recomputeMembers(U1);
+    expect([U2, U3, U4].map((u) => profile(db, u).plan)).toEqual(["team", "team", "team"]);
+    stripe.subs.set("sub_t", teamSub(2)); // the owner + ONE member
+    await deliver(event("customer.subscription.updated", stripe.subs.get("sub_t"), NOW + 10));
+    expect(db.tables.team_seats!.map((s) => s.member_id)).toEqual([U2]); // first come, first served
+    expect(profile(db, U2)).toMatchObject({ plan: "team" });
+    expect(profile(db, U3)).toMatchObject({ plan: "free" });
+    expect(profile(db, U4)).toMatchObject({ plan: "free" });
+    expect(db.tables.audit_log!.some((a) => a.action === "billing.seats" && (a.meta as { removed: number }).removed === 2)).toBe(true);
+  });
+
+  it("recomputePlan alone never gives a seat beyond the paid ones (the check is in the plan, not only at joining)", async () => {
+    stripe.subs.set("sub_t", teamSub(2));
+    await deliver(event("customer.subscription.created", stripe.subs.get("sub_t")));
+    db.tables.team_seats!.push(...seats(U2, U3)); // two members on a 2-seat team: U3 is surplus
+    expect((await recomputePlan(U2)).plan).toBe("team");
+    expect((await recomputePlan(U3)).plan).toBe("free");
+    expect(profile(db, U3)).toMatchObject({ plan: "free" });
+  });
+});
+
+describe("recomputePlan checks after it writes (Linse 1 #13)", () => {
+  it("a webhook that read OLDER facts and writes last cannot leave an ended subscription on Pro", async () => {
+    db.tables.subscriptions!.push({ ...rowFromSubscription(stripeSub("sub_r", { status: "active", user: U1, trialEnd: null }), U1), status: "active" });
+    // between the first read and the first write of `recomputePlan` a second delivery ends the subscription
+    db.beforeProfileWrite = () => {
+      db.tables.subscriptions![0]!.status = "canceled";
+    };
+    const info = await recomputePlan(U1);
+    expect(info.plan).toBe("free");
+    expect(profile(db, U1)).toMatchObject({ plan: "free", plan_status: "canceled" });
+  });
+
+  it("a stable state is written once and confirmed (no endless loop)", async () => {
+    db.tables.subscriptions!.push({ ...rowFromSubscription(stripeSub("sub_r", { status: "active", user: U1, trialEnd: null }), U1), status: "active" });
+    expect((await recomputePlan(U1)).plan).toBe("pro");
+    expect(profile(db, U1)).toMatchObject({ plan: "pro", plan_status: "active" });
+  });
+});
+
+describe("one trial per ADDRESS, also across a deleted account (Linse 1 #6)", () => {
+  const withEmail = (user: string, email: string) => ({ authorization: `Bearer eyJhbGciOiJFUzI1NiJ9.${b64url(JSON.stringify({ sub: user, aal: "aal1", email }))}.c2ln` });
+  const order = async (user: string, email: string, plan = "pro") =>
+    call(checkoutFn, req("/api/v1/billing/checkout", { body: { plan, interval: "month", orderId: newOrderId(), consents: { terms: true, immediateStart: true }, consentHash: await consentSetHash() }, headers: withEmail(user, email) }));
+
+  it("delete + register again with the same address gets NO second trial; another address does", async () => {
+    db.tables.trial_tombstones = [];
+    // the first account had a trial and is deleted: its address leaves a keyed hash behind
+    db.tables.subscriptions!.push({ ...rowFromSubscription(stripeSub("sub_old", { status: "canceled", user: U3 }), U3), status: "canceled" });
+    expect(await recordTrialTombstone(U3, "Anna.Beispiel+neu@GMX.de")).toBe(true);
+    expect(db.tables.trial_tombstones).toHaveLength(1);
+    expect(JSON.stringify(db.tables.trial_tombstones)).not.toMatch(/anna|gmx/i);
+    // the same address registers again (new user id) → no trial
+    expect((await order(U1, "anna.beispiel@gmx.de")).status).toBe(200);
+    expect(stripe.checkout[0]!.subscription_data?.trial_period_days).toBeUndefined();
+    // another address → the trial
+    expect((await order(U2, "bert@gmx.de")).status).toBe(200);
+    expect(stripe.checkout[1]!.subscription_data?.trial_period_days).toBe(14);
+    // the status page says it as well
+    const st = await call(statusFn, req("/api/v1/billing/status", { headers: withEmail(U1, "anna.beispiel@gmx.de") }));
+    expect(st.body.trialUsed).toBe(true);
+  });
+
+  it("a Gmail address is one address with or without dots and +tag; a hash made under an OLDER pepper still matches after a rotation", async () => {
+    db.tables.trial_tombstones = [];
+    vi.stubEnv("IP_HASH_PEPPER", "pepper-one");
+    db.tables.subscriptions!.push({ ...rowFromSubscription(stripeSub("sub_old", { status: "canceled", user: U3 }), U3), status: "canceled" });
+    await recordTrialTombstone(U3, "a.b.c+x@gmail.com");
+    expect(await trialTombstoned("abc@googlemail.com")).toBe(true);
+    vi.stubEnv("IP_HASH_PEPPER_V2", "pepper-two"); // rotation: new hashes use V2, the old one still counts
+    expect(await trialTombstoned("abc@gmail.com")).toBe(true);
+    expect(trialEmailKey("A.B.C+x@Gmail.com")).toBe("abc@gmail.com");
+    expect(trialEmailKey("not an address")).toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it("the card-less trial is for Pro only: Premium and Team carry phone, SMS and AI costs and still need a card", async () => {
+    process.env.STRIPE_TRIAL_CARDLESS = "1";
+    await order(U1, "x@example.com", "premium");
+    const p = stripe.checkout[0]!;
+    expect(p.payment_method_collection).toBeUndefined();
+    expect(p.subscription_data?.trial_settings).toBeUndefined();
+    expect(p.subscription_data?.trial_period_days).toBe(14); // the trial itself stays, with a card
+  });
+});
+
+describe("referral credits: a real payment, a hold, and a way back (Linse 1 #3)", () => {
+  const referral = async (amountPaid: number, id = "in_1") => {
+    db.tables.referral_codes!.push({ user_id: U2, code: "ABCD2345" });
+    db.tables.billing_customers!.push({ user_id: U2, stripe_customer_id: "cus_ref" });
+    stripe.subs.set("sub_1", stripeSub("sub_1", { customer: "cus_9", user: U1, status: "active", ref: "ABCD2345", trialEnd: null }));
+    await deliver(event("checkout.session.completed", { id: "cs_1", mode: "subscription", client_reference_id: U1, customer: "cus_9", subscription: "sub_1", metadata: { ref: "ABCD2345" } }));
+    return paid(amountPaid, id);
+  };
+  const paid = (amount: number, id: string) =>
+    deliver(event("invoice.paid", { id, object: "invoice", amount_paid: amount, currency: "eur", attempt_count: 1, parent: { subscription_details: { subscription: "sub_1" } } }));
+
+  it("a one-cent invoice (100 % code + a cent) earns nothing and does not count as the conversion; a later real payment does", async () => {
+    await referral(1);
+    expect(db.tables.affiliate_ledger).toEqual([]);
+    expect(stripe.balance).toEqual([]);
+    expect(db.tables.referrals![0]).toMatchObject({ status: "trialing" });
+    await paid(1200, "in_2");
+    expect(db.tables.affiliate_ledger).toEqual([expect.objectContaining({ kind: "credit", amount: 1000, stripe_invoice_id: "in_2" })]);
+    expect(db.tables.referrals![0]).toMatchObject({ status: "paying" });
+  });
+
+  it("the credit waits REFERRAL_HOLD_DAYS (14): booked as pending at once, put on the Stripe balance by the daily reconcile only after the hold", async () => {
+    process.env.REFERRAL_HOLD_DAYS = "14";
+    await referral(1200);
+    expect(db.tables.affiliate_ledger).toEqual([expect.objectContaining({ kind: "credit", status: "pending" })]);
+    expect(stripe.balance).toEqual([]);
+    const early = await reconcileBilling(Date.now() + 5 * 86_400_000);
+    expect(early.creditsApplied).toBe(0);
+    expect(stripe.balance).toEqual([]);
+    const late = await reconcileBilling(Date.now() + 15 * 86_400_000);
+    expect(late.creditsApplied).toBe(1);
+    expect(stripe.balance).toEqual([{ customer: "cus_ref", amount: -1000, key: expect.stringMatching(/^tj-ref-credit-/) }]);
+    expect(db.tables.affiliate_ledger![0]).toMatchObject({ status: "applied" });
+  });
+
+  it("a FULL refund takes an applied credit back: a booking the other way, a reversal row, the referral is canceled – once, however often it is delivered", async () => {
+    await referral(1200);
+    expect(db.tables.affiliate_ledger).toEqual([expect.objectContaining({ status: "applied" })]);
+    stripe.paymentInvoices.pi_1 = ["in_1"];
+    const refund = (id: string) => event("charge.refunded", { id, object: "charge", refunded: true, payment_intent: "pi_1", customer: "cus_9" });
+    const r1 = await deliver(refund("ch_1"));
+    expect(r1.body.result).toBe("processed");
+    expect(stripe.balance).toEqual([
+      { customer: "cus_ref", amount: -1000, key: expect.stringMatching(/^tj-ref-credit-/) },
+      { customer: "cus_ref", amount: 1000, key: expect.stringMatching(/^tj-ref-reversal-/) },
+    ]);
+    expect(db.tables.affiliate_ledger!.map((l) => [l.kind, l.amount, l.status])).toEqual([
+      ["credit", 1000, "applied"],
+      ["reversal", 1000, "applied"],
+    ]);
+    expect(db.tables.referrals![0]).toMatchObject({ status: "canceled" });
+    // Stripe delivers the event again (a new event id): nothing is booked twice
+    await deliver(refund("ch_1"));
+    expect(stripe.balance).toHaveLength(2);
+    expect(db.tables.affiliate_ledger).toHaveLength(2);
+  });
+
+  it("a partial refund changes nothing; a dispute takes the credit back like a refund", async () => {
+    await referral(1200);
+    stripe.paymentInvoices.pi_1 = ["in_1"];
+    const partial = await deliver(event("charge.refunded", { id: "ch_1", object: "charge", refunded: false, payment_intent: "pi_1" }));
+    expect(partial.body.result).toBe("ignored");
+    expect(db.tables.affiliate_ledger).toHaveLength(1);
+    const dispute = await deliver(event("charge.dispute.created", { id: "dp_1", object: "dispute", charge: "ch_1", payment_intent: "pi_1" }));
+    expect(dispute.body.result).toBe("processed");
+    expect(db.tables.affiliate_ledger!.map((l) => l.kind)).toEqual(["credit", "reversal"]);
+    expect(stripe.balance.at(-1)).toMatchObject({ amount: 1000 });
+  });
+
+  it("a credit still in the hold is voided by the refund – it never reaches the balance; a commission becomes void or a pending reversal", async () => {
+    process.env.REFERRAL_HOLD_DAYS = "14";
+    await referral(1200);
+    stripe.paymentInvoices.pi_1 = ["in_1"];
+    await deliver(event("charge.refunded", { id: "ch_1", object: "charge", refunded: true, payment_intent: "pi_1" }));
+    expect(db.tables.affiliate_ledger).toEqual([expect.objectContaining({ kind: "credit", status: "void" })]);
+    expect(stripe.balance).toEqual([]);
+    expect((await reconcileBilling(Date.now() + 30 * 86_400_000)).creditsApplied).toBe(0);
+    // an affiliate's commission that was ALREADY paid out by hand: the clawback is a pending reversal for the operator
+    db.tables.affiliate_ledger!.push({ id: 90, referrer_id: U2, referral_id: null, kind: "commission", amount: 600, currency: "eur", status: "paid", stripe_invoice_id: "in_c" });
+    stripe.paymentInvoices.pi_2 = ["in_c"];
+    await deliver(event("charge.refunded", { id: "ch_2", object: "charge", refunded: true, payment_intent: "pi_2" }));
+    expect(db.tables.affiliate_ledger!.find((l) => l.kind === "reversal")).toMatchObject({ amount: 600, status: "pending", stripe_invoice_id: "in_c" });
+  });
+});
+
+describe("billing-reconcile: the daily comparison with Stripe (Linse 1 #13)", () => {
+  it("a missed webhook is made good: the stored subscription and the profile follow what Stripe says now", async () => {
+    // the database still says "active/pro", Stripe ended the subscription and the webhook never arrived
+    db.tables.subscriptions!.push({ ...rowFromSubscription(stripeSub("sub_x", { status: "active", user: U1, trialEnd: null }), U1), status: "active" });
+    Object.assign(profile(db, U1), { plan: "pro", plan_status: "active" });
+    stripe.subs.set("sub_x", stripeSub("sub_x", { status: "canceled", user: U1, trialEnd: null }));
+    const r = await reconcileBilling();
+    expect(r).toMatchObject({ stripe: true, subscriptions: 1, subscriptionsFailed: 0 });
+    expect(db.tables.subscriptions![0]).toMatchObject({ status: "canceled" });
+    expect(profile(db, U1)).toMatchObject({ plan: "free", plan_status: "canceled" });
+  });
+
+  it("a stale Team plan of a member without a paid seat is removed; a surplus seat is dropped (database part: no Stripe call needed)", async () => {
+    setEnv(false); // without Stripe only the database part runs
+    db.tables.subscriptions!.push({ ...rowFromSubscription(stripeSub("sub_t", { customer: "cus_t", user: U1, price: "price_team_m", quantity: 2, status: "active", trialEnd: null }), U1), status: "active", plan: "team", seats: 2 });
+    Object.assign(profile(db, U1), { plan: "team", plan_status: "active" });
+    db.tables.team_seats!.push({ owner_id: U1, member_id: U2, created_at: "2026-10-01T10:00:00.000Z" }, { owner_id: U1, member_id: U3, created_at: "2026-10-02T10:00:00.000Z" });
+    Object.assign(profile(db, U2), { plan: "team", plan_status: "active" });
+    Object.assign(profile(db, U3), { plan: "team", plan_status: "active" });
+    const r = await reconcileBilling();
+    expect(r.stripe).toBe(false);
+    expect(r.seatsRemoved).toBe(1);
+    expect(profile(db, U2)).toMatchObject({ plan: "team" });
+    expect(profile(db, U3)).toMatchObject({ plan: "free" });
+    expect(db.tables.team_seats!.map((s) => s.member_id)).toEqual([U2]);
+  });
+
+  it("without Stripe only the database part runs; a Stripe error on one row does not stop the run", async () => {
+    db.tables.subscriptions!.push({ ...rowFromSubscription(stripeSub("sub_x", { status: "active", user: U1, trialEnd: null }), U1), status: "active" });
+    stripe.retrieveFails = true;
+    expect(await reconcileBilling()).toMatchObject({ stripe: true, subscriptions: 0, subscriptionsFailed: 1 });
+    setEnv(false);
+    expect(await reconcileBilling()).toMatchObject({ stripe: false, subscriptions: 0 });
+  });
+});
+
+describe("fail closed in production, cost features and dunning (Linse 1 #10, #3 past_due)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("production WITHOUT Stripe is closed: every account counts as Free, the cost features answer 402 – before, the whole app was free for everybody", async () => {
+    setEnv(false);
+    vi.stubEnv("CONTEXT", "production");
+    expect(paymentsConfigured()).toBe(false);
+    expect(gatesOpen()).toBe(false);
+    expect(failsClosed()).toBe(true);
+    await expect(requireFeature(U1, "coachAi")).rejects.toMatchObject({ status: 402, code: "plan_required" });
+    await expect(requireFeature(U1, "shotExtract")).rejects.toMatchObject({ status: 402 });
+    await expect(requireLimit(U1, "exchangeConnections", 1)).rejects.toMatchObject({ status: 402, code: "limit_reached" });
+    await expect(requireExchangeAccess(U1)).resolves.toMatchObject({ plan: "free" }); // Free has one connection, manual: that is the plan, not a gate
+    await expect(requireAutoSync(U1)).rejects.toMatchObject({ status: 402 });
+  });
+
+  it("ALLOW_UNGATED=true is the operator's deliberate switch; previews and local runs are open without it", async () => {
+    setEnv(false);
+    vi.stubEnv("CONTEXT", "production");
+    vi.stubEnv("ALLOW_UNGATED", "true");
+    expect(gatesOpen()).toBe(true);
+    expect(failsClosed()).toBe(false);
+    await expect(requireFeature(U1, "coachAi")).resolves.toMatchObject({ plan: "free" });
+    vi.unstubAllEnvs();
+    vi.stubEnv("CONTEXT", "deploy-preview");
+    expect(gatesOpen()).toBe(true);
+    vi.unstubAllEnvs();
+    expect(gatesOpen()).toBe(true); // no CONTEXT at all (tests, netlify dev)
+    setEnv(true);
+    vi.stubEnv("CONTEXT", "production");
+    expect(gatesOpen()).toBe(false); // with Stripe set up the gates are always on
+  });
+
+  it("the database is told that the gates are ENFORCED – also for a production that fails closed (the screenshots bucket policy reads it)", async () => {
+    setEnv(false);
+    vi.stubEnv("CONTEXT", "production");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test"); // production has no public fallback key: the address pseudonym needs one
+    await call(statusFn, req("/api/v1/billing/status"));
+    expect(db.tables.app_config).toEqual([expect.objectContaining({ key: "billing", value: { paymentsEnabled: true } })]);
+  });
+
+  it("a subscription in dunning (past_due) keeps the plan but not what costs money per use: AI is paused with its own message", async () => {
+    Object.assign(profile(db, U1), { plan: "premium", plan_status: "past_due" });
+    await expect(requireFeature(U1, "cloudSync")).resolves.toMatchObject({ plan: "premium" });
+    await expect(requireFeature(U1, "coach")).resolves.toMatchObject({ plan: "premium" }); // the journal features run on
+    await expect(requireFeature(U1, "coachAi")).rejects.toMatchObject({ status: 402, code: "payment_past_due" });
+    await expect(requireFeature(U1, "shotExtract")).rejects.toMatchObject({ status: 402, code: "payment_past_due" });
+    Object.assign(profile(db, U1), { plan_status: "active" });
+    await expect(requireFeature(U1, "coachAi")).resolves.toMatchObject({ plan: "premium" });
   });
 });

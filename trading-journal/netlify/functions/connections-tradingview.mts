@@ -24,7 +24,7 @@ import { clientIp, handler, HttpError, json, readJson, requireMethod } from "./_
 import { listReceipts } from "./_lib/connections/receipts";
 import { listSignals } from "./_lib/signals/store";
 import { mcpStatus } from "./_lib/tvmcp/status";
-import { paymentsConfigured, planOf } from "./_lib/plan";
+import { gatesOpen, planOf } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { createToken, listTokens, revokeToken, type TokenInfo } from "./_lib/exchanges/tokens";
 
@@ -57,7 +57,7 @@ export default handler(async (req, ctx) => {
       signals: sig.signals,
       signalsAvailable: sig.available,
       mcp,
-      tradeAlerts: { allowed: !paymentsConfigured() || planIncludes(plan.plan, "apiAccess"), plan: plan.plan },
+      tradeAlerts: { allowed: gatesOpen() || planIncludes(plan.plan, "apiAccess"), plan: plan.plan },
       origin: siteOrigin(),
     });
   }

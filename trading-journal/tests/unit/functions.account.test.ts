@@ -9,6 +9,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { setSupabaseAdminForTests } from "../../netlify/functions/_lib/supabase";
 import { setStripeForTests, type StripeLike } from "../../netlify/functions/_lib/billingCleanup";
 import { expiredBackups, runNightlyBackup, type BackupFile } from "../../netlify/functions/_lib/account";
+import { encrypt } from "../../netlify/functions/_lib/crypto";
+import { trialTombstoned } from "../../netlify/functions/_lib/stripe";
+import { setTvMcpFetchForTests } from "../../netlify/functions/_lib/tvmcp/status";
+import { CLIENT_ID, MCP_URL, TvMock } from "./helpers/tvMock";
 import accountExport from "../../netlify/functions/account-export.mts";
 import accountDelete from "../../netlify/functions/account-delete.mts";
 import accountBackups from "../../netlify/functions/account-backups.mts";
@@ -71,6 +75,7 @@ function table(state: FakeState, name: string) {
     select: (cols?: string) => ((columns = cols && cols !== "*" && !cols.includes("(") ? cols.split(",").map((c) => c.trim()) : null), q),
     eq: (col: string, v: unknown) => (filters.push((r) => r[col] === v), q),
     lt: (col: string, v: unknown) => (filters.push((r) => (r[col] as never) < (v as never)), q),
+    in: (col: string, vals: unknown[]) => (filters.push((r) => vals.includes(r[col])), q),
     order: (col: string, o?: { ascending?: boolean }) => (order.push({ col, asc: o?.ascending !== false }), q),
     range: (a: number, b: number) => ((range = [a, b]), q),
     limit: (n: number) => ((limit = n), q),
@@ -79,6 +84,14 @@ function table(state: FakeState, name: string) {
     insert: async (row: Row) => {
       if (missing()) return { error: { code: "PGRST205" } };
       state.tables[name]!.push(row);
+      return { error: null };
+    },
+    upsert: async (row: Row, o: { onConflict?: string; ignoreDuplicates?: boolean } = {}) => {
+      if (missing()) return { error: { code: "PGRST205" } };
+      const hit = o.onConflict ? state.tables[name]!.find((r) => r[o.onConflict!] === row[o.onConflict!]) : undefined;
+      if (hit) {
+        if (!o.ignoreDuplicates) Object.assign(hit, row);
+      } else state.tables[name]!.push(row);
       return { error: null };
     },
     maybeSingle: async () => {
@@ -98,8 +111,8 @@ function fakeAdmin(state: FakeState) {
       if (!objs) return { data: null, error: { message: "Bucket not found", statusCode: "404" } };
       const names = new Map<string, boolean>();
       for (const obj of objs) {
-        if (!obj.name.startsWith(`${prefix}/`)) continue;
-        const rest = obj.name.slice(prefix.length + 1);
+        if (prefix !== "" && !obj.name.startsWith(`${prefix}/`)) continue;
+        const rest = prefix === "" ? obj.name : obj.name.slice(prefix.length + 1);
         const [head, ...tail] = rest.split("/");
         names.set(head!, tail.length === 0);
       }
@@ -134,6 +147,7 @@ function fakeAdmin(state: FakeState) {
   const client = {
     auth: {
       getClaims: vi.fn(async () => (state.claims ? { data: { claims: state.claims }, error: null } : { data: null, error: { message: "bad" } })),
+      getUser: vi.fn(async () => (state.claims ? { data: { user: { id: String(state.claims.sub) } }, error: null } : { data: null, error: { message: "bad" } })),
       admin: {
         mfa: { listFactors: vi.fn(async () => ({ data: { factors: state.factors }, error: null })) },
         getUserById: vi.fn(async (id: string) => ({ data: { user: { id, email: "a@b.de", created_at: "2026-01-01T00:00:00Z", last_sign_in_at: null, factors: [] } }, error: null })),
@@ -290,7 +304,9 @@ describe("account-delete", () => {
     expect(state.deleted).toEqual([U1]);
     expect(state.storage.screenshots!.map((o) => o.name)).toEqual([`${U2}/b.png`]);
     expect(state.tables.journal_docs!.every((r) => r.user_id === U2)).toBe(true);
-    expect(state.tables.audit_log!.map((a) => (a.meta as { step: string }).step)).toEqual(["start", "done"]);
+    // Runde 11: the user's own audit rows ("start" with their id) are erased; only the closing row stays – without a user id
+    expect(state.tables.audit_log!.map((a) => (a.meta as { step: string }).step)).toEqual(["done"]);
+    expect(state.tables.audit_log![0]!.user_id).toBeNull();
   });
 
   it("never deletes while a subscription runs and Stripe is not configured", async () => {
@@ -308,7 +324,7 @@ describe("account-delete", () => {
     state.tables.profiles![0]!.plan_status = "trialing";
     const cancel = vi.fn(async (id: string) => ({ id, status: "canceled" }));
     const stripe: StripeLike = {
-      customers: { search: vi.fn(async () => ({ data: [{ id: "cus_1" }] })) },
+      customers: { search: vi.fn(async () => ({ data: [{ id: "cus_1" }] })), update: vi.fn(async (id: string) => ({ id })) },
       subscriptions: { list: vi.fn(async () => ({ data: [{ id: "sub_1", status: "trialing" }, { id: "sub_0", status: "canceled" }] })), cancel },
     };
     setStripeForTests(async () => stripe);
@@ -342,7 +358,7 @@ describe("account-delete", () => {
       { owner_id: U1, member_id: U3 },
     ];
     const stripe: StripeLike = {
-      customers: { search: vi.fn(async () => ({ data: [] })) },
+      customers: { search: vi.fn(async () => ({ data: [] })), update: vi.fn(async (id: string) => ({ id })) },
       subscriptions: { list: vi.fn(async () => ({ data: [{ id: "sub_team", status: "active" }] })), cancel: vi.fn(async (id: string) => ({ id, status: "canceled" })) },
     };
     setStripeForTests(async () => stripe);
@@ -363,6 +379,152 @@ describe("account-delete", () => {
     const r = await accountDelete(post("/api/v1/account/delete", { confirm: "LÖSCHEN" }), ctx);
     expect(r.status).toBe(502);
     expect((await r.json()).error.code).toBe("delete_failed");
+  });
+});
+
+describe("account-delete: what must not outlive the account (Runde 11)", () => {
+  const del = () => accountDelete(post("/api/v1/account/delete", { confirm: "LÖSCHEN", acknowledgeSubscription: true }), ctx);
+
+  it("the user's audit rows and the free text of their contract requests are erased; other people's stay", async () => {
+    state.tables.audit_log = [
+      { id: 1, user_id: U1, action: "auth.signin", meta: {}, ip_hash: "a".repeat(32), at: "2026-10-01T00:00:00Z" },
+      { id: 2, user_id: U2, action: "auth.signin", meta: {}, ip_hash: "b".repeat(32), at: "2026-10-01T00:00:00Z" },
+    ];
+    state.tables.contract_requests = [
+      { id: "r1", kind: "withdraw", user_id: U1, email_hash: "c".repeat(64), token_hash: "d".repeat(64), declared_name: "Anna Beispiel", contract_hint: "Pro seit Mai", status: "executed", received_at: "2026-10-02T00:00:00Z" },
+      { id: "r2", kind: "cancel", user_id: U2, email_hash: "e".repeat(64), token_hash: null, declared_name: "Bert", contract_hint: null, status: "executed", received_at: "2026-10-02T00:00:00Z" },
+    ];
+    expect((await del()).status).toBe(200);
+    expect(state.tables.audit_log!.filter((a) => a.user_id === U1)).toEqual([]);
+    expect(state.tables.audit_log!.some((a) => a.id === 2)).toBe(true);
+    // the PROOF of the declaration stays (kind, time, status), the person's text and the address hash do not
+    expect(state.tables.contract_requests![0]).toMatchObject({ kind: "withdraw", status: "executed", received_at: "2026-10-02T00:00:00Z", declared_name: null, contract_hint: null, token_hash: null, email_hash: "0".repeat(64) });
+    expect(state.tables.contract_requests![1]).toMatchObject({ declared_name: "Bert", email_hash: "e".repeat(64) });
+  });
+
+  it("the TradingView-MCP tokens are revoked AT TradingView, not only dropped here", async () => {
+    const tv = new TvMock();
+    setTvMcpFetchForTests(tv.fetch);
+    vi.stubEnv("EXCHANGE_ENC_KEY_V1", Buffer.alloc(32, 5).toString("base64"));
+    vi.stubEnv("SITE_ORIGIN", "https://journal.test");
+    vi.stubEnv("TV_MCP_CLIENT_ID", CLIENT_ID);
+    vi.stubEnv("TV_MCP_URL", MCP_URL);
+    state.tables.tv_mcp_connections = [
+      { user_id: U1, client_id: CLIENT_ID, scope: "mcp:read", resource: MCP_URL, access_enc: encrypt("at_secret", `${U1}:tv-mcp:access`), refresh_enc: encrypt("rt_secret", `${U1}:tv-mcp:refresh`), status: "active" },
+    ];
+    state.tables.tv_mcp_states = [];
+    const r = await del();
+    setTvMcpFetchForTests(null);
+    expect(r.status).toBe(200);
+    expect((await r.json()).tradingView).toEqual({ revoked: true });
+    expect(tv.revoked.sort()).toEqual(["at_secret", "rt_secret"]);
+    expect(state.tables.tv_mcp_connections).toEqual([]);
+  });
+
+  it("an account that HAD a trial leaves the keyed hash of its address (no second trial for the same address); one without does not", async () => {
+    // Stripe is configured and knows no open subscription (the trial ended): the deletion goes through
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_x");
+    setStripeForTests(async () => ({
+      customers: { search: vi.fn(async () => ({ data: [] })), update: vi.fn(async (id: string) => ({ id })) },
+      subscriptions: { list: vi.fn(async () => ({ data: [] })), cancel: vi.fn(async (id: string) => ({ id, status: "canceled" })) },
+    }));
+    state.tables.trial_tombstones = [];
+    state.tables.subscriptions = [{ id: "sub_t", user_id: U1, stripe_customer_id: "cus_1", status: "canceled", plan: "pro", seats: 1, trial_end: "2026-09-01T00:00:00Z", updated_at: "2026-10-01T00:00:00Z" }];
+    expect(await trialTombstoned("a@b.de")).toBe(false);
+    expect((await del()).status).toBe(200);
+    expect(state.tables.trial_tombstones).toHaveLength(1);
+    expect(state.tables.trial_tombstones![0]!.email_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(state.tables)).not.toContain("a@b.de");
+    expect(await trialTombstoned("a@b.de")).toBe(true);
+    expect(await trialTombstoned("A.B+Neu@b.de")).toBe(false); // another local part: another person
+    // no trial -> nothing remembered
+    state = baseState();
+    state.tables.trial_tombstones = [];
+    fakeAdmin(state);
+    expect((await del()).status).toBe(200);
+    expect(state.tables.trial_tombstones).toEqual([]);
+  });
+
+  it("the recovery codes and the Stripe customer are handled AFTER deleteUser – a failing deleteUser leaves an account with 2FA its way back", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_x");
+    state.tables.profiles![0]!.plan_status = "trialing";
+    state.tables.app_config = [{ key: `mfa-recovery:${U1}`, value: { v: 1, codes: [] } }];
+    const update = vi.fn(async (id: string, _params?: Record<string, unknown>) => ({ id }));
+    const stripe: StripeLike = {
+      customers: { search: vi.fn(async () => ({ data: [{ id: "cus_1" }] })), update },
+      subscriptions: { list: vi.fn(async () => ({ data: [{ id: "sub_1", status: "trialing" }] })), cancel: vi.fn(async (id: string) => ({ id, status: "canceled" })) },
+    };
+    setStripeForTests(async () => stripe);
+    state.failDelete = true;
+    expect((await del()).status).toBe(502);
+    expect(state.tables.app_config).toHaveLength(1); // the codes are still there
+    expect(update).not.toHaveBeenCalled(); // the customer is untouched while the account lives
+    state.failDelete = false;
+    state.rate = 1;
+    const ok = await del();
+    expect(ok.status).toBe(200);
+    expect(state.tables.app_config).toEqual([]);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0]![0]).toBe("cus_1");
+    expect(update.mock.calls[0]![1]).toMatchObject({ email: "", name: "", phone: "", address: "", metadata: { supabase_user_id: "" } });
+    expect((await ok.json()).stripeCustomers).toEqual({ anonymized: 1, failed: 0 });
+  });
+
+  it("a stolen token of a signed-out session cannot delete the account: the Auth server must still know it (live check)", async () => {
+    const auth = (await import("../../netlify/functions/_lib/supabase")).supabaseAdmin().auth as unknown as { getUser: ReturnType<typeof vi.fn> };
+    auth.getUser.mockResolvedValueOnce({ data: { user: null }, error: { message: "session_not_found" } });
+    const r = await del();
+    expect(r.status).toBe(401);
+    expect((await r.json()).error.code).toBe("invalid_token");
+    expect(state.deleted).toEqual([]);
+    auth.getUser.mockResolvedValueOnce({ data: { user: { id: U2 } }, error: null });
+    expect((await del()).status).toBe(401); // a token that belongs to somebody else
+    expect(state.deleted).toEqual([]);
+  });
+
+  it("an anonymous (guest) session is turned away everywhere", async () => {
+    state.claims = { ...state.claims, is_anonymous: true };
+    const r = await accountExport(get("/api/v1/account/export"), ctx);
+    expect(r.status).toBe(403);
+    expect((await r.json()).error.code).toBe("anonymous_not_allowed");
+    expect((await del()).status).toBe(403);
+    expect(state.deleted).toEqual([]);
+  });
+});
+
+describe("nightly job: retention and staged exports (Runde 11)", () => {
+  it("purges the security log after 365 days, requests without a contract after 30, tombstones after 24 months – and keeps the proofs", async () => {
+    const now = new Date("2026-11-07T02:00:00Z");
+    const ago = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
+    state.tables.audit_log = [
+      { id: 1, user_id: null, action: "old", meta: {}, at: ago(400) },
+      { id: 2, user_id: U1, action: "new", meta: {}, at: ago(10) },
+    ];
+    state.tables.contract_requests = [
+      { id: "a", kind: "cancel", status: "unknown", received_at: ago(40) },
+      { id: "b", kind: "cancel", status: "unknown", received_at: ago(5) },
+      { id: "c", kind: "cancel", status: "executed", received_at: ago(400) },
+      { id: "d", kind: "withdraw", status: "expired", received_at: ago(31) },
+    ];
+    state.tables.trial_tombstones = [
+      { email_hash: "a".repeat(64), created_at: ago(800) },
+      { email_hash: "b".repeat(64), created_at: ago(100) },
+    ];
+    const res = await runNightlyBackup({ now, sinceMs: 86_400_000 });
+    expect(res).toMatchObject({ purgedAudit: true, purgedRequests: true, purgedTombstones: true });
+    expect(state.tables.audit_log!.map((a) => a.id)).toEqual([2]);
+    expect(state.tables.contract_requests!.map((r) => r.id).sort()).toEqual(["b", "c"]); // the executed one is a proof: it stays
+    expect(state.tables.trial_tombstones!.map((t) => t.email_hash)).toEqual(["b".repeat(64)]);
+  });
+
+  it("removes the staged exports of EVERY user older than an hour – not only of the users who export again", async () => {
+    const now = new Date("2026-11-07T02:00:00Z");
+    const staged = (u: string, ageMs: number, n: string) => ({ name: `${u}/exports/${now.getTime() - ageMs}-${n}.json`, body: "{}" });
+    state.storage.backups = [staged(U1, 2 * 3_600_000, "old1"), staged(U2, 3 * 3_600_000, "old2"), staged(U2, 60_000, "fresh"), { name: `${U2}/2026-11-01.json`, body: "{}" }];
+    const res = await runNightlyBackup({ now, sinceMs: 1 });
+    expect(res.stagedExportsRemoved).toBe(2);
+    const left = state.storage.backups.map((o) => o.name.split("/").slice(1).join("/"));
+    expect(left.sort()).toEqual([`2026-11-01.json`, `exports/${now.getTime() - 60_000}-fresh.json`].sort());
   });
 });
 

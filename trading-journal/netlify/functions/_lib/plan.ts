@@ -6,7 +6,7 @@
 import { autoSyncAllowed, exchangeAccessAllowed, FEATURE_INFO, limitOf, PAID_PLANS, planIncludes, upgradePlanFor } from "../../../src/billing/plans";
 import { FREE_PLAN, grantsPlan, isPlanId, isPlanStatus, type Feature, type LimitKey, type PlanId, type PlanInfo } from "../../../src/billing/types";
 import { isMissingTable } from "./account";
-import { envOptional, type ServerEnvName } from "./env";
+import { envBool, envOptional, isProduction, type ServerEnvName } from "./env";
 import { HttpError } from "./http";
 import { supabaseAdmin } from "./supabase";
 
@@ -55,41 +55,79 @@ export function paymentsConfigured(): boolean {
 }
 
 /**
+ * The plan gates are OPEN (everything free) only where that is meant: without Stripe in development, in a deploy preview, in the
+ * tests – and in production only when the operator says so on purpose (`ALLOW_UNGATED=true`). A production deploy whose Stripe
+ * variables are missing or mistyped therefore FAILS CLOSED (Runde 11, Linse 1 #10): every account counts as Free, the functions that
+ * cost money (phone, SMS, AI, background sync) stay shut instead of becoming free for everybody.
+ */
+export function gatesOpen(): boolean {
+  if (paymentsConfigured()) return false;
+  return !isProduction() || envBool("ALLOW_UNGATED", false);
+}
+
+/** Production without a working Stripe set-up and without `ALLOW_UNGATED`: the server is closed, the operator must act (ops-status says so). */
+export function failsClosed(): boolean {
+  return !paymentsConfigured() && isProduction() && !envBool("ALLOW_UNGATED", false);
+}
+
+/**
+ * Features that cost money every time they are used (an Anthropic call). A subscription in the dunning window (`past_due`)
+ * keeps the plan's journal features – Stripe is still retrying the card – but NOT these, nor the telephone / SMS (`costPlanOf`):
+ * nobody uses Premium's phone or AI on the operator's money while the payment is failing (Runde 11, Linse 1 + 3).
+ */
+export const COST_FEATURES: ReadonlySet<Feature> = new Set<Feature>(["coachAi", "shotExtract"]);
+
+/** The plan for things that cost money per use: a `past_due` subscription counts as Free there. */
+export function costPlan(info: PlanInfo): PlanInfo {
+  return info.status === "past_due" ? { ...FREE_PLAN, status: info.status } : info;
+}
+
+/** `planOf` for the cost features (phone, SMS, AI): see `costPlan`. */
+export async function costPlanOf(userId: string): Promise<PlanInfo> {
+  return costPlan(await planOf(userId));
+}
+
+/**
  * Throws 402 `plan_required` (German message naming the feature, `details.required` = the cheapest paid plan with it)
- * unless the user's effective plan includes `feature` (`src/billing/plans.ts`). Not gated while payments are not set up.
+ * unless the user's effective plan includes `feature` (`src/billing/plans.ts`). Not gated while the gates are open (`gatesOpen`).
+ * The cost features (`COST_FEATURES`) are refused with 402 `payment_past_due` while the payment fails.
  */
 export async function requireFeature(userId: string, feature: Feature): Promise<PlanInfo> {
-  const info = await planOf(userId);
-  if (planIncludes(info.plan, feature) || !paymentsConfigured()) return info;
+  const base = await planOf(userId);
+  const info = COST_FEATURES.has(feature) ? costPlan(base) : base;
+  if (planIncludes(info.plan, feature) || gatesOpen()) return base;
+  if (base.status === "past_due" && COST_FEATURES.has(feature)) {
+    throw new HttpError(402, "payment_past_due", `${FEATURE_INFO[feature].label} ist pausiert, solange die letzte Zahlung nicht geklappt hat. Aktualisiere dein Zahlungsmittel im Kundenportal.`, { feature, plan: base.plan });
+  }
   throw new HttpError(402, "plan_required", `${FEATURE_INFO[feature].label} ist in deinem Tarif nicht enthalten.`, { feature, required: upgradePlanFor(feature), plan: info.plan });
 }
 
 /**
  * Manual use of a read-only exchange connection (connect, sync by hand, open positions, import): the plan needs a
- * connection quota (`exchangeAccessAllowed`; Free: 1). Not gated while payments are not set up. The AUTOMATIC sync is a
+ * connection quota (`exchangeAccessAllowed`; Free: 1). Not gated while the gates are open (`gatesOpen`). The AUTOMATIC sync is a
  * different question (`autoSyncAllowed`, the cron) – both read `src/billing/plans.ts`, the browser too.
  */
 export async function requireExchangeAccess(userId: string): Promise<PlanInfo> {
   const info = await planOf(userId);
-  if (exchangeAccessAllowed(info.plan) || !paymentsConfigured()) return info;
+  if (exchangeAccessAllowed(info.plan) || gatesOpen()) return info;
   throw new HttpError(402, "plan_required", "Börsen-Verbindungen sind in deinem Tarif nicht enthalten.", { feature: "exchangeSync", required: upgradePlanFor("exchangeSync"), plan: info.plan });
 }
 
-/** Throws 402 `plan_required` unless the plan syncs by itself in the background (Pro and up). Not gated while payments are not set up. */
+/** Throws 402 `plan_required` unless the plan syncs by itself in the background (Pro and up). Not gated while the gates are open (`gatesOpen`). */
 export async function requireAutoSync(userId: string): Promise<PlanInfo> {
   const info = await planOf(userId);
-  if (autoSyncAllowed(info.plan) || !paymentsConfigured()) return info;
+  if (autoSyncAllowed(info.plan) || gatesOpen()) return info;
   throw new HttpError(402, "plan_required", `${FEATURE_INFO.exchangeSync.label} ist in deinem Tarif nicht enthalten.`, { feature: "exchangeSync", required: upgradePlanFor("exchangeSync"), plan: info.plan });
 }
 
 /**
  * Throws 402 `limit_reached` when `used` already reaches the plan's limit for `key` (e.g. a 2nd exchange connection on
- * Pro). Returns the limit (`Infinity` = unlimited). Not enforced while payments are not set up.
+ * Pro). Returns the limit (`Infinity` = unlimited). Not enforced while the gates are open (`gatesOpen`).
  */
 export async function requireLimit(userId: string, key: LimitKey, used: number): Promise<number> {
   const info = await planOf(userId);
   const limit = limitOf(info.plan, key);
-  if (used < limit || !paymentsConfigured()) return limit;
+  if (used < limit || gatesOpen()) return limit;
   throw new HttpError(402, "limit_reached", "Das Limit deines Tarifs ist erreicht.", { key, limit, plan: info.plan });
 }
 
@@ -102,7 +140,8 @@ let reportedPayments: boolean | null = null;
  * by billing/status (every client load) and the Stripe webhook. Never throws.
  */
 export async function reportPaymentsConfig(): Promise<void> {
-  const on = paymentsConfigured();
+  // "on" = the plan gates are ENFORCED: payments are set up, or this is a production deploy that fails closed (`gatesOpen`)
+  const on = !gatesOpen();
   if (reportedPayments === on) return;
   try {
     const { error } = await supabaseAdmin()

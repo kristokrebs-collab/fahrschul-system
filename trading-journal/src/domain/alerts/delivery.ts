@@ -43,6 +43,7 @@ export type DeliveryReason =
   | "resend_busy"
   | "resend_5xx"
   | "resend_network"
+  | "mail_off"
   | "no_recipient"
   | "email_unconfirmed"
   | "not_configured"
@@ -75,6 +76,7 @@ export const DELIVERY_REASON_TEXT: Readonly<Record<DeliveryReason, string>> = {
   resend_busy: "Der Versanddienst bearbeitet gerade dieselbe Anfrage",
   resend_5xx: "Der Versanddienst antwortet nicht",
   resend_network: "Der Versanddienst ist nicht erreichbar",
+  mail_off: "Übersprungen: Notschalter (E-Mail) des Betreibers ist an",
   no_recipient: "Keine E-Mail-Adresse im Konto",
   email_unconfirmed: "E-Mail-Adresse nicht bestätigt",
   not_configured: "Auf dem Server nicht eingerichtet",

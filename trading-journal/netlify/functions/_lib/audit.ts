@@ -3,7 +3,8 @@
  * Sicherheit); only functions write. Never throws – an audit failure must not break the action.
  */
 import { createHash, createHmac } from "node:crypto";
-import { envOptional } from "./env";
+import { envOptional, isProduction } from "./env";
+import { HttpError } from "./http";
 import { supabaseAdmin } from "./supabase";
 
 export type AuditAction =
@@ -44,10 +45,39 @@ export function scrubMeta(meta: unknown, depth = 0): unknown {
  * audit log and the rate limits live in Supabase) – the fixed key only keeps tests and local runs working.
  */
 function ipPepper(): string {
-  const own = envOptional("IP_HASH_PEPPER");
-  if (own) return own;
+  const ring = pepperRing();
+  const first = ring[0];
+  if (!first) throw new HttpError(500, "server_misconfigured", "Der Server ist nicht vollständig eingerichtet.");
+  return first;
+}
+
+/**
+ * Every key a pseudonym or hash may have been made with, NEWEST FIRST (Runde 11, Linse 3 #9):
+ *  1. the explicit, versioned pepper: `IP_HASH_PEPPER_V9` … `IP_HASH_PEPPER_V2`, then `IP_HASH_PEPPER` (= version 1). New hashes use the
+ *     first one; old hashes stay checkable with the older ones (rotate by adding `IP_HASH_PEPPER_V2`, remove V1 only when no recovery
+ *     code or tombstone made with it is left to matter);
+ *  2. the LEGACY key derived from `SUPABASE_SECRET_KEY` – only so that recovery codes made before the pepper was set keep working (checked,
+ *     never used to make a new hash while an explicit pepper exists);
+ *  3. the fixed local key `tj-local-only` – ONLY outside production (tests, `netlify dev`). A public constant must never key anything in
+ *     production: there the ring is just what the operator configured.
+ */
+export function pepperRing(): string[] {
+  const out: string[] = [];
+  for (let v = 9; v >= 2; v--) {
+    const k = envOptional(`IP_HASH_PEPPER_V${v}`);
+    if (k) out.push(k);
+  }
+  const v1 = envOptional("IP_HASH_PEPPER");
+  if (v1) out.push(v1);
   const sb = envOptional("SUPABASE_SECRET_KEY");
-  return sb ? createHash("sha256").update(`tj-ip-pepper:${sb}`).digest("hex") : "tj-local-only";
+  if (sb) out.push(createHash("sha256").update(`tj-ip-pepper:${sb}`).digest("hex"));
+  if (!isProduction()) out.push("tj-local-only");
+  return out;
+}
+
+/** True when the operator set an explicit pepper (`IP_HASH_PEPPER`, `IP_HASH_PEPPER_V<n>`): what a long-lived hash (recovery codes) requires in production. */
+export function pepperConfigured(): boolean {
+  return !!envOptional("IP_HASH_PEPPER") || [2, 3, 4, 5, 6, 7, 8, 9].some((v) => !!envOptional(`IP_HASH_PEPPER_V${v}`));
 }
 
 /**
@@ -56,6 +86,11 @@ function ipPepper(): string {
  */
 export function purposeKey(purpose: string): string {
   return createHmac("sha256", ipPepper()).update(`tj-purpose:${purpose}`).digest("hex");
+}
+
+/** The purpose key under EVERY key of the ring, newest first – to CHECK a hash that may predate a rotation. */
+export function purposeKeys(purpose: string): string[] {
+  return pepperRing().map((k) => createHmac("sha256", k).update(`tj-purpose:${purpose}`).digest("hex"));
 }
 
 /** Pseudonym of an IP for the audit log: truncated HMAC-SHA-256 with the server secret (`null` passes through). */

@@ -14,9 +14,15 @@
  *
  * Env (Netlify secrets, scope Functions): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_<PRO|PREMIUM|TEAM>_<MONTHLY|
  * YEARLY>, TRIAL_DAYS (14), optional STRIPE_TRIAL_CARDLESS (trial without card), STRIPE_AUTOMATIC_TAX (Stripe Tax),
- * REFERRAL_TRIAL_DAYS (30), REFERRAL_REWARD_CENTS (1000), SITE_ORIGIN.
+ * REFERRAL_TRIAL_DAYS (30), REFERRAL_REWARD_CENTS (1000), REFERRAL_HOLD_DAYS (14), SITE_ORIGIN.
+ *
+ * Runde 11 (Sicherheits-Fixpaket, Paket A): the members of a team are re-checked on EVERY event of the owner's subscription (plan change,
+ * fewer seats: the surplus loses its seat), a trial is used once per ADDRESS even across a deleted account (tombstone of the e-mail hash),
+ * a referral credit needs a real payment of at least the credit and waits `REFERRAL_HOLD_DAYS` before it reaches the Stripe balance, a full
+ * refund or a dispute takes it back (`charge.refunded`, `charge.dispute.created` → ledger `reversal`), and `recomputePlan` checks after
+ * writing that nothing moved meanwhile. `_lib/billingReconcile.ts` compares everything with Stripe once a day.
  */
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import Stripe from "stripe";
 import {
   normalizePromoCode,
@@ -57,7 +63,7 @@ import {
   type PlanStatus,
 } from "../../../src/billing/types";
 import { isMissingTable } from "./account";
-import { audit } from "./audit";
+import { audit, purposeKeys } from "./audit";
 import type { AuthUser } from "./auth";
 import { envOptional, type ServerEnvName } from "./env";
 import { HttpError } from "./http";
@@ -68,7 +74,7 @@ import { supabaseAdmin } from "./supabase";
 /* ------------------------------------------------------------------ env */
 
 /** Optional billing env names beyond `SERVER_ENV` (documented in `.env.example`). */
-type BillingEnvName = ServerEnvName | "STRIPE_TRIAL_CARDLESS" | "STRIPE_AUTOMATIC_TAX" | "REFERRAL_TRIAL_DAYS" | "REFERRAL_REWARD_CENTS";
+type BillingEnvName = ServerEnvName | "STRIPE_TRIAL_CARDLESS" | "STRIPE_AUTOMATIC_TAX" | "REFERRAL_TRIAL_DAYS" | "REFERRAL_REWARD_CENTS" | "REFERRAL_HOLD_DAYS";
 
 const benv = (name: BillingEnvName): string | undefined => envOptional(name as ServerEnvName);
 
@@ -109,6 +115,9 @@ export const billingConfigured = paymentsConfigured;
 export const trialDays = (): number => benvInt("TRIAL_DAYS", DEFAULT_TRIAL_DAYS, 0, 60);
 export const referralTrialDays = (): number => benvInt("REFERRAL_TRIAL_DAYS", DEFAULT_REFERRAL_TRIAL_DAYS, 0, 90);
 export const referralRewardCents = (): number => benvInt("REFERRAL_REWARD_CENTS", DEFAULT_REFERRAL_REWARD_CENTS, 0, 100_000);
+/** Days a referral credit waits (pending) before it is put on the referrer's Stripe balance – the time in which a refund or dispute can still arrive. */
+export const REFERRAL_HOLD_DEFAULT_DAYS = 14;
+export const referralHoldDays = (): number => benvInt("REFERRAL_HOLD_DAYS", REFERRAL_HOLD_DEFAULT_DAYS, 0, 120);
 export const cardlessTrial = (): boolean => benvBool("STRIPE_TRIAL_CARDLESS");
 export const automaticTax = (): boolean => benvBool("STRIPE_AUTOMATIC_TAX");
 
@@ -137,6 +146,8 @@ export interface StripeApi {
     cancel(id: string, params?: Stripe.SubscriptionCancelParams): Promise<Stripe.Subscription>;
   };
   invoices: { list(params: Stripe.InvoiceListParams): Promise<{ data: Stripe.Invoice[] }> };
+  /** Which invoice a payment (PaymentIntent of a refunded / disputed charge) paid – the API 2025+ way (a charge no longer names its invoice). */
+  invoicePayments: { list(params: Stripe.InvoicePaymentListParams): Promise<{ data: Stripe.InvoicePayment[] }> };
   promotionCodes: { list(params: Stripe.PromotionCodeListParams): Promise<{ data: Stripe.PromotionCode[] }> };
   prices: { retrieve(id: string): Promise<Stripe.Price> };
   webhooks: { constructEventAsync(payload: string, header: string, secret: string): Promise<Stripe.Event> };
@@ -354,24 +365,68 @@ export async function linkCustomer(userId: string, customerId: string): Promise<
   if (error && !isMissingTable(error) && error.code !== "23505" && error.code !== FK_VIOLATION) dbFail("billing_customers write", error);
 }
 
-/** The best plan a user is entitled to: own granting subscriptions and a team seat of an owner with a live team plan. */
-export async function recomputePlan(userId: string): Promise<PlanInfo> {
+/** The owner's members in the order they joined (oldest first; ties by id) – the first `seats - 1` hold a seat that is paid for. */
+async function seatMembers(ownerId: string): Promise<string[] | null> {
+  const { data, error } = await supabaseAdmin().from("team_seats").select("member_id,created_at").eq("owner_id", ownerId).limit(1000);
+  if (error) {
+    if (!isMissingTable(error)) console.error("[fn] team_seats read failed", error.code);
+    return null;
+  }
+  return ((data ?? []) as { member_id: string; created_at?: string | null }[])
+    .sort((a, b) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")) || a.member_id.localeCompare(b.member_id))
+    .map((m) => m.member_id);
+}
+
+/** The owner's live team subscription (the one that pays for the seats), or undefined. */
+async function liveTeam(ownerId: string): Promise<SubscriptionRow | undefined> {
+  return (await subscriptionRows(ownerId)).find((r) => r.plan === "team" && grantsPlan(r.status));
+}
+
+/**
+ * What a user is entitled to RIGHT NOW (read only): own granting subscriptions and a team seat of an owner with a live team plan –
+ * but only while the seat lies within the seats the owner pays for (the owner takes one; the newest members are the surplus,
+ * Runde 11 Linse 1 #1: a Portal downgrade must not leave the members on Team for good).
+ */
+async function computePlan(userId: string): Promise<PlanInfo> {
   const sb = supabaseAdmin();
   const own = await subscriptionRows(userId);
   const candidates: PlanInfo[] = own.filter((r) => grantsPlan(r.status)).map((r) => ({ plan: r.plan, status: r.status, trialEnd: r.trial_end }));
   const seat = await sb.from("team_seats").select("owner_id").eq("member_id", userId).maybeSingle();
   const ownerId = validUuid((seat.data as { owner_id?: string } | null)?.owner_id);
   if (ownerId) {
-    const team = (await subscriptionRows(ownerId)).find((r) => r.plan === "team" && grantsPlan(r.status));
-    if (team) candidates.push({ plan: "team", status: team.status, trialEnd: null });
+    const team = await liveTeam(ownerId);
+    if (team) {
+      const members = await seatMembers(ownerId);
+      const paid = Math.max(0, team.seats - 1);
+      if (members?.slice(0, paid).includes(userId)) candidates.push({ plan: "team", status: team.status, trialEnd: null });
+    }
   }
   const statusRank = (s: PlanStatus) => (s === "active" ? 3 : s === "trialing" ? 2 : 1);
   const best = candidates.sort((a, b) => PLAN_RANK[b.plan] - PLAN_RANK[a.plan] || statusRank(b.status) - statusRank(a.status))[0];
   const latest = own[0];
-  const info: PlanInfo = best ?? { plan: "free", status: latest?.status ?? "none", trialEnd: null };
-  const { error } = await sb.from("profiles").update({ plan: info.plan, plan_status: info.status, trial_end: info.trialEnd }).eq("id", userId);
-  if (error) dbFail("profiles plan write", error);
-  return info;
+  return best ?? { plan: "free", status: latest?.status ?? "none", trialEnd: null };
+}
+
+const samePlan = (a: PlanInfo, b: PlanInfo): boolean => a.plan === b.plan && a.status === b.status && a.trialEnd === b.trialEnd;
+
+/**
+ * The best plan a user is entitled to, written to `profiles` (the only writer of `plan / plan_status / trial_end`). Two events of one
+ * subscription can arrive at the same moment: the one that READ older facts could write last and leave a ended subscription on Pro
+ * (Linse 1 #13). So after every write the facts are read again; when they moved meanwhile, the newest state is written – the last writer
+ * always wrote what it saw AFTER its write, so the profile converges on the real state (three rounds at most, the daily
+ * `billing-reconcile` catches the rest).
+ */
+export async function recomputePlan(userId: string): Promise<PlanInfo> {
+  const sb = supabaseAdmin();
+  let info = await computePlan(userId);
+  for (let round = 0; ; round++) {
+    const { error } = await sb.from("profiles").update({ plan: info.plan, plan_status: info.status, trial_end: info.trialEnd }).eq("id", userId);
+    if (error) dbFail("profiles plan write", error);
+    if (round >= 2) return info;
+    const check = await computePlan(userId);
+    if (samePlan(info, check)) return info;
+    info = check;
+  }
 }
 
 export interface SyncResult {
@@ -425,17 +480,33 @@ export async function syncSubscription(
   // (review MONEY-02). recordReferral is idempotent (first referrer wins).
   if (row.ref_code) await recordReferral(row.ref_code, userId, sub.id);
   const plan = await recomputePlan(userId);
-  if (row.plan === "team") await recomputeMembers(userId);
+  // EVERY event of the owner's subscription, not only a team one: after a switch from Team to Pro (Customer Portal) or fewer seats the
+  // members must lose the plan / the seat at once (Linse 1 #1)
+  await recomputeMembers(userId);
   return { userId, row, plan };
 }
 
-async function recomputeMembers(ownerId: string): Promise<void> {
-  const { data, error } = await supabaseAdmin().from("team_seats").select("member_id").eq("owner_id", ownerId).limit(1000);
-  if (error) {
-    if (!isMissingTable(error)) console.error("[fn] team_seats read failed", error.code);
-    return;
+/**
+ * Re-checks the members of an owner's team. While the owner has a live team subscription the seats beyond the paid ones are removed
+ * (newest first – the owner takes one seat, `seats - 1` members stay); without one the seat rows stay (the owner may come back) but
+ * every member's plan is recomputed, which no longer counts them. Called on every subscription event of the owner and by the daily
+ * reconcile. Returns the number of seats removed.
+ */
+export async function recomputeMembers(ownerId: string): Promise<number> {
+  const members = await seatMembers(ownerId);
+  if (!members?.length) return 0;
+  let removed = 0;
+  const team = await liveTeam(ownerId);
+  if (team) {
+    for (const m of members.slice(Math.max(0, team.seats - 1))) {
+      const { error } = await supabaseAdmin().from("team_seats").delete().eq("owner_id", ownerId).eq("member_id", m);
+      if (error) dbFail("team_seats delete", error);
+      removed++;
+    }
+    if (removed) await audit(ownerId, "billing.seats", { removed, seats: team.seats, members: members.length });
   }
-  for (const m of (data ?? []) as { member_id: string }[]) await recomputePlan(m.member_id);
+  for (const m of members) await recomputePlan(m);
+  return removed;
 }
 
 /* ------------------------------------------------------------------ team seats (P12 links them to groups) */
@@ -588,11 +659,73 @@ export async function ensureCustomer(user: Pick<AuthUser, "id" | "email">): Prom
   return winner;
 }
 
-/** True when the user already had a trial (no second one). */
-export async function trialUsed(userId: string, rows?: readonly SubscriptionRow[]): Promise<boolean> {
+/**
+ * The address in the one form a trial is remembered by: lower case, without a `+tag` in the local part, and for Gmail without dots –
+ * so `Anna.Beispiel+neu@gmail.com` and `annabeispiel@gmail.com` are one person. Not an identity check, a speed bump for serial trials.
+ */
+export function trialEmailKey(email: string): string | null {
+  const e = email.trim().toLowerCase();
+  const at = e.lastIndexOf("@");
+  if (at < 1 || at === e.length - 1 || e.length > 254) return null;
+  let local = e.slice(0, at);
+  let domain = e.slice(at + 1);
+  local = local.split("+")[0] ?? local;
+  if (domain === "googlemail.com") domain = "gmail.com";
+  if (domain === "gmail.com") local = local.replace(/\./g, "");
+  return local ? `${local}@${domain}` : null;
+}
+
+/** HMAC of the trial key under EVERY key of the pepper ring, newest first (a rotated pepper must not give a second trial). Never the address itself. */
+function trialHashes(email: string): string[] {
+  const key = trialEmailKey(email);
+  return key ? purposeKeys("trial-email").map((k) => createHmac("sha256", k).update(key).digest("hex")) : [];
+}
+
+/** True when this ADDRESS already had a trial under an account that has since been deleted (`trial_tombstones`, migration 0019). */
+export async function trialTombstoned(email: string | null | undefined): Promise<boolean> {
+  if (!email) return false;
+  const hashes = trialHashes(email);
+  if (!hashes.length) return false;
+  for (const h of hashes) {
+    const { data, error } = await supabaseAdmin().from("trial_tombstones").select("email_hash").eq("email_hash", h).maybeSingle();
+    if (error) {
+      if (isMissingTable(error)) return false;
+      dbFail("trial_tombstones read", error);
+    }
+    if (data) return true;
+  }
+  return false;
+}
+
+/**
+ * Account deletion: remembers that this address had a trial (only the keyed hash, no address, no user id) so the same address cannot
+ * start the next trial the day after (Linse 1 #6). Only written when the account really had one. Best effort – never blocks the deletion.
+ * Returns whether a tombstone was written.
+ */
+export async function recordTrialTombstone(userId: string, email: string | null | undefined): Promise<boolean> {
+  try {
+    if (!email || !(await trialUsed(userId))) return false;
+    const hashes = trialHashes(email);
+    const first = hashes[0];
+    if (!first) return false;
+    const { error } = await supabaseAdmin().from("trial_tombstones").upsert({ email_hash: first }, { onConflict: "email_hash", ignoreDuplicates: true });
+    if (error) {
+      if (!isMissingTable(error)) console.error("[fn] trial_tombstones write failed", error.code);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[fn] trial tombstone failed", e instanceof Error ? e.name : typeof e);
+    return false;
+  }
+}
+
+/** True when the user (or, with `email`, the address of a deleted account) already had a trial (no second one). */
+export async function trialUsed(userId: string, rows?: readonly SubscriptionRow[], email?: string | null): Promise<boolean> {
   const list = rows ?? (await subscriptionRows(userId));
   if (list.some((r) => r.trial_end)) return true;
-  return (await planOf(userId)).trialEnd !== null;
+  if ((await planOf(userId)).trialEnd !== null) return true;
+  return trialTombstoned(email);
 }
 
 /** A live promotion code by its customer-facing code (null when unknown / inactive / used up / expired). */
@@ -670,7 +803,7 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
     throw new HttpError(409, "already_subscribed", "Du hast schon ein Abo. Tarif wechseln oder kündigen kannst du im Kundenportal.");
   }
   const consentHash = await checkConsents(body.consents, body.consentHash);
-  const used = await trialUsed(user.id, rows);
+  const used = await trialUsed(user.id, rows, user.email);
   let ref = normalizeRefCode(body.ref);
   const referrer = ref ? await referrerOf(ref) : null;
   if (!referrer || referrer === user.id) ref = null;
@@ -697,7 +830,8 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
     consent_hash: consentHash,
     ...(ref ? { ref } : {}),
   };
-  const cardless = days > 0 && cardlessTrial();
+  // a trial WITHOUT a card only for Pro: Premium and Team carry the telephone, SMS and AI the operator pays per use (Linse 1 #6)
+  const cardless = days > 0 && cardlessTrial() && body.plan === "pro";
   const tax = automaticTax();
   const params: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
@@ -859,15 +993,21 @@ export async function recordReferral(code: string, referredId: string, subscript
   if (error && !isMissingTable(error) && error.code !== "23505") dbFail("referrals write", error);
 }
 
-/** Applies the referrer's pending credits to their Stripe balance (negative balance = credit on the next invoices). */
-export async function applyPendingCredits(referrerId: string, customerId: string): Promise<number> {
+/**
+ * Applies the referrer's pending credits to their Stripe balance (negative balance = credit on the next invoices) – but only those
+ * that have waited `REFERRAL_HOLD_DAYS` since the payment: a refund or a dispute of the referred person's first payment usually arrives
+ * within that time, and a credit that already sits on the balance has to be taken back by a second booking (Linse 1 #3).
+ */
+export async function applyPendingCredits(referrerId: string, customerId: string, now = Date.now()): Promise<number> {
   const sb = supabaseAdmin();
+  const cutoff = new Date(now - referralHoldDays() * 86_400_000).toISOString();
   const { data, error } = await sb
     .from("affiliate_ledger")
     .select("id,amount,currency")
     .eq("referrer_id", referrerId)
     .eq("kind", "credit")
     .eq("status", "pending")
+    .lte("created_at", cutoff)
     .limit(50);
   if (error) {
     if (!isMissingTable(error)) console.error("[fn] ledger read failed", error.code);
@@ -938,6 +1078,9 @@ export async function rewardReferral(inv: Stripe.Invoice, subscriptionId: string
     if (ins.error) dbFail("ledger write", ins.error);
   } else if (referral.status !== "paying") {
     const reward = referralRewardCents();
+    // a real payment: at least what the credit is worth. An invoice of one cent (a 100 % code plus a cent) earned the referrer ten euros
+    // for nothing (Linse 1 #3) – such a payment neither pays a credit nor counts as the conversion; a later full invoice still does
+    if (reward > 0 && inv.amount_paid < reward) return;
     if (reward > 0) {
       const ins = await sb
         .from("affiliate_ledger")
@@ -963,6 +1106,90 @@ export async function rewardReferral(inv: Stripe.Invoice, subscriptionId: string
       .from("referrals")
       .update({ status: "paying", converted_at: referral.converted_at ?? now })
       .eq("id", referral.id);
+}
+
+/**
+ * A refund or a dispute of the payment that earned a credit / commission takes it back (Linse 1 #3; the ledger kind `reversal` existed,
+ * nothing wrote it). Per ledger row of that invoice:
+ *  - still `pending` (waiting out the hold): `void` – it never reaches the balance;
+ *  - `applied` (credit on the referrer's Stripe balance): a booking of the same amount the other way (positive balance transaction,
+ *    idempotent per row) and a `reversal` row;
+ *  - `paid` (a commission the operator paid out by hand): a `reversal` row, status `pending` – the operator settles it by hand.
+ * The referral goes back to `canceled`, so a later REAL payment of that person can still earn the credit once. Idempotent per invoice
+ * (`unique (stripe_invoice_id, kind)`); returns the number of ledger rows it changed.
+ */
+export async function reverseReferralForInvoice(invoiceId: string): Promise<number> {
+  const sb = supabaseAdmin();
+  const { data, error } = await sb
+    .from("affiliate_ledger")
+    .select("id,referrer_id,referral_id,kind,amount,currency,status")
+    .eq("stripe_invoice_id", invoiceId)
+    .limit(10);
+  if (error) {
+    if (isMissingTable(error)) return 0;
+    dbFail("ledger read", error);
+  }
+  const rows = (data ?? []) as { id: number; referrer_id: string; referral_id: number | null; kind: string; amount: number; currency: string; status: string }[];
+  if (rows.some((r) => r.kind === "reversal")) return 0;
+  let changed = 0;
+  for (const row of rows) {
+    if (row.kind !== "credit" && row.kind !== "commission") continue;
+    if (row.status === "void") continue;
+    let txnId: string | null = null;
+    let status: "applied" | "pending" = "pending";
+    if (row.status === "pending") {
+      const up = await sb.from("affiliate_ledger").update({ status: "void" }).eq("id", row.id);
+      if (up.error) dbFail("ledger write", up.error);
+      changed++;
+    } else if (row.status === "applied" && row.kind === "credit") {
+      const customer = await customerIdOf(row.referrer_id);
+      if (customer) {
+        const txn = await stripeCall("balance reversal", () =>
+          stripeApi().customers.createBalanceTransaction(
+            customer,
+            { amount: Math.abs(row.amount), currency: row.currency, description: "Empfehlungs-Gutschrift zurückgenommen (Erstattung oder Rückbuchung)" },
+            { idempotencyKey: `tj-ref-reversal-${row.id}` },
+          ),
+        );
+        txnId = txn.id;
+        status = "applied";
+      }
+    }
+    if (row.status === "applied" || row.status === "paid") {
+      const ins = await sb.from("affiliate_ledger").upsert(
+        {
+          referrer_id: row.referrer_id,
+          referral_id: row.referral_id,
+          kind: "reversal",
+          amount: row.amount,
+          currency: row.currency,
+          status,
+          stripe_invoice_id: invoiceId,
+          ...(txnId ? { stripe_balance_txn_id: txnId } : {}),
+        },
+        { onConflict: "stripe_invoice_id,kind", ignoreDuplicates: true },
+      );
+      if (ins.error) dbFail("ledger write", ins.error);
+      changed++;
+    }
+    if (row.referral_id != null) await sb.from("referrals").update({ status: "canceled" }).eq("id", row.referral_id);
+  }
+  return changed;
+}
+
+/** The invoices a PaymentIntent paid (API 2025+: `invoice_payments`), plus the legacy `charge.invoice` when the object still has it. */
+async function invoicesOfPayment(paymentIntent: string | null, legacyInvoice: unknown): Promise<string[]> {
+  const out = new Set<string>();
+  const legacy = idOf(legacyInvoice);
+  if (legacy) out.add(legacy);
+  if (paymentIntent) {
+    const res = await stripeCall("invoice payments", () => stripeApi().invoicePayments.list({ payment: { type: "payment_intent", payment_intent: paymentIntent }, limit: 5 }));
+    for (const p of res.data) {
+      const id = idOf((p as { invoice?: unknown }).invoice);
+      if (id) out.add(id);
+    }
+  }
+  return [...out];
 }
 
 /** The user's referral page data (creates the code on first call). */
@@ -1013,7 +1240,7 @@ const SUB_EVENTS = new Set([
 ]);
 
 /** Re-reads a subscription from Stripe (latest state); null when that fails (the caller then uses the snapshot). */
-async function freshSubscription(id: string): Promise<Stripe.Subscription | null> {
+export async function freshSubscription(id: string): Promise<Stripe.Subscription | null> {
   try {
     return await stripeApi().subscriptions.retrieve(id);
   } catch (e) {
@@ -1053,6 +1280,18 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<"processed
       await audit(res.userId, "billing.subscription", { event: "trial_will_end", trialEnd: res.row.trial_end });
     }
     return "processed";
+  }
+  if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
+    // only a FULL refund takes a credit back (`refunded` is true only then; a partial one leaves the payment standing); a dispute always does
+    const obj = event.data.object as Stripe.Charge | Stripe.Dispute;
+    const isDispute = event.type === "charge.dispute.created";
+    if (!isDispute && !(obj as Stripe.Charge).refunded) return "ignored";
+    const paymentIntent = idOf((obj as { payment_intent?: unknown }).payment_intent);
+    const invoices = await invoicesOfPayment(paymentIntent, (obj as { invoice?: unknown }).invoice);
+    let changed = 0;
+    for (const id of invoices) changed += await reverseReferralForInvoice(id);
+    if (changed) console.error("[fn] referral booking reversed", event.type, changed);
+    return changed ? "processed" : "ignored";
   }
   if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
     const inv = event.data.object as Stripe.Invoice;
@@ -1144,7 +1383,7 @@ export async function billingStatus(user: AuthUser | null, opts: { invoices?: bo
     subscription: current ? summaryOf(current) : null,
     invoices,
     hasCustomer: !!customer,
-    trialUsed: rows.some((r) => r.trial_end) || plan.trialEnd !== null,
+    trialUsed: rows.some((r) => r.trial_end) || plan.trialEnd !== null || (await trialTombstoned(user.email)),
     team,
   };
 }

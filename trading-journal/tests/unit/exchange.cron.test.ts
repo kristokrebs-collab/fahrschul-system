@@ -56,7 +56,8 @@ vi.mock("../../netlify/functions/_lib/supabase", () => ({
 }));
 vi.mock("../../netlify/functions/_lib/plan", () => ({
   paymentsConfigured: () => true,
-  planOf: async (uid: string) => ({ plan: uid.startsWith("payer") ? "pro" : "free", status: uid.startsWith("payer") ? "active" : "canceled", trialEnd: null }),
+  gatesOpen: () => false,
+  planOf: async (uid: string) => ({ plan: uid.startsWith("premium") ? "premium" : uid.startsWith("payer") ? "pro" : "free", status: uid.startsWith("payer") || uid.startsWith("premium") ? "active" : "canceled", trialEnd: null }),
 }));
 vi.mock("../../netlify/functions/_lib/exchanges/api", () => ({ cronEnabled: () => true }));
 vi.mock("../../netlify/functions/_lib/exchanges/sync", () => ({
@@ -71,6 +72,7 @@ vi.mock("../../netlify/functions/_lib/exchanges/store", () => ({
   CONNECTION_COLUMNS: "id,user_id,status,sync_enabled,last_sync_at",
   runningRun: async () => null,
   loadConnection: async (_u: string, id: string) => ({ id }),
+  listConnections: async (userId: string) => db.rows.filter((r) => r.user_id === userId).map((r) => ({ ...r })),
   profileTz: async () => null,
   rotateStaleConnections: async () => ({ rotated: 0, failed: 0, remaining: 0 }),
 }));
@@ -81,6 +83,7 @@ let clock = NOW;
 const conn = (id: string, user: string, lastSyncAgoMs: number | null): Row => ({
   id,
   user_id: user,
+  created_at: `2026-09-${String(10 + (Number(id.replace(/\D/g, "")) % 15)).padStart(2, "0")}T08:00:00.000Z`,
   status: "active",
   sync_enabled: true,
   last_sync_at: lastSyncAgoMs === null ? null : new Date(NOW - lastSyncAgoMs).toISOString(),
@@ -159,5 +162,32 @@ describe("exchange-sync-cron: fair queue (review SYNC-01)", () => {
     db.hasSchedule = false;
     db.rows = [conn("a", "payer", 2 * H)];
     expect(await run(0)).toMatchObject({ considered: 1, synced: 1 });
+  });
+});
+
+describe("exchange-sync-cron: backgroundSyncConnections (Runde 11, Linse 1 #4)", () => {
+  it("a Pro account with three connections gets ONE synced in the background (the oldest) – before the fix all three ran", async () => {
+    // created_at of conn(): c1 → 11th, c2 → 12th, c3 → 13th (the number in the id decides the day)
+    db.rows = [conn("c3", "payer", 3 * H), conn("c1", "payer", 3 * H), conn("c2", "payer", 3 * H)];
+    const r = await run(0);
+    expect(r).toMatchObject({ considered: 3, synced: 1, skipped: 2 });
+    expect(synced).toEqual(["c1"]);
+    // the others are looked at again later (the plan check), not hammered
+    expect(db.rows.filter((x) => x.id !== "c1").every((x) => Date.parse(x.next_sync_at as string) === NOW + CRON_PLAN_RECHECK_MS)).toBe(true);
+  });
+
+  it("Premium syncs up to five; the sixth waits", async () => {
+    db.rows = Array.from({ length: 6 }, (_, i) => conn(`c${i + 1}`, "premium1", 3 * H));
+    const r = await run(0);
+    expect(r).toMatchObject({ synced: 5, skipped: 1 });
+    expect(synced).not.toContain("c6");
+  });
+
+  it("a connection that is not active does not use up a place of the plan", async () => {
+    db.rows = [conn("c1", "payer", 3 * H), conn("c2", "payer", 3 * H)];
+    db.rows[0]!.status = "invalid"; // the oldest one is dead: not selected by the cron, and it must not block c2
+    const r = await run(0);
+    expect(r.synced).toBe(1);
+    expect(synced).toEqual(["c2"]);
   });
 });
