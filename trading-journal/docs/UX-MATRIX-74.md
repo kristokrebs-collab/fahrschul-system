@@ -158,7 +158,7 @@ Nur dort, wo es klein und sicher ist; die primären Aktionen („Trade eintragen
 
 | Nr | Vereinfachung | Wo | Funktion |
 |---|---|---|---|
-| V1 | **Pflichtfeld-Markierung**: das Feldlabel trägt ein kleines „Pflicht“ (Screenreader: „Pflichtfeld“); optionale Felder bleiben unmarkiert. Neue Eigenschaft `required` an `Field` (`src/primitives/Field.tsx`). | Schlüsselmarke: Preis · Eigene Termine: Titel und Zeitpunkt · Gruppe anlegen: Name | F09, F43, F72 |
+| V1 | **Pflichtfeld-Markierung**: das Feldlabel trägt ein kleines „Pflicht“ (erzeugter Inhalt `::after`, damit Teil des zugänglichen Namens; `data-required` am Label); optionale Felder bleiben unmarkiert. Neue Eigenschaft `required` an `Field` (`src/primitives/Field.tsx`). | Schlüsselmarke: Preis · Eigene Termine: Titel und Zeitpunkt · Gruppe anlegen: Name | F09, F43, F72 |
 | V2 | **Fehler am Feld**: der Fehlertext unter einem Feld verschwindet, sobald das Feld bearbeitet wird (er bezog sich auf den alten Wert). | Schlüsselmarke: Preis, Zeiteinheit, Invalidierung | F09 |
 | V3 | **Werte übernehmen**: „Aktuellen Preis übernehmen (…)“ setzt den Live-Preis ins Preisfeld (Tippfläche ≥ 44 px auf Touch). | Schlüsselmarke: Preis | F09 |
 | V4 | **Fehler am Feld** wie V2 | Eigene Termine: Titel, Zeitpunkt | F43 |

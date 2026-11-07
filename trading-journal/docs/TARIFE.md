@@ -199,7 +199,7 @@ der Browser spiegelt ihn. Solange Zahlungen nicht eingerichtet sind, ist nichts 
 | F29 | Automatischer Screenshot-Import | Free | Premium | Kern | Kern | voll | voll | Screenshot-Import pro Tag, Screenshot-Speicher |
 | F30 | Börsen-/CSV-Import und Fills | Free | Premium | Kern | Kern | voll | voll | Screenshot-Import pro Tag, Börsen-Verbindungen, Automatischer Abgleich im Hintergrund |
 | F53 | Backups und Wiederherstellung | Free | Free | voll | voll | voll | voll | – |
-| F56 | Zuverlässige Integrationen | Pro | Pro | – | voll | voll | voll | Börsen-Verbindungen, Automatischer Abgleich im Hintergrund |
+| F56 | Zuverlässige Integrationen | Free | Pro | Kern | voll | voll | voll | Börsen-Verbindungen, Automatischer Abgleich im Hintergrund |
 
 **Community & Teilen**
 
