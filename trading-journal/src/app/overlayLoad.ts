@@ -26,15 +26,25 @@ const LOADERS = {
   setup: () => import("@/overlays/SetupEditor"),
 } as const;
 
-type Loaded<K extends OverlayId> = Awaited<ReturnType<(typeof LOADERS)[K]>>;
+/** The module of an overlay chunk (`import("@/overlays/TradeEditor")` …). */
+export type OverlayModule<K extends OverlayId> = Awaited<ReturnType<(typeof LOADERS)[K]>>;
+type Loaded<K extends OverlayId> = OverlayModule<K>;
 
 const started = new Map<OverlayId, Promise<unknown>>();
+const loaded = new Map<OverlayId, unknown>();
+
+/** The module once its download has finished, else `undefined` – lets the lazy components render without suspending. */
+export function getLoadedOverlay<K extends OverlayId>(id: K): OverlayModule<K> | undefined {
+  return loaded.get(id) as OverlayModule<K> | undefined;
+}
 
 /** The overlay's module; one download per overlay (shared by the lazy component and every preload). */
 export function loadOverlay<K extends OverlayId>(id: K): Promise<Loaded<K>> {
   let p = started.get(id) as Promise<Loaded<K>> | undefined;
   if (!p) {
     p = LOADERS[id]() as Promise<Loaded<K>>;
+    // registered first, so every later `.then` (arming, the lazy component) already finds the module
+    void p.then((m) => void loaded.set(id, m));
     // a failed download (offline, a deploy replaced the chunk) may be tried again
     p.catch(() => started.delete(id));
     started.set(id, p);

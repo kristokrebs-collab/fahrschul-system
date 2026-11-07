@@ -92,6 +92,19 @@ describe("overlay loading (Budget-Schnitt)", () => {
     expect(isOverlayArmed("editor")).toBe(true);
   });
 
+  it("once the chunk has arrived an overlay renders in the same commit that mounts it (no lazy suspension: the dock disc morph needs it)", async () => {
+    await act(async () => {
+      await preloadOverlay("editor");
+    });
+    render(
+      <ArmedOverlay id="editor" open>
+        <TradeEditor />
+      </ArmedOverlay>,
+    );
+    // `getBy`, not `findBy`: it is in the tree after the first synchronous render
+    expect(screen.getByTestId("editor-stub")).toBeInTheDocument();
+  });
+
   it("the tabs that left the first load are chunks of their own: not feature pages, fetched once on intent", async () => {
     expect(DEFERRED_TABS).toEqual(["trades", "setups", "settings"]);
     for (const tab of DEFERRED_TABS) expect(LAZY_PAGES).not.toContain(tab);

@@ -13,21 +13,25 @@
  * `ImportDialog` is mounted by the settings page itself (`DataCard` → `ImportDialog`), not here.
  */
 import { createElement, lazy, type ComponentType, type LazyExoticComponent } from "react";
-import { loadOverlay } from "@/app/overlayLoad";
+import { getLoadedOverlay, loadOverlay, type OverlayId, type OverlayModule } from "@/app/overlayLoad";
 import type { SetupEditorProps } from "@/overlays/SetupEditor";
 import type { TradeDetailProps } from "@/overlays/TradeDetail";
 import type { TradeEditorProps } from "@/overlays/TradeEditor";
 
 export { HyblockForm } from "@/overlays/HyblockForm";
 
-/** A lazy overlay that forgets a failed download (a deploy replaced the chunk): the next render fetches it again. */
-function deferred<P extends object>(pick: () => Promise<ComponentType<P>>): ComponentType<P> {
+/**
+ * A lazy overlay that forgets a failed download (a deploy replaced the chunk): the next render fetches it again. Once the
+ * chunk has arrived (idle / intent preload, `openEditorWarm`) it renders the component directly – no `lazy` suspension, so
+ * an overlay that mounts in the very commit that opens it (the dock disc → sheet morph) is in the tree at once.
+ */
+function deferred<K extends OverlayId, P extends object>(id: K, pick: (m: OverlayModule<K>) => ComponentType<P>): ComponentType<P> {
   let current: LazyExoticComponent<ComponentType<P>> | null = null;
   const get = (): LazyExoticComponent<ComponentType<P>> => {
     if (!current) {
       const next = lazy(() =>
-        pick().then(
-          (component) => ({ default: component }),
+        loadOverlay(id).then(
+          (m) => ({ default: pick(m) }),
           (err: unknown) => {
             if (current === next) current = null;
             throw err;
@@ -39,12 +43,13 @@ function deferred<P extends object>(pick: () => Promise<ComponentType<P>>): Comp
     return current;
   };
   return function Deferred(props: P) {
-    return createElement(get() as ComponentType<P>, props);
+    const m = getLoadedOverlay(id);
+    return createElement(m ? pick(m) : (get() as ComponentType<P>), props);
   };
 }
 
-const TradeDetail = deferred<TradeDetailProps>(() => loadOverlay("detail").then((m) => m.TradeDetail));
-const TradeEditor = deferred<TradeEditorProps>(() => loadOverlay("editor").then((m) => m.TradeEditor));
-const SetupEditor = deferred<SetupEditorProps>(() => loadOverlay("setup").then((m) => m.SetupEditor));
+const TradeDetail = deferred<"detail", TradeDetailProps>("detail", (m) => m.TradeDetail);
+const TradeEditor = deferred<"editor", TradeEditorProps>("editor", (m) => m.TradeEditor);
+const SetupEditor = deferred<"setup", SetupEditorProps>("setup", (m) => m.SetupEditor);
 
 export { TradeDetail, TradeEditor, SetupEditor };
