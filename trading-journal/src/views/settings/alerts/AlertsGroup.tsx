@@ -36,7 +36,7 @@ function WhenOpen({ children }: { children: React.ReactNode }) {
 
 export function AlertsGroup() {
   return (
-    <SettingsGroup section={ALERTS_GROUP.section} title={ALERTS_GROUP.title} sub={ALERTS_GROUP.sub} className="mt-5 lg:grid-cols-1">
+    <SettingsGroup section={ALERTS_GROUP.section} title={ALERTS_GROUP.title} sub={ALERTS_GROUP.sub} className="mt-5 lg:col-span-1 lg:grid-cols-1">
       <Fold id="settings-alarme" title="Alarme" hint="Grün- und Rot-Vorwarnung und -Bestätigung per Browser, E-Mail und Telefon, mit Ruhezeit und Zustellprotokoll" className="lg:col-span-1">
         <WhenOpen>
           <Suspense

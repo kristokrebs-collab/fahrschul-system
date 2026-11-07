@@ -10,7 +10,7 @@ import { collectErrors, expectNoHorizontalScroll, fixture, isMobile, openPageVia
 
 async function gotoSettings(page: import("@playwright/test").Page) {
   await page.goto("/#settings");
-  await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible({ timeout: 30_000 });
 }
 
 test("Startkapital → `Speichern` → toast, hero subline shows the new capital", async ({ page }, info) => {

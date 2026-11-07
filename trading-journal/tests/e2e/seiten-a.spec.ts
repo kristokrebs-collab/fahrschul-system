@@ -156,7 +156,7 @@ test.describe("Seiten A: Feinschliff", () => {
     await expect(groups.locator("h2").first()).toHaveText("Grundlagen");
     const nav = view.getByTestId("section-nav");
     await expect(nav).toBeVisible({ timeout: 20_000 });
-    await expect(nav.locator("[data-section-chip]")).toHaveCount(6);
+    await expect(nav.locator("[data-section-chip]")).toHaveCount(7);
     await nav.locator('[data-section-chip="s-sichern"]').click();
     await expect.poll(async () => groups.nth(4).evaluate((el) => Math.round(el.getBoundingClientRect().top)), { timeout: 8000 }).toBeLessThan(260);
     // the archive: its small print is one tap away – in the DOM closed, readable open

@@ -109,27 +109,27 @@ export const SETTINGS_STRINGS = {
 
 /** Subtitle recipe: pixel fill once per session, then the marker on the key word. */
 /**
- * End sizes (px at 390 / 640 / 1024+) of the cards below the first screenful, measured on the finished page. Each card mounts
- * after the page has painted (`Later`, one per idle slice – the switch to the page is no longer one 700 ms task) and the box
- * holds its size until then (`Reserve` floor + `CardSkeleton`), so nothing moves when it lands. The 16 cards of this page
- * used to mount in ONE commit.
+ * End sizes (px at 390 / 640+ / 1024+) of the cards below the first screenful, measured on the finished page at 390, 700,
+ * 1280 and 1440 px (the larger of the two desktop widths). Each card mounts after the page has painted (`Later`, one per
+ * idle slice – the switch to the page is no longer one 700 ms task) and the box holds its size until then (`Reserve`
+ * floor + `CardSkeleton`), so nothing moves when it lands. The 16 cards of this page used to mount in ONE commit.
  */
 const SIZE = {
-  trigger: { base: 867, sm: 500, lg: 434 },
-  live: { base: 2671, sm: 1713, lg: 1182 },
-  signal: { base: 4408, sm: 3455, lg: 2363 },
+  trigger: { base: 871, sm: 500, lg: 434 },
+  live: { base: 2683, sm: 1713, lg: 1182 },
+  signal: { base: 4405, sm: 3472, lg: 2383 },
   lage: { base: 409, sm: 341, lg: 233 },
-  hyblock: { base: 666, sm: 570, lg: 399 },
-  mistakes: { base: 560, sm: 512, lg: 654 },
-  rules: { base: 404, sm: 368, lg: 368 },
-  limits: { base: 309, sm: 250, lg: 266 },
-  data: { base: 904, sm: 665, lg: 647 },
-  storage: { base: 466, sm: 369, lg: 336 },
+  hyblock: { base: 663, sm: 570, lg: 399 },
+  mistakes: { base: 528, sm: 512, lg: 654 },
+  rules: { base: 384, sm: 368, lg: 368 },
+  limits: { base: 314, sm: 250, lg: 266 },
+  data: { base: 949, sm: 665, lg: 647 },
+  storage: { base: 499, sm: 369, lg: 336 },
   // + „Bewegung“ (Runde 11): measured 661 / 598 / 574–595 px at 390 / 700 / 1024–1440
   theme: { base: 661, sm: 580, lg: 574 },
-  tour: { base: 529, sm: 415, lg: 443 },
+  tour: { base: 499, sm: 415, lg: 436 },
   more: { base: 361, sm: 266, lg: 266 },
-  connect: { base: 972, sm: 880, lg: 690 },
+  connect: { base: 972, sm: 842, lg: 654 },
 } as const satisfies Record<string, ReserveHeight>;
 
 function LateCard({ size, className, children }: { size: ReserveHeight; className?: string; children: ReactNode }) {
