@@ -486,7 +486,7 @@ _Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 7 Funktionen
 
 ### Konto, Einstellungen & Hilfe
 
-_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 23 Funktionen
+_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 25 Funktionen
 
 **Konto & Tarif**
 
@@ -494,6 +494,8 @@ _Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 23 Funktionen
 |---|---|---|---|
 | Anmelden, synchronisieren und das Konto verwalten | Konto & Cloud-Sync | Konto | fertig |
 | Sehen, was verbunden ist, und fehlende Verbindungen einrichten | Verbindungen (alle Dienste auf einen Blick) | Einstellungen › Verbindungen | fertig |
+| Sehen, was deine TradingView-Alarme geschickt haben und was daraus wurde | TradingView-Signale empfangen | Einstellungen › Verbindungen › TradingView › Letzte Signale | teilweise |
+| Dein TradingView-Konto der App lesend erlauben | TradingView-Konto lesend verbinden (OAuth) | Einstellungen › Verbindungen › TradingView › TradingView-Konto lesend verbinden | teilweise |
 | Tarif wählen, Abo verwalten oder kündigen | Abo & Tarife | Preise | fertig |
 | Sehen, welcher Tarif welche Funktion enthält | Tarife im Vergleich | Preise › Alle Funktionen im Vergleich | fertig |
 | Freunde einladen und Gutschrift erhalten | Freunde einladen (Empfehlungscode) | Konto | teilweise |
