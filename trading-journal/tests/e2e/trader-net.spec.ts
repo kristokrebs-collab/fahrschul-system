@@ -147,7 +147,19 @@ test.describe("Top-Trader netto in the Long signal", () => {
     await expect.poll(async () => (await paintedPixels(chart)).red, { timeout: 5_000 }).toBeGreaterThan(300);
     const tip = plaque.getByTestId("trader-net-tip");
     await expect(tip).toHaveCSS("opacity", "0");
-    const b = (await chart.boundingBox())!;
+    // the plaque has just opened (its height eases open): the pointer goes where the chart SETTLES – a move to a box that is
+    // still travelling lands beside the chart and no second move event follows
+    // (the chart sits below the fold on a 900 px window: a mouse move to a point outside the window sends no pointer event at all)
+    await chart.scrollIntoViewIfNeeded();
+    let b = (await chart.boundingBox())!;
+    await expect
+      .poll(async () => {
+        const next = (await chart.boundingBox())!;
+        const still = next.x === b.x && next.y === b.y && next.width === b.width && next.height === b.height;
+        b = next;
+        return still;
+      })
+      .toBe(true);
     const at = { x: b.width * 0.5, y: b.height * 0.5 };
     if (isMobile(info)) await chart.tap({ position: at });
     else await page.mouse.move(b.x + at.x, b.y + at.y);
