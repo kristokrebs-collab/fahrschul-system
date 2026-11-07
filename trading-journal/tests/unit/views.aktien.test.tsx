@@ -144,7 +144,7 @@ describe("Aktien page", () => {
     expect(within(analyse).getAllByTestId("analysis-lead")).toHaveLength(3);
     expect(screen.getByTestId("analysis-note")).toHaveTextContent(/Die App sendet nie Orders/);
     expect(world.calls).toEqual([]); // opening the page asks for nothing: a scan starts only when the trader starts it
-  });
+  }, 30_000); // renders every section, the lazy cards (Branchen-Trend with the paper portfolio, Kongress, analyst panels): ~5 s on a quiet machine
 
   it("shows the thresholds of the rules with their numbers and keeps a changed one for the next visit", async () => {
     wrap();
