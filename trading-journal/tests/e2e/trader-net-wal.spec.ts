@@ -121,6 +121,8 @@ async function openMarkt(page: Page, opts: OpenOpts = {}): Promise<Opened> {
     await page.getByTestId("trader-net-archive").scrollIntoViewIfNeeded();
     await expect(page.getByTestId("trader-net-archive")).toHaveAttribute("data-status", "ready", { timeout: 15_000 });
     await writeRows(page, opts.stored.series, opts.stored.rows);
+    // (a reload restores the scroll position, and the page's own skeleton leaving then counts as a shift: back to the top first)
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.reload();
     await expect(page.locator('[data-page="markt"][data-page-role="current"] h1').first()).toBeAttached({ timeout: 30_000 });
   }
@@ -248,7 +250,7 @@ test.describe("Wal-Karte (C3): Top-Trader netto on the Markt page", () => {
       // a pixel is more than one point wide on a phone: the arrow keys take the last steps to the exact point
       await plot.focus();
       const mark = card.getByTestId("trader-net-tip-mark");
-      for (const key of ["ArrowLeft", "ArrowLeft", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight"]) {
+      for (const key of [...Array(6).fill("ArrowLeft"), ...Array(12).fill("ArrowRight")] as string[]) {
         if ((await mark.textContent()) === texts[i]) break;
         await page.keyboard.press(key);
       }

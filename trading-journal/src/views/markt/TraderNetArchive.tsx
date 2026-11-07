@@ -32,8 +32,8 @@ export function TraderNetArchive({ line, status, recording, stored, canExport, o
       <p className="min-h-[2.75em] text-[11.5px] leading-[1.3] text-mute sm:min-h-[1.3em]" data-testid="trader-net-archive-line">
         {line}
       </p>
-      <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex items-center gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <div className="flex min-h-11 items-center gap-2.5">
           <Switch id={id} size="sm" checked={recording && !unavailable} onCheckedChange={setNetArchiveOn} disabled={unavailable} aria-label={S.archiveSwitch} className="touch-hit shrink-0" />
           <label htmlFor={id} className={cn("text-[12px] text-mute", unavailable && "opacity-60")}>
             {S.archiveSwitch}
