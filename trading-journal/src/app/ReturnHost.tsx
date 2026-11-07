@@ -10,6 +10,7 @@ import { entitledNow } from "@/billing/entitlements";
 import { parseOrderParam } from "@/billing/purchase/order";
 import { requestOrder, useBilling, useEffectivePlan } from "@/billing/store";
 import { useCloudSession } from "@/cloud/session";
+import { useTakeover } from "@/cloud/takeover";
 import { primaryConnection, useExchange } from "@/exchanges/store";
 import { clearReturnTo, peekReturnTo, useReturnTo, type ReturnWait } from "@/store/returnTo";
 import type { Feature } from "@/billing/types";
@@ -30,6 +31,8 @@ export function ReturnHost() {
   const pending = useReturnTo((s) => s.pending);
   const signedIn = useCloudSession((s) => s.phase === "signedIn" && !s.needsMfa);
   const authSheetOpen = useCloudSession((s) => s.sheet.open);
+  // the takeover question (first login with data on both sides) is a sheet of its own that outlives the login sheet
+  const takeoverOpen = useTakeover((s) => s.phase !== "idle" && s.phase !== "undone");
   const connected = useExchange((s) => primaryConnection(s.status) !== null);
   // a plan change (the account arrives from the server, the cache is rewritten) re-renders here; `entitledNow` then reads the new plan
   const plan = useEffectivePlan().plan;
@@ -41,8 +44,8 @@ export function ReturnHost() {
     const now = peekReturnTo();
     if (!now) return;
     if (!waitMet(now.wait, { signedIn, connected, entitled: (f) => entitledNow(f as Feature) })) return;
-    // an order waits until the login sheet (and its welcome step) is closed: two sheets never stack
-    if (now.target.kind === "order" && authSheetOpen) return;
+    // an order waits until the login sheet (its welcome step and the takeover question) is closed: two sheets never stack
+    if (now.target.kind === "order" && (authSheetOpen || takeoverOpen)) return;
     // once: the note is cleared before the target opens, so nothing can fire it twice
     clearReturnTo();
     const t = now.target;
@@ -55,7 +58,7 @@ export function ReturnHost() {
     const id = t.kind === "feature" ? t.id : pageTargetId(t.page);
     // the register is a lazy chunk of its own: it is fetched only when a return actually happens
     void import("@/app/featureOpen").then((m) => m.openFeature(id, { remember: false }));
-  }, [pending, signedIn, authSheetOpen, connected, plan, account, cached]);
+  }, [pending, signedIn, authSheetOpen, takeoverOpen, connected, plan, account, cached]);
 
   return null;
 }
