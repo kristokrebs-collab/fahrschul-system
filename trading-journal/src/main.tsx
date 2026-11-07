@@ -5,6 +5,7 @@ import "./styles/themes.css";
 import App from "./App";
 import { installE2eHooks } from "@/app/e2eHooks";
 import { bootMarket } from "@/app/marketBoot";
+import { preloadPage } from "@/app/pages";
 import { installThemeTransition } from "@/app/themeTransition";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { bootJournal, useJournal } from "@/store/journalStore";
@@ -34,6 +35,8 @@ try {
 void bootJournal();
 installRouter();
 bootMarket();
+// opened on one of the tabs that are chunks of their own (a reload on #trades …): fetch it in parallel with the first render
+preloadPage(useUi.getState().page);
 // e2e only (flag set by the Playwright seed, `src/app/e2eHooks.ts`): the stores the specs read and write
 installE2eHooks({ __tjJournal: useJournal, __tjUi: useUi, __tjTheme: useTheme });
 

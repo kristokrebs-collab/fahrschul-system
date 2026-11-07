@@ -9,7 +9,8 @@
 import { expect, test } from "@playwright/test";
 import { seed } from "./helpers";
 
-const PAGES = ["markt", "analyse", "risiko", "coach", "labor", "studio", "plan", "aktien"] as const;
+// trades / setups / settings joined with the Budget-Schnitt (Runde 11): they are lazy chunks now, a direct landing must not jump either
+const PAGES = ["markt", "analyse", "risiko", "coach", "labor", "studio", "plan", "aktien", "trades", "setups", "settings"] as const;
 const PROJECTS = ["mobile", "desktop"];
 const MAX_CLS = 0.02;
 const MAX_GROWTH = 60;

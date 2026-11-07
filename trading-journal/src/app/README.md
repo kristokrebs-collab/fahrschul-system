@@ -121,7 +121,7 @@ known, so the app now lets the device answer it:
     </motion.div>
   </main>
   <Footer/> <BottomFade/> <Dock/> <CommandNav/> <Toasts/>
-  <Detail/> <EditorHost/> <SetupEditor/>   each behind its own widget boundary (fallback null)
+  <Detail/> <EditorHost/> <SetupEditorHost/>   each behind its own widget boundary (fallback null), each an `ArmedOverlay` (lazy chunk, see "Budget-Schnitt")
   hosts (P14, leaves after SetupEditor, before Celebrate – each a HostSlot: widget boundary + data-layer):
   <HostSlot Suche/Tastenkürzel/Einführung/Cloud>   GlobalSearchHost, ShortcutHost, OnboardingHost, CloudSyncHost
   <FeatureHosts/>                          lazy chunk DeferredHosts (table below)
@@ -129,8 +129,8 @@ known, so the app now lets the device answer it:
 </MorphDialogProvider>
 ```
 `Pages` reads the page through `useDeferredValue` → `<PageHost keepAlive={["overview"]} cascade={["settings"]}>`;
-`renderPage(page)` wraps every page in `<ErrorBoundary variant="page" resetKeys={[page]}>`. The four original pages are
-static; every other page is a lazy chunk (`pages.ts`) behind `Suspense` with `<PageSkeleton page>` and, for a paid page,
+`renderPage(page)` wraps every page in `<ErrorBoundary variant="page" resetKeys={[page]}>`. Only the Übersicht is
+static (Budget-Schnitt, Runde 11: Trades, Entscheidungsgrundlagen and Einstellungen are chunks of their own now); every other page is a lazy chunk (`pages.ts`) behind `Suspense` with `<PageSkeleton page>` and, for a paid page,
 `PageGate` (`PAGE_FEATURE` → `useEntitlement`; locked → `LockedPage`: the page's `h1` + `UpgradeTeaser`, the page chunk
 is never downloaded). Every store subscription lives in a leaf host, so the shell itself only re-renders when the local
 banner opens or closes.
@@ -281,7 +281,8 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
 | `marketBoot.ts` | `bootMarket(): () => void` | see boot |
 | `toasts.ts` | `toIslandToast(uiToast)`, `toastLifetime` | `success→ok`, `error→error`, `signal/info→warn` (info glyph); passes the lifetime (`TOAST_MS` or the toast's `duration`, `0` = sticky) as the island `duration` – the island owns the countdown, `uiStore` never auto-dismisses |
 | `useDetailCandles.ts` | `useDetailCandles()`, `sliceAround`, `DETAIL_WINDOW_MS` | 1h cache slice ±3 d around `tradeTime(trade)` (identity per detail id), `history()` for the missing edge |
-| `pages.ts` / `overlays.ts` | the four static views + the lazy page registry (`lazyView`, `preloadPage`, `PAGE_FEATURE`) / the app overlays | single seam for the shell and for tests (`vi.mock("@/app/pages")`, `vi.mock("@/app/overlays")`) |
+| `pages.ts` / `overlays.ts` | the Übersicht + the three deferred tabs (`TradesView`, `SetupsView`, `SettingsView`, `DEFERRED_TABS`) + the lazy page registry (`lazyView`, `preloadPage`, `PAGE_FEATURE`) / the app overlays (`TradeEditor`, `TradeDetail`, `SetupEditor` as lazy components, `HyblockForm` static) | single seam for the shell and for tests (`vi.mock("@/app/pages")`, `vi.mock("@/app/overlays")`) |
+| `overlayLoad.ts` / `ArmedOverlay.tsx` | `loadOverlay`, `preloadOverlay`, `armOverlay`, `useOverlayArmed`, `openEditorWarm` / `ArmedOverlay` | Budget-Schnitt: one download per overlay chunk; an overlay is mounted (closed) once its chunk arrived (idle / intent) or while its state is open, and stays mounted; the main „Trade eintragen“ entries wait for a missing chunk and open in the commit that mounts the sheet |
 
 ## What the integrator should check
 
@@ -519,3 +520,8 @@ Belastbarer ist der CPU-Zeit-Zähler der Seite (CDP `Performance.getMetrics`, `T
 **Offen:** eine Messung auf einer ruhigen Maschine oder einem Gerät (Frames bei 120 Hz, Long Tasks ≤ 50 ms, INP) steht aus; die Ausgangslage dafür sind die Zahlen oben und `tests/e2e/shell-motion.spec.ts` („Messung“, die Zahlen stehen im Testprotokoll).
 
 **Budget** (`npm run budget`, Erstladung): JS 780,0 → 782,8 KiB gz (Haupt-Chunk 560,3 → 563,1; +2,8 KiB, Grenze +4), CSS 45,9 → 47,1 KiB gz (+1,2 KiB, Grenze +1,5). Neue Lazy-Chunks: keine (die Menü-Treffer liegen wie zuvor im Chunk `NavFinderResults`).
+
+**Budget-Schnitt (Runde 11, Paket „Budget“)** – Erstlade-JS 788,7 → 638,6 KiB gz (Grenze 800; Haupt-Chunk 569,0 → 418,9 KiB), CSS unverändert 49,2 / 52 KiB. Aus dem Erstladen heraus, ohne sichtbare Änderung: der Trade-Editor (`TradeEditor` samt `journal/editor`, Screenshot-Feld, Formularteile), die Trade-Detailansicht, der Grundlagen-Editor und die Tabs Trades, Entscheidungsgrundlagen, Einstellungen (je ein Lazy-Chunk).
+Laden: `useIdlePreload` (App.tsx) holt sie einzeln je Leerlauf-Slot nach dem ersten Bild – Editor zuerst, dann Detail, Trades, Markt, Grundlagen-Editor, Einstellungen, Grundlagen; Absicht (Maus/Fokus/Druck auf „Trade eintragen“ in Kopfzeile, Seitenleiste und Dock, auf einen Seitenleisten-/Menülink) holt früher; ein Neuladen auf `#trades` startet den Abruf schon in `main.tsx`.
+Der Editor ist wie vorher dauerhaft eingehängt (geschlossen), sobald sein Chunk da ist – Öffnungs- und Formularanimation sind unverändert. Vor dem ersten Leerlauf öffnet „Trade eintragen“ (`openEditorWarm`: Kopfzeile, Seitenleiste, Dock-Mitte) erst, wenn der Chunk da ist (lokal ~10–40 ms), damit die Scheibe → Sheet-Verwandlung im selben Commit startet; schlägt der Abruf fehl, sagt ein Hinweis es. Andere Wege (Tastenkürzel, Menü) öffnen sofort und hängen den Editor beim Eintreffen ein.
+Test: `tests/unit/app.overlayLoad.test.tsx` (Einhängen erst bewaffnet/offen, bleibt nach dem Schließen, `openEditorWarm` kalt/warm, die drei Tabs je ein Abruf und nicht in `LAZY_PAGES`). Angepasst: `tests/unit/app.chrome.test.tsx` (Dock-FAB: der Editor-Chunk gilt als geladen, weil das Öffnen vor dem ersten Leerlauf absichtlich auf den Chunk wartet).
