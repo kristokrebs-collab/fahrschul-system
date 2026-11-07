@@ -16,19 +16,20 @@
  * - Offline / server errors: status `offline`, header "Offline", retry with backoff and on the `online` event; the
  *   local journal keeps working and the outbox (IndexedDB) keeps the queue across reloads.
  */
-import type { DayNotes, JsonBackup, Settings, StoreMode } from "@/domain/types";
+import type { DayNotes, Settings, StoreMode } from "@/domain/types";
 import { normalizeSettings } from "@/domain/normalize";
 import type { ToastInput } from "@/store/uiStore";
 import type { LocalStorageAdapter, SnapshotPatch, StorageSnapshot } from "@/store/adapters/StoreApi";
-import { ALL_PARTS, applyBackup } from "@/store/backup";
 import { jsonEqual, merge3 } from "@/store/merge3";
 import { recordCloudQuarantine, SNAPSHOT_FAILED_TITLE, validateReadings, validateTrades } from "@/store/migrate";
 import type { BaseStore, SyncBase } from "./base";
 import { docKey, hashDoc, parseDocKey, tombstoneData, type DocKind, type DocRow } from "./docs";
 import type { Outbox, OutboxEntry } from "./outbox";
-import { applyPlanLocal, planReconcile, remoteSnapshot, snapshotDocs, toRemoteDoc, type Plan, type RemoteDoc } from "./reconcile";
+import { applyPlanLocal, planReconcile, snapshotDocs, toRemoteDoc, type Plan, type RemoteDoc } from "./reconcile";
 import { RemoteError, type RemoteJournal, type UpsertDoc } from "./remote";
 import { patchSyncStatus, pingSync, type SyncStatus } from "./status";
+import { computeTakeover, hasLocalData, needsDecision, previewTakeover, remoteSide, type TakeoverChoice, type TakeoverPreview, type TakeoverResult, type TakeoverStep } from "./takeover";
+import { undoOpen, UNDO_WINDOW_MS, type UndoEntry, type UndoStorage } from "./undo";
 
 export const SYNC_COPY = {
   firstTitle: "Sync aktiv",
@@ -41,6 +42,8 @@ export const SYNC_COPY = {
   denied: "Die Cloud lehnt den Zugriff ab. Melde dich bitte neu an.",
   failed: "Sync gerade nicht möglich.",
   snapshotFailed: SNAPSHOT_FAILED_TITLE,
+  keptLocalTitle: "Journal bleibt lokal",
+  keptLocalDetail: "Der Sync ist auf diesem Gerät aus. Einschalten: Konto → Datenschutz.",
 } as const;
 
 export interface EngineDeps {
@@ -61,6 +64,18 @@ export interface EngineDeps {
   flushDelayMs?: number;
   /** Realtime batching window (ms). */
   batchMs?: number;
+  /**
+   * B1 – the first login of this browser: asks the user what happens to the journal on this device (dialog). Only
+   * called when there is something to decide (`needsDecision`); without it the engine merges (the pre-B1 behaviour).
+   * `keep` stops the sync for this device (`onKeepLocal`), nothing is read or written in the account.
+   */
+  decideTakeover?: (preview: TakeoverPreview) => Promise<TakeoverChoice>;
+  /** Progress / result of an applied takeover (the dialog's working and done screens). */
+  takeover?: { step?: (s: TakeoverStep) => void; done?: (r: TakeoverResult) => void; undone?: () => void; failed?: (message: string) => void };
+  /** Undo journal of the takeover (`undo.ts`); without it nothing can be undone. */
+  undo?: UndoStorage | null;
+  /** The user chose "Lokal behalten": the sync is switched off for this device. */
+  onKeepLocal?: () => void;
   /** Event target for `online` / `offline` / `visibilitychange` (default `window` / `document`). */
   events?: { win?: Pick<Window, "addEventListener" | "removeEventListener">; doc?: Pick<Document, "addEventListener" | "removeEventListener" | "visibilityState"> };
   isOnline?: () => boolean;
@@ -76,6 +91,10 @@ export interface SyncEngine {
   flush(): Promise<void>;
   /** Full reconcile now ("Jetzt synchronisieren"). */
   syncNow(): Promise<void>;
+  /** Puts the takeover back (device journal + the account rows it changed) while the undo window is open; then asks again. */
+  undoTakeover(): Promise<boolean>;
+  /** The open undo entry, if any. */
+  pendingUndo(): Promise<UndoEntry | null>;
   readonly running: boolean;
 }
 
@@ -83,6 +102,8 @@ export const RETRY_MS = [3_000, 10_000, 30_000, 60_000, 300_000] as const;
 export const POLL_MS = 60_000;
 
 class SyncAbort extends Error {}
+/** The user chose to keep the journal local: not an error, the sync just does not run on this device. */
+class SyncPaused extends Error {}
 
 function newerIso(a: string | null, b: string | null | undefined): string | null {
   if (!b) return a;
@@ -219,53 +240,135 @@ export function createSyncEngine(d: EngineDeps): SyncEngine {
 
   /* ---------------------------------------------------------------- reconcile */
 
-  async function firstSync(rows: readonly DocRow[], prev: SyncBase | null): Promise<void> {
-    const snap = d.local.fresh();
-    const { remote, settings: settingsRow, serverAt } = parseRows(rows, null);
+  async function firstSync(initialRows: readonly DocRow[], prev: SyncBase | null): Promise<void> {
+    let snap = d.local.fresh();
+    let parsed = parseRows(initialRows, null);
     const otherOwner = !!prev && prev.owner !== d.userId;
-    const hasLocal = snap.trades.length > 0 || snap.hyblock.length > 0 || Object.keys(snap.days ?? {}).length > 0;
-    if (hasLocal && !d.snapshot(`import-${iso()}`, { ...snap, days: snap.days ?? {}, at: iso() })) throw new SyncAbort(SYNC_COPY.snapshotFailed);
+    let hasLocal = hasLocalData(snap);
+    const step = (s: TakeoverStep) => d.takeover?.step?.(s);
 
-    const remoteParts = remoteSnapshot(remote);
-    const remoteSettings = settingsRow && !settingsRow.deleted ? normalizeSettings(settingsRow.data) : null;
-    let merged: StorageSnapshot;
-    let conflicts = 0;
-    if (otherOwner) {
-      merged = { ...remoteParts, settings: remoteSettings ?? normalizeSettings(null) };
-    } else {
-      const current: StorageSnapshot = { ...remoteParts, settings: remoteSettings ?? snap.settings };
-      const backup: JsonBackup = { exportedAt: iso(), settings: snap.settings, trades: snap.trades, hyblock: snap.hyblock, days: snap.days ?? {} };
-      merged = applyBackup(current, backup, "merge", ALL_PARTS);
-      const localDocs = snapshotDocs(snap);
-      for (const [k, r] of remote) {
-        const l = localDocs.get(k);
-        if (l && !r.deleted && hashDoc(l) !== r.hash) conflicts++;
+    // B1: something to decide (data here that the account lacks, differs from it, or belongs to another account)?
+    let choice: Exclude<TakeoverChoice, "keep"> = otherOwner ? "cloud" : "merge";
+    let asked = false;
+    if (hasLocal && d.decideTakeover) {
+      const preview = previewTakeover({ local: snap, remote: parsed.remote, settingsRow: parsed.settings, otherOwner, now: iso() });
+      if (needsDecision(preview)) {
+        const picked = await d.decideTakeover(preview);
+        if (!preview.allowed.includes(picked)) throw new SyncAbort("Ungültige Auswahl.");
+        if (picked === "keep") throw new SyncPaused();
+        choice = picked;
+        asked = true;
+        // the user may have taken minutes: both sides are read again, so nothing that changed meanwhile is overwritten
+        parsed = parseRows(await d.remote.pullAll(), null);
+        snap = d.local.fresh();
+        hasLocal = hasLocalData(snap);
       }
     }
-    const days: DayNotes = merged.days ?? {};
-    await d.local.replaceAll({ ...merged, days });
+    const { remote, settings: settingsRow, serverAt } = parsed;
 
+    step("snapshot");
+    if (hasLocal && !d.snapshot(`import-${iso()}`, { ...snap, days: snap.days ?? {}, at: iso() })) throw new SyncAbort(SYNC_COPY.snapshotFailed);
+
+    step("merge");
+    const { settings: remoteSettings } = remoteSide(remote, settingsRow);
+    const duplicates = asked ? previewTakeover({ local: snap, remote, settingsRow, otherOwner, now: iso() }).duplicates : 0;
+    const { merged, conflicts } = computeTakeover(choice, { local: snap, remote, settingsRow, now: iso() });
+    const days: DayNotes = merged.days ?? {};
+    const localDocs = snapshotDocs(snap);
     const mergedDocs = snapshotDocs({ ...merged, days });
     const uploads: UpsertDoc[] = [];
+    const cloudBefore: UndoEntry["cloudBefore"] = {};
     for (const [k, rec] of mergedDocs) {
       const r = remote.get(k);
-      if (!r || r.deleted || r.hash !== hashDoc(rec)) uploads.push(liveUpload(k, rec));
+      if (!r || r.deleted || r.hash !== hashDoc(rec)) {
+        uploads.push(liveUpload(k, rec));
+        cloudBefore[k] = r ? { data: r.data, deleted: r.deleted } : null;
+      }
     }
+    let pulled = 0;
+    for (const [k, rec] of mergedDocs) {
+      const l = localDocs.get(k);
+      if (!l || hashDoc(l) !== hashDoc(rec)) pulled++;
+    }
+    const settingsPush = !remoteSettings || !jsonEqual(merged.settings, remoteSettings);
+
+    // the undo journal is written BEFORE the first byte leaves the device
+    const until = asked && d.undo ? new Date(now().getTime() + UNDO_WINDOW_MS).toISOString() : null;
+    if (asked && d.undo) {
+      try {
+        // an earlier, interrupted attempt of the same takeover keeps its (older, truer) "before"
+        const open = await d.undo.read().catch(() => undefined);
+        const first = undoOpen(open, now()) && open.owner === d.userId ? open : null;
+        await d.undo.write({
+          v: 1,
+          owner: d.userId,
+          choice,
+          at: first?.at ?? iso(),
+          expiresAt: until!,
+          local: first?.local ?? { trades: snap.trades, hyblock: snap.hyblock, days: snap.days ?? {}, settings: snap.settings },
+          cloudBefore: { ...cloudBefore, ...(first?.cloudBefore ?? {}) },
+          settingsBefore: first ? first.settingsBefore : remoteSettings,
+          settingsPushed: (first?.settingsPushed ?? false) || (settingsPush && choice !== "cloud"),
+        });
+      } catch {
+        throw new SyncAbort("Die Rückgängig-Sicherung konnte nicht angelegt werden.");
+      }
+    }
+    await d.local.replaceAll({ ...merged, days });
+
     const base: SyncBase = { v: 1, owner: d.userId, at: iso(), docs: {}, settings: remoteSettings, settingsRev: remoteSettings ? settingsRow!.rev : null, serverAt };
     for (const [k, rec] of mergedDocs) {
       const r = remote.get(k);
       if (r && !r.deleted && r.hash === hashDoc(rec)) base.docs[k] = r.hash;
     }
     status({ phase: "syncing" });
+    step("upload");
     await uploadAll(uploads, base, true);
-    if (!remoteSettings || !jsonEqual(merged.settings, remoteSettings)) await pushSettings(base);
+    if (settingsPush) await pushSettings(base);
     base.at = iso();
     d.base.write(base);
     status({ conflicts, records: Object.keys(base.docs).length });
+    step("finish");
 
+    if (asked) {
+      d.takeover?.done?.({ choice, pushed: uploads.length, pulled, conflicts, duplicates, undoUntil: until });
+      return;
+    }
     if (otherOwner && hasLocal) d.notify?.({ kind: "info", title: SYNC_COPY.otherOwnerTitle, detail: SYNC_COPY.otherOwnerDetail, duration: 7000 });
     else if (conflicts > 0) d.notify?.({ kind: "info", title: SYNC_COPY.conflictsTitle(conflicts), detail: SYNC_COPY.conflictsDetail });
     else d.notify?.({ kind: "success", title: SYNC_COPY.firstTitle, value: SYNC_COPY.firstValue(mergedDocs.size) });
+  }
+
+  /** Puts the takeover back: the account's rows it changed, then this device's journal; the next sync asks again. */
+  async function undoNow(): Promise<boolean> {
+    const entry = await d.undo?.read();
+    if (!undoOpen(entry, now()) || entry.owner !== d.userId) {
+      await d.undo?.clear();
+      return false;
+    }
+    status({ phase: "syncing", error: null });
+    const ups: UpsertDoc[] = [];
+    for (const [key, before] of Object.entries(entry.cloudBefore)) {
+      const p = parseDocKey(key);
+      if (!p || p.kind === "settings") continue;
+      if (before === null) ups.push(tombstoneUpload(key));
+      else ups.push({ kind: p.kind, id: p.id, data: before.data, deleted: before.deleted, clientUpdatedAt: iso() });
+    }
+    if (ups.length) await d.remote.upsert(ups);
+    if (entry.settingsPushed && entry.settingsBefore) {
+      const cur = d.base.read();
+      await d.remote.writeSettings(entry.settingsBefore, cur?.settingsRev ?? null, iso());
+    }
+    const now0 = d.local.fresh();
+    d.snapshot(`undo-${iso()}`, { ...now0, days: now0.days ?? {}, at: iso() });
+    const l = entry.local;
+    await d.local.replaceAll({ trades: l.trades as StorageSnapshot["trades"], hyblock: l.hyblock as StorageSnapshot["hyblock"], days: l.days as DayNotes, settings: l.settings as Settings });
+    d.base.clear();
+    await d.outbox.clear();
+    await d.undo?.clear();
+    needsReconcile = true;
+    d.takeover?.undone?.();
+    return true;
   }
 
   async function threeWay(rows: readonly DocRow[], prev: SyncBase): Promise<void> {
@@ -419,12 +522,21 @@ export function createSyncEngine(d: EngineDeps): SyncEngine {
 
   function onFailure(e: unknown): void {
     if (!running) return;
+    if (e instanceof SyncPaused) {
+      // "Lokal behalten": not a failure – the controller switches this device back to the local adapter
+      status({ phase: "paused", error: null, progress: null });
+      d.notify?.({ kind: "info", title: SYNC_COPY.keptLocalTitle, detail: SYNC_COPY.keptLocalDetail, duration: 7000 });
+      d.onKeepLocal?.();
+      return;
+    }
     if (e instanceof SyncAbort) {
       status({ phase: "error", error: e.message, progress: null });
       d.onMode?.("error");
+      d.takeover?.failed?.(e.message);
       d.notify?.({ kind: "error", title: e.message, detail: "Sync abgebrochen – dein lokales Journal ist unverändert." });
       return;
     }
+    d.takeover?.failed?.(SYNC_COPY.failed);
     const retryable = !(e instanceof RemoteError) || e.retryable;
     const offline = !isOnline() || (e instanceof RemoteError && e.retryable && !e.code);
     status({ phase: offline ? "offline" : "error", error: offline ? SYNC_COPY.offline : retryable ? SYNC_COPY.failed : SYNC_COPY.denied, progress: null });
@@ -587,6 +699,22 @@ export function createSyncEngine(d: EngineDeps): SyncEngine {
       needsReconcile = true;
       retryStep = 0;
       return runCycle();
+    },
+    async undoTakeover() {
+      let ok = false;
+      try {
+        ok = await exclusive(undoNow);
+      } catch (e) {
+        onFailure(e);
+        return false;
+      }
+      // the base is gone: the next cycle is a first login again and asks (the dialog opens once more)
+      if (ok) await this.syncNow();
+      return ok;
+    },
+    async pendingUndo() {
+      const e = await d.undo?.read().catch(() => undefined);
+      return undoOpen(e, now()) && e.owner === d.userId ? e : null;
     },
   };
 }

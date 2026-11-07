@@ -19,6 +19,7 @@ import { openAuthSheet, useCloudSession } from "../session";
 import { useSyncStatus } from "../sync/status";
 import { syncPill } from "./pill";
 import { SYNC_CARD } from "./strings";
+import { TakeoverUndoLine } from "./TakeoverUndoLine";
 
 /** Re-renders every `ms` (relative-time labels; 1 render per 30 s, never per frame). */
 export function useTick(ms = 30_000): number {
@@ -151,6 +152,7 @@ export function SyncStatusCard({ className }: { className?: string }) {
           >
             {SYNC_CARD.now}
           </ActionButton>
+          <TakeoverUndoLine />
         </div>
       )}
     </Card>

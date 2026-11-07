@@ -11,14 +11,16 @@ import { hasClaudeRuntime } from "@/store/capability";
 import { getAdapter, switchAdapter, useJournal } from "@/store/journalStore";
 import { KEY_PREFIX } from "@/store/storage";
 import { pushToast } from "@/store/uiStore";
-import { usePrivacy } from "../privacy";
+import { setPrivacy, usePrivacy } from "../privacy";
 import { useSyncGate } from "../runtime";
 import { useCloudSession } from "../session";
+import { requestTakeover, setUndoUntil, takeoverHooks } from "../takeover";
 import { localBaseStore } from "./base";
 import { createOutbox, idbOutboxStorage } from "./outbox";
 import { createSupabaseRemote } from "./remote";
 import { patchSyncStatus, resetSyncStatus, type SyncPhase } from "./status";
 import { createSupabaseAdapter, type SupabaseAdapter } from "./supabaseAdapter";
+import { idbUndoStorage, memoryUndoStorage } from "./undo";
 
 let active: { userId: string; adapter: SupabaseAdapter } | null = null;
 
@@ -56,8 +58,14 @@ export function startSyncController(sb: SupabaseClient): () => void {
         base: localBaseStore,
         snapshot: (tag, snap) => writeSnapshot(tag, snap),
         notify: (t) => pushToast(t),
+        // B1: the first login of this browser asks what happens to the journal on this device (dialog, undo window)
+        decideTakeover: requestTakeover,
+        takeover: takeoverHooks,
+        undo: idbUndoStorage(`${KEY_PREFIX}cloud-undo`, uid) ?? memoryUndoStorage(),
+        onKeepLocal: () => setPrivacy({ sync: false }),
       });
       active = { userId: uid, adapter };
+      void adapter.engine.pendingUndo().then((e) => setUndoUntil(e?.expiresAt ?? null));
       void switchAdapter(adapter).then((ok) => {
         if (!ok && active?.adapter === adapter) active = null;
       });

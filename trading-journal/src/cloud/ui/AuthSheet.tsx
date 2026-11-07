@@ -587,7 +587,7 @@ export function NewPasswordForm({ reason, onDone }: { reason: "reset" | "change"
     const r = m ? await m.updatePassword(pw, reason) : null;
     setBusy(false);
     if (!r || !r.ok) return setErr(errorOf(r && !r.ok && r.field === "password" ? "password" : null, r && !r.ok ? r.message : AUTH.unavailable));
-    pushToast({ kind: "success", title: AUTH.passwordSaved });
+    pushToast({ kind: "success", title: AUTH.passwordSaved, detail: r.value.othersSignedOut ? AUTH.passwordOthersOut : AUTH.passwordOthersKept });
     onDone();
   }
   return (

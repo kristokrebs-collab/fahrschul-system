@@ -64,6 +64,8 @@ export const AUTH = {
     signOutHint: "Dein Journal bleibt in diesem Browser erhalten.",
   },
   passwordSaved: "Passwort gespeichert",
+  passwordOthersOut: "Alle anderen Geräte wurden abgemeldet.",
+  passwordOthersKept: "Andere Geräte konnten nicht abgemeldet werden. Melde sie unter Konto → Sicherheit ab.",
   signedOut: "Abgemeldet",
   signedOutDetail: "Dein Journal bleibt in diesem Browser.",
   signedIn: "Angemeldet",
@@ -137,6 +139,9 @@ export const SECURITY = {
   signOutOthersAsk: "Alle anderen Geräte abmelden?",
   signedOutOthers: "Andere Geräte abgemeldet",
   signedOutOthersDetail: "Dort ist innerhalb einer Stunde Schluss.",
+  signOutEverywhere: "Überall abmelden",
+  signOutEverywhereAsk: "Auf allen Geräten abmelden, auch hier?",
+  signOutEverywhereHint: "Beendet jede Sitzung dieses Kontos, auch diese. Dein Journal bleibt in diesem Browser.",
   idleTitle: "Automatisch abmelden",
   idleHelp: "Nach so langer Inaktivität wirst du auf diesem Gerät abgemeldet. Dein Journal bleibt hier gespeichert.",
   idleOptions: [

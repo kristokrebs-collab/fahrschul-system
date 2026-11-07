@@ -266,16 +266,30 @@ export async function resendConfirmation(email: string): Promise<ActionResult> {
   }
 }
 
-/** New password (after the reset link, or "Passwort ändern" while signed in). */
-export async function updatePassword(password: string, reason: "reset" | "change"): Promise<ActionResult> {
+/**
+ * New password (after the reset link, or "Passwort ändern" while signed in). B1 session rule: a new password ends every
+ * OTHER session (a stolen device must not stay signed in with the old secret); this device keeps its session. The
+ * password is saved even when the sign-out of the others fails – `othersSignedOut` says which it was.
+ */
+export async function updatePassword(password: string, reason: "reset" | "change"): Promise<ActionResult<{ othersSignedOut: boolean }>> {
   try {
-    const { error } = await getClient().auth.updateUser({ password });
+    const sb = getClient();
+    const { error } = await sb.auth.updateUser({ password });
     if (error) return fail(error);
     auditEvent(reason === "reset" ? "auth.password.reset" : "auth.password.change");
-    return { ok: true };
+    const out = await sb.auth.signOut({ scope: "others" }).catch(() => ({ error: new Error("signout") }));
+    const othersSignedOut = !out.error;
+    if (othersSignedOut) auditEvent("auth.sessions.revoke", { reason: "password" });
+    return { ok: true, value: { othersSignedOut } };
   } catch (e) {
     return fail(e);
   }
+}
+
+/** "Rückgängig" of the data takeover (the dialog asks again afterwards). False when no sync runs or the window is over. */
+export async function undoTakeover(): Promise<boolean> {
+  const a = activeSync();
+  return a ? a.engine.undoTakeover() : false;
 }
 
 export async function signOutScope(scope: "local" | "global" | "others"): Promise<ActionResult> {

@@ -7,9 +7,11 @@ import { watchIdle } from "./idle";
 import { installErrorReporting } from "./report";
 import { bootCloud, ensureCloud, setSyncEntitled } from "./runtime";
 import { useCloudSession } from "./session";
+import { useTakeover } from "./takeover";
 import { SECURITY } from "./ui/strings";
 
 const AuthSheet = lazy(() => import("./ui/AuthSheet").then((m) => ({ default: m.AuthSheet })));
+const TakeoverDialog = lazy(() => import("./ui/TakeoverDialog").then((m) => ({ default: m.TakeoverDialog })));
 
 export interface CloudSyncHostProps {
   /** Opens the Konto page from the account panel (`() => navigate("konto")`). */
@@ -32,6 +34,7 @@ export function CloudSyncHost({ onOpenAccount }: CloudSyncHostProps) {
   const entitled = useEntitlement("cloudSync");
   const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const mounted = useCloudSession((s) => s.sheet.mounted);
+  const takeoverMounted = useTakeover((s) => s.mounted);
 
   useEffect(() => {
     if (!enabled) return;
@@ -55,11 +58,13 @@ export function CloudSyncHost({ onOpenAccount }: CloudSyncHostProps) {
     });
   }, [enabled, signedIn]);
 
-  if (!enabled || !mounted) return null;
+  if (!enabled || (!mounted && !takeoverMounted)) return null;
   return (
     <div data-layer="CloudAuth">
       <Suspense fallback={null}>
-        <AuthSheet onOpenAccount={onOpenAccount} />
+        {mounted && <AuthSheet onOpenAccount={onOpenAccount} />}
+        {/* B1: the data-takeover dialog – its chunk loads when the engine first asks */}
+        {takeoverMounted && <TakeoverDialog />}
       </Suspense>
     </div>
   );
