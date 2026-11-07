@@ -162,5 +162,18 @@ export function checkPrefsAgainstLimits(p: AlertPrefs, limits: { alertChannels: 
   return { ok: true, problem: null };
 }
 
+/**
+ * What the plan lets through when the settings ask for more (a downgrade after the settings were saved): the phone goes first when
+ * the plan has no calls, then channels beyond the limit are dropped from the back (phone, e-mail, browser) – the settings
+ * document is not changed, the delivery just does not use them.
+ */
+export function limitPrefsToPlan(p: AlertPrefs, limits: { alertChannels: number; phoneCallsPerMonth: number }): AlertPrefs {
+  const channels = { ...p.channels };
+  if (!(limits.phoneCallsPerMonth > 0)) channels.phone = noEvents();
+  const on = ALERT_CHANNELS.filter((c) => ALERT_EVENTS.some((e) => channels[c][e]));
+  for (const c of on.slice(Math.max(0, limits.alertChannels))) channels[c] = noEvents();
+  return { ...p, channels };
+}
+
 /** `true` when settings and plan together mean at least one alert can fire. */
 export const alertsActive = (p: AlertPrefs): boolean => sourcesOn(p).length > 0 && channelsOn(p).length > 0;

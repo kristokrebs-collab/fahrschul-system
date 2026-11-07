@@ -21,6 +21,7 @@ export type DeliveryReason =
   | "phone_not_ready"
   | "email_not_ready"
   | "phone_opted_out"
+  | "switched_off"
   | "month_limit"
   | "user_day_limit"
   | "global_day_limit"
@@ -51,6 +52,7 @@ export const DELIVERY_REASON_TEXT: Readonly<Record<DeliveryReason, string>> = {
   phone_not_ready: "Telefon nicht eingerichtet",
   email_not_ready: "E-Mail nicht eingerichtet",
   phone_opted_out: "Telefon abgemeldet",
+  switched_off: "Kanal inzwischen ausgeschaltet",
   month_limit: "Anruf-Grenze des Monats erreicht",
   user_day_limit: "Anruf-Grenze des Tages erreicht",
   global_day_limit: "Kostenbremse des Servers für heute erreicht",

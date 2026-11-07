@@ -29,6 +29,13 @@ export const SERVER_ENV = [
   "RESEND_API_KEY",
   "ALERT_FROM",
   "SEC_USER_AGENT",
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_AUTH_TOKEN",
+  "TWILIO_FROM",
+  "TWILIO_VERIFY_SERVICE_SID",
+  "ALERT_PHONE_DAILY_MAX",
+  "ALERT_PHONE_USER_DAILY_MAX",
+  "ALERTS_CRON_ENABLED",
 ] as const;
 
 /** Known names plus further key versions for rotation (`EXCHANGE_ENC_KEY_V2`, …). */
