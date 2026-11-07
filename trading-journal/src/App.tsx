@@ -29,6 +29,7 @@ import type { Feature } from "@/billing/types";
 import { CloudSyncHost } from "@/cloud/CloudSyncHost";
 import { Celebrate, celebrateFrom } from "@/motion/Celebrate";
 import { IntroHost } from "@/intro/IntroHost";
+import { useIntroSettled } from "@/intro/introStore";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { spring } from "@/motion/tokens";
 import { FirstRunEmpty } from "@/onboarding/FirstRunEmpty";
@@ -227,8 +228,11 @@ const IDLE_STEPS: readonly (() => unknown)[] = [
   () => preloadPage("setups"),
 ];
 
-function useIdlePreload(): void {
+/** Leaf (renders nothing): starts the idle chain once nothing intro-related holds the UI back, so the first-visit intro never shares a frame with a chunk's evaluation. */
+function IdlePreload() {
+  const settled = useIntroSettled();
   useEffect(() => {
+    if (!settled) return;
     let cancelled = false;
     let cancel: () => void = () => undefined;
     const schedule = (i: number, timeout: number) => {
@@ -250,7 +254,8 @@ function useIdlePreload(): void {
       cancelled = true;
       cancel();
     };
-  }, []);
+  }, [settled]);
+  return null;
 }
 
 /** The feature hosts' chunk: requested by the first render, never waited for (no fallback – the shell paints at once). */
@@ -275,10 +280,10 @@ function Shell() {
   const bannerOpen = useLocalBannerOpen();
   // grey-bar fix: `--vv-bottom` follows host UI laid over the bottom of the page (visualViewport, event driven)
   useEffect(() => installViewportInset(), []);
-  useIdlePreload();
   return (
     <MorphDialogProvider>
       <ScenarioWatcher />
+      <IdlePreload />
       {/* `overflow-x-clip` (no scroll container, sticky bars keep working): a page that scales / slides in or out reaches a few px
           past the screen edge for a moment (its full-bleed rows, the needles of the bias bar) – never a wider document */}
       <div className="relative min-h-dvh overflow-x-clip">
