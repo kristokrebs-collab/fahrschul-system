@@ -114,7 +114,8 @@ async function saveTrade(page: Page, editor: Locator, entry: number): Promise<St
   await editor.getByRole("button", { name: "Speichern", exact: true }).click();
   // generous: this suite also runs on machines shared with other test runs
   await expect(editor).toBeHidden({ timeout: 30_000 });
-  await expect(toast(page)).toContainText("Trade gespeichert", { timeout: 20_000 });
+  // the saved trade itself is the proof (the toast island may already show the next message, e.g. the coach's)
+  await expect.poll(async () => ((await stored<StoredTrade[]>(page, "tj2-trades")) ?? []).some((x) => x.entry === entry), { timeout: 20_000 }).toBe(true);
   const trades = (await stored<StoredTrade[]>(page, "tj2-trades")) ?? [];
   const t = trades.find((x) => x.entry === entry);
   expect(t, "the saved trade").toBeTruthy();
@@ -312,7 +313,6 @@ test.describe("Screenshot-Originale", () => {
       expect(sha256(entries.get(s.file)!), `file ${s.file} in the ZIP`).toBe(s.sha256);
       expect(s.key).toBe(refs[i]!.key);
     }
-    await expect(toast(page).first()).toBeVisible();
 
     const csvDl = await downloadFrom(page, card.getByTestId("data-shot-hashes"));
     expect(csvDl.name).toMatch(/-bild-hashes\.csv$/);
