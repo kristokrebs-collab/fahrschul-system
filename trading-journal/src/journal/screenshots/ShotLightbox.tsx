@@ -7,6 +7,8 @@ import { useBackClose, useFocusTrap, useInertOutside, useScrollLock } from "@/mo
 import { StripWipe } from "@/motion/pulse/StripWipe";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { pushToast } from "@/store/uiStore";
+import { isOriginal, shotFacts } from "./info";
 import { ShotImage } from "./ShotThumb";
 
 export interface ShotLightboxProps {
@@ -48,6 +50,52 @@ function snapshot(stage: HTMLElement | null): HTMLCanvasElement | null {
 }
 
 /**
+ * The picture in the stage: the fast derived preview first; „Original ansehen“ lays the exact stored file over it and
+ * shows it as soon as the browser has decoded it (a 12 MB PNG never leaves the stage empty).
+ */
+function LightboxPicture({ shot, original }: { shot: ScreenshotRef; original: boolean }) {
+  const [ready, setReady] = useState(false);
+  // toggled off: forget the loaded state, so the next look fades the original in again
+  if (!original && ready) setReady(false);
+  return (
+    <>
+      <ShotImage shot={shot} fit="contain" />
+      {original && (
+        <span className="absolute inset-0 transition-opacity duration-200" style={{ opacity: ready ? 1 : 0 }} data-testid="shot-original-layer" data-ready={ready || undefined}>
+          <ShotImage shot={shot} fit="contain" variant="original" className="bg-ink-950" onLoaded={() => setReady(true)} />
+        </span>
+      )}
+    </>
+  );
+}
+
+/** „Original ansehen“ (toggle) and „Original herunterladen“ (the exact bytes under their own file name). */
+function Actions({ shot, original, onToggle }: { shot: ScreenshotRef; original: boolean; onToggle: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const exact = isOriginal(shot);
+  if (shot.store === "url") return null;
+  const run = async () => {
+    setBusy(true);
+    try {
+      const m = await import("./original");
+      pushToast(m.downloadMessage(shot, await m.downloadOriginal(shot)));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <Button size="sm" onClick={onToggle} aria-pressed={original} data-testid="shot-view-original">
+        {original ? "Vorschau zeigen" : exact ? "Original ansehen" : "Größere Ansicht"}
+      </Button>
+      <Button size="sm" onClick={() => void run()} loading={busy} data-testid="shot-download-original">
+        {exact ? "Original herunterladen" : "Version herunterladen"}
+      </Button>
+    </span>
+  );
+}
+
+/**
  * Full-screen screenshot viewer (Journal v3). Opens with a fade + settle (`spring.enter`); switching pictures plays the
  * pulse `StripWipe` – the previous picture (a contain-fit canvas snapshot) peels away in 10 strips. ← / → and swipe
  * switch, Escape / backdrop / Android back close. It is its own modal session above whatever opened it (portal to
@@ -59,9 +107,11 @@ export function ShotLightbox({ shots, index, onIndex, onClose, title = "Screensh
   const panelRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [wipe, setWipe] = useState<{ n: number; from: HTMLCanvasElement | null }>({ n: 0, from: null });
+  const [original, setOriginal] = useState<{ id: string; on: boolean }>({ id: "", on: false });
   const swipeX = useRef<number | null>(null);
   const i = index == null ? 0 : Math.min(Math.max(0, index), shots.length - 1);
   const shot = shots[i];
+  const showOriginal = !!shot && original.id === shot.id && original.on;
 
   useFocusTrap(panelRef, open);
   useInertOutside(panelRef, open);
@@ -149,14 +199,25 @@ export function ShotLightbox({ shots, index, onIndex, onClose, title = "Screensh
             </div>
             <div
               ref={stageRef}
-              className="relative h-[min(72vh,760px)] w-full touch-pan-y overflow-hidden bg-ink-950"
+              className="relative h-[min(66vh,760px)] w-full touch-pan-y overflow-hidden bg-ink-950"
               style={{ borderRadius: radius.card }}
               onPointerDown={onPointerDown}
               onPointerUp={onPointerUp}
               onPointerCancel={() => (swipeX.current = null)}
             >
-              <ShotImage key={shot.id} shot={shot} fit="contain" />
+              <LightboxPicture key={shot.id} shot={shot} original={showOriginal} />
               <StripWipe trigger={wipe.n} from={wipe.from} />
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2" data-testid="shot-facts-row">
+              <span className="min-w-0 text-[11.5px] leading-snug text-mute" data-testid="shot-facts">
+                {shotFacts(shot)}
+                {shot.sha256 ? (
+                  <span className="ml-2 font-mono text-faint" title={`SHA-256 ${shot.sha256}`}>
+                    SHA-256 {shot.sha256.slice(0, 10)}…
+                  </span>
+                ) : null}
+              </span>
+              <Actions key={shot.id} shot={shot} original={showOriginal} onToggle={() => setOriginal({ id: shot.id, on: !showOriginal })} />
             </div>
             {shots.length > 1 && (
               <div className="flex items-center justify-center gap-2">

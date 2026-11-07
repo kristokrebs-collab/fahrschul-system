@@ -1,15 +1,38 @@
 import type { ScreenshotRef } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { NotchedFrame } from "@/motion/pulse/NotchedFrame";
-import { shotPlace, useShotUrl } from "./shots";
+import { isShrunkVersion } from "./info";
+import { shotPlace, useShotUrl, type ShotVariant } from "./shots";
+
+export interface ShotImageProps {
+  shot: ScreenshotRef;
+  className?: string;
+  fit?: "cover" | "contain";
+  /** `preview` (default): the small derived picture, fast. `original`: the exact stored file. */
+  variant?: ShotVariant;
+  /** Called once the browser has the picture (the viewer swaps the preview for the original then). */
+  onLoaded?: () => void;
+}
 
 /** The picture of a reference (cover), a quiet placeholder while it loads, a hint when it is not reachable. */
-export function ShotImage({ shot, className, fit = "cover" }: { shot: ScreenshotRef; className?: string; fit?: "cover" | "contain" }) {
-  const s = useShotUrl(shot);
-  if (s.status === "ok") return <img src={s.url} alt={shot.caption || "Screenshot"} draggable={false} className={cn("size-full select-none", fit === "cover" ? "object-cover" : "object-contain", className)} />;
+export function ShotImage({ shot, className, fit = "cover", variant = "preview", onLoaded }: ShotImageProps) {
+  const s = useShotUrl(shot, variant);
+  if (s.status === "ok") {
+    return (
+      <img
+        src={s.url}
+        alt={shot.caption || "Screenshot"}
+        draggable={false}
+        decoding="async"
+        onLoad={onLoaded}
+        className={cn("size-full select-none", fit === "cover" ? "object-cover" : "object-contain", className)}
+      />
+    );
+  }
+  const gone = shot.storage === "ram" ? "Nicht gespeichert (war nur im Arbeitsspeicher)" : `Nicht verfügbar${shot.store === "cloud" ? " · Cloud anmelden" : ""}`;
   return (
     <span className={cn("grid size-full place-items-center bg-ink-850 text-center text-[10.5px] text-faint", className)}>
-      {s.status === "loading" ? <span className="size-3 rounded-full bg-white/10" aria-hidden="true" /> : <span className="px-2">Nicht verfügbar{shot.store === "cloud" ? " · Cloud anmelden" : ""}</span>}
+      {s.status === "loading" ? <span className="size-3 rounded-full bg-white/10" aria-hidden="true" /> : <span className="px-2">{gone}</span>}
     </span>
   );
 }
@@ -42,8 +65,9 @@ export function ShotThumb({ shot, index, onOpen, className, badge }: ShotThumbPr
         }
       >
         {badge && (
-          <span className="absolute left-2 top-2 rounded-full bg-ink-950/80 px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.12em] text-mute" aria-hidden="true">
-            {shotPlace(shot)}
+          <span className="absolute left-2 top-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-1" aria-hidden="true">
+            <span className={cn("rounded-full bg-ink-950/80 px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.12em]", shot.storage === "ram" ? "text-warn" : "text-mute")}>{shotPlace(shot)}</span>
+            {isShrunkVersion(shot) && <span className="rounded-full bg-ink-950/80 px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.12em] text-mute">verkleinert</span>}
           </span>
         )}
       </NotchedFrame>
