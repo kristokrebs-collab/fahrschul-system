@@ -100,6 +100,8 @@ export const EXPORT_TABLES: ExportTable[] = [
   // F47 (0010_cases): the Chartfälle the user posted and the hypotheses they wrote
   { table: "group_cases", userColumn: "author_id", columns: "id,group_id,pair,interval,anchor_ms,horizon,question,closes_at,closed_at,created_at" },
   { table: "case_hypotheses", userColumn: "user_id", columns: "case_id,direction,confidence,reason,created_at" },
+  // A3 (0011_simulations): the saved simulations of the Zeitmaschine (figures and hashes, never the heavy paths)
+  { table: "simulations", userColumn: "user_id", columns: "id,trade_id,symbol,interval,seed,model_version,data_hash,data_bars,data_from,data_to,source,runs,horizon,plan,costs,metrics,result_hash,client_created_at,created_at,updated_at" },
 ];
 
 const SECRET_KEY = /secret|password|passphrase|token|api[-_]?key|authorization|cookie|jwt|_enc$/i;

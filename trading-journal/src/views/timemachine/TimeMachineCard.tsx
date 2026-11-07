@@ -12,13 +12,15 @@
  * Lazy: default export, import with `lazy(() => import("@/views/timemachine/TimeMachineCard"))`.
  */
 import { motion } from "motion/react";
-import { lazy, Suspense, type ReactNode } from "react";
-import { assumptionsOf, count, durationText, MIN_EVENTS, MIN_EVENTS_SHARES, pc, pc0, planLine, rr, triggerText, TM_INTERVAL_TEXT, TM_RUNS, TM_SEED, type TmHistory, type TmResult, type Quart } from "@/domain/timemachine";
+import { lazy, Suspense, useState, type ReactNode } from "react";
+import { assumptionsOf, costText, count, durationText, MIN_EVENTS, MIN_EVENTS_SHARES, MODEL_SCOPE, pc, pc0, planLine, rr, triggerText, TM_INTERVAL_TEXT, TM_RUNS, TM_SEED, type TmHistory, type TmResult, type Quart } from "@/domain/timemachine";
 import { cn } from "@/lib/cn";
+import { date as fmtDate, time as fmtTime } from "@/lib/format";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
+import { Segmented } from "@/primitives/Segmented";
 import { Skeleton } from "@/primitives/Skeleton";
 import { VerdictPanel } from "@/primitives/VerdictPanel";
 import { AnalysisNote } from "@/ui/AnalysisNote";
@@ -32,6 +34,8 @@ import { useTimeMachine, type TimeMachineRun } from "./useTimeMachine";
 // the two pictures are their own chunk: a card that only shows an empty state or a progress bar never loads them
 const FanChart = lazy(() => import("./FanChart"));
 const Histogram = lazy(() => import("./Histogram"));
+// the canvas mode „alle Pfade“ (and its worker) is loaded the first time it is chosen
+const PathsCanvas = lazy(() => import("./PathsCanvas"));
 
 const tone = (v: number): string => (v > 0.005 ? "text-win" : v < -0.005 ? "text-loss" : "text-fg");
 
@@ -220,6 +224,117 @@ function CompareBlock({ r }: { r: TmResult }) {
   );
 }
 
+
+type FanView = "bands" | "paths";
+
+/** The fan: the bands with 36 sample paths (SVG), or every simulated path on a canvas („Alle Pfade“, alpha overlay). */
+function FanBlock({ r, run }: { r: TmResult; run: TimeMachineRun }) {
+  const [view, setView] = useState<FanView>("bands");
+  return (
+    <Block title={TM.fan.title} lead={TM.fan.lead} testId="tm-fan-block">
+      <Segmented<FanView>
+        aria-label={TM.paths.view}
+        size="sm"
+        value={view}
+        onChange={setView}
+        options={[
+          { v: "bands", label: TM.paths.bands },
+          { v: "paths", label: TM.paths.allAlpha },
+        ]}
+        className="w-fit"
+      />
+      <Suspense fallback={<Skeleton height={260} />}>
+        {view === "bands" ? <FanChart result={r} /> : <PathsCanvas result={r} paths={run.paths} failed={run.pathsStatus === "error"} onNeedPaths={run.loadPaths} />}
+      </Suspense>
+    </Block>
+  );
+}
+
+const when = (ms: number): string => `${fmtDate(new Date(ms))} ${fmtTime(new Date(ms))}`;
+
+/** Which simulation this is: id, model, seed, size, data (hash and stand), costs, where it is kept, whether a recomputation agreed. */
+function SimMeta({ r, run }: { r: TmResult; run: TimeMachineRun }) {
+  const rec = run.record;
+  const S = TM.saved;
+  const stored = !rec ? S.notKept : !run.persistent ? S.notKept : rec.sync === "synced" ? S.synced : rec.sync === "pending" ? S.pending : S.local;
+  const rows: [string, ReactNode, string][] = [
+    [S.id, rec ? <span className="break-all">{rec.simulationId}</span> : "–", "tm-sim-id"],
+    [S.model, rec?.modelVersion ?? "–", "tm-sim-model"],
+    [S.seed, String(r.seed), "tm-sim-seed"],
+    [S.size, `${count(r.options.runs)} Läufe × ${r.sim.horizon} Kerzen`, "tm-sim-size"],
+    [S.data, rec ? `${count(rec.dataBars)} Kerzen bis ${when(r.pool.toMs)} · Hash ${rec.dataHash.slice(0, 12)}…` : `${count(r.pool.bars)} Kerzen bis ${when(r.pool.toMs)}`, "tm-sim-data"],
+    [S.costs, costText(r.costs), "tm-sim-costs"],
+    [S.stored, stored, "tm-sim-stored"],
+  ];
+  return (
+    <Block title={S.title} testId="tm-sim" lead={undefined} className="rounded-xl border border-line bg-ink-950/40 p-3">
+      <dl className="grid gap-x-4 gap-y-1.5 text-[12px] sm:grid-cols-[auto_1fr]">
+        {rows.map(([label, value, id]) => (
+          <div key={id} className="grid gap-0.5 sm:contents">
+            <dt className="text-[10px] font-semibold uppercase tracking-[0.1em] text-faint sm:pt-px">{label}</dt>
+            <dd className="num min-w-0 text-fg" data-testid={id}>
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {run.restored && (
+        <p className="text-[12px] leading-snug text-mute" role="status" data-testid="tm-sim-restored">
+          {S.restored}
+        </p>
+      )}
+      {run.check && (
+        <p className={cn("text-[12px] leading-snug", run.check === "same" ? "text-mute" : "text-warn")} role="status" data-testid="tm-sim-check" data-check={run.check}>
+          <span aria-hidden="true">{run.check === "same" ? "✓ " : "⚠ "}</span>
+          {run.check === "same" ? S.same : S.differs}
+        </p>
+      )}
+      {run.saveError && (
+        <p className="text-[12px] text-warn" role="alert" data-testid="tm-sim-save-error">
+          {run.saveError}
+        </p>
+      )}
+    </Block>
+  );
+}
+
+/** What the model covers and what it leaves out – shown, not hidden; a simulation is no forecast. */
+function ModelScope() {
+  const S = TM.saved;
+  return (
+    <Block title={S.scopeTitle} testId="tm-scope" lead={MODEL_SCOPE.note}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid content-start gap-1.5">
+          <h4 className="text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">{S.scopeIncluded}</h4>
+          <ul className="grid gap-1 text-[12px] leading-snug text-mute" data-testid="tm-scope-included">
+            {MODEL_SCOPE.included.map((t) => (
+              <li key={t} className="flex gap-2">
+                <span aria-hidden="true" className="shrink-0 text-faint">
+                  ✓
+                </span>
+                <span>{t}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="grid content-start gap-1.5">
+          <h4 className="text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">{S.scopeMissing}</h4>
+          <ul className="grid gap-1 text-[12px] leading-snug text-mute" data-testid="tm-scope-missing">
+            {MODEL_SCOPE.missing.map((t) => (
+              <li key={t} className="flex gap-2">
+                <span aria-hidden="true" className="shrink-0 text-faint">
+                  ✕
+                </span>
+                <span>{t}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </Block>
+  );
+}
+
 function Results({ r, run, props }: { r: TmResult; run: TimeMachineRun; props: TimeMachineProps }) {
   const stale = run.stale;
   return (
@@ -238,11 +353,7 @@ function Results({ r, run, props }: { r: TmResult; run: TimeMachineRun; props: T
       </div>
       <Odds r={r} />
       <Expectancy r={r} stocks={props.market === "stocks"} />
-      <Block title={TM.fan.title} lead={TM.fan.lead} testId="tm-fan-block">
-        <Suspense fallback={<Skeleton height={260} />}>
-          <FanChart result={r} />
-        </Suspense>
-      </Block>
+      <FanBlock r={r} run={run} />
       <Block title={TM.hist.title} lead={TM.hist.lead} testId="tm-hist-block">
         <Suspense fallback={<Skeleton height={200} />}>
           <Histogram result={r} />
@@ -266,6 +377,8 @@ function Results({ r, run, props }: { r: TmResult; run: TimeMachineRun; props: T
           </ul>
         </Block>
       )}
+      <SimMeta r={r} run={run} />
+      <ModelScope />
       <details className="text-[12.5px] text-mute" data-testid="tm-assumptions">
         <summary className="cursor-pointer select-none py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-mute pointer-coarse:min-h-11 pointer-coarse:py-3">{TM.assumptions.title}</summary>
         <ul className="mt-2 grid gap-1.5 leading-snug">

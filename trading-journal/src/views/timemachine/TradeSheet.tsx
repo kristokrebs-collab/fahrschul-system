@@ -28,6 +28,7 @@ import { ASSUMED_R, HISTORY_DAYS, tmPlanOfTrade, type TradePlan } from "./tradeP
 import type { TimeMachineCandle } from "./types";
 
 const TimeMachineCard = lazy(() => import("./TimeMachineCard"));
+const TradeSimulationBlock = lazy(() => import("./TradeSimulationBlock"));
 const SOURCE = "Binance USDⓈ-M";
 
 export default function TimeMachineHost() {
@@ -134,6 +135,15 @@ function Loaded({ trade, tp, interval, setInterval, assumed, setAssumed }: { tra
         )}
       </StaggerItem>
 
+      {/* the simulation saved for this trade is there before the candles are (it comes from this device) */}
+      {load.status !== "ok" && (
+        <StaggerItem>
+          <Suspense fallback={null}>
+            <TradeSimulationBlock tradeId={trade.id} />
+          </Suspense>
+        </StaggerItem>
+      )}
+
       {load.status === "loading" && (
         <StaggerItem className="grid h-[160px] place-items-center rounded-2xl border border-line bg-ink-950/50" data-testid="tm-trade-loading">
           <div className="grid justify-items-center gap-3">
@@ -160,6 +170,7 @@ function Loaded({ trade, tp, interval, setInterval, assumed, setAssumed }: { tra
               startMs={load.candles[load.candles.length - 1]!.time + HIST_MS[interval as HistInterval]}
               note={`${TM.title}, so wie sie am Einstieg gerechnet hätte: ${load.candles.length} Kerzen vor ${when(entryMs)}.`}
               framed={false}
+              tradeId={trade.id}
             />
           </Suspense>
         </StaggerItem>

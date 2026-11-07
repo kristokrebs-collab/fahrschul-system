@@ -167,7 +167,7 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 17 Funktionen
 
 ### Aktien beobachten & bewerten
 
-_Scannen, beobachten, lesen und bewerten – Aktien und Krypto._ · 8 Funktionen
+_Scannen, beobachten, lesen und bewerten – Aktien und Krypto._ · 9 Funktionen
 
 **Finden & beobachten**
 
@@ -178,6 +178,7 @@ _Scannen, beobachten, lesen und bewerten – Aktien und Krypto._ · 8 Funktionen
 | Schlagzeilen zu deiner Watchlist lesen | News-Monitor (Watchlist) | Aktien › News | teilweise |
 | Sehen, welche Aktiengeschäfte Mitglieder des US-Kongresses gemeldet haben | Kongress-Tracker | Aktien › Kongress | teilweise |
 | Sehen, welche US-Branchen die Trendregel gerade kauft | Branchen-Trend | Aktien › Branchen-Trend | teilweise |
+| Ein grünes Branchen-Signal als Papier-Position durchspielen | Papier-Portfolio aus dem Branchen-Signal | Aktien › Branchen-Trend › Papier-Portfolio | teilweise |
 
 **Zahlen & Bewertung**
 
@@ -189,7 +190,7 @@ _Scannen, beobachten, lesen und bewerten – Aktien und Krypto._ · 8 Funktionen
 
 ### Trade planen
 
-_Vom Einstieg über Stop und Größe bis zum Ticket – und durchgespielt._ · 8 Funktionen
+_Vom Einstieg über Stop und Größe bis zum Ticket – und durchgespielt._ · 10 Funktionen
 
 **Plan bauen**
 
@@ -207,6 +208,8 @@ _Vom Einstieg über Stop und Größe bis zum Ticket – und durchgespielt._ · 8
 | Prüfen, ob der Plan deine Grenzen einhält | Handelsplan: Risiko-Check | Handelsplan › Risiko-Check | fertig |
 | Prüfen, ob sich deine Größe gerade sauber handeln lässt | Handelsplan: Ausführbarkeit jetzt (Spread und Tiefe) | Handelsplan › Ticket › Ausführbarkeit jetzt | teilweise |
 | Einen Handelsplan durchspielen, bevor Geld im Spiel ist | Zeitmaschine (Plan durchspielen) | Labor › Zeitmaschine | fertig |
+| Alle 10 000 simulierten Verläufe als Bild ansehen | Zeitmaschine: alle Pfade | Labor › Zeitmaschine | teilweise |
+| Die Zeitmaschine zu einem Trade nach dem Neustart wiederfinden | Gespeicherte Simulation am Trade | Trades – Trades → Trade öffnen → Gespeicherte Zeitmaschine (erscheint nach einem Durchspielen mit „Zeitmaschine“) | teilweise |
 | Den fertigen Plan als Text oder CSV mitnehmen | Handelsplan: Ticket zum Kopieren | Handelsplan › Ticket | fertig |
 
 ### Risiko & Disziplin

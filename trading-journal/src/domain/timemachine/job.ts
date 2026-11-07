@@ -16,13 +16,15 @@ import { buildPool, type Pool } from "./pool";
 import { K_MOVED, K_NEITHER, K_SKIPPED, K_STOP, K_TARGET, SimJob, type SimOut } from "./sim";
 import { histogram, meanOf, prob, quantile, quart } from "./stats";
 import { compareOf, notesOf, verdictOf } from "./texts";
-import { MIN_POOL_BARS, type FanBand, type TmFan, type TmInput, type TmPhase, type TmResult, type TmSim } from "./types";
+import { MIN_POOL_BARS, type FanBand, type TmFan, type TmInput, type TmPaths, type TmPhase, type TmResult, type TmSim } from "./types";
 
 export interface TmJob {
   step(deadline: number): boolean;
   progress(): number;
   phase(): TmPhase;
   result(): TmResult | null;
+  /** every simulated path (after the job is done; the buffers belong to the caller from then on – the job is finished) */
+  paths?(): TmPaths | null;
 }
 
 const BANDS: readonly [FanBand, number][] = [
@@ -122,6 +124,11 @@ export function createTmJob(input: TmInput): TmJob {
     },
     phase: () => phase,
     result: () => res,
+    paths() {
+      if (phase !== "done" || !sim) return null;
+      const o = sim.out;
+      return { runs: o.bandRuns, stride: o.stride, data: o.fan, kind: o.kind.slice(0, o.bandRuns), exit: o.exit.slice(0, o.bandRuns), computed: o.runs };
+    },
   };
 }
 

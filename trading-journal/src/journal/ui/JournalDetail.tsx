@@ -1,5 +1,5 @@
 import { Button } from "@/primitives/Button";
-import { useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { useEntitlement } from "@/billing/entitlements";
 import { openUpgrade } from "@/billing/store";
 import { BEHAVIOR_LABEL, type BehaviorKey } from "@/domain/coach/behaviorKeys";
@@ -25,6 +25,9 @@ import { ExcursionBar } from "./ExcursionBar";
 import { FillsBar } from "./FillsBar";
 import { FillsTimeline } from "./FillsTimeline";
 import { RatingDots } from "./RatingDots";
+
+// A3: the simulation saved for this trade (IndexedDB) – a lazy chunk; it shows nothing for a trade without one
+const TradeSimulationBlock = lazy(() => import("@/views/timemachine/TradeSimulationBlock"));
 
 export interface JournalDetailProps {
   trade: EnrichedTrade;
@@ -224,6 +227,13 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
         <ActionButton onClick={() => void share()} disabled={sharing} icon="M12 4v11M7 9l5-5 5 5M5 20h14">
           {sharing ? "Erzeugt …" : "Als Bild"}
         </ActionButton>
+      </StaggerItem>
+
+      {/* A3: the Zeitmaschine simulation saved for this trade – last, so its appearing moves nothing above it */}
+      <StaggerItem>
+        <Suspense fallback={null}>
+          <TradeSimulationBlock tradeId={t.id} onOpen={() => (replayOk ? openTimeMachine(t.id, { fromDetail: true }) : openUpgrade("replay"))} />
+        </Suspense>
       </StaggerItem>
     </>
   );

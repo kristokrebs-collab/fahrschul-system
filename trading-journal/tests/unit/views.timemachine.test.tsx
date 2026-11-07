@@ -12,6 +12,7 @@ import { MotionRoot } from "@/motion/MotionRoot";
 import { histGeometry, fanGeometry, niceTicks } from "@/views/timemachine/geometry";
 import { DEFAULT_FORM, costsOfLab, missingPrices, optionsOfForm, readPrices, sanitizeForm } from "@/views/timemachine/formModel";
 import { __forgetTimeMachine, lastTimeMachine } from "@/views/timemachine/lastResult";
+import { setSimulationsForTests } from "@/views/timemachine/simulations";
 import { barsOf, inputOf, runKey } from "@/views/timemachine/model";
 import { tmPlanOfTrade, symbolOfPair, costsOfTrade } from "@/views/timemachine/tradePlan";
 import type { TimeMachineCandle, TimeMachineProps } from "@/views/timemachine/types";
@@ -47,6 +48,8 @@ const done = async () => waitFor(() => expect(screen.getByTestId("tm-card")).toH
 beforeAll(() => installDomPolyfills());
 afterEach(() => {
   __forgetTimeMachine();
+  // a finished run is saved, and the same plan on the same candles is then served from the store: every test starts with an empty one
+  setSimulationsForTests(null);
   vi.restoreAllMocks();
 });
 
@@ -310,7 +313,8 @@ describe("Karte", { timeout: 60_000 }, () => {
       history: { ...real.history, n: 0, events: [], target: { ...real.history.target, k: 0 } },
     };
     const mod = await import("@/domain/timemachine/tmRunner");
-    vi.spyOn(mod, "runTimeMachine").mockResolvedValue(warn);
+    // the card asks the runner for the result AND every path (canvas mode): the one door is `runTimeMachineFull`
+    vi.spyOn(mod, "runTimeMachineFull").mockResolvedValue({ result: warn, paths: null });
     wrap(<TimeMachineCard {...props()} />);
     await done();
     const text = screen.getByTestId("tm-compare-text");

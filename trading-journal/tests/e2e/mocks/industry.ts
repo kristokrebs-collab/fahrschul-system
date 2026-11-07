@@ -34,9 +34,20 @@ function bp(i: number, k: number): number {
   return k % 2 ? 40 : 60;
 }
 
-function payload(now: number) {
+/** `DAYS` consecutive calendar days ending at `endDay` (`YYYYMMDD`): a data set that ends TODAY (the paper bridge refuses old data). */
+function daysEnding(endDay: number): number[] {
+  const y = Math.floor(endDay / 10_000);
+  const m = Math.floor((endDay % 10_000) / 100);
+  const d = endDay % 100;
+  const end = Date.UTC(y, m - 1, d);
+  return Array.from({ length: DAYS }, (_, k) => Number(new Date(end - (DAYS - 1 - k) * 86_400_000).toISOString().slice(0, 10).replace(/-/g, "")));
+}
+
+function payload(now: number, endDay?: number) {
+  const days = endDay ? daysEnding(endDay) : null;
+  const dayAt = (k: number): number => (days ? days[k]! : dayOf(k));
   const buf = Buffer.alloc(DAYS * 4 + NAMES.length * DAYS * 2);
-  for (let k = 0; k < DAYS; k++) buf.writeInt32LE(dayOf(k), k * 4);
+  for (let k = 0; k < DAYS; k++) buf.writeInt32LE(dayAt(k), k * 4);
   for (let i = 0; i < NAMES.length; i++) for (let k = 0; k < DAYS; k++) buf.writeInt16LE(bp(i, k), DAYS * 4 + (i * DAYS + k) * 2);
   return {
     source: "ken-french",
@@ -46,8 +57,8 @@ function payload(now: number) {
     database: "202609",
     names: [...NAMES],
     days: DAYS,
-    firstDay: dayOf(0),
-    lastDay: LAST_DAY,
+    firstDay: dayAt(0),
+    lastDay: dayAt(DAYS - 1),
     encoding: "int32le-dates+int16le-industry-major;gzip;base64",
     bytes: buf.length,
     data: gzipSync(buf).toString("base64"),
@@ -63,9 +74,9 @@ export interface Industry {
   delayMs: number;
 }
 
-export async function mockIndustry(page: Page): Promise<Industry> {
+export async function mockIndustry(page: Page, opts: { endDay?: number } = {}): Promise<Industry> {
   const state: Industry = { calls: 0, fail: null, delayMs: 0 };
-  const body = JSON.stringify(payload(Date.now()));
+  const body = JSON.stringify(payload(Date.now(), opts.endDay));
   await page.route(/\/api\/v1\/industry\/daily/, async (route: Route) => {
     state.calls++;
     if (state.delayMs) await new Promise((r) => setTimeout(r, state.delayMs));
