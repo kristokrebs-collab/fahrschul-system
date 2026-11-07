@@ -197,7 +197,10 @@ export const usePaper = create<PaperState>((set, get) => ({
       // 4. the risk rule on everything
       put({ step: "regel" });
       data.set(id, { bars, plan, sim, simulationId });
-      put({ status: "done", step: null, progress: 1, simulationId, decision: decide({ ...base, book: get().book, bars, plan, sim }) });
+      const final = decide({ ...base, book: get().book, bars, plan, sim });
+      // without fresh candles nothing was simulated: say that, not "not played through yet"
+      const decision: Decision = dataOk ? final : { ...final, checks: final.checks.map((c) => (c.id === "zeitmaschine" ? { ...c, text: "Nicht geprüft – ohne frische Kerzen wird nicht simuliert." } : c)) };
+      put({ status: "done", step: null, progress: 1, simulationId, decision });
     } catch (e) {
       if (ctl.signal.aborted || (e instanceof Error && e.name === "AbortError")) return;
       put({ status: "error", step: null, message: e instanceof Error ? e.message : "Die Prüfung ist fehlgeschlagen." });

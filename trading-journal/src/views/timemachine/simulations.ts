@@ -29,9 +29,53 @@ const appCloud: SimCloud = {
 
 let current: SimulationStore | null = null;
 
+export interface SignInWatch {
+  /** the sync is allowed right now (default: `canSyncSimulations`) */
+  allowed?: () => boolean;
+  /** calls `fn` after every change of the login state; returns the unsubscribe (default: the cloud session store) */
+  subscribe?: (fn: () => void) => () => void;
+}
+
+/**
+ * A login that comes AFTER simulations were saved: what is `local` / `pending` goes up, and the figures other devices saved come down
+ * (without their paths). Runs once at the start when the sync is already allowed, then at every sign-in / finished second factor.
+ * Nothing happens while signed out. Returns the unsubscribe.
+ */
+export function syncOnSignIn(store: SimulationStore, opts: SignInWatch = {}): () => void {
+  const allowed = opts.allowed ?? canSyncSimulations;
+  const subscribe = opts.subscribe ?? ((fn) => useCloudSession.subscribe(() => fn()));
+  let running = false;
+  let again = false;
+  const run = (): void => {
+    if (!allowed()) return;
+    if (running) {
+      again = true;
+      return;
+    }
+    running = true;
+    void store
+      .flush()
+      .then(() => store.pull())
+      .catch(() => undefined)
+      .finally(() => {
+        running = false;
+        if (again) {
+          again = false;
+          run();
+        }
+      });
+  };
+  run();
+  return subscribe(run);
+}
+
 /** The one store of the app (created on first use). */
 export function simulations(): SimulationStore {
-  current ??= createSimulationStore(idbSimStorage() ?? memorySimStorage(), appCloud);
+  if (!current) {
+    const made = createSimulationStore(idbSimStorage() ?? memorySimStorage(), appCloud);
+    current = made;
+    syncOnSignIn(made, { subscribe: (fn) => useCloudSession.subscribe((s, prev) => ((s.phase === "signedIn" && prev.phase !== "signedIn") || (prev.needsMfa && !s.needsMfa) ? fn() : undefined)) });
+  }
   return current;
 }
 

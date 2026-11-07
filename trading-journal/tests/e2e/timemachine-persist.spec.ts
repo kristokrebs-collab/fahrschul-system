@@ -4,9 +4,11 @@
  * OffscreenCanvas where the browser has one) with „berechnet“ and „gezeichnet“ apart in the title, the labelled sample on request;
  * the trade shows the simulation saved for it, also after a reload. Nothing here depends on the clock beyond a fixed set of bars.
  */
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, openRoute, screenshot, seed } from "./helpers";
 import { synthPrice } from "./mocks/synth";
+import { themeSettled } from "./uxHarness";
 
 const PROJECTS = ["mobile", "desktop"];
 const PLAN = { entry: "82.900", stop: "80.500", target: "87.700" };
@@ -171,6 +173,33 @@ test.describe("Zeitmaschine · gespeicherte Simulation", () => {
     await expect(page.getByTestId("tm-paths-title")).toContainText(`berechnet: 10.000 · gezeichnet: ${drawn.toLocaleString("de-DE")}`);
     expect(errors).toEqual([]);
   });
+});
+
+test.describe("Zeitmaschine · Barrierefreiheit der neuen Teile (axe, WCAG 2.1 A + AA)", () => {
+  test.setTimeout(240_000);
+  for (const theme of ["dark", "light"] as const) {
+    test(`Alle Pfade, „Diese Simulation“ und Modellumfang (${theme})`, async ({ page }, info) => {
+      test.skip(!PROJECTS.includes(info.project.name), "runs on mobile + desktop");
+      await seed(page, { boxes: true, extra: { "tj2-theme": JSON.stringify({ pref: theme, accent: "signal" }), "tj2-tm-paths-mode": JSON.stringify("all") } });
+      await openRoute(page, "/#labor", "Labor");
+      await themeSettled(page);
+      await page.getByTestId("tm-section").scrollIntoViewIfNeeded();
+      await runPlan(page);
+      await page.getByTestId("tm-fan-block").scrollIntoViewIfNeeded();
+      await page.getByRole("radio", { name: "Alle Pfade (Alpha)" }).click();
+      await expect(page.getByTestId("tm-paths")).toHaveAttribute("data-state", "done", { timeout: 120_000 });
+      await page.waitForTimeout(1500);
+      for (const [sel, what] of [
+        ['[data-testid="tm-fan-block"]', "Fächer mit allen Pfaden"],
+        ['[data-testid="tm-sim"]', "Diese Simulation"],
+        ['[data-testid="tm-scope"]', "Modellumfang"],
+      ] as const) {
+        const res = await new AxeBuilder({ page }).include(sel).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+        const lines = res.violations.map((v) => `${v.id} (${v.impact}): ${v.help} → ${v.nodes.slice(0, 4).map((n) => n.target.join(" ")).join(" | ")}`);
+        expect(lines, `${what}: axe violations`).toEqual([]);
+      }
+    });
+  }
 });
 
 /* ------------------------------------------------------------------------------------------------------ Trade-Detail */

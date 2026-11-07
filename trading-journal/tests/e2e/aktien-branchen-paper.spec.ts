@@ -5,11 +5,13 @@
  * A second click or a second delivery of the signal opens nothing; the Not-Aus stops new positions but not the exit; Rot = Cash closes;
  * the real (weeks old) data of the library are refused as too old and nothing is fetched; no request but GET leaves the page.
  */
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Request, type TestInfo } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, screenshot, seed } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockIndustry } from "./mocks/industry";
 import { recentTradingDay, stockHistoryBars, stockOpen } from "./mocks/planStockCandles";
+import { themeSettled } from "./uxHarness";
 
 const PROJECTS = ["mobile", "desktop"];
 const STOCK_BARS = /\/api\/v1\/stocks\/bars/;
@@ -41,15 +43,16 @@ async function stockRig(page: Page): Promise<Rig> {
 
 const yyyymmdd = (ms: number): number => Number(new Date(ms).toISOString().slice(0, 10).replace(/-/g, ""));
 
-async function open(page: Page, info: TestInfo, o: { fresh: boolean; extra?: Record<string, unknown> }): Promise<{ errors: string[]; rig: Rig }> {
+async function open(page: Page, info: TestInfo, o: { fresh: boolean; extra?: Record<string, unknown>; theme?: "dark" | "light" }): Promise<{ errors: string[]; rig: Rig }> {
   test.skip(!PROJECTS.includes(info.project.name), "Papier-Portfolio runs on mobile + desktop");
   const errors = collectErrors(page);
-  await seed(page, { extra: o.extra ?? {} });
+  await seed(page, { extra: { ...(o.theme ? { "tj2-theme": JSON.stringify({ pref: o.theme, accent: "signal" }) } : {}), ...(o.extra ?? {}) } });
   await mockIndustry(page, o.fresh ? { endDay: yyyymmdd(Date.now() - 86_400_000) } : {});
   const rig = await stockRig(page);
   await openRoute(page, "/#aktien", "Aktien");
   await expect(page.getByTestId("aktien-scanner")).toBeVisible();
   await page.getByRole("navigation", { name: "Inhalt dieser Seite" }).getByRole("button", { name: "Branchen-Trend" }).click();
+  await themeSettled(page);
   await expect(page.getByTestId("branchen-honest")).toBeVisible();
   await expect(page.getByTestId("branchen-ampel-body")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
   await page.getByTestId("branchen-paper").scrollIntoViewIfNeeded();
@@ -217,4 +220,18 @@ test.describe("Branchen-Trend · Papier-Portfolio", () => {
     expect(misses, JSON.stringify(misses)).toEqual([]);
     await expectNoHorizontalScroll(page);
   });
+
+  for (const theme of ["dark", "light"] as const) {
+    test(`Barrierefreiheit (axe, WCAG 2.1 A + AA): Karte mit Regeln, Position und Historie (${theme})`, async ({ page }, info) => {
+      await open(page, info, { fresh: true, theme });
+      await checked(page, "Util");
+      await panel(page, "Util").getByTestId("paper-open").click();
+      await expect(page.getByTestId("paper-position")).toHaveCount(1);
+      await checked(page, "Agric"); // the second panel stays open, with its rules
+      await page.waitForTimeout(1500);
+      const res = await new AxeBuilder({ page }).include('[data-testid="branchen-paper"]').withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+      const lines = res.violations.map((v) => `${v.id} (${v.impact}): ${v.help} → ${v.nodes.slice(0, 4).map((n) => n.target.join(" ")).join(" | ")}`);
+      expect(lines, "axe violations").toEqual([]);
+    });
+  }
 });

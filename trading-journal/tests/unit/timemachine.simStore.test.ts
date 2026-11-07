@@ -13,7 +13,7 @@ import { setPrivacy } from "@/cloud/privacy";
 import { SIGNED_OUT, useCloudSession } from "@/cloud/session";
 import { createSimulationStore, idbSimStorage, KEEP_FREE, memorySimStorage, type SimCloud, type SimulationRemote } from "@/views/timemachine/simStore";
 import { createSupabaseSimulations } from "@/views/timemachine/simCloud";
-import { canSyncSimulations } from "@/views/timemachine/simulations";
+import { canSyncSimulations, syncOnSignIn } from "@/views/timemachine/simulations";
 import { input, latticePlan } from "./timemachine.helpers";
 
 const make = (over: Parameters<typeof input>[0] = {}, meta: Parameters<typeof buildRecord>[2] = {}): SimulationRecord => {
@@ -341,5 +341,62 @@ describe("Wer in die Wolke schreiben darf", () => {
     gate.setState({ entitled: true });
     expect(can()).toBe(true);
     vi.unstubAllEnvs();
+  });
+});
+
+describe("Eine Anmeldung nach dem Speichern", () => {
+  /** A store whose sync calls are spies; `subscribe` hands the test the callback of the login watch. */
+  function watch(allowedNow: boolean) {
+    const gate = { on: allowedNow };
+    const calls: string[] = [];
+    const store = { flush: async () => void calls.push("flush"), pull: async () => void calls.push("pull") } as unknown as ReturnType<typeof createSimulationStore>;
+    let fire: () => void = () => undefined;
+    const off = vi.fn();
+    const stop = syncOnSignIn(store, {
+      allowed: () => gate.on,
+      subscribe: (fn) => {
+        fire = fn;
+        return off;
+      },
+    });
+    return { gate, calls, fire: () => fire(), stop, off };
+  }
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  it("ausgeloggt passiert nichts – beim Start nicht und bei Änderungen des Anmeldezustands nicht", async () => {
+    const w = watch(false);
+    await tick();
+    w.fire();
+    await tick();
+    expect(w.calls).toEqual([]);
+  });
+
+  it("schon angemeldet beim Start: erst hochladen, dann holen – einmal", async () => {
+    const w = watch(true);
+    await tick();
+    expect(w.calls).toEqual(["flush", "pull"]);
+  });
+
+  it("die Anmeldung kommt später: beim nächsten Anlass geht es los; mehrere Anlässe auf einmal ergeben höchstens einen Nachlauf", async () => {
+    const w = watch(false);
+    await tick();
+    w.gate.on = true;
+    w.fire();
+    w.fire();
+    w.fire();
+    await tick();
+    await tick();
+    // one run, plus one more run for the triggers that came while it was running – never three
+    expect(w.calls.filter((c) => c === "flush").length).toBeLessThanOrEqual(2);
+    expect(w.calls.filter((c) => c === "flush").length).toBeGreaterThanOrEqual(1);
+    expect(w.calls.filter((c) => c === "pull").length).toBe(w.calls.filter((c) => c === "flush").length);
+    expect(w.calls[0]).toBe("flush");
+    expect(w.calls[1]).toBe("pull");
+  });
+
+  it("der Rückgabewert beendet die Beobachtung", () => {
+    const w = watch(false);
+    w.stop();
+    expect(w.off).toHaveBeenCalledTimes(1);
   });
 });

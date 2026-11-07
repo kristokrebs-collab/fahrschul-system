@@ -260,6 +260,7 @@ describe("Prüfung und Eröffnung (Store)", () => {
     await act(async () => void usePaper.getState().check(s));
     await done(s);
     expect(decision(s).checks.find((c) => c.id === "kerzen")!.text).toMatch(/veraltet/);
+    expect(decision(s).checks.find((c) => c.id === "zeitmaschine")!.text).toMatch(/Nicht geprüft/);
     expect(runSim).not.toHaveBeenCalled();
     expect(usePaper.getState().openFrom(s)).toBe("refused");
   });
