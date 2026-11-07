@@ -217,6 +217,26 @@ describe("RadialShare", () => {
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 
+  it("a scroll that leaves the trigger in place (the section strip sliding its chip) keeps the fan; one that moves the trigger closes it", async () => {
+    render(<Harness onSelect={vi.fn()} />);
+    const trigger = screen.getByTestId("share-button");
+    const at = { top: 100, left: 50 };
+    trigger.getBoundingClientRect = () => ({ x: at.left, y: at.top, left: at.left, top: at.top, width: 80, height: 32, right: at.left + 80, bottom: at.top + 32, toJSON: () => ({}) });
+    fireEvent.click(trigger);
+    await screen.findByRole("menu");
+    const strip = document.body.appendChild(document.createElement("ul"));
+    act(() => {
+      strip.dispatchEvent(new Event("scroll"));
+    });
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    at.top = 160;
+    act(() => {
+      strip.dispatchEvent(new Event("scroll"));
+    });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    strip.remove();
+  });
+
   it("each target is 48 px, never below the 44 px touch minimum", async () => {
     render(<Harness onSelect={vi.fn()} />);
     fireEvent.click(screen.getByTestId("share-button"));

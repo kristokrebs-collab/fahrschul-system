@@ -141,14 +141,18 @@ test.describe("Branchen-Trend", () => {
     await expect(loading.locator("li")).toHaveCount(48);
     // the grid's place is measured INSIDE its section: the cards above it on the page (analyst panels, Kongress, news) load on
     // their own clock and are the business of `layout-shift.spec`, not of this section
-    const section = page.getByTestId("aktien-branchen");
-    const h0 = (await loading.boundingBox())!.height;
-    const top0 = (await loading.boundingBox())!.y - (await section.boundingBox())!.y;
+    // both boxes are read in ONE step: the section strip scrolls smoothly to the section (`revealSection`), and two separate reads
+    // would each see another scroll position while it is still on its way
+    const inSection = (id: string) =>
+      page.evaluate((grid) => {
+        const g = document.querySelector<HTMLElement>(`[data-testid="${grid}"]`)!.getBoundingClientRect();
+        const s = document.querySelector<HTMLElement>('[data-testid="aktien-branchen"]')!.getBoundingClientRect();
+        return { h: g.height, top: g.top - s.top };
+      }, id);
+    const { h: h0, top: top0 } = await inSection("branchen-grid-loading");
     release();
     await ready(page);
-    const grid = page.getByTestId("branchen-grid");
-    const h1 = (await grid.boundingBox())!.height;
-    const top1 = (await grid.boundingBox())!.y - (await section.boundingBox())!.y;
+    const { h: h1, top: top1 } = await inSection("branchen-grid");
     expect(Math.abs(h1 - h0), `Platzhalter ${h0} px, Raster ${h1} px`).toBeLessThan(12);
     // everything above the grid inside the section (status row, stand line, figures) was there before the data
     expect(Math.abs(top1 - top0), `Raster beginnt ${top0} px, dann ${top1} px unter der Sektion`).toBeLessThan(24);

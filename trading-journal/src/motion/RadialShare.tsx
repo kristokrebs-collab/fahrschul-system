@@ -49,7 +49,7 @@ const viewport = (): { w: number; h: number } => {
  * - Motion: targets leave the trigger centre one after another (`spring.pop`, `stagger.cards`), and return on `tween.exit`;
  *   transform / opacity only. Reduced motion: they are simply there.
  * - The fan is a fixed layer in `<body>` (a dialog's scroll box cannot clip it); it is exempt from the dialog's inert rule
- *   (`data-radial-share`, `INERT_EXEMPT_SELECTOR`). A pointer press anywhere else, a resize or a scroll closes it.
+ *   (`data-radial-share`, `INERT_EXEMPT_SELECTOR`). A pointer press anywhere else, a resize or a scroll that moves the trigger closes it.
  */
 export function RadialShare({ targets, label = "Teilen", icon, size = "sm", className, testId = "share-button" }: RadialShareProps) {
   const reduced = useReducedFx();
@@ -84,17 +84,26 @@ export function RadialShare({ targets, label = "Teilen", icon, size = "sm", clas
     if (open && firstEnabled >= 0) itemRefs.current[firstEnabled]?.focus({ preventScroll: true });
   }, [open, firstEnabled]);
 
-  // anything that moves the trigger closes the fan (its place was measured once)
+  // anything that moves the trigger closes the fan (its place was measured once). A scroll counts only when the trigger really
+  // moved: the capture listener also hears scrolls that leave it where it is – the sticky section strip sliding its chip into view
+  // a moment after the page scrolled – and those must not take the fan away from under a finger
+  const ox = fan?.ox;
+  const oy = fan?.oy;
   useEffect(() => {
     if (!open) return;
     const away = () => close(false);
+    const moved = () => {
+      const r = trigger.current?.getBoundingClientRect();
+      if (!r || ox === undefined || oy === undefined) return close(false);
+      if (Math.abs(r.left + r.width / 2 - ox) > 1 || Math.abs(r.top + r.height / 2 - oy) > 1) close(false);
+    };
     window.addEventListener("resize", away);
-    window.addEventListener("scroll", away, true);
+    window.addEventListener("scroll", moved, true);
     return () => {
       window.removeEventListener("resize", away);
-      window.removeEventListener("scroll", away, true);
+      window.removeEventListener("scroll", moved, true);
     };
-  }, [open, close]);
+  }, [open, close, ox, oy]);
 
   const onMenuKey = (e: KeyboardEvent<HTMLDivElement>) => {
     const cur = active >= 0 ? active : firstEnabled;
