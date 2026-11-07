@@ -196,6 +196,7 @@ test.describe("Top-Trader: Netto Long/Short on the Markt page", () => {
     const tip = card.getByTestId("trader-net-tip");
     const glow = card.getByTestId("trader-net-glow");
     await expect(tip).toHaveCSS("opacity", "0");
+    await plot.scrollIntoViewIfNeeded();
     const b = (await plot.boundingBox())!;
     const at = { x: b.width * 0.4, y: b.height * 0.45 };
     if (isMobile(info)) await plot.tap({ position: at });

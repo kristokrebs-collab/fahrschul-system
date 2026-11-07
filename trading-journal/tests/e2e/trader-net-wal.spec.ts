@@ -157,6 +157,8 @@ const xOf = (w: number, t: number, tMin: number, tMax: number): number => {
 };
 
 async function pointAt(page: Page, plot: Locator, info: Parameters<typeof isMobile>[0], x: number, y = 0.45): Promise<void> {
+  // (a mouse move to a point outside the window sends no pointer event: bring the plot into view first)
+  await plot.scrollIntoViewIfNeeded();
   const b = (await plot.boundingBox())!;
   if (isMobile(info)) await plot.tap({ position: { x, y: b.height * y } });
   else await page.mouse.move(b.x + x, b.y + b.height * y);
