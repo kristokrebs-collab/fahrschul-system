@@ -237,8 +237,30 @@ export interface EnvReport {
 
 const truthy = (x: string | undefined): boolean => ["1", "true", "yes", "on"].includes((x ?? "").trim().toLowerCase());
 
-/** Names that look like ours but are not in the spec: a typo is the commonest reason a variable "does not work". */
-const FAMILY = /^(SUPABASE_|STRIPE_|EXCHANGE_ENC_KEY_V|RESEND_|ALERT_|TWILIO_|ANTHROPIC_|SEC_|OPS_|KILL_|VITE_SUPABASE|VITE_LEGAL|HYBLOCK_|SYNC_|LOG_|IP_HASH|SITE_|COACH_|ROUTER_|VISION_|TRIAL_|REFERRAL_)/;
+/** Edit distance (small strings only). */
+function distance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0]!;
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = row[j]!;
+      row[j] = Math.min(row[j]! + 1, row[j - 1]! + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return row[b.length]!;
+}
+
+/**
+ * Names that look like a typo of one of ours (edit distance ≤ 2 from a known name, but not a known name): a typo is the
+ * commonest reason a variable "does not work". Names that merely share a prefix (`ANTHROPIC_BASE_URL` of the SDK) are not
+ * flagged.
+ */
+function looksLikeTypo(name: string, known: readonly string[]): boolean {
+  if (known.includes(name) || /^EXCHANGE_ENC_KEY_V[1-9]$/.test(name) || name.length < 6) return false;
+  return known.some((k) => Math.abs(k.length - name.length) <= 2 && distance(name, k) <= 2);
+}
 
 export function evaluateEnv(get: (name: string) => string | undefined, present: readonly string[] = []): EnvReport {
   const groups = ENV_GROUPS.map((g) => groupStatus(g, get));
@@ -255,7 +277,7 @@ export function evaluateEnv(get: (name: string) => string | undefined, present: 
   // a half-set group (one Stripe key without the webhook secret) is a mistake, not "off": it is never "bereit"
   const partial = groups.some((g) => g.state === "teilweise");
   const verdict: Verdict = coreOk && !partial ? "bereit" : coreNone && !partial ? "nicht eingerichtet" : "unvollständig";
-  const known = new Set(ENV_SPEC.map((e) => e.name));
-  const unknown = present.filter((n) => FAMILY.test(n) && !known.has(n) && !/^EXCHANGE_ENC_KEY_V[1-9]$/.test(n)).sort();
+  const names = ENV_SPEC.map((e) => e.name);
+  const unknown = present.filter((n) => looksLikeTypo(n, names)).sort();
   return { verdict, groups, functions, switches, unknown };
 }
