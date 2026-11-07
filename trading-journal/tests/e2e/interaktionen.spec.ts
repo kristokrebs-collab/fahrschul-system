@@ -257,6 +257,27 @@ test.describe("Radial Share", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menu")).toHaveCount(0);
   });
+
+  test("Bericht: der Streifen der Seitenabschnitte, der seinen Chip ins Bild schiebt, nimmt den Fächer nicht weg", async ({ page }, info) => {
+    only(info);
+    await seed(page, {});
+    await openRoute(page, "/#berichte", "Berichte");
+    const trigger = page.getByTestId("report-share");
+    await trigger.scrollIntoViewIfNeeded();
+    await trigger.click();
+    await expect(page.getByRole("menuitem", { name: "Kopieren" })).toBeVisible();
+    // the sticky strip slides the chip of the section in view a moment after the page scrolled: a scroll event of ITS own, which
+    // leaves the trigger where it is (on a slow runner it lands while the fan is open)
+    await page.evaluate(() => {
+      const strip = document.querySelector('nav[aria-label="Inhalt dieser Seite"] ul')!;
+      strip.dispatchEvent(new Event("scroll"));
+    });
+    await page.waitForTimeout(300);
+    await expect(page.getByRole("menuitem", { name: "Datei" })).toBeVisible();
+    // a scroll that does move the trigger still closes it
+    await page.evaluate(() => window.scrollBy({ top: 120, behavior: "instant" }));
+    await expect(page.getByRole("menu")).toHaveCount(0);
+  });
 });
 
 /* ------------------------------------------------------------------------------------------------------ Speicher-Morph */
