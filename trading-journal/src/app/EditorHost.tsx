@@ -4,11 +4,14 @@
  * editor. While open, the rounded price and its provenance are read once per second on the shared `nowMv` clock
  * (no per-trade subscription, no throttle timers) and the editor re-renders only when the integer price or the
  * source changes – at most once a second. Live displays inside the editor render `priceMv` directly.
+ * Budget-Schnitt: the editor itself is a chunk of its own (`@/app/overlayLoad`), mounted (closed) once it arrived at idle /
+ * on intent, or as soon as `editor.open` – and kept mounted from then on (`ArmedOverlay`).
  */
 import { useSyncExternalStore } from "react";
 import { getProvider, lastPrice, SOURCE_NAME, type Provenance } from "@/market";
 import { nowMv, retainClock } from "@/motion/clock";
-import { TradeEditor } from "@/overlays/TradeEditor";
+import { ArmedOverlay } from "@/app/ArmedOverlay";
+import { TradeEditor } from "@/app/overlays";
 import { useUi } from "@/store/uiStore";
 
 export interface LivePriceSnapshot {
@@ -58,5 +61,9 @@ export function EditorHost() {
   const open = useUi((s) => s.editor.open);
   const { price, provenance } = useLivePriceWhile(open);
   const livePriceLabel = provenance && provenance.source !== "binance" && provenance.source !== "proxy" ? `Live-Preis (${SOURCE_NAME[provenance.source]}) übernehmen` : undefined;
-  return <TradeEditor livePrice={price} livePriceLabel={livePriceLabel} />;
+  return (
+    <ArmedOverlay id="editor" open={open}>
+      <TradeEditor livePrice={price} livePriceLabel={livePriceLabel} />
+    </ArmedOverlay>
+  );
 }

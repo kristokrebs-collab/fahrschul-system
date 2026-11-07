@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bandBox, bandMask, BOTTOM_BANDS, BottomFade } from "@/app/BottomFade";
+import { armOverlay, resetOverlayArming } from "@/app/overlayLoad";
 import { Dock, DOCK, DOCK_INTRO_KEY, dockBell, dockLayout, markerFlip } from "@/app/Dock";
 import { HeaderEdge, scrollBar, scrollDrivenEdge } from "@/app/Header";
 import { priceStep, tickerChange, tickerChangePct, tickerDecimals, tickerJump, tickerPrice } from "@/app/HeaderTicker";
@@ -108,7 +109,10 @@ describe("Dock", () => {
     expect(within(dock).getByRole("button", { name: "Markt" })).toHaveAttribute("aria-current", "page");
   });
 
+  // Budget-Schnitt: the editor is a chunk of its own; before the first idle the FAB opens it once the chunk has arrived
+  // (`openEditorWarm`, tests/unit/app.overlayLoad.test.tsx). Here the chunk is already there (armed), as after the idle preload.
   it("the FAB opens the editor from the dock and its disc leaves while the editor is open", () => {
+    armOverlay("editor");
     render(
       <MotionRoot>
         <Dock />
@@ -119,6 +123,7 @@ describe("Dock", () => {
     fireEvent.click(fab);
     expect(useUi.getState().editor).toEqual({ open: true, tradeId: undefined, fromFab: true });
     expect(fab.querySelector(".bg-gradient-to-br")).toBeNull();
+    resetOverlayArming();
   });
 });
 

@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import { lazy, Suspense, useDeferredValue, useEffect, useMemo, type ReactNode } from "react";
+import { ArmedOverlay } from "@/app/ArmedOverlay";
 import { BottomFade } from "@/app/BottomFade";
 import { CommandNav } from "@/app/CommandNav";
 import { Dock } from "@/app/Dock";
@@ -18,6 +19,7 @@ import { isLazyPage, lazyView, OverviewView, PAGE_FEATURE, preloadPage, Settings
 import { installViewportInset } from "@/app/pwa";
 import { ScenarioWatcher } from "@/app/ScenarioWatcher";
 import { ShortcutHost } from "@/app/ShortcutHost";
+import { preloadOverlay } from "@/app/overlayLoad";
 import { LegalHost } from "@/legal/LegalHost";
 import { toIslandToast } from "@/app/toasts";
 import { useDetailCandles } from "@/app/useDetailCandles";
@@ -27,6 +29,7 @@ import type { Feature } from "@/billing/types";
 import { CloudSyncHost } from "@/cloud/CloudSyncHost";
 import { Celebrate, celebrateFrom } from "@/motion/Celebrate";
 import { IntroHost } from "@/intro/IntroHost";
+import { useIntroSettled } from "@/intro/introStore";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { spring } from "@/motion/tokens";
 import { FirstRunEmpty } from "@/onboarding/FirstRunEmpty";
@@ -95,16 +98,21 @@ function LazyPageView({ page }: { page: LazyPage }) {
   return <View />;
 }
 
+/** One of the original tabs that left the first load (`pages.ts`): its chunk is fetched at idle, so this skeleton is rarely seen. */
+function deferredTab(page: Page, view: ReactNode): ReactNode {
+  return <Suspense fallback={<PageSkeleton page={page} />}>{view}</Suspense>;
+}
+
 function pageContent(page: Page): ReactNode {
   switch (page) {
     case "overview":
       return <OverviewView />;
     case "trades":
-      return <TradesView />;
+      return deferredTab(page, <TradesView />);
     case "setups":
-      return <SetupsView />;
+      return deferredTab(page, <SetupsView />);
     case "settings":
-      return <SettingsView />;
+      return deferredTab(page, <SettingsView />);
   }
   if (!isLazyPage(page)) return <OverviewView />;
   const body = (
@@ -176,7 +184,22 @@ function Toasts() {
 /** Trade detail with the 1h candle slice around the open trade (re-renders on detail / journal changes only). */
 function Detail() {
   const candles = useDetailCandles();
-  return <TradeDetail candles={candles} />;
+  const open = useUi((s) => s.detail.id != null);
+  return (
+    <ArmedOverlay id="detail" open={open}>
+      <TradeDetail candles={candles} />
+    </ArmedOverlay>
+  );
+}
+
+/** The setup editor (its own chunk, mounted once armed – see `ArmedOverlay`). */
+function SetupEditorHost() {
+  const open = useUi((s) => s.setupEditor.open);
+  return (
+    <ArmedOverlay id="setup" open={open}>
+      <SetupEditor />
+    </ArmedOverlay>
+  );
 }
 
 /** P10 banner (trial ending, failed payment, paused) under the local-mode banner; inert without billing. */
@@ -189,17 +212,50 @@ function Banners() {
   );
 }
 
-/** Idle work after the first paint: the dock's Markt chunk (the one lazy tab) – a tap on it then shows the page at once. */
-function useIdlePreload(): void {
+/**
+ * Idle work after the first paint (Budget-Schnitt): the chunks that left the first load, one per idle slot so none of
+ * them adds a long task – the trade editor first (a tap on „Trade eintragen“ must open at once), then the trade detail,
+ * the Trades tab, the dock's Markt tab, the setup editor, Einstellungen and the Entscheidungsgrundlagen. Intent
+ * (hover / focus / press of a link or of „Trade eintragen“) fetches earlier; a chunk is downloaded once.
+ */
+const IDLE_STEPS: readonly (() => unknown)[] = [
+  () => preloadOverlay("editor"),
+  () => preloadOverlay("detail"),
+  () => preloadPage("trades"),
+  () => preloadPage("markt"),
+  () => preloadOverlay("setup"),
+  () => preloadPage("settings"),
+  () => preloadPage("setups"),
+];
+
+/** Leaf (renders nothing): starts the idle chain once nothing intro-related holds the UI back, so the first-visit intro never shares a frame with a chunk's evaluation. */
+function IdlePreload() {
+  const settled = useIntroSettled();
   useEffect(() => {
-    const run = () => preloadPage("markt");
-    if (typeof window.requestIdleCallback === "function") {
-      const id = window.requestIdleCallback(run, { timeout: 4000 });
-      return () => window.cancelIdleCallback(id);
-    }
-    const t = window.setTimeout(run, 2500);
-    return () => window.clearTimeout(t);
-  }, []);
+    if (!settled) return;
+    let cancelled = false;
+    let cancel: () => void = () => undefined;
+    const schedule = (i: number, timeout: number) => {
+      const run = () => {
+        if (cancelled) return;
+        IDLE_STEPS[i]?.();
+        if (i + 1 < IDLE_STEPS.length) schedule(i + 1, 1500);
+      };
+      if (typeof window.requestIdleCallback === "function") {
+        const id = window.requestIdleCallback(run, { timeout });
+        cancel = () => window.cancelIdleCallback(id);
+      } else {
+        const t = window.setTimeout(run, Math.min(timeout, 600));
+        cancel = () => window.clearTimeout(t);
+      }
+    };
+    schedule(0, 2500);
+    return () => {
+      cancelled = true;
+      cancel();
+    };
+  }, [settled]);
+  return null;
 }
 
 /** The feature hosts' chunk: requested by the first render, never waited for (no fallback – the shell paints at once). */
@@ -224,10 +280,10 @@ function Shell() {
   const bannerOpen = useLocalBannerOpen();
   // grey-bar fix: `--vv-bottom` follows host UI laid over the bottom of the page (visualViewport, event driven)
   useEffect(() => installViewportInset(), []);
-  useIdlePreload();
   return (
     <MorphDialogProvider>
       <ScenarioWatcher />
+      <IdlePreload />
       {/* `overflow-x-clip` (no scroll container, sticky bars keep working): a page that scales / slides in or out reaches a few px
           past the screen edge for a moment (its full-bleed rows, the needles of the bias bar) – never a wider document */}
       <div className="relative min-h-dvh overflow-x-clip">
@@ -266,7 +322,7 @@ function Shell() {
         <EditorHost />
       </ErrorBoundary>
       <ErrorBoundary variant="widget" label="Grundlagen-Editor" fallback={() => null}>
-        <SetupEditor />
+        <SetupEditorHost />
       </ErrorBoundary>
       {/* hosts (P14): leaves after SetupEditor, before Celebrate */}
       <HostSlot name="Suche">

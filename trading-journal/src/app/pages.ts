@@ -1,28 +1,37 @@
 /**
  * Page components, gathered in one module so the shell (and its tests) has a single seam.
  *
- * - The four original tabs are imported statically (the overview is keep-alive and pre-rendered at idle).
+ * - Only the overview is imported statically (it is keep-alive, pre-rendered at idle, and the first thing on screen).
+ *   Budget-Schnitt (Runde 11): the other three original tabs – Trades, Entscheidungsgrundlagen, Einstellungen – are
+ *   chunks of their own as well (`STATIC_LOADERS`), fetched at idle after the first paint and on intent, behind the
+ *   same page skeleton as the feature pages. They keep their exports (`TradesView` …) and stay out of `LAZY_PAGES`
+ *   (they are not feature pages: no plan gate, no registry entry of their own).
  * - Every feature page (P02–P13) is a `React.lazy` chunk of its own: it is downloaded the first time it is shown (or
  *   when `preloadPage` is called on intent – a hover / focus of its link, the dock's Markt tab at idle), so the first
  *   load stays the journal. The lazy imports name the view MODULE, never a view barrel: a barrel imported statically
  *   anywhere in the shell would pull the whole page into the main chunk.
  * `renderPage` in `App.tsx` wraps each lazy page in `Suspense` (skeleton) and its plan gate (`PAGE_FEATURE`).
  */
-import type { ComponentType, LazyExoticComponent } from "react";
+import { createElement, type ComponentType, type LazyExoticComponent } from "react";
 import { retryableLazy } from "@/app/retryableLazy";
 import type { Feature } from "@/billing/types";
 import type { Page } from "@/store/uiStore";
 
 export { OverviewView } from "@/views/overview";
-export { TradesView } from "@/views/trades";
-export { SetupsView } from "@/views/setups";
-// `SettingsView` needs the market wiring (health, labels, refresh/reconnect/cache) → `SettingsPage` provides it.
-export { SettingsPage as SettingsView } from "@/app/SettingsPage";
 
-/** The pages that are lazy chunks (everything but the four original tabs). */
+/** The pages that are lazy chunks and feature pages (everything but the four original tabs). */
 export type LazyPage = Exclude<Page, "overview" | "trades" | "setups" | "settings">;
+/** The original tabs that left the first load (Budget-Schnitt): same lazy mechanism, but not feature pages. */
+export type DeferredTab = "trades" | "setups" | "settings";
 
 type Loader = () => Promise<{ default: ComponentType }>;
+
+const STATIC_LOADERS: Record<DeferredTab, Loader> = {
+  trades: () => import("@/views/trades/TradesView").then((m) => ({ default: m.TradesView })),
+  setups: () => import("@/views/setups/SetupsView").then((m) => ({ default: m.SetupsView })),
+  // `SettingsView` needs the market wiring (health, labels, refresh/reconnect/cache) → `SettingsPage` provides it.
+  settings: () => import("@/app/SettingsPage").then((m) => ({ default: m.SettingsPage })),
+};
 
 const LOADERS: Record<LazyPage, Loader> = {
   markt: () => import("@/views/markt/MarktView").then((m) => ({ default: m.MarktView })),
@@ -68,9 +77,36 @@ export function lazyView(page: LazyPage): LazyExoticComponent<ComponentType> {
   return VIEWS[page]();
 }
 
-/** Starts the download of a page's chunk (intent: hover / focus / press of its link). No-op for static pages. */
+const startedTabs = new Map<DeferredTab, Promise<{ default: ComponentType }>>();
+function loadTab(tab: DeferredTab): Promise<{ default: ComponentType }> {
+  let p = startedTabs.get(tab);
+  if (!p) {
+    p = STATIC_LOADERS[tab]();
+    p.catch(() => startedTabs.delete(tab));
+    startedTabs.set(tab, p);
+  }
+  return p;
+}
+const TAB_VIEWS = Object.fromEntries((Object.keys(STATIC_LOADERS) as DeferredTab[]).map((t) => [t, retryableLazy(() => loadTab(t))])) as Record<DeferredTab, () => LazyExoticComponent<ComponentType>>;
+
+/** One original tab as a component: its chunk is fetched on the first render (or earlier by `preloadPage`); wrap it in `Suspense`. */
+function tabView(tab: DeferredTab): ComponentType {
+  return function DeferredTabView() {
+    // stable per tab (created once); a new identity only after a failed download, where the fresh mount is the retry
+    return createElement(TAB_VIEWS[tab]());
+  };
+}
+export const TradesView = tabView("trades");
+export const SetupsView = tabView("setups");
+export const SettingsView = tabView("settings");
+
+/** The original tabs that are chunks of their own (Trades, Entscheidungsgrundlagen, Einstellungen). */
+export const DEFERRED_TABS = Object.keys(STATIC_LOADERS) as DeferredTab[];
+
+/** Starts the download of a page's chunk (intent: hover / focus / press of its link). No-op for the overview. */
 export function preloadPage(page: Page): void {
   if (isLazyPage(page)) void load(page).catch(() => undefined);
+  else if (page in STATIC_LOADERS) void loadTab(page as DeferredTab).catch(() => undefined);
 }
 
 /**

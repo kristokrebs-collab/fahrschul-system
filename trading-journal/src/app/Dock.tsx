@@ -12,6 +12,7 @@ import { isSafeFx } from "@/app/pwa";
 import { redrawStrokes, useIdleCycle } from "@/app/shellFx";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { openCommandNav, useCommandNavOpen } from "@/app/CommandNav";
+import { openEditorWarm, preloadOverlay } from "@/app/overlayLoad";
 import { FAB_LABEL, PAGE_ICON, PAGE_LABELS, WIDE_QUERY } from "@/app/navGroups";
 import { Icon } from "@/primitives/icons";
 import { Magnetic } from "@/primitives/Magnetic";
@@ -456,7 +457,6 @@ export function Dock() {
   const page = useUi((s) => s.page);
   const editor = useUi((s) => s.editor);
   const fabCycle = useUi((s) => s.fabCycle);
-  const openEditor = useUi((s) => s.openEditor);
   const reduced = useReducedFx();
   const canHover = useCanHover();
   const wide = useMediaQuery(WIDE_QUERY, false);
@@ -554,6 +554,8 @@ export function Dock() {
     });
   };
   const onPointerEnter = (e: PointerEvent<HTMLDivElement>) => {
+    // the editor is a chunk of its own (Budget-Schnitt): the dock is where „Trade eintragen“ is reached
+    void preloadOverlay("editor");
     if (e.pointerType !== "mouse" || !magnify) return;
     geometry.current = null;
     track(e.clientX);
@@ -606,7 +608,7 @@ export function Dock() {
   };
   const onTabClick = (k: number) => (e: MouseEvent<HTMLButtonElement>) => activateTab(k, e.detail === 0 ? Number.NaN : lastPressMs());
   const activateSlot = (k: number) => {
-    if (k === FAB_SLOT) openEditor({ fromFab: true });
+    if (k === FAB_SLOT) openEditorWarm({ fromFab: true });
     else if (k === MORE_SLOT) openCommandNav();
     else activateTab(k, Number.NaN);
   };
@@ -781,6 +783,7 @@ export function Dock() {
         aria-label="Navigation"
         data-layer="Dock-Leiste"
         onPointerEnter={onPointerEnter}
+        onFocus={() => void preloadOverlay("editor")}
         onPointerDown={drag.handlers.onPointerDown}
         onPointerMove={(e) => {
           drag.handlers.onPointerMove(e);
@@ -814,7 +817,7 @@ export function Dock() {
                 index={k}
                 label={FAB_LABEL}
                 caption={FAB_CAPTION}
-                onClick={() => openEditor({ fromFab: true })}
+                onClick={() => openEditorWarm({ fromFab: true })}
                 // the centre button: a little larger than the tabs and standing taller than the row
                 className="size-[52px] text-ink-950 [&_[data-dock-caption]]:text-fg"
                 layer={

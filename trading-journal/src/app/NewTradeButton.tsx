@@ -1,7 +1,7 @@
+import { openEditorWarm, preloadOverlay } from "@/app/overlayLoad";
 import { cn } from "@/lib/cn";
 import { Icon } from "@/primitives/icons";
 import { Magnetic } from "@/primitives/Magnetic";
-import { useUi } from "@/store/uiStore";
 
 export const NEW_TRADE_LABEL = "Trade eintragen";
 
@@ -20,10 +20,11 @@ export interface NewTradeButtonProps {
  * a morph source. The words are the accessible name even when only the plus is visible.
  */
 export function NewTradeButton({ className, labelClassName, wrapClassName }: NewTradeButtonProps) {
-  const openEditor = useUi((s) => s.openEditor);
+  // the editor is a chunk of its own (Budget-Schnitt): fetched on intent here and at idle, so the tap opens it at once
+  const warm = () => void preloadOverlay("editor");
   return (
     <Magnetic intensity={0.25} range={120} className={wrapClassName}>
-      <button type="button" onClick={() => openEditor()} className={cn("shiny-cta inline-flex items-center gap-2 pointer-coarse:min-h-tap pointer-coarse:min-w-tap pointer-coarse:justify-center", className)}>
+      <button type="button" onClick={() => openEditorWarm()} onPointerEnter={warm} onFocus={warm} onPointerDown={warm} className={cn("shiny-cta inline-flex items-center gap-2 pointer-coarse:min-h-tap pointer-coarse:min-w-tap pointer-coarse:justify-center", className)}>
         <span className="size-3.5 [&>svg]:size-full" aria-hidden="true">
           <Icon name="plus" />
         </span>

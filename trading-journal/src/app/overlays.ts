@@ -7,9 +7,49 @@
  * - `TradeEditor { livePrice?, livePriceLabel?, onNewSetup? }` – reads `uiStore.editor`; the shell passes the last price.
  * - `SetupEditor` – reads `uiStore.setupEditor`.
  * - `HyblockForm { last?, live?, onClose?, onSave? }` – rendered inside the `hyblock-new` MorphDialog by the Top-Trader card.
+ * Budget-Schnitt (Runde 11): the three overlays below are chunks of their own (`@/app/overlayLoad`: fetched at idle, on
+ * intent or when they open; the shell mounts them through `ArmedOverlay`), so the first load carries none of their form
+ * code. They are `React.lazy` components behind `Suspense` – a failed download is tried again on the next render.
  * `ImportDialog` is mounted by the settings page itself (`DataCard` → `ImportDialog`), not here.
  */
-export { TradeDetail } from "@/overlays/TradeDetail";
-export { TradeEditor } from "@/overlays/TradeEditor";
-export { SetupEditor } from "@/overlays/SetupEditor";
+import { createElement, lazy, type ComponentType, type LazyExoticComponent } from "react";
+import { getLoadedOverlay, loadOverlay, type OverlayId, type OverlayModule } from "@/app/overlayLoad";
+import type { SetupEditorProps } from "@/overlays/SetupEditor";
+import type { TradeDetailProps } from "@/overlays/TradeDetail";
+import type { TradeEditorProps } from "@/overlays/TradeEditor";
+
 export { HyblockForm } from "@/overlays/HyblockForm";
+
+/**
+ * A lazy overlay that forgets a failed download (a deploy replaced the chunk): the next render fetches it again. Once the
+ * chunk has arrived (idle / intent preload, `openEditorWarm`) it renders the component directly – no `lazy` suspension, so
+ * an overlay that mounts in the very commit that opens it (the dock disc → sheet morph) is in the tree at once.
+ */
+function deferred<K extends OverlayId, P extends object>(id: K, pick: (m: OverlayModule<K>) => ComponentType<P>): ComponentType<P> {
+  let current: LazyExoticComponent<ComponentType<P>> | null = null;
+  const get = (): LazyExoticComponent<ComponentType<P>> => {
+    if (!current) {
+      const next = lazy(() =>
+        loadOverlay(id).then(
+          (m) => ({ default: pick(m) }),
+          (err: unknown) => {
+            if (current === next) current = null;
+            throw err;
+          },
+        ),
+      );
+      current = next;
+    }
+    return current;
+  };
+  return function Deferred(props: P) {
+    const m = getLoadedOverlay(id);
+    return createElement(m ? pick(m) : (get() as ComponentType<P>), props);
+  };
+}
+
+const TradeDetail = deferred<"detail", TradeDetailProps>("detail", (m) => m.TradeDetail);
+const TradeEditor = deferred<"editor", TradeEditorProps>("editor", (m) => m.TradeEditor);
+const SetupEditor = deferred<"setup", SetupEditorProps>("setup", (m) => m.SetupEditor);
+
+export { TradeDetail, TradeEditor, SetupEditor };

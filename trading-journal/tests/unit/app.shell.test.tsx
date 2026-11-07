@@ -39,6 +39,7 @@ vi.mock("@/app/overlays", () => ({
 }));
 
 import App from "@/App";
+import { armOverlay, resetOverlayArming } from "@/app/overlayLoad";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { navigate } from "@/store/router";
 import { useUi } from "@/store/uiStore";
@@ -201,7 +202,10 @@ describe("App shell", () => {
     await waitFor(() => expect(screen.queryByTestId("layer-diag")).toBeNull());
   });
 
+  // Budget-Schnitt: the editor is a chunk of its own; before the first idle „Trade eintragen“ opens it once the chunk has arrived
+  // (`openEditorWarm`, tests/unit/app.overlayLoad.test.tsx). Here the chunk counts as loaded, as after the idle preload.
   it("FAB and header CTA open the trade editor", () => {
+    armOverlay("editor");
     renderApp();
     const dock = screen.getByRole("toolbar", { name: "Navigation" });
     fireEvent.click(within(dock).getByRole("button", { name: "Trade eintragen" }));
@@ -211,6 +215,7 @@ describe("App shell", () => {
     fireEvent.click(within(header).getByRole("button", { name: /Trade eintragen/ }));
     expect(useUi.getState().editor.open).toBe(true);
     expect(useUi.getState().editor.fromFab).toBe(false);
+    resetOverlayArming();
   });
 
   it("signed in to the cloud: one sync status in the header – the account pill, no second mode pill (P1-04)", async () => {

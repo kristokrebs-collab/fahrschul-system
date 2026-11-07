@@ -21,6 +21,7 @@ Bei Widersprüchen gilt die jüngste konkrete Nutzerentscheidung.
 | Motion / UI | Runde 9/10 (Sidebar, Dock, `data-rich`, Buttons mit Zuständen, Wal-Karte, Matrix 177) | Sidebar ab 1.624 px automatisch offen (soll kompakt bleiben); SVG-Sequenz überlappt (640 ms / 46 ms) statt strikt nacheinander; keine Welle der Menüzeilen; Radial Share, Papierkorb-Animation, Speicher-Morph, Login/Signup-Morph fehlen; keine Tarif-Profile; keine Motion-Einstellung |
 | Suche | Funktionsfinder mit Ankern, Synonymen, 179 Einträgen | Findet Funktionen, keine Seiten („Einstellungen“ → „Box-Einstellungen“); bei verdecktem Ziel nur Hinweis; keine Clay-Optik |
 | Budget | Erstlade-JS 788,7 / 800 KiB, CSS 49,2 / 52 KiB | Nur ~11 KiB Reserve: neue Teile zwingend als Lazy-Chunks, ggf. Editor aus dem Haupt-Chunk lösen |
+| Budget (nach dem Budget-Schnitt, Runde 11) | Erstlade-JS 638,6 / 800 KiB (Haupt-Chunk 418,9), CSS 49,2 / 52 KiB | ~161 KiB JS-Reserve; Editor, Trade-Detail, Grundlagen-Editor, Trades, Entscheidungsgrundlagen und Einstellungen sind Lazy-Chunks (`src/app/README.md`, „Budget-Schnitt“). CSS-Reserve nicht gewonnen: Tailwind erzeugt ein Stylesheet für alle Dateien |
 | F55 | COVERAGE: „Klare mobile Oberfläche“, teilweise | Der Auftrag nennt F55 als unzugeordnet – die Zuordnung existiert in `docs/COVERAGE.md`; im Register fehlt ein Eintrag mit `fids: ["F55"]` |
 
 ## 1. Vom Nutzer zu entscheiden oder bereitzustellen (gebündelt, vor dem Bau)
