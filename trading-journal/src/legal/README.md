@@ -14,7 +14,8 @@ auszufüllen: VITE_LEGAL_…“). The drafts of the documents live in `docs/RECH
 | `LegalDocument.tsx` | one draft page: loads the Markdown on demand, the „Entwurf“ bar (gone only with `VITE_LEGAL_DRAFTS_REVIEWED=true`), reserved height while loading |
 | `markdown.tsx` | the small Markdown of the drafts as React nodes (never HTML): headings, lists, quotes, bold, safe links; `{{VITE_LEGAL_…}}` = operator value or marked placeholder, `{{TODO: …}}` = always a marked placeholder; `> **[ANWALT]**` notes are dropped |
 | `texts.ts` | lazy loaders of `docs/RECHT/*.md` (`?raw`, one chunk per file, never in the first load); „Hinweise“ = Risikohinweis + Preise + Partnerlinks + Marken |
-| `consentTexts.ts` | wordings the drafts quote and the purchase flow still has to use: `IMMEDIATE_START_CONSENT`, `PARTNER_LINK_LABEL`, `BUTTON_LABELS` (§ 312j / § 312k / § 356a), `PRICE_TAX_NOTE`, `RISK_SHORT`, `DRAFT_NOTICE` – NOT wired into the purchase flow (that package owns it; see the checklist, section 6) |
+| `consentTexts.ts` | wordings the drafts quote and the purchase flow still has to use: `IMMEDIATE_START_CONSENT`, `PARTNER_LINK_LABEL`, `BUTTON_LABELS` (§ 312j / § 312k / § 356a), `PRICE_TAX_NOTE`, `RISK_SHORT`, `DRAFT_NOTICE` – wired into the purchase flow since B4 (`src/billing/purchase/`); `BUTTON_LABELS.order` is now exactly „Zahlungspflichtig bestellen“ |
+| `consentRecord.ts` | the two consents of the order (`terms`, `immediate_start`) as data: wording, version, SHA-256, order id – shared by the order sheet and the server (evidence in `consents`, migration 0016) |
 | `LegalHost.tsx` | leaf host in `App` (HostSlot „Rechtliches“): reads `?rechtliches=` once, removes it from the address bar, mounts the sheet on demand |
 | `ConsentCheck.tsx` | required checkbox (native input) with document links in its label: sign-up (`AuthSheet`) and before every Stripe checkout (`UpgradeSheet`; `startCheckout` routes through the sheet until `termsAccepted`) |
 

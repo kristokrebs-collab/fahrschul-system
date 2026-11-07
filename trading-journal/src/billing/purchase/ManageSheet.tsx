@@ -5,7 +5,7 @@
  * the cancel button "Verträge hier kündigen" (§ 312k BGB) and – during the first 14 days – "Vertrag widerrufen" (§ 356a BGB).
  * Nothing here changes a plan by itself: the plan comes from the server (`billing-status`, written by the webhook).
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BUTTON_LABELS } from "@/legal/consentTexts";
 import { Sheet, StaggerItem } from "@/motion/Sheet";
 import { Button } from "@/primitives/Button";
@@ -24,6 +24,7 @@ export function ManageSheet() {
   const account = useBilling((s) => s.account);
   const busy = useBilling((s) => s.busy);
   const sub = account?.subscription ?? null;
+  const [now] = useState(() => Date.now());
 
   useEffect(() => {
     if (open) void loadBilling({ invoices: false });
@@ -31,7 +32,7 @@ export function ManageSheet() {
 
   const live = !!sub && sub.status !== "canceled" && sub.status !== "incomplete_expired";
   const cancelled = !!sub?.cancelAtPeriodEnd;
-  const canWithdraw = live && !cancelled && withdrawalOpen(sub?.startedAt ?? null, Date.now());
+  const canWithdraw = live && !cancelled && withdrawalOpen(sub?.startedAt ?? null, now);
   const left = sub?.startedAt ? daysUntil(new Date(Date.parse(sub.startedAt) + WITHDRAWAL_DAYS * 86_400_000).toISOString()) : null;
   const other = sub?.interval === "month" ? "year" : "month";
 

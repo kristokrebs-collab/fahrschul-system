@@ -68,10 +68,10 @@ export function saveLastOrder(o: LastOrder): void {
 }
 
 export function readLastOrder(now = Date.now()): LastOrder | null {
-  let raw: unknown = null;
+  let raw: unknown;
   try {
-    const s = sessionStorage.getItem(LAST_KEY);
-    raw = s ? JSON.parse(s) : readJson<unknown>(LAST_KEY, null);
+    const stored = sessionStorage.getItem(LAST_KEY);
+    raw = stored ? JSON.parse(stored) : readJson<unknown>(LAST_KEY, null);
   } catch {
     raw = readJson<unknown>(LAST_KEY, null);
   }

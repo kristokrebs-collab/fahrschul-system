@@ -74,7 +74,7 @@ export interface BillingState {
   /** The confirmation mail of the last in-app cancellation (`sent` / `unavailable` = mail not set up), `null` = none yet. */
   cancelMail: "sent" | "unavailable" | null;
   /** The order sheet (B4, lazy chunk `purchase/`): open + what is being ordered. `loaded` keeps the chunk mounted for its exit. */
-  order: { open: boolean; draft: OrderDraft | null; loaded: boolean };
+  order: { open: boolean; draft: OrderDraft | null; loaded: boolean; openedAt: number };
   /** The tariff detail sheet (B4): which plan. */
   detail: { open: boolean; plan: PaidPlanId | null };
   /** The management sheet of Konto (B4). */
@@ -117,7 +117,7 @@ const INITIAL: BillingState = {
   upgrade: { open: false, feature: null, plan: null },
   cancelOpen: false,
   cancelMail: null,
-  order:{ open: false, draft: null, loaded: false },
+  order: { open: false, draft: null, loaded: false, openedAt: 0 },
   detail: { open: false, plan: null },
   manageOpen: false,
   returned: null,
@@ -307,7 +307,7 @@ export function usePurchaseGate(): { open: boolean; blockedBy: ("stripe" | "lega
 
 /** Opens the order sheet for `draft` (the sheet itself lives in the lazy chunk `purchase/`). */
 export function openOrder(draft: OrderDraft): void {
-  useBilling.setState({ order: { open: true, draft: normalizeDraft(draft), loaded: true }, detail: { open: false, plan: useBilling.getState().detail.plan } });
+  useBilling.setState({ order: { open: true, draft: normalizeDraft(draft), loaded: true, openedAt: Date.now() }, detail: { open: false, plan: useBilling.getState().detail.plan } });
 }
 
 export function closeOrder(): void {

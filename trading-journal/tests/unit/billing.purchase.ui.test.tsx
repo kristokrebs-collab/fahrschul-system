@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setRedirectForTests } from "@/billing/api";
 import type { BillingStatus, SubscriptionSummary } from "@/billing/contract";
 import { closeContract, openContract } from "@/billing/contractStore";
+import type { OrderDraft } from "@/billing/purchase/order";
 import { resetOrderForm } from "@/billing/purchase/orderState";
 import { openDetail, openManage, openOrder, resetBilling, setReturned, useBilling } from "@/billing/store";
 import { BillingHost } from "@/billing/ui";
@@ -88,7 +89,7 @@ afterEach(() => {
 
 const wrap = (ui: React.ReactNode = <BillingHost />) => render(<MotionRoot>{ui}</MotionRoot>);
 
-async function openTheOrder(draft = { plan: "pro" as const, interval: "year" as const, seats: 1 }, config: BillingStatus["config"] = CONFIG) {
+async function openTheOrder(draft: OrderDraft = { plan: "pro", interval: "year", seats: 1 }, config: BillingStatus["config"] = CONFIG) {
   useBilling.setState({ config });
   wrap();
   act(() => openOrder(draft));
@@ -111,7 +112,7 @@ describe("order summary (§ 312j Abs. 2 BGB: everything in front of the order)",
   });
 
   it("the tax sentence follows the Stripe Tax switch – honest in both cases", async () => {
-    let sheet = await openTheOrder(undefined, { ...CONFIG, automaticTax: true });
+    const sheet = await openTheOrder(undefined, { ...CONFIG, automaticTax: true });
     expect(within(sheet).getByTestId("order-tax")).toHaveTextContent("Steuer wird im nächsten Schritt von Stripe berechnet.");
   });
 

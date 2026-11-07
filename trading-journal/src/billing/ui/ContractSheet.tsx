@@ -10,7 +10,7 @@
  *
  * Without a mail service on the server the page SAYS so ("nicht eingerichtet") instead of promising a mail.
  */
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { ApiError } from "@/cloud/api";
 import { useCloudSession } from "@/cloud/session";
 import { BUTTON_LABELS } from "@/legal/consentTexts";
@@ -58,16 +58,20 @@ export function ContractSheet() {
   const nameId = useId();
   const noteId = useId();
 
-  // every opening starts clean (the token of a mail link goes straight to its last page)
-  useEffect(() => {
-    if (!kind) return;
-    setStep(token ? "link" : "form");
-    setEmail((e) => e || signedEmail);
-    setErr(null);
-    setFail(null);
-    setReceipt(null);
-    setResult(null);
-  }, [kind, token, signedEmail]);
+  // every opening starts clean (the token of a mail link goes straight to its last page) – adjusted while rendering, the sanctioned pattern
+  const openKey = kind ? `${kind}|${token ?? ""}` : "";
+  const [seenKey, setSeenKey] = useState("");
+  if (seenKey !== openKey) {
+    setSeenKey(openKey);
+    if (kind) {
+      setStep(token ? "link" : "form");
+      setEmail((e) => e || signedEmail);
+      setErr(null);
+      setFail(null);
+      setReceipt(null);
+      setResult(null);
+    }
+  }
 
   const toConfirm = () => {
     const e = email.trim();

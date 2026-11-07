@@ -429,7 +429,7 @@ describe("both consents, with the wording that was shown, stored BEFORE the Chec
     }
     const meta = stripe.sessions[0]!.params.metadata!;
     expect(meta).toMatchObject({ order_id: body.orderId, consent_hash: HASH, supabase_user_id: U1 });
-    expect(Date.parse(meta.consent_at!)).toBeGreaterThan(Date.now() - 60_000);
+    expect(Date.parse(String(meta.consent_at))).toBeGreaterThan(Date.now() - 60_000);
     expect(stripe.sessions[0]!.params.subscription_data?.metadata).toMatchObject({ order_id: body.orderId, consent_hash: HASH });
   });
 
@@ -516,7 +516,8 @@ describe("the button text beside Stripe's (§ 312j Abs. 3 BGB)", () => {
     await checkout(order());
     const p = stripe.sessions[0]!.params;
     expect(p.submit_type).toBe("pay");
-    const text = p.custom_text?.submit?.message ?? "";
+    const submit = p.custom_text?.submit;
+    const text = submit && typeof submit === "object" ? submit.message : "";
     expect(text).toMatch(/zahlungspflichtige Bestellung/);
     expect(text).toMatch(/Testphase \(14 Tage\)/);
     expect(text).toMatch(/verlängert sich automatisch/);

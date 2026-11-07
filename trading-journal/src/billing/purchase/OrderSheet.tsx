@@ -7,7 +7,7 @@
  * Wertersatz and Erlöschen – wording from `src/legal/consentRecord.ts`); the button says exactly "Zahlungspflichtig bestellen".
  * ENTWURF – Prüfung durch Anwalt nötig. The order is placed only by the button (`submitOrder`).
  */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { openAuthSheet, useCloudSession } from "@/cloud/session";
 import { legalConfig } from "@/legal/config";
 import { ConsentCheck } from "@/legal/ConsentCheck";
@@ -47,19 +47,15 @@ export function OrderSheet() {
   const offer = useOffer();
   const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const form = useOrderForm();
-  const [now, setNow] = useState(() => new Date());
   const open = order.open && !!order.draft;
-  const draft: OrderDraft = order.draft ?? { plan: "pro", interval: "year", seats: 1 };
+  const draft = useMemo<OrderDraft>(() => order.draft ?? { plan: "pro", interval: "year", seats: 1 }, [order.draft]);
+  // the date of the order is the moment it was opened (stamped by `openOrder`, an event – not read while rendering)
+  const now = useMemo(() => new Date(order.openedAt || 0), [order.openedAt]);
 
-  // every opening is a NEW order: new idempotency key, both boxes open, today's date
-  const [wasOpen, setWasOpen] = useState(false);
+  // every opening is a NEW order: new idempotency key, both boxes open
   useEffect(() => {
-    if (open && !wasOpen) {
-      resetOrderForm();
-      setNow(new Date());
-    }
-    if (open !== wasOpen) setWasOpen(open);
-  }, [open, wasOpen]);
+    if (open) resetOrderForm();
+  }, [open, order.openedAt]);
 
   const s = useMemo(
     () => summarize(draft, { prices: config?.prices, trialDays: trial, now, automaticTax: config?.automaticTax === true, coupon: promo?.valid ? promo : null }),

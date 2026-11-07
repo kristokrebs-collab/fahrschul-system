@@ -186,7 +186,7 @@ describe("store flows", () => {
   it("the purchase flow is LOCKED while the server does not say purchaseOpen (legal texts missing, or an older server): honest toast, no sheet", async () => {
     signIn();
     for (const config of [{ ...CONFIG, purchaseOpen: false, purchaseBlockedBy: ["legal" as const] }, { ...CONFIG, purchaseOpen: undefined }]) {
-      useBilling.setState({ config, order: { open: false, draft: null, loaded: false } });
+      useBilling.setState({ config, order: { open: false, draft: null, loaded: false, openedAt: 0 } });
       requestOrder({ plan: "pro", interval: "month" });
       expect(useBilling.getState().order.open).toBe(false);
     }

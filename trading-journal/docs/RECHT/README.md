@@ -9,6 +9,7 @@ Dies ist **keine Rechtsberatung** und kein Nachweis von Rechtskonformität. Die 
 | `agb.md` | AGB: Leistung, Laufzeit, Verlängerung, Kündigung, Haftung | Rechtliches › AGB (Entwurf, bis `VITE_LEGAL_AGB_URL` gesetzt ist) |
 | `widerruf.md` | Widerrufsbelehrung, Muster-Formular, Zustimmung zum sofortigen Beginn, Widerrufsfunktion | Rechtliches › Widerruf (Entwurf, bis `VITE_LEGAL_WIDERRUF_URL` gesetzt ist) |
 | `preisangaben.md`, `risikohinweis.md`, `partnerlinks.md`, `marken.md` | Preise und Steuern, Risikohinweis, Werbekennzeichnung, Marken | Rechtliches › Hinweise (alle vier in einem Dokument) |
+| `kuendigung-widerruf.md` | Wie die App Kündigung (§ 312k) und Widerruf (§ 356a) ohne Login löst, warum, und was offen ist | nur Dokumentation (Seiten `/?kuendigen`, `/?widerruf`) |
 | `anwaltsfragen.md` | Liste der offenen Anwaltsfragen | nur Dokumentation |
 
 Die Prüfliste mit Befunden aus dem Code steht in `docs/RECHT-CHECKLISTE.md`.
