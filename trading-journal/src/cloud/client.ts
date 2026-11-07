@@ -158,7 +158,7 @@ export function initClient(): Promise<void> {
       if (useCloudSession.getState().needsMfa) openAuthSheet("mfa", "callback");
     }
     stopController ??= startSyncController(sb);
-    onPrivacyChange((next, changed) => void pushProfilePrivacy(next, changed));
+    onPrivacyChange((next, changed) => pushProfilePrivacy(next, changed));
   })());
 }
 
@@ -180,16 +180,21 @@ async function adoptProfilePrivacy(): Promise<void> {
   }
 }
 
-async function pushProfilePrivacy(next: PrivacyPrefs, changed: (keyof PrivacyPrefs)[]): Promise<void> {
+/** Mirrors the account keys into the profile. Resolves `false` when the server refused (the toast says so too); nothing to push = `true`. */
+async function pushProfilePrivacy(next: PrivacyPrefs, changed: (keyof PrivacyPrefs)[]): Promise<boolean> {
   const uid = useCloudSession.getState().user?.id;
-  if (!uid || !changed.some((k) => (ACCOUNT_PRIVACY_KEYS as readonly string[]).includes(k))) return;
+  if (!uid || !changed.some((k) => (ACCOUNT_PRIVACY_KEYS as readonly string[]).includes(k))) return true;
   const sb = getClient();
   const { data } = await sb.from("profiles").select("privacy").eq("id", uid).maybeSingle();
   const cur = (data as { privacy?: Record<string, unknown> } | null)?.privacy ?? {};
   const privacy = { ...cur, ...Object.fromEntries(ACCOUNT_PRIVACY_KEYS.map((k) => [k, next[k]])) };
   const { error } = await sb.from("profiles").update({ privacy }).eq("id", uid);
-  if (error) pushToast({ kind: "error", title: "Datenschutz-Einstellung nicht gespeichert", detail: "Sie gilt vorerst nur auf diesem Gerät." });
-  else auditEvent("privacy.update", Object.fromEntries(ACCOUNT_PRIVACY_KEYS.map((k) => [k, next[k]])));
+  if (error) {
+    pushToast({ kind: "error", title: "Datenschutz-Einstellung nicht gespeichert", detail: "Sie gilt vorerst nur auf diesem Gerät." });
+    return false;
+  }
+  auditEvent("privacy.update", Object.fromEntries(ACCOUNT_PRIVACY_KEYS.map((k) => [k, next[k]])));
+  return true;
 }
 
 /* ------------------------------------------------------------------ auth actions */

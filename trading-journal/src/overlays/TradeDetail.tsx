@@ -9,11 +9,13 @@ import type { Candle } from "@/market/types";
 import { UNREACHABLE_SELECTOR, useDialogBehaviour, useTouchMoveGuard } from "@/motion/a11y";
 import { flingExit, useSwipeDismiss, type SwipeDismiss, type SwipeDismissInfo } from "@/motion/physics";
 import { MotionNumber } from "@/motion/MotionNumber";
+import { SaveBadge, useSaveMorph } from "@/motion/SaveMorph";
 import { BODY_REVEAL_AT, STAGGER_HIDDEN, STAGGER_SHOWN, StaggerItem, sectionDelay } from "@/motion/Stagger";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button, Skeleton } from "@/primitives";
 import { useEnriched, useJournal } from "@/store/journalStore";
+import { persisted } from "@/store/persisted";
 import { pushToast, useUi } from "@/store/uiStore";
 import { HoldConfirm, confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
 import { useOverlayLane } from "@/primitives/toastStore";
@@ -382,13 +384,23 @@ interface DetailContentProps {
 function DetailContent({ trade: e, setups, currency, candles, settled, onClose, onEdit, onDelete, handle, handleRef, reduced }: DetailContentProps) {
   const [confirm, setConfirm] = useState(false);
   const saveTrade = useJournal((st) => st.saveTrade);
+  // Speicher-Morph (R11): the drawings' autosave shows `Speichert …` → `Zeichnung gespeichert` only after the store resolved, or an honest failure with „Erneut versuchen“
+  const drawings = useSaveMorph();
+  const runDrawings = drawings.run;
+  const latest = useRef(e);
+  latest.current = e;
   // Journal v3: chart drawings are saved with the trade as they change (they never touch P&L / R)
   const saveAnnotations = useCallback(
     (next: Annotation[]) => {
-      const { annotations: _old, ...rest } = stripEnrichment(e);
-      void saveTrade({ ...rest, ...(next.length ? { annotations: next } : null), updatedAt: new Date().toISOString() }).catch(() => pushToast({ kind: "error", title: "Zeichnung nicht gespeichert" }));
+      void runDrawings(() =>
+        persisted(() => {
+          // built from the CURRENT trade, so a retry never overwrites what changed meanwhile
+          const { annotations: _old, ...rest } = stripEnrichment(latest.current);
+          return saveTrade({ ...rest, ...(next.length ? { annotations: next } : null), updatedAt: new Date().toISOString() });
+        }),
+      ).then((ok) => ok || pushToast({ kind: "error", title: "Zeichnung nicht gespeichert" }));
     },
-    [e, saveTrade],
+    [runDrawings, saveTrade],
   );
   const [err, setErr] = useState("");
   const { trigger: deleteTrigger, no: deleteNo } = useConfirmFocus(confirm);
@@ -587,6 +599,7 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
                 Chart öffnen ↗
               </a>
             )}
+            <SaveBadge phase={drawings.phase} error={drawings.error} onRetry={() => void drawings.retry()} testId="detail-drawing-saved" saving="Zeichnung speichert …" saved="Zeichnung gespeichert" failed="Zeichnung nicht gespeichert" />
           </span>
           <div className="flex min-h-8 flex-wrap items-center justify-end gap-2">
             {err && (
