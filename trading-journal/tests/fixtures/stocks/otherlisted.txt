@@ -1,0 +1,16 @@
+ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue|NASDAQ Symbol
+A|Agilent Technologies, Inc. Common Stock|N|A|N|100|N|A
+AA|Alcoa Corporation Common Stock |N|AA|N|100|N|AA
+AAA|Alternative Access First Priority CLO Bond ETF|P|AAA|Y|100|N|AAA
+ABEV|Ambev S.A. American Depositary Shares (Each representing 1 Common Share)|N|ABEV|N|100|N|ABEV
+BAC|Bank of America Corporation Common Stock|N|BAC|N|100|N|BAC
+BF.A|Brown Forman Inc Class A Common Stock|N|BF.A|N|100|N|BF.A
+BF.B|Brown Forman Inc Class B Common Stock|N|BF.B|N|100|N|BF.B
+BRK.B|Berkshire Hathaway Inc. New Common Stock|N|BRK.B|N|40|N|BRK.B
+C$R|Citigroup Inc. Depositary Shares, Each Representing a 1/1,000th Interest in a Share of 6.250% Noncumulative Preferred Stock, Series II|N|CpR|N|100|N|C-R
+CANF|Can-Fite Biopharma Ltd American Depositary Shares, each representing two (2) Ordinary Shares|A|CANF|N|100|N|CANF
+CCL|Carnival Corporation Ltd. Common Shares|N|CCL|N|100|N|CCL
+CCM|Concord Medical Services Holdings Limited American Depositary Shares (Each represents thirty (30) Class A ordinary shares)|N|CCM|N|100|N|CCM
+SPY|State Street SPDR S&P 500 ETF Trust|P|SPY|Y|40|N|SPY
+ZZZTX|TXSE Test Stk 5 Common Stock|F|ZZZTX|N|40|Y|ZZZTX
+File Creation Time: 1023202621:31||||||

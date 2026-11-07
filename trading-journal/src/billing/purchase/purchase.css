@@ -1,0 +1,109 @@
+/* Kaufstrecke (B4): die Glas-Fläche der Tarifkarten und der Bezahl-Sheets, die kleinen Lade-Kugeln des Bestell-Knopfs. Nur Tokens
+   (`--color-ink-850`, `--color-line-2`), nichts Festes. Die Fläche ist 88–94 % deckend, damit Text auf jedem Grund ≥ AA liegt; ohne
+   `backdrop-filter` (alter Browser, `data-safe-fx`) bleibt sie eine ruhige, deckende Fläche mit demselben Verlauf. Bewegt wird nur
+   transform / opacity / filter. Reduced Motion: die Kugeln stehen still (kein Dauer-Loop). Wird nur mit dem Lazy-Chunk der Kaufstrecke
+   und der Preise-Seite geladen, nie mit dem ersten Bild. */
+.pay-glass {
+  --pg-hi: 255 255 255;
+  --pg-lo: 0 0 0;
+  --pg-ink: 255 255 255;
+  --pg-edge: 0.11;
+  position: relative;
+  isolation: isolate;
+  border-radius: 22px;
+  background:
+    linear-gradient(155deg, rgb(var(--pg-hi) / 0.09), rgb(var(--pg-hi) / 0.02) 52%, transparent),
+    color-mix(in srgb, var(--color-ink-850) 88%, transparent);
+  border: 1px solid rgb(var(--pg-ink) / var(--pg-edge));
+  box-shadow:
+    inset 1px 1px 0 rgb(var(--pg-hi) / 0.12),
+    inset 0 -22px 34px -26px rgb(var(--pg-lo) / 0.55),
+    0 20px 44px -24px rgb(var(--pg-lo) / 0.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  backdrop-filter: blur(16px) saturate(1.25);
+}
+:root[data-theme="light"] .pay-glass:not(:where([data-theme-scope="dark"], [data-intro-stage]) *) {
+  --pg-lo: 15 23 42;
+  --pg-ink: 15 23 42;
+  --pg-edge: 0.14;
+  --pg-hi: 255 255 255;
+}
+.pay-glass[data-tone="hot"] {
+  border-color: rgb(229 32 46 / 0.5);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .pay-glass {
+    background: linear-gradient(155deg, rgb(var(--pg-hi) / 0.08), transparent 55%), var(--color-ink-850);
+  }
+}
+html[data-safe-fx] .pay-glass {
+  background: linear-gradient(155deg, rgb(var(--pg-hi) / 0.08), transparent 55%), var(--color-ink-850);
+}
+
+/* The Sheet panel as glass: the same surface, a notch more opaque (94 %). Specificity (0,2,0) beats the panel's `bg-ink-850`. */
+.pay-sheet.pay-sheet {
+  background:
+    linear-gradient(160deg, rgb(255 255 255 / 0.07), transparent 38%),
+    color-mix(in srgb, var(--color-ink-850) 94%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  backdrop-filter: blur(22px) saturate(1.2);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .pay-sheet.pay-sheet {
+    background: var(--color-ink-850);
+  }
+}
+html[data-safe-fx] .pay-sheet.pay-sheet {
+  background: var(--color-ink-850);
+}
+
+/* Small "thinking orbs" in the order button while it works: six dots on a ring, each pulsing a little later – a sphere that
+   breathes. 2 compositor properties only (transform, opacity). */
+.pay-orbs {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.pay-orbs i {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: rotate(calc(var(--k) * 60deg)) translateY(-7px);
+  animation: pay-orb 1.2s ease-in-out infinite;
+  animation-delay: calc(var(--k) * 0.14s);
+}
+@keyframes pay-orb {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: rotate(calc(var(--k) * 60deg)) translateY(-7px) scale(0.7);
+  }
+  45% {
+    opacity: 1;
+    transform: rotate(calc(var(--k) * 60deg)) translateY(-5px) scale(1.15);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pay-orbs i {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+/* a hidden tab produces no frames, so the loop costs nothing there; the orbs only exist while the button works (they unmount after) */
+
+/* the swap of the two labels of the order button (the longer one decides the width, so the button never changes size) */
+.pay-swap {
+  display: grid;
+}
+.pay-swap > span {
+  grid-area: 1 / 1;
+  transition: opacity 180ms ease-out;
+}
+.pay-swap > span[data-on="false"] {
+  opacity: 0;
+  pointer-events: none;
+}

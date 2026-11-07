@@ -1,0 +1,319 @@
+/**
+ * The feature hosts of the app (P14 wiring of P02 / P04 / P05 / P06 / P08 / P10 / P11 / P12) – ONE lazy chunk, mounted
+ * by `App` right after the first commit (after `SetupEditor`, before `Celebrate`), so none of their domains (boxes,
+ * coach, risk, reports, growth, billing sheets, exchange sheets, share sheet, replay) weighs on the first load. Every
+ * host is a leaf with its own `data-layer` and error boundary (`HostSlot`); the watchers that belong to a paid feature
+ * only run while the plan includes it (`src/billing/plans.ts`; without payments every gate is open).
+ *
+ * | host | package | does |
+ * |---|---|---|
+ * | `BoxAlertHost` | P02 | candle-close box alerts of the Markt symbol while `settings.boxes.alerts` is on (free, like the box chart); the watchlist-scanner alerts only with gate `boxScanner` (F03) |
+ * | `CoachWatcher` | P04 | live coach alerts after a save (revenge, overtrading …) (gate `coach`) |
+ * | `ReportReadyHost` | P04 | "Bericht bereit" wipe → Berichte (checks `reports` itself) |
+ * | `RiskGuardHost` | P05 | limit / cooldown toasts after a save (gate `riskLive`) |
+ * | `PostTradeReviewHost` | P08 | review prompt for closed trades + the review sheet (gate `growth`) |
+ * | `DailyCheckinHost` | F61 | the daily check-in dialog at the first open of the day + the check-in sheet (gate `growth`) |
+ * | `ArrivalNote`, `ReturnHost` | A4 | the note a finder leaves where it landed (why a card is missing, the next step as a button); the return to the task after a login / plan change / connection (`src/store/returnTo.ts`) |
+ * | `BillingHost` | P10 | upgrade / cancel sheets, Stripe return, `?ref=` (inert without billing) |
+ * | `ExchangeHost` | P11 | connect / dry-run / CSV sheets, server pulls (CSV works without cloud) |
+ * | `SocialHost` | P12 | the share sheet |
+ * | `ReplayHost`, `ExcursionBackfillHost` | P06 | trade replay sheet, idle MAE / MFE backfill |
+ * | `ShotImportHost` | F29 | the lazy preview sheet of „Aus Screenshot übernehmen“ + the pill for queued drafts |
+ * | `BoxSnapBackfillHost` | P02 | idle Box-zu-Box context at entry for synced / imported trades and other pairs (F02) |
+ * | `KeyLevelHost` | F22 / F08 | stage alerts of the user's own key levels + day-plan change toast, only while the app is open (no plan gate) |
+ * | `PlanClockHost` | F44 / F22 | the „flat by close“ reminder of a saved Handelsplan (a clock time, not a price), only while the app is open |
+ * | `PresenceHost` | F27 | the beat that records when the app was open (alerts run only then) – this device only |
+ * | `WhatIfMount` | F33 | the „Was wäre wenn“ sheet of a trade – its own chunk, fetched the first time it is opened |
+ * | `TimeMachineMount` | Zeitmaschine | the „Zeitmaschine für diesen Trade“ sheet (the plan of a trade played through 10 000 simulated sessions and every earlier occasion) – its own chunk, fetched the first time it is opened |
+ * | `TrainingMount` | F38 | the training sheet (Lernmodus: situations without the future, decision, reveal, reflection) – its own chunk, fetched the first time it is opened |
+ * | `SignalOutcomeHost` | F32 | once after the start: the automatic outcomes of archived signals (idle, a few at a time; own chunk, fetched only when entry signals are stored; gate `coach`) |
+ * | `ForwardMount` | F23 | the forward test's catch-up of the virtual accounts – its own chunk, fetched only while an account is running / paused / being wound up, only while the app is open |
+ * | `ArchiveMount` | F26 | the data archive's collector (public Binance numbers + analysis states into this browser's IndexedDB) – its own chunk, fetched only while the user has switched the archive on (default off), only while the app is open |
+ * | `SqueezeMount` | F07 | the squeeze observation's alert (toast, only after the explicit switch `settings.squeeze.alerts`) – its own chunk, fetched only then |
+ * | `ConnectMount` | Verbindungen | the connection dialog (TradingView assistant, Binance wizard, hand-offs) – its own chunk, fetched the first time a `ConnectSlot` was clicked |
+ * | `TrashMount` | R11 | the Papierkorb pills („Screenshot 2 entfernt · Rückgängig“, 6 s) – its own chunk, fetched the first time something is removed |
+ * | `DemoMount` | F58 | the interactive demo with marked example data (import, rule draft, test, demo account, alarm) – its own chunk, fetched the first time it is opened; its state is a session in memory that is gone when it closes |
+ */
+import { lazy, Suspense, type ReactNode } from "react";
+import { useArrival } from "@/app/arrival";
+import { ArrivalNote } from "@/app/ArrivalNote";
+import { useCloudSession } from "@/cloud/session";
+import { installE2eHooks } from "@/app/e2eHooks";
+import { ReturnHost } from "@/app/ReturnHost";
+import { HostSlot } from "@/app/HostSlot";
+import { useAssistantOpen } from "@/assistant/open";
+import { useConnectUi } from "@/connect/open";
+import { useEntitlement } from "@/billing/entitlements";
+import type { Feature } from "@/billing/types";
+import { BillingHost } from "@/billing/ui/BillingHost";
+import { ExchangeHost } from "@/exchanges/ExchangeHost";
+import { ExcursionBackfillHost } from "@/journal/ExcursionBackfillHost";
+import { ShotImportHost } from "@/journal/extract/ShotImportHost";
+import { BoxAlertHost } from "@/market/boxes/alerts";
+import { squeezeOfSettings } from "@/domain/squeeze/config";
+import { useArchiveOn } from "@/market/archive/store";
+import { BoxSnapBackfillHost } from "@/market/boxes/BoxSnapBackfillHost";
+import { KeyLevelHost } from "@/market/keylevels/alerts";
+import { PlanClockHost } from "@/market/plan/clock";
+import { PresenceHost } from "@/market/presence";
+import { SocialHost } from "@/social/ui/SocialHost";
+import { hasActiveForward } from "@/domain/forward/active";
+import { useBrowserAlertsOn } from "@/views/settings/alerts/browserFlag";
+import { useJournal } from "@/store/journalStore";
+import { navigate } from "@/store/router";
+import { ReportReadyHost } from "@/views/berichte/ReportReady";
+import { CoachWatcher } from "@/views/coach/CoachWatcher";
+import { SignalOutcomeHost } from "@/views/coach/SignalOutcomeHost";
+import { RiskGuardHost, useRiskGuardStore } from "@/views/risiko/guard";
+import { ReplayHost } from "@/views/trades/replay/TradeReplay";
+import { useDemo } from "@/views/demo/demoStore";
+import { useTmSheet } from "@/views/timemachine/sheetStore";
+import { useWhatIf } from "@/views/trades/whatif/whatIfStore";
+import { useTrash } from "@/motion/trash/trashStore";
+import { useTraining } from "@/views/ueben/trainingStore";
+import { DailyCheckinHost } from "@/views/wachstum/DailyCheckinHost";
+import { PostTradeReviewHost } from "@/views/wachstum/PostTradeReview";
+
+const AssistantHost = lazy(() => import("@/assistant/AssistantHost"));
+const WhatIfHost = lazy(() => import("@/views/trades/whatif/WhatIfHost"));
+const TimeMachineHost = lazy(() => import("@/views/timemachine/TradeSheet"));
+const TrainingHost = lazy(() => import("@/views/ueben/TrainingHost"));
+const ForwardHost = lazy(() => import("@/views/labor/forward/ForwardHost"));
+const ArchiveHost = lazy(() => import("@/market/archive/host"));
+const SqueezeHost = lazy(() => import("@/market/squeeze/host"));
+const AlertFeedHost = lazy(() => import("@/views/settings/alerts/AlertFeedHost"));
+const DemoHost = lazy(() => import("@/views/demo/DemoHost"));
+const ConnectHost = lazy(() => import("@/connect/ConnectHost"));
+const TrashHost = lazy(() => import("@/motion/trash/TrashHost"));
+
+/** The assistant sheet: its chunk is fetched the first time it is opened and then stays mounted (close animation). */
+function AssistantMount() {
+  const used = useAssistantOpen((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <AssistantHost />
+    </Suspense>
+  ) : null;
+}
+
+/** „Was wäre wenn“ (F33): the chunk is fetched the first time a trade asks for it, then stays mounted (close animation). */
+function WhatIfMount() {
+  const used = useWhatIf((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <WhatIfHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Zeitmaschine für einen Trade: same pattern – the chunk (sheet, card, charts, worker) is fetched the first time a trade asks for it. */
+function TimeMachineMount() {
+  const used = useTmSheet((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <TimeMachineHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Training (F38): same pattern – nothing of it loads before the first „Üben“. */
+function TrainingMount() {
+  const used = useTraining((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <TrainingHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Forward test (F23): the chunk is fetched only while a virtual account needs the app (nothing without one). */
+function ForwardMount() {
+  const active = useJournal((s) => hasActiveForward(s.settings.forward));
+  return active ? (
+    <Suspense fallback={null}>
+      <ForwardHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Data archive (F26): the collector's chunk is fetched only while the switch (default off) is on; the switch is read from this browser's storage. */
+function ArchiveMount() {
+  const on = useArchiveOn();
+  return on ? (
+    <Suspense fallback={null}>
+      <ArchiveHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Browser channel of the four alarms (C2): the host that picks up waiting browser alerts is fetched only while this browser has the channel switched on (flag set by the alarm settings). */
+function AlertFeedMount() {
+  const on = useBrowserAlertsOn();
+  return on ? (
+    <Suspense fallback={null}>
+      <AlertFeedHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Squeeze observation (F07): the alert's chunk is fetched only after the explicit switch (default off) and while the archive it reads runs. */
+function SqueezeMount() {
+  const alerts = useJournal((s) => squeezeOfSettings(s.settings).alerts);
+  const archiveOn = useArchiveOn();
+  return alerts && archiveOn ? (
+    <Suspense fallback={null}>
+      <SqueezeHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Connection dialog (Verbindungen): same pattern – nothing of it loads before the first click on a placeholder. */
+function ConnectMount() {
+  const used = useConnectUi((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <ConnectHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Demo (F58): same pattern – nothing of it loads before the first „Demo mit Beispieldaten“. */
+function DemoMount() {
+  const used = useDemo((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <DemoHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Papierkorb (R11): the pills' chunk is fetched the first time something is removed, then stays mounted (exit animation, next removal). */
+function TrashMount() {
+  const used = useTrash((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <TrashHost />
+    </Suspense>
+  ) : null;
+}
+
+// e2e only (`src/app/e2eHooks.ts`): the risk guard's store (override / marks)
+installE2eHooks({ __tjGuard: useRiskGuardStore, __tjSession: useCloudSession, __tjArrival: useArrival });
+
+/** Renders a watcher only while the plan includes its feature. */
+function Entitled({ feature, children }: { feature: Feature; children: ReactNode }) {
+  return useEntitlement(feature) ? children : null;
+}
+
+/** Box alerts: the Markt symbol's close alerts for every plan, the scanner part only with `boxScanner`. */
+function BoxAlerts() {
+  return <BoxAlertHost scanner={useEntitlement("boxScanner")} />;
+}
+
+export default function DeferredHosts() {
+  return (
+    <>
+      <HostSlot name="Assistent">
+        <AssistantMount />
+      </HostSlot>
+      <HostSlot name="Abo">
+        <BillingHost onNavigate={(p) => navigate(p)} />
+      </HostSlot>
+      {/* A4: the note a finder leaves where it landed, and the way back to the task after a login / plan / connection */}
+      <HostSlot name="Fundort-Hinweis">
+        <ArrivalNote />
+      </HostSlot>
+      <HostSlot name="Rückkehr">
+        <ReturnHost />
+      </HostSlot>
+      <HostSlot name="Börse">
+        <ExchangeHost />
+      </HostSlot>
+      <HostSlot name="Box-Alarme">
+        <BoxAlerts />
+      </HostSlot>
+      <HostSlot name="Coach-Wächter">
+        <Entitled feature="coach">
+          <CoachWatcher />
+        </Entitled>
+      </HostSlot>
+      <HostSlot name="Bericht bereit">
+        <ReportReadyHost onOpen={() => navigate("berichte")} />
+      </HostSlot>
+      <HostSlot name="Risiko-Wächter">
+        <Entitled feature="riskLive">
+          <RiskGuardHost />
+        </Entitled>
+      </HostSlot>
+      <HostSlot name="Trade-Review">
+        <Entitled feature="growth">
+          <PostTradeReviewHost />
+        </Entitled>
+      </HostSlot>
+      <HostSlot name="Täglicher Check-in">
+        <Entitled feature="growth">
+          <DailyCheckinHost />
+        </Entitled>
+      </HostSlot>
+      <HostSlot name="Teilen">
+        <SocialHost />
+      </HostSlot>
+      <HostSlot name="Replay">
+        <ReplayHost />
+      </HostSlot>
+      <HostSlot name="Was wäre wenn">
+        <WhatIfMount />
+      </HostSlot>
+      <HostSlot name="Zeitmaschine">
+        <TimeMachineMount />
+      </HostSlot>
+      <HostSlot name="Training">
+        <TrainingMount />
+      </HostSlot>
+      <HostSlot name="MAE/MFE">
+        <ExcursionBackfillHost />
+      </HostSlot>
+      <HostSlot name="Box-Kontext">
+        <BoxSnapBackfillHost />
+      </HostSlot>
+      <HostSlot name="Screenshot-Import">
+        <ShotImportHost />
+      </HostSlot>
+      <HostSlot name="Schlüsselmarken-Alarme">
+        <KeyLevelHost />
+      </HostSlot>
+      <HostSlot name="Handelsplan-Erinnerung">
+        <PlanClockHost />
+      </HostSlot>
+      <HostSlot name="Anwesenheit">
+        <PresenceHost />
+      </HostSlot>
+      <HostSlot name="Signal-Ausgänge">
+        <Entitled feature="coach">
+          <SignalOutcomeHost />
+        </Entitled>
+      </HostSlot>
+      <HostSlot name="Forward-Test">
+        <ForwardMount />
+      </HostSlot>
+      <HostSlot name="Datenarchiv">
+        <ArchiveMount />
+      </HostSlot>
+      <HostSlot name="Alarme (Browser-Kanal)">
+        <AlertFeedMount />
+      </HostSlot>
+      <HostSlot name="Squeeze-Beobachtung">
+        <SqueezeMount />
+      </HostSlot>
+      <HostSlot name="Demo">
+        <DemoMount />
+      </HostSlot>
+      <HostSlot name="Verbindungen">
+        <ConnectMount />
+      </HostSlot>
+      <HostSlot name="Papierkorb">
+        <TrashMount />
+      </HostSlot>
+    </>
+  );
+}
