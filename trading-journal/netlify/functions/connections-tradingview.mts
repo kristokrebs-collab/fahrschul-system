@@ -2,9 +2,10 @@
  * TradingView connection assistant (Paket Verbindungen, B3) – no OAuth: the trader's own TradingView alert posts to a
  * personal webhook address (`hooks-tradingview.mts`). This function manages that address and shows what arrived.
  *
- * GET    /api/v1/connections/tradingview → `{ hasToken, token, receipts, receiptsAvailable, tradeAlerts, origin }`
+ * GET    /api/v1/connections/tradingview → `{ hasToken, token, receipts, receiptsAvailable, signals, signalsAvailable, mcp, tradeAlerts, origin }`
  *        (`token` = prefix / dates only, never the secret; `tradeAlerts.allowed` = the plan lets trade alerts write the
- *        journal; the test signal works in every plan).
+ *        journal; the test signal works in every plan; `signals` = the last deliveries (processed / duplicate / rejected with the
+ *        reason, `_lib/signals`); `mcp` = state of the OAuth connection to the official TradingView MCP, `connections-tradingview-mcp.mts`).
  * POST   /api/v1/connections/tradingview `{ action: "create" | "rotate" }` → `{ token, path, info }` 201 – the plain
  *        token ONLY here, once; `path` = `/api/v1/hooks/tradingview/<token>`. `rotate` revokes the old address first
  *        (alerts that still use it stop working at once and show up as "rejected" nowhere – they get 401).
@@ -21,6 +22,8 @@ import { requireUser } from "./_lib/auth";
 import { envOptional } from "./_lib/env";
 import { clientIp, handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
 import { listReceipts } from "./_lib/connections/receipts";
+import { listSignals } from "./_lib/signals/store";
+import { mcpStatus } from "./_lib/tvmcp/status";
 import { paymentsConfigured, planOf } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { createToken, listTokens, revokeToken, type TokenInfo } from "./_lib/exchanges/tokens";
@@ -44,13 +47,16 @@ export default handler(async (req, ctx) => {
   const mine = (await listTokens(user.id)).filter(isAssistantToken);
 
   if (method === "GET") {
-    const [{ receipts, available }, plan] = await Promise.all([listReceipts(user.id, 10), planOf(user.id)]);
+    const [{ receipts, available }, plan, sig, mcp] = await Promise.all([listReceipts(user.id, 10), planOf(user.id), listSignals(user.id, 20), mcpStatus(user.id)]);
     const current = mine[0] ?? null;
     return json({
       hasToken: !!current,
       token: current ? { id: current.id, prefix: current.prefix, createdAt: current.createdAt, lastUsedAt: current.lastUsedAt } : null,
       receipts,
       receiptsAvailable: available,
+      signals: sig.signals,
+      signalsAvailable: sig.available,
+      mcp,
       tradeAlerts: { allowed: !paymentsConfigured() || planIncludes(plan.plan, "apiAccess"), plan: plan.plan },
       origin: siteOrigin(),
     });
