@@ -213,7 +213,7 @@ export function MarktView({ className }: { className?: string }) {
             {/* the big card sits first: it is the picture of who is positioned how, right under the chart of „Jetzt“ and before the
                 folded rows (Squeeze reads the same positioning from the archive) */}
             <Cell index={2} span="lg:col-span-12">
-              <Suspense fallback={<PendingCard title={NETCARD.title} testId="markt-trader-net-loading" height={{ base: 855, sm: 671, lg: 735 }} />}>
+              <Suspense fallback={<PendingCard title={NETCARD.title} testId="markt-trader-net-loading" height={{ base: 1369, sm: 978, lg: 975 }} />}>
                 <TraderNetCard />
               </Suspense>
             </Cell>

@@ -10,6 +10,7 @@ Reine Funktionen, keine Uhr, kein Netz. Server (`netlify/functions/_lib/alerts/*
 | `quiet.ts` | Ruhezeit in der Zeitzone des Nutzers (`isQuiet`, `quietEndsAt`) |
 | `delivery.ts` | `planDeliveries` (ein Eintrag je Kanal: wartet / übersprungen mit Grund), Statusvokabular, Gründe auf Deutsch, Wartezeiten, Twilio-Status → unser Status, `phoneBudget`, `deliveryKey` |
 | `phone.ts` | E.164 weltweit (`parsePhone`), Maske, Einwilligungstext und -version, Ansage (`alertCallText`) und TwiML |
+| `replay.ts` | `replayWhale`: dieselbe Quelle und dieselbe Engine Punkt für Punkt über einen Verlauf gespielt (Marken der Wal-Karte); erster Blick still, eine Lücke beendet einen Lauf |
 | `sources/*` | `industryReadings` (Regel des Branchen-Trends, Abstand zu Stop / Einstiegslinie), `whaleReading` (Top-Trader-Long-Anteil gegen 50 %), `keyLevelReading` (eigene Schlüsselmarken) |
 
 Ehrlich: Ein Alarm weist auf eine Regel hin, die der Nutzer eingestellt hat – keine Beratung, keine Order; die Ansage sagt nie, was zu tun ist. Der Branchen-Trend hängt an Daten, die ein bis zwei Monate hinterherhinken. „Top-Trader“ sind Binance-Gruppen, keine Wale.

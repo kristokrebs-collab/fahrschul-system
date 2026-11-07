@@ -8,6 +8,7 @@ export * from "./types";
 export * from "./config";
 export * from "./quiet";
 export * from "./engine";
+export * from "./replay";
 export * from "./delivery";
 export * from "./phone";
 export * from "./sources/industry";

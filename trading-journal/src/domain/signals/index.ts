@@ -192,6 +192,7 @@ export {
 export * from "./copy";
 export {
   buildTraderNet,
+  buildTraderNetFromPoints,
   netOf,
   priceAt,
   netText,

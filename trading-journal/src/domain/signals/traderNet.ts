@@ -47,6 +47,12 @@ export interface NetPoint {
   longPct: number;
   /** price of the candle covering `t` (its open), `null` = no candle covers it */
   price: number | null;
+  /**
+   * The spacing (ms) this point stands for. Absent = the spacing of the series it sits in. Only the stored history sets it
+   * (`netSeries.ts`): its points are one hour or more apart whatever the live period was, and a stretch is a gap only when
+   * it is clearly longer than this.
+   */
+  s?: number;
 }
 
 export type NetSide = "long" | "short" | "neutral";
@@ -170,10 +176,41 @@ export function buildTraderNet(positions: readonly NetRatioPoint[] | null | unde
   if (!raw.length) return EMPTY;
   const sortedBars = bars && bars.length ? [...bars].sort((a, b) => a.time - b.time) : [];
   const points: NetPoint[] = raw.map((p) => ({ t: p.time, net: netOf(p), longPct: p.longPct, price: priceAt(sortedBars, p.time, barMs) }));
+  const priceNow = sortedBars.length ? (sortedBars[sortedBars.length - 1]!.close ?? null) : null;
+  // the price at a crossing: the covering candle's open (interpolation is not claimed)
+  return viewOfPoints(points, now, priceNow, (t) => priceAt(sortedBars, t, barMs));
+}
+
+/**
+ * The same view from points that already are net points (the stored history joined with the live series). `priceNow` is the
+ * newest known price, `priceAtTime` answers the price at a crossing (default: the price of the newest point at or before it).
+ * Pass the newest gap-free run of a series with gaps: a crossing between two points with a gap in between was never observed,
+ * so no flip may be dated there.
+ */
+export function buildTraderNetFromPoints(input: readonly NetPoint[], now: number, priceNow: number | null, priceAtTime?: (t: number) => number | null): TraderNetView {
+  const points = input.filter((p) => Number.isFinite(p.t) && Number.isFinite(p.net) && Number.isFinite(p.longPct)).sort((a, b) => a.t - b.t);
+  if (!points.length) return EMPTY;
+  return viewOfPoints(points, now, priceNow, priceAtTime ?? ((t) => coverPrice(points, t)));
+}
+
+/** The price of the newest point at or before `t` (`null` = none before, or that point has no price). */
+function coverPrice(points: readonly NetPoint[], t: number): number | null {
+  if (t < points[0]!.t) return null;
+  let lo = 0;
+  let hi = points.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (points[mid]!.t <= t) lo = mid;
+    else hi = mid - 1;
+  }
+  return points[lo]!.price;
+}
+
+function viewOfPoints(points: NetPoint[], now: number, priceNowRaw: number | null, priceAtTime: (t: number) => number | null): TraderNetView {
   const last = points[points.length - 1]!;
   const spanMs = last.t - points[0]!.t;
-  const priceNow = sortedBars.length ? (sortedBars[sortedBars.length - 1]!.close ?? null) : null;
-  if (points.length < TRADER_NET_MIN_POINTS) return { ...EMPTY, status: "short", count: points.length, last, side: sideOf(last.net), spanMs, priceNow: Number.isFinite(priceNow) ? priceNow : null };
+  const priceNow = priceNowRaw !== null && Number.isFinite(priceNowRaw) ? priceNowRaw : null;
+  if (points.length < TRADER_NET_MIN_POINTS) return { ...EMPTY, status: "short", count: points.length, last, side: sideOf(last.net), spanMs, priceNow };
 
   // side changes through the dead band (a run only ends on a firm point of the other side)
   let state: NetSide = "neutral";
@@ -184,10 +221,9 @@ export function buildTraderNet(positions: readonly NetRatioPoint[] | null | unde
     if (state !== "neutral" && s !== state) changes++;
     state = s;
   }
-  const nowPrice = priceNow !== null && Number.isFinite(priceNow) ? priceNow : null;
+  const nowPrice = priceNow;
   const flipOf = (c: Crossing): NetFlip => {
-    // the price at the crossing: the covering candle's open (interpolation is not claimed)
-    const pAt = priceAt(sortedBars, Math.round(c.at), barMs);
+    const pAt = priceAtTime(Math.round(c.at));
     return {
       at: c.at,
       from: c.from,
@@ -214,7 +250,7 @@ export function buildTraderNet(positions: readonly NetRatioPoint[] | null | unde
     holdMs: flip ? 0 : Math.max(0, spanMs),
     changes,
     spanMs,
-    priceNow: Number.isFinite(priceNow) ? priceNow : null,
+    priceNow,
   };
 }
 
@@ -310,8 +346,7 @@ const lengthText = (ms: number): string => (durationText(ms) ?? "wenigen Minuten
  * "erstmals seit <Datum>" is the date of the sign change BEFORE the last one (the one that ended the earlier run on this side).
  * A sentence that ends on a date has no extra full stop (`28.10.` is the stop).
  */
-export function netTitle(v: TraderNetView | null | undefined): NetTitle {
-  const who = TRADER_NET_SOURCE;
+export function netTitle(v: TraderNetView | null | undefined, who: string = TRADER_NET_SOURCE): NetTitle {
   if (!v || v.status === "none" || !v.last || !v.side) return asTitle("none", null, [{ text: "Keine Top-Trader-Daten von Binance" }]);
   if (v.status === "short") return asTitle("short", null, [{ text: `Zu wenig Verlauf: erst ${v.count} Punkte von Binance geladen, ab ${TRADER_NET_MIN_POINTS} zeichnet die Karte den Verlauf.` }]);
   const word = (side: Side): string => (side === "long" ? "Long" : "Short");

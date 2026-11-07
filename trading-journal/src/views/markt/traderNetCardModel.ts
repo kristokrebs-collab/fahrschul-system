@@ -6,6 +6,7 @@
  * `@/domain/signals/traderNet` – nothing is calculated twice.
  */
 import { durationText, netDayText, netText, pctText, type NetFlip, type NetPoint, type TraderNetView } from "@/domain/signals";
+import { gapText, type NetGap } from "@/domain/signals/netSeries";
 import { n0, n1, price } from "@/lib/format";
 import type { NetGeometry, NetPad } from "@/views/overview/traderNetChart";
 
@@ -25,7 +26,12 @@ export interface RangeChoice {
   days: number | null;
   /** for the switch, in words (`7 Tage`, `Alles · 20 Tage`) */
   label: string;
+  /** the history is not that long (yet): the choice is shown but cannot be taken */
+  disabled?: boolean;
 }
+
+/** The ranges of the card. */
+export const RANGE_DAYS = [7, 30, 90] as const;
 
 /** `20 Tage` / `36 Std.` – the real length of the loaded history (rounded down, never longer than it is). */
 export function lengthLabel(spanMs: number): string {
@@ -33,13 +39,14 @@ export function lengthLabel(spanMs: number): string {
 }
 
 /**
- * The ranges to offer: 7 and 14 days when the loaded history is clearly longer than that, and always "Alles" with the real
- * length. The source gives what it gives (about 21 days at 1 h, Binance keeps ~30 days at most) – nothing is promised that
- * is not there, and a range as long as the whole history is not offered twice.
+ * The ranges to offer: 7, 30 and 90 days and always "Alles" with the real length. A range the history does not fill (clearly
+ * more than the range is needed: 15 % more) is shown but disabled – the stored history grows with every visit, and the switch
+ * says what is still to come instead of hiding it. Nothing is promised that is not there; a range as long as the whole history
+ * is not taken twice.
  */
 export function rangeChoices(spanMs: number): RangeChoice[] {
   const out: RangeChoice[] = [];
-  for (const days of [7, 14]) if (spanMs > days * DAY * 1.15) out.push({ id: String(days), days, label: `${days} Tage` });
+  for (const days of RANGE_DAYS) out.push({ id: String(days), days, label: `${days} Tage`, disabled: !(spanMs > days * DAY * 1.15) });
   out.push({ id: "all", days: null, label: `Alles · ${lengthLabel(spanMs)}` });
   return out;
 }
@@ -56,6 +63,56 @@ export function windowPoints(points: readonly NetPoint[], days: number | null): 
 export function flipIn(points: readonly NetPoint[], flip: NetFlip | null): NetFlip | null {
   if (!flip || points.length < 2) return null;
   return flip.at >= points[0]!.t && flip.at <= points[points.length - 1]!.t ? flip : null;
+}
+
+/* ------------------------------------------------------------------------------------------------ gaps in the plot */
+
+/** The gaps that lie inside the shown points (both ends are shown points). */
+export function gapsInWindow(gaps: readonly NetGap[], points: readonly NetPoint[]): NetGap[] {
+  if (points.length < 2) return [];
+  const a = points[0]!.t;
+  const b = points[points.length - 1]!.t;
+  return gaps.filter((g) => g.from >= a && g.to <= b);
+}
+
+/** The points split into runs at the gaps (a run ends with the point a gap starts at). One run when there is no gap. */
+export function splitRuns(points: readonly NetPoint[], gaps: readonly NetGap[]): NetPoint[][] {
+  if (!gaps.length) return [points as NetPoint[]];
+  const ends = new Set(gaps.map((g) => g.from));
+  const out: NetPoint[][] = [];
+  let cur: NetPoint[] = [];
+  for (const p of points) {
+    cur.push(p);
+    if (ends.has(p.t)) {
+      out.push(cur);
+      cur = [];
+    }
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+
+/** What the crosshair and the arrow keys stop at: every point, and every gap between two points. */
+export type PlotStop = { kind: "point"; i: number } | { kind: "gap"; gap: NetGap };
+
+export function plotStops(points: readonly NetPoint[], gaps: readonly NetGap[]): PlotStop[] {
+  const at = new Map(gaps.map((g) => [g.from, g] as const));
+  const out: PlotStop[] = [];
+  points.forEach((p, i) => {
+    out.push({ kind: "point", i });
+    const g = at.get(p.t);
+    if (g) out.push({ kind: "gap", gap: g });
+  });
+  return out;
+}
+
+/** The gap a time lies inside of (between two points of it), else `null`. */
+export const gapAt = (gaps: readonly NetGap[], t: number): NetGap | null => gaps.find((g) => t > g.from && t < g.to) ?? null;
+
+/** The readout lines of a gap (the tooltip and the screen reader): there is NO value inside, and none is made up. */
+export function gapReadout(g: NetGap): { stamp: string; net: string; price: string; speak: string } {
+  const text = gapText(g);
+  return { stamp: "Lücke", net: text.replace(/^Lücke /, ""), price: "nichts ergänzt", speak: `${text}. Nichts ergänzt.` };
 }
 
 /* ------------------------------------------------------------------------------------------------ axis ticks */
