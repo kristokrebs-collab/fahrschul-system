@@ -45,7 +45,8 @@ async function signInViaSheet(page: Page): Promise<void> {
   await sheet.getByLabel("E-Mail").fill(EMAIL);
   await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
   await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await completeSignIn(page, { synced: true });
+  // in the order flow the order summary opens right after the login: only the login dialogs must be gone (the header flow asserts "no dialog" itself)
+  await completeSignIn(page, { synced: true, expectNext: true });
 }
 
 async function signInHeader(page: Page): Promise<void> {
