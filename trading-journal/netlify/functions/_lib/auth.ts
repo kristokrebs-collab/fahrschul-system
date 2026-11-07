@@ -2,6 +2,13 @@
  * Verifies the caller's Supabase JWT (Wave-0 contract, owner P09). The client sends `Authorization: Bearer <access
  * token>` (`apiFetch` does it). Verification uses `auth.getClaims(jwt)` – local JWKS check with asymmetric signing
  * keys, otherwise a round trip to the Auth server.
+ *
+ * Runde 11: (1) an ANONYMOUS Supabase user (`is_anonymous` claim, anonymous sign-ins switched on in the dashboard) is turned away
+ * everywhere – such a token is free for any visitor and must never reach a function that costs money or touches data (Linse 1 #26);
+ * (2) `live: true` for the sensitive actions (delete the account, connect an exchange, create an API token): the local check cannot see a
+ * revoked, banned or deleted session ("log out everywhere", password change) – until the token expires it would stay valid. With `live`
+ * the Auth server is asked (`auth.getUser(jwt)`) and must still know the same user (Linse 1 #9, #19). A fresh PASSWORD prompt for these
+ * actions needs a dialog in the app (not built); users with a second factor already prove it per session (`aal2: "ifEnrolled"`).
  */
 import { HttpError } from "./http";
 import { supabaseAdmin } from "./supabase";
@@ -23,6 +30,8 @@ export interface RequireUserOptions {
    * (account deletion, exchange keys). Default: aal1 is enough.
    */
   aal2?: boolean | "ifEnrolled";
+  /** Sensitive action: the Auth server must confirm that this session is still alive (see the header). */
+  live?: boolean;
 }
 
 /** Token of an `Authorization: Bearer …` header, or null. */
@@ -41,6 +50,7 @@ export async function requireUser(req: Request, opts: RequireUserOptions = {}): 
   if (error || !claims || typeof claims.sub !== "string" || !claims.sub || claims.role !== "authenticated") {
     throw new HttpError(401, "invalid_token", "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.");
   }
+  if ((claims as { is_anonymous?: unknown }).is_anonymous === true) throw new HttpError(403, "anonymous_not_allowed", ANONYMOUS_MESSAGE);
   const user: AuthUser = {
     id: claims.sub,
     email: typeof claims.email === "string" ? claims.email : null,
@@ -49,7 +59,23 @@ export async function requireUser(req: Request, opts: RequireUserOptions = {}): 
     jwt,
   };
   if (opts.aal2) await assertAal2(user, opts.aal2);
+  if (opts.live) await assertSessionLive(user);
   return user;
+}
+
+/** The German 403 of an anonymous (guest) session. */
+export const ANONYMOUS_MESSAGE = "Dafür brauchst du ein Konto mit E-Mail-Adresse. Bitte melde dich an oder registriere dich.";
+
+/**
+ * Asks the Auth server whether the session of `user` is still alive: the token must belong to a user the server still knows (a deleted,
+ * banned or signed-out-everywhere session is refused), the same one the claims named, and not an anonymous one. 401 `invalid_token` otherwise.
+ */
+export async function assertSessionLive(user: AuthUser): Promise<void> {
+  const { data, error } = await supabaseAdmin().auth.getUser(user.jwt);
+  if (error || !data?.user || data.user.id !== user.id) {
+    throw new HttpError(401, "invalid_token", "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.");
+  }
+  if ((data.user as { is_anonymous?: boolean }).is_anonymous === true) throw new HttpError(403, "anonymous_not_allowed", ANONYMOUS_MESSAGE);
 }
 
 /** The German 403 of a session that still needs the TOTP step. */

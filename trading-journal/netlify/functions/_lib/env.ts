@@ -48,10 +48,17 @@ export const SERVER_ENV = [
   "KILL_CALLS",
   "KILL_AI",
   "KILL_CHECKOUT",
+  "KILL_MAIL",
+  "ALLOW_UNGATED",
+  "AI_DAILY_MAX",
+  "ALERT_SMS_DAILY_MAX",
+  "PHONE_ALLOWED_COUNTRIES",
+  "PHONE_HASH_KEY",
+  "REFERRAL_HOLD_DAYS",
 ] as const;
 
-/** Known names plus further key versions for rotation (`EXCHANGE_ENC_KEY_V2`, …). */
-export type ServerEnvName = (typeof SERVER_ENV)[number] | `EXCHANGE_ENC_KEY_V${number}`;
+/** Known names plus further key versions for rotation (`EXCHANGE_ENC_KEY_V2`, `IP_HASH_PEPPER_V2`, …). */
+export type ServerEnvName = (typeof SERVER_ENV)[number] | `EXCHANGE_ENC_KEY_V${number}` | `IP_HASH_PEPPER_V${number}`;
 
 type NetlifyEnvGlobal = { Netlify?: { env?: { get(name: string): string | undefined } } };
 
@@ -92,4 +99,14 @@ export function envBool(name: ServerEnvName, fallback: boolean): boolean {
   if (v === "1" || v === "true" || v === "yes" || v === "on") return true;
   if (v === "0" || v === "false" || v === "no" || v === "off") return false;
   return fallback;
+}
+
+/**
+ * True on the PRODUCTION deploy of Netlify (`CONTEXT=production`; deploy previews, branch deploys, `netlify dev` and the tests are
+ * not). Read directly, not through `env()`: Netlify sets it itself, it is not an operator variable. Gates that must fail CLOSED
+ * in production (no Stripe configured, no pepper) look here; everywhere else the open "development" behaviour stays.
+ */
+export function isProduction(): boolean {
+  const v = (globalThis as NetlifyEnvGlobal).Netlify?.env?.get("CONTEXT") ?? process.env.CONTEXT;
+  return v === "production";
 }

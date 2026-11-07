@@ -16,7 +16,7 @@ import { createHash, createHmac, randomBytes } from "node:crypto";
 import type { ContractConfirmResponse, ContractDeclaration, ContractKind, ContractReceipt } from "../../../src/billing/contract";
 import { WITHDRAWAL_DAYS } from "../../../src/billing/purchase/manage";
 import { isMissingTable } from "./account";
-import { audit } from "./audit";
+import { audit, pepperRing } from "./audit";
 import { mailConfig, sendMail, type MailConfig } from "./alertWatch/mail";
 import { recipientOf } from "./alertWatch/recipient";
 import { buildContractMail } from "./contractMail";
@@ -50,7 +50,9 @@ export const normalizeEmail = (raw: string): string | null => {
 
 const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex");
 const emailHash = (email: string): string => {
-  const pepper = envOptional("IP_HASH_PEPPER") ?? (envOptional("SUPABASE_SECRET_KEY") ? sha256(`tj-ip-pepper:${envOptional("SUPABASE_SECRET_KEY")}`) : "tj-local-only");
+  // the newest key of the pepper ring (`_lib/audit.ts`): never the public local key in production
+  const pepper = pepperRing()[0];
+  if (!pepper) throw new HttpError(500, "server_misconfigured", "Der Server ist nicht vollständig eingerichtet.");
   return createHmac("sha256", pepper).update(`tj-contract:${email}`).digest("hex");
 };
 

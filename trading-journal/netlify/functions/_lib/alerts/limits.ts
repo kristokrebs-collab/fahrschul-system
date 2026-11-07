@@ -7,8 +7,9 @@
  */
 import { limitOf } from "../../../../src/billing/plans";
 import type { PlanId } from "../../../../src/billing/types";
-import { envInt } from "../env";
-import { effectivePlan, paymentsConfigured } from "../plan";
+import { parseCountryList } from "../../../../src/domain/alerts/phone";
+import { envInt, envOptional } from "../env";
+import { effectivePlan, gatesOpen } from "../plan";
 import { supabaseAdmin } from "../supabase";
 
 export interface AlertLimits {
@@ -17,7 +18,7 @@ export interface AlertLimits {
 }
 
 export function alertLimits(plan: PlanId): AlertLimits {
-  const p: PlanId = paymentsConfigured() ? plan : "premium";
+  const p: PlanId = gatesOpen() ? "premium" : plan;
   return { alertChannels: limitOf(p, "alertChannels"), phoneCallsPerMonth: limitOf(p, "phoneCallsPerMonth") };
 }
 
@@ -34,6 +35,11 @@ export function phoneBrakes(): PhoneBrakes {
     userDayMax: Math.max(0, envInt("ALERT_PHONE_USER_DAILY_MAX", PHONE_USER_DAILY_DEFAULT)),
     globalDayMax: Math.max(0, envInt("ALERT_PHONE_DAILY_MAX", PHONE_GLOBAL_DAILY_DEFAULT)),
   };
+}
+
+/** The country calling codes this server calls and sends codes to (`PHONE_ALLOWED_COUNTRIES`, else the default list of `src/domain/alerts/phone.ts`). */
+export function phoneAllowedCountries(): readonly string[] {
+  return parseCountryList(envOptional("PHONE_ALLOWED_COUNTRIES"));
 }
 
 /** Effective plans of many accounts (one query per 100). A plan that cannot be read counts as free. */

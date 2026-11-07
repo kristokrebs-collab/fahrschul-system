@@ -39,8 +39,9 @@ import {
 import { requireUser } from "./_lib/auth";
 import { envOptional } from "./_lib/env";
 import { handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
+import { enforceBudget } from "./_lib/budget";
 import { assertRunning, killed } from "./_lib/killswitch";
-import { paymentsConfigured, requireFeature } from "./_lib/plan";
+import { gatesOpen, requireFeature } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 
 export const DEFAULT_VISION_MODEL = "claude-opus-5-5";
@@ -191,12 +192,13 @@ export default handler(async (req) => {
   assertRunning("ai");
   if (!apiKey) throw new HttpError(503, "shot_extract_unavailable", VISION_OFF_MESSAGE);
   const plan = await requireFeature(user.id, "shotExtract");
-  const daily = paymentsConfigured() ? limitOf(plan.plan, "shotExtractPerDay") : DEFAULT_DAILY;
+  const daily = gatesOpen() ? DEFAULT_DAILY : limitOf(plan.plan, "shotExtractPerDay");
   if (!(daily > 0)) throw new HttpError(402, "limit_reached", "Das Limit deines Tarifs ist erreicht.", { key: "shotExtractPerDay", limit: daily, plan: plan.plan });
   // the body is read (and rejected when malformed or oversized) BEFORE the limits count it
   const body = await readJson(req, ExtractBody, { maxBytes: MAX_BODY_BYTES });
   await enforceRateLimit(rateKey("shot-extract", user.id), 6, 600);
   if (Number.isFinite(daily)) await enforceRateLimit(rateKey("shot-extract-day", user.id), daily, 86_400);
+  await enforceBudget("ai");
   const model = envOptional("VISION_MODEL") ?? envOptional("COACH_MODEL") ?? DEFAULT_VISION_MODEL;
   return json(await extract(body, apiKey, model));
 });

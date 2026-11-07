@@ -11,6 +11,9 @@ import { setStripeForTests } from "../../netlify/functions/_lib/billingCleanup";
 import { ENV_SPEC } from "../../netlify/functions/_lib/envSpec";
 import { probeTesting } from "../../netlify/functions/_lib/opsProbes";
 import { setSupabaseAdminForTests } from "../../netlify/functions/_lib/supabase";
+import { sendMail, SEND_MESSAGE } from "../../netlify/functions/_lib/alertWatch/mail";
+import { assertRunning, switchStates } from "../../netlify/functions/_lib/killswitch";
+import { reasonText } from "../../src/domain/alerts/delivery";
 import { hashCode, normalizeCode, formatCode } from "../../netlify/functions/_lib/mfaRecovery";
 import accountDelete from "../../netlify/functions/account-delete.mts";
 import accountExport from "../../netlify/functions/account-export.mts";
@@ -348,12 +351,33 @@ describe("emergency switches", () => {
     expect((await r.json()).error.code).toBe("switched_off");
   });
 
-  it("anything but a true-ish value leaves the area running; /api/v1/flags is public and shows the four states", async () => {
+  it("KILL_MAIL (Runde 11): no outgoing mail leaves – sendMail answers `mail_off` before any request, the alarm job is skipped with its reason", async () => {
+    const calls: string[] = [];
+    const fetchSpy = async (url: string) => (calls.push(url), new Response(JSON.stringify({ id: "m1" }), { status: 200 }));
+    const cfg = { apiKey: "re_x", from: "Test <a@b.de>" };
+    vi.stubEnv("KILL_MAIL", "true");
+    expect(await sendMail(cfg, { to: "u@example.com", subject: "s", text: "t" }, fetchSpy as never)).toEqual({ ok: false, code: "mail_off", status: null });
+    expect(calls).toEqual([]);
+    vi.stubEnv("KILL_MAIL", "false");
+    expect((await sendMail(cfg, { to: "u@example.com", subject: "s", text: "t" }, fetchSpy as never)).ok).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(SEND_MESSAGE.mail_off).toMatch(/abgeschaltet/);
+    expect(reasonText("mail_off")).toMatch(/Notschalter \(E-Mail\)/);
+  });
+
+  it("KILL_MAIL is one of the five switches: the test mail function and the status page show it", async () => {
+    expect(switchStates()).toEqual({ sync: false, calls: false, ai: false, checkout: false, mail: false });
+    vi.stubEnv("KILL_MAIL", "1");
+    expect(switchStates().mail).toBe(true);
+    expect(() => assertRunning("mail")).toThrowError(/E-Mails werden gerade nicht verschickt/);
+  });
+
+  it("anything but a true-ish value leaves the area running; /api/v1/flags is public and shows the five states", async () => {
     vi.stubEnv("KILL_SYNC", "nein");
     vi.stubEnv("KILL_CALLS", "yes");
     const r = await opsFlags(new Request("https://x.test/api/v1/flags"), ctx);
     expect(r.status).toBe(200);
-    expect(await r.json()).toEqual({ switches: { sync: false, calls: true, ai: false, checkout: false } });
+    expect(await r.json()).toEqual({ switches: { sync: false, calls: true, ai: false, checkout: false, mail: false } });
     expect(r.headers.get("cache-control")).toContain("max-age=60");
   });
 
@@ -415,6 +439,24 @@ describe("ops-status", () => {
     expect(JSON.stringify(half)).not.toContain("sk_test_secretvalue");
   });
 
+  it("PRODUCTION without Stripe or without IP_HASH_PEPPER is never 'bereit': the page says the functions run closed (Runde 11)", async () => {
+    vi.stubEnv("OPS_TOKEN", TOKEN);
+    for (const [n, v] of Object.entries({ SUPABASE_URL: "https://p.supabase.co", SUPABASE_SECRET_KEY: "sb_secret_abc", VITE_SUPABASE_URL: "https://p.supabase.co", VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_x", SITE_ORIGIN: "https://site.test" })) vi.stubEnv(n, v);
+    expect((await (await call()).json()).production).toEqual([]); // not production: no remark, 'bereit'
+    vi.stubEnv("CONTEXT", "production");
+    const closed = await (await call()).json();
+    expect(closed.verdict).toBe("unvollständig");
+    expect(closed.production).toHaveLength(2);
+    expect(closed.production.join(" ")).toMatch(/GESCHLOSSEN/);
+    expect(closed.production.join(" ")).toMatch(/IP_HASH_PEPPER fehlt/);
+    // the operator's deliberate decision and the pepper clear both
+    vi.stubEnv("ALLOW_UNGATED", "true");
+    vi.stubEnv("IP_HASH_PEPPER", "p".repeat(32));
+    const ok = await (await call()).json();
+    expect(ok.production).toEqual([]);
+    expect(ok.verdict).toBe("bereit");
+  });
+
   it("names that look like ours but are not in the list are reported (typos)", async () => {
     vi.stubEnv("OPS_TOKEN", TOKEN);
     vi.stubEnv("STRIPE_SECRET_KY", "oops");
@@ -426,7 +468,7 @@ describe("ops-status", () => {
     vi.stubEnv("OPS_TOKEN", TOKEN);
     vi.stubEnv("KILL_AI", "true");
     const body = await (await call()).json();
-    expect(body.switches).toEqual({ sync: false, calls: false, ai: true, checkout: false });
+    expect(body.switches).toEqual({ sync: false, calls: false, ai: true, checkout: false, mail: false });
     expect(body.functions.find((f: { fn: string }) => f.fn === "coach-ask").switchedOff).toBe(true);
   });
 

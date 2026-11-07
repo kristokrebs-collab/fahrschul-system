@@ -38,7 +38,7 @@ import { evaluateWatch, stepWatch, unknownEvaluation, watchEntry, type WatchEntr
 import { barsOfTf } from "../../../../src/market/keylevels/bars";
 import { RestError } from "../../../../src/market/sources/http";
 import type { Candle } from "../../../../src/market/types";
-import { effectivePlan, paymentsConfigured } from "../plan";
+import { effectivePlan, gatesOpen } from "../plan";
 import { supabaseAdmin } from "../supabase";
 import { localClock, safeTz } from "./clock";
 import { appOrigin, buildAlertMail, mailConfig, sendMail, type MailConfig } from "./mail";
@@ -114,7 +114,7 @@ function serverKeys(c: ServerAlertsCfg): Partial<Omit<ServerAlertsCfg, "v">> {
 
 /** Accounts whose plan includes the alarm (all of them while payments are not set up). A plan that cannot be read is not allowed this run. */
 async function allowed(ids: string[]): Promise<Set<string>> {
-  if (!paymentsConfigured()) return new Set(ids);
+  if (gatesOpen()) return new Set(ids);
   const ok = new Set<string>();
   for (let i = 0; i < ids.length; i += 100) {
     const chunk = ids.slice(i, i + 100);

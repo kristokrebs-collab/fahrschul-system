@@ -164,6 +164,8 @@ describe("alerts-prefs", () => {
 
 describe("alerts-phone: setup", () => {
   const start = (over: Record<string, unknown> = {}) => phoneCall("POST", { action: "start", number: "+49 170 1234567", consent: true, consentVersion: CONSENT_VERSION, ...over });
+  // Runde 11: the verification SMS needs a REAL paid plan with calls (never "payments off") – the default of this block is Premium
+  beforeEach(() => payments("premium"));
 
   it("needs a login; a plan without calls is told so; without Twilio nothing happens (Einrichtung nötig)", async () => {
     db.claims = null;
@@ -262,13 +264,24 @@ describe("alerts-phone: setup", () => {
     expect((await phoneCall("POST", { action: "check", code: "12ab" })).status).toBe(422);
   });
 
-  it("one verified number per number: a second account can neither start nor finish with it", async () => {
+  it("one verified number per number: a second account never gets a code for it – and cannot tell why (no number oracle)", async () => {
     await verifyNumber(U);
     asUser(V);
+    db.tables.profiles = [...(db.tables.profiles ?? []), { id: V, plan: "premium", plan_status: "active", trial_end: null }];
     const res = await start();
-    expect(res.status).toBe(409);
-    expect((await res.json()).error.code).toBe("number_in_use");
+    // the SAME answer as for a free number (200 pending, the masked number) – only no SMS leaves
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "pending", masked: "+49 ••• ••67" });
     expect(tw.verifications).toHaveLength(1);
+    // finishing is impossible too: the number stays with the first account (the unique index answers only AFTER a correct code)
+    const done = await phoneCall("POST", { action: "check", code: "123456" });
+    expect(done.status).toBe(409);
+    expect((await done.json()).error.code).toBe("number_in_use");
+    // a free number gives the identical answer to "start", and does send the SMS
+    const free = await start({ number: "+49 171 7654321" });
+    expect(free.status).toBe(200);
+    expect(await free.json()).toEqual({ status: "pending", masked: "+49 ••• ••21" });
+    expect(tw.verifications).toHaveLength(2);
   });
 
   it("Twilio cannot reach the number / is busy: named, not a crash", async () => {
@@ -294,8 +307,123 @@ describe("alerts-phone: setup", () => {
   });
 });
 
+describe("alerts-phone: SMS-pumping / toll-fraud guards (Runde 11)", () => {
+  const start = (over: Record<string, unknown> = {}) => phoneCall("POST", { action: "start", number: "+49 170 1234567", consent: true, consentVersion: CONSENT_VERSION, ...over });
+  const premiumUser = (id: string) => {
+    db.tables.profiles = [...(db.tables.profiles ?? []).filter((r) => r.id !== id), { id, plan: "premium", plan_status: "active", trial_end: null }];
+    asUser(id);
+  };
+  beforeEach(() => payments("premium"));
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("only the allowed countries get a code: Germany, Austria, … yes – Japan, Brazil, a satellite network no; the operator's list wins", async () => {
+    for (const number of ["+81 3 1234 5678", "+55 11 91234-5678", "+234 802 123 4567"]) {
+      db.hits.clear();
+      const res = await start({ number });
+      expect(res.status, number).toBe(422);
+      expect((await res.json()).error.details).toEqual({ problem: "country" });
+    }
+    expect(tw.verifications).toHaveLength(0);
+    db.hits.clear();
+    expect((await start({ number: "+43 664 1234567" })).status).toBe(200); // Austria: allowed by default
+    db.hits.clear();
+    vi.stubEnv("PHONE_ALLOWED_COUNTRIES", "49");
+    expect((await (await start({ number: "+43 664 7654321" })).json()).error.details).toEqual({ problem: "country" });
+    db.hits.clear();
+    expect((await start({ number: "+49 171 7654321" })).status).toBe(200);
+  });
+
+  it("premium-rate and 'Caribbean' ranges are refused even in an allowed country", async () => {
+    for (const number of ["+49 900 1234567", "+49 137 1234567", "+44 909 8790000", "+1 876 555 0123", "+1 900 555 0123", "+43 900 123456", "+41 900 123 456", "+33 891 123 456"]) {
+      db.hits.clear();
+      const res = await start({ number });
+      expect(res.status, number).toBe(422);
+      expect((await res.json()).error.details, number).toEqual({ problem: "premium" });
+    }
+    expect(tw.verifications).toHaveLength(0);
+    db.hits.clear();
+    expect((await start({ number: "+1 415 555 2671" })).status).toBe(200); // a normal US number still works
+  });
+
+  it("the verification SMS needs a REAL paid plan: payments switched off, a free plan or a payment in dunning get none", async () => {
+    // payments off (all gates open in development): calls would be free, the SMS is still not
+    for (const k of ["STRIPE_SECRET_KEY", "STRIPE_PRICE_PRO_MONTHLY"]) delete process.env[k];
+    db.tables.profiles = [{ id: U, plan: "free", plan_status: "none", trial_end: null }];
+    let res = await start();
+    expect(res.status).toBe(402);
+    expect((await res.json()).error).toMatchObject({ code: "plan_required", details: { required: "premium" } });
+    // Premium whose payment is failing (past_due)
+    payments("premium");
+    db.tables.profiles = [{ id: U, plan: "premium", plan_status: "past_due", trial_end: null }];
+    res = await start();
+    expect(res.status).toBe(402);
+    expect(tw.verifications).toHaveLength(0);
+    // back to a healthy Premium: works
+    payments("premium");
+    expect((await start()).status).toBe(200);
+  });
+
+  it("a server-wide SMS budget per day: the operator's ceiling – a number that is already taken does not use it", async () => {
+    vi.stubEnv("ALERT_SMS_DAILY_MAX", "2");
+    expect((await start({ number: "+49 170 1111111" })).status).toBe(200);
+    expect((await start({ number: "+49 170 2222222" })).status).toBe(200);
+    const res = await start({ number: "+49 170 3333333" });
+    expect(res.status).toBe(503);
+    expect((await res.json()).error.code).toBe("budget_exhausted");
+    expect(res.headers.get("retry-after")).toMatch(/^\d+$/);
+    expect(tw.verifications).toHaveLength(2);
+  });
+
+  it("a number that is already verified elsewhere uses no budget (no SMS leaves)", async () => {
+    await verifyNumber(U, "+49 170 1234567");
+    db.hits.clear();
+    vi.stubEnv("ALERT_SMS_DAILY_MAX", "1");
+    premiumUser(V);
+    expect((await start()).status).toBe(200); // taken: no SMS, no budget
+    expect(tw.verifications).toHaveLength(1);
+    expect((await start({ number: "+49 171 7654321" })).status).toBe(200); // the one SMS of the day
+    expect(tw.verifications).toHaveLength(2);
+  });
+
+  it("the same number gets at most 3 codes a day, whoever asks (a victim's phone is not a pumping target)", async () => {
+    const users = ["33333333-3333-4333-8333-333333333331", "33333333-3333-4333-8333-333333333332", "33333333-3333-4333-8333-333333333333", "33333333-3333-4333-8333-333333333334"];
+    const codes: number[] = [];
+    for (const id of users) {
+      premiumUser(id);
+      codes.push((await start({ number: "+49 170 5555555" })).status);
+    }
+    expect(codes).toEqual([200, 200, 200, 429]);
+  });
+});
+
+describe("the number hash has its own key (Runde 11)", () => {
+  const N = "+491701234567";
+  const saved = { ...process.env };
+  afterEach(() => {
+    for (const k of ["PHONE_HASH_KEY", "EXCHANGE_ENC_KEY_V2"]) delete process.env[k];
+    process.env.EXCHANGE_ENC_KEY_V1 = saved.EXCHANGE_ENC_KEY_V1 ?? KEY;
+  });
+
+  it("PHONE_HASH_KEY decides the hash; removing the old encryption key no longer changes it", async () => {
+    const { numberHash, numberHashes } = await import("../../netlify/functions/_lib/alerts/phoneAccount");
+    const legacy = numberHash(N);
+    process.env.PHONE_HASH_KEY = "phone-hash-key-one";
+    const own = numberHash(N);
+    expect(own).not.toBe(legacy);
+    expect(numberHashes(N)).toEqual([own, legacy]); // a number verified before the switch is still found
+    // a key rotation: V2 added, V1 removed – the own hash stays, the legacy one would have changed
+    process.env.EXCHANGE_ENC_KEY_V2 = Buffer.alloc(32, 9).toString("base64");
+    delete process.env.EXCHANGE_ENC_KEY_V1;
+    expect(numberHash(N)).toBe(own);
+    delete process.env.PHONE_HASH_KEY;
+    expect(numberHash(N)).not.toBe(legacy);
+    expect(numberHashes(N)).toHaveLength(1);
+  });
+});
+
 describe("alerts-phone: test call and opt-out", () => {
   beforeEach(() => {
+    payments("premium");
     store.users.set(U, { prefs: withChannels({ phone: phoneOn }), tz: "Europe/Berlin" });
   });
 
@@ -427,6 +555,13 @@ describe("alerts-twilio-status", () => {
     expect((await post({ CallSid: SIDX, CallStatus: "ringing" }, null)).status).toBe(403);
     expect((await post({ CallSid: SIDX, CallStatus: "ringing" }, "AAAA")).status).toBe(403);
     expect([...store.deliveries.values()][0]!.status).toBe("queued");
+  });
+
+  it("an unsigned request never reaches the shared limiter: anonymous traffic cannot lock Twilio out (Runde 11)", async () => {
+    for (let i = 0; i < 650; i++) expect((await post({ CallSid: SIDX, CallStatus: "ringing" }, "AAAA")).status).toBe(403);
+    expect([...db.hits.keys()].filter((k) => k.startsWith("alerts-twilio-cb"))).toEqual([]);
+    expect(await (await post({ CallSid: SIDX, CallStatus: "ringing" })).json()).toEqual({ ok: true, changed: true }); // the real callback still passes
+    expect(db.hits.get("alerts-twilio-cb")).toBe(1);
   });
 
   it("a signed callback moves the call forward; a repeated or late one changes nothing", async () => {

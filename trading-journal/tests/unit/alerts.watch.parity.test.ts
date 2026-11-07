@@ -22,6 +22,7 @@ vi.mock("../../netlify/functions/_lib/supabase", async () => {
 });
 vi.mock("../../netlify/functions/_lib/plan", () => ({
   paymentsConfigured: () => false,
+  gatesOpen: () => true,
   effectivePlan: (r: { plan: unknown; plan_status: unknown }) => ({ plan: r.plan, status: r.plan_status, trialEnd: null }),
 }));
 

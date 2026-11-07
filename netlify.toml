@@ -35,6 +35,8 @@
 # Scheduled functions (the cron lives in their code, `config.schedule`; they run on PUBLISHED deploys only):
 #   exchange-sync-cron   */30 * * * *   Bitunix read-only sync (SYNC_CRON_ENABLED=false switches it off)
 #   backup-nightly       @daily         nightly server backup of the journal docs (P09)
+#   billing-reconcile    @daily         daily comparison with Stripe (Runde 11): open subscriptions read again, profiles with a paid plan recomputed,
+#                                       surplus team seats removed, referral credits whose hold has run out put on the Stripe balance
 #   social-aggregate     @daily         leaderboard snapshots + community distribution (k ≥ 10, P12)
 #   alert-watch-cron     */5 * * * *    E-Mail-Alarm bei geschlossener App (F21): needs RESEND_API_KEY + ALERT_FROM and migration 0008,
 #                                       does nothing without them; /api/v1/alerts/test = status + test mail. Binance is read direct, on

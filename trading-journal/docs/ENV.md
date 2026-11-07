@@ -24,7 +24,8 @@ Hängt daran: Login, Sync, Konto, jede Funktion mit Anmeldung. **Kern-Bereich** 
 | `VITE_SUPABASE_OAUTH_PROVIDERS` | Komma-Liste der Anmelde-Anbieter (google,github,apple,discord) | Optional | Browser-Build (Scope Builds, öffentlich) | Kein Knopf „Mit … anmelden“; Passwort und Magic Link bleiben. |
 | `SUPABASE_URL` | Projekt-Adresse für die Server-Funktionen | Pflicht | Funktionen (Netlify, Scope Functions) | Jede Funktion mit Anmeldung antwortet 500 „Der Server ist nicht vollständig eingerichtet.“ |
 | `SUPABASE_SECRET_KEY` | Service-Schlüssel (sb_secret_…) – umgeht RLS, nur in Funktionen | Pflicht · geheim | Funktionen (Netlify, Scope Functions) | Wie oben; auch Export, Löschen, Backups und Raten-Begrenzung laufen nicht. |
-| `IP_HASH_PEPPER` | Geheimer Schlüssel für IP-Pseudonyme in Audit-Log und Raten-Begrenzung und für den gesalzenen Hash der E-Mail-Adresse in `contract_requests` (openssl rand -base64 32; empfohlen) | Optional · geheim | Funktionen (Netlify, Scope Functions) | Der Schlüssel wird aus SUPABASE_SECRET_KEY abgeleitet. |
+| `IP_HASH_PEPPER` | Geheimer Schlüssel (Version 1) für IP-Pseudonyme in Audit-Log und Raten-Begrenzung, für den gesalzenen Hash der E-Mail-Adresse in `contract_requests`, für die Wiederherstellungscodes der Zwei-Faktor-Anmeldung und für die Testphasen-Sperre (openssl rand -base64 32). PFLICHT in Produktion: ohne ihn gibt es dort keine neuen Wiederherstellungscodes, und `ops-status` meldet „unvollständig“ | Pflicht · geheim | Funktionen (Netlify, Scope Functions) | Der Schlüssel wird aus SUPABASE_SECRET_KEY abgeleitet (nur zum Prüfen alter Codes); in Produktion gibt es keine neuen Wiederherstellungscodes. |
+| `IP_HASH_PEPPER_V2` | Zweite Version des Pepper-Schlüssels (Rotation; `…_V3` bis `…_V9` ebenso): neue Hashes und Codes nutzen die höchste vorhandene Version, ältere bleiben zum Prüfen gültig – die alte Version erst entfernen, wenn kein Wiederherstellungscode und keine Testphasen-Sperre damit mehr gebraucht wird | Optional · geheim | Funktionen (Netlify, Scope Functions) | Version 1 (`IP_HASH_PEPPER`) bleibt der Schlüssel. |
 | `LOG_SAMPLE_RATE` | Anteil gespeicherter Fehlerberichte, 0–1 (Standard 1) | Optional | Funktionen (Netlify, Scope Functions) | Alle Berichte (nur mit Einwilligung des Nutzers). |
 
 ## Adresse der Seite
@@ -54,6 +55,8 @@ Hängt daran: Kaufstrecke, Kundenportal, Webhook, Tarif-Freischaltung.
 | `STRIPE_AUTOMATIC_TAX` | Stripe Tax im Checkout (true/false, Standard false; Betreiberentscheidung mit dem Steuerberater, docs/RECHT/preisangaben.md): Anschrift Pflicht, Steuer-ID abfragbar | Optional | Funktionen (Netlify, Scope Functions) | Die Bestellübersicht sagt „Stripe Tax ist beim Betreiber nicht eingeschaltet“; mit `true`: „Steuer wird im nächsten Schritt von Stripe berechnet“. Nie ein erfundener Betrag. |
 | `REFERRAL_TRIAL_DAYS` | Testphase über einen Einladungslink in Tagen (Standard 30) | Optional | Funktionen (Netlify, Scope Functions) | 30 Tage. |
 | `REFERRAL_REWARD_CENTS` | Gutschrift je zahlendem Geworbenen in Cent (Standard 1000) | Optional | Funktionen (Netlify, Scope Functions) | 1000 Cent. |
+| `REFERRAL_HOLD_DAYS` | Tage, die eine Empfehlungs-Gutschrift wartet, bevor sie auf das Stripe-Guthaben kommt (Standard 14): in dieser Zeit kommt eine Erstattung oder Rückbuchung der ersten Zahlung noch an; danach schreibt `billing-reconcile` sie gut. Eine Gutschrift gibt es nur für eine echte Zahlung mindestens in Höhe der Gutschrift | Optional | Funktionen (Netlify, Scope Functions) | 14 Tage. |
+| `ALLOW_UNGATED` | `true` = in PRODUKTION dürfen alle Funktionen ohne Stripe-Einrichtung frei laufen (Telefon, SMS, KI, Hintergrund-Sync, Teams). Ohne diese Variable sperrt eine Produktion ohne Stripe-Schlüssel oder Preis-IDs ZU (jedes Konto zählt als Free) – statt für alle kostenlos zu werden. Nur für Betreiber, die bewusst gar nichts verkaufen und die Kosten selbst tragen; in Vorschau-Deploys und lokal ist alles ohnehin frei | Optional | Funktionen (Netlify, Scope Functions) | Produktion ohne Stripe: geschlossen (Free-Rechte für alle); `ops-status` meldet es. |
 
 ## Börsen-Sync
 
@@ -83,6 +86,8 @@ Hängt daran: Anruf-Alarm, Testanruf, Nummernprüfung (SMS-Code), Status-Rückme
 | `TWILIO_AUTH_TOKEN` | Zugriff auf Twilio; prüft auch die Signatur der Status-Rückmeldung (/api/v1/alerts/twilio/status) | Pflicht für den Bereich · geheim | Funktionen (Netlify, Scope Functions) | Wie TWILIO_ACCOUNT_SID; die Status-Rückmeldung antwortet 503. |
 | `TWILIO_FROM` | Absendernummer (E.164, Twilio-Nummer oder verifizierte Anrufer-ID) | Pflicht für den Bereich | Funktionen (Netlify, Scope Functions) | Wie TWILIO_ACCOUNT_SID. |
 | `TWILIO_VERIFY_SERVICE_SID` | Twilio-Verify-Dienst (VA…): schickt und prüft den SMS-Code der Nummernprüfung | Pflicht für den Bereich | Funktionen (Netlify, Scope Functions) | Keine Nummer lässt sich bestätigen, also wird nie angerufen („Einrichtung nötig“). |
+| `PHONE_ALLOWED_COUNTRIES` | Länder-Vorwahlen, an die Codes und Anrufe gehen (Komma-Liste, z. B. `49,43,41`); Premium- und Sondernummern sind immer gesperrt | Optional | Funktionen (Netlify, Scope Functions) | Standardliste: Deutschland, Österreich, Schweiz, übrige EU / EWR, Vereinigtes Königreich, USA und Kanada (+1 ohne die Karibik-Vorwahlen). |
+| `PHONE_HASH_KEY` | Eigener, NIE gedrehter Schlüssel (`openssl rand -base64 32`) für den Hash der Telefonnummer („eine bestätigte Nummer pro Nummer“). Setzen, BEVOR ein alter `EXCHANGE_ENC_KEY_V<n>` entfernt wird: bisher hing der Hash am ältesten Verschlüsselungsschlüssel | Optional · geheim | Funktionen (Netlify, Scope Functions) | Der Hash nutzt den ältesten `EXCHANGE_ENC_KEY_V<n>` (altes Verhalten); wird der entfernt, ändern sich alle Hashes. |
 
 ## TradingView-MCP-Verbindung
 
@@ -129,6 +134,8 @@ Hängt daran: /api/v1/ops/status.
 | `ALERTS_CRON_ENABLED` | Zeitplan der vier Alarme (`alerts-cron`, alle 5 Minuten) an/aus; `0` schaltet ihn ab | Optional | Funktionen (Netlify, Scope Functions) | An. |
 | `ALERT_PHONE_DAILY_MAX` | Kostenbremse: Anrufe pro Tag über ALLE Konten (Standard 50) | Optional | Funktionen (Netlify, Scope Functions) | 50; danach „Kostenbremse des Servers für heute erreicht“ im Zustellprotokoll. |
 | `ALERT_PHONE_USER_DAILY_MAX` | Anrufe pro Konto und Tag, Testanrufe eingerechnet (Standard 5) | Optional | Funktionen (Netlify, Scope Functions) | 5. |
+| `ALERT_SMS_DAILY_MAX` | Kostenbremse: Bestätigungs-SMS (Twilio Verify) pro Tag über ALLE Konten (Standard 100); schützt vor SMS-Pumping | Optional | Funktionen (Netlify, Scope Functions) | 100; danach „Für heute sind keine weiteren Bestätigungs-SMS mehr möglich“. |
+| `AI_DAILY_MAX` | Kostenbremse: KI-Aufrufe (Coach, Screenshot-Import, Strategie-Übersetzer, Assistent) pro Tag über ALLE Konten (Standard 2000) | Optional | Funktionen (Netlify, Scope Functions) | 2000; danach „Die KI hat heute ihr Tageskontingent erreicht“. |
 
 ## Binance-Anbindung (alles optional)
 
@@ -154,6 +161,7 @@ Hängt daran: /api/v1/ops/status.
 | `KILL_CALLS` | Notfall-Schalter: keine Telefon-Anrufe (true) | Optional | Funktionen (Netlify, Scope Functions) | Aus (Anrufe erlaubt, sobald Twilio eingerichtet ist). |
 | `KILL_AI` | Notfall-Schalter: keine KI-Aufrufe (true) | Optional | Funktionen (Netlify, Scope Functions) | Aus (KI läuft, sobald ein Schlüssel da ist). |
 | `KILL_CHECKOUT` | Notfall-Schalter: Kaufstrecke zu (true) – neue Käufe gehen nicht, bestehende Abos und das Kundenportal bleiben | Optional | Funktionen (Netlify, Scope Functions) | Aus (Kauf läuft, sobald Stripe eingerichtet ist). |
+| `KILL_MAIL` | Notfall-Schalter: kein E-Mail-Versand (true) – Alarm-Mails, Test-Mails und die Bestätigungs-Mails zu Kündigung und Widerruf | Optional | Funktionen (Netlify, Scope Functions) | Aus (Mails gehen, sobald Resend eingerichtet ist). |
 
 ## Rechtliches & Sonstiges (Client)
 
@@ -189,12 +197,13 @@ Aus `FUNCTION_ENV` in `envSpec.ts`; `/api/v1/ops/status` zeigt dasselbe live (�
 | `audit` | /api/v1/audit | Konto & Cloud (Supabase) | – |
 | `log` | /api/v1/log | Konto & Cloud (Supabase) | – |
 | `backup-nightly` | (täglich) | Konto & Cloud (Supabase) | – |
+| `billing-reconcile` | (täglich) | Konto & Cloud (Supabase), Abos (Stripe) | – |
 | `billing-status` | /api/v1/billing/status | Konto & Cloud (Supabase) | – |
 | `billing-checkout` | /api/v1/billing/checkout | Konto & Cloud (Supabase), Abos (Stripe), Adresse der Seite | `KILL_CHECKOUT` |
 | `billing-portal` | /api/v1/billing/portal | Konto & Cloud (Supabase), Abos (Stripe) | – |
 | `billing-code` | /api/v1/billing/code | Konto & Cloud (Supabase), Abos (Stripe) | – |
 | `billing-referral` | /api/v1/billing/referral | Konto & Cloud (Supabase), Abos (Stripe) | – |
-| `billing-contract` | /api/v1/billing/contract (+ /confirm) | Konto & Cloud (Supabase), E-Mail-Alarm (Resend), Adresse der Seite | – |
+| `billing-contract` | /api/v1/billing/contract (+ /confirm) | Konto & Cloud (Supabase), E-Mail-Alarm (Resend), Adresse der Seite | `KILL_MAIL` |
 | `stripe-webhook` | /api/v1/stripe/webhook | Konto & Cloud (Supabase), Abos (Stripe) | – |
 | `exchange-connect` | /api/v1/exchange/connect | Konto & Cloud (Supabase), Börsen-Sync | `KILL_SYNC` |
 | `exchange-disconnect` | /api/v1/exchange/disconnect | Konto & Cloud (Supabase), Börsen-Sync | – |
@@ -202,12 +211,12 @@ Aus `FUNCTION_ENV` in `envSpec.ts`; `/api/v1/ops/status` zeigt dasselbe live (�
 | `exchange-positions` | /api/v1/exchange/positions | Konto & Cloud (Supabase), Börsen-Sync | `KILL_SYNC` |
 | `exchange-backfill-background` | /api/v1/exchange/backfill | Konto & Cloud (Supabase), Börsen-Sync | `KILL_SYNC` |
 | `exchange-sync-cron` | (alle 30 Min) | Konto & Cloud (Supabase), Börsen-Sync | `KILL_SYNC` |
-| `alert-watch-cron` | (alle 5 Min) | Konto & Cloud (Supabase), E-Mail-Alarm (Resend), Adresse der Seite | – |
-| `alert-test` | /api/v1/alerts/test | Konto & Cloud (Supabase), E-Mail-Alarm (Resend) | – |
-| `alerts-cron` | (alle 5 Min) | Konto & Cloud (Supabase), E-Mail-Alarm (Resend), Adresse der Seite | – |
+| `alert-watch-cron` | (alle 5 Min) | Konto & Cloud (Supabase), E-Mail-Alarm (Resend), Adresse der Seite | `KILL_MAIL` |
+| `alert-test` | /api/v1/alerts/test | Konto & Cloud (Supabase), E-Mail-Alarm (Resend) | `KILL_MAIL` |
+| `alerts-cron` | (alle 5 Min) | Konto & Cloud (Supabase), E-Mail-Alarm (Resend), Adresse der Seite | `KILL_MAIL` |
 | `alerts-prefs` | /api/v1/alerts/prefs | Konto & Cloud (Supabase) | – |
 | `alerts-feed` | /api/v1/alerts/feed | Konto & Cloud (Supabase) | – |
-| `alerts-email-test` | /api/v1/alerts/email-test | Konto & Cloud (Supabase), E-Mail-Alarm (Resend) | – |
+| `alerts-email-test` | /api/v1/alerts/email-test | Konto & Cloud (Supabase), E-Mail-Alarm (Resend) | `KILL_MAIL` |
 | `alerts-phone` | /api/v1/alerts/phone | Konto & Cloud (Supabase), Telefon-Alarm (Twilio), Börsen-Sync | `KILL_CALLS` |
 | `alerts-twilio-status` | /api/v1/alerts/twilio/status | Konto & Cloud (Supabase), Telefon-Alarm (Twilio), Adresse der Seite | – |
 | `coach-ask` | /api/v1/coach/ask | Konto & Cloud (Supabase), KI (Anthropic) | `KILL_AI` |

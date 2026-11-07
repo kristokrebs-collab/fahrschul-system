@@ -9,6 +9,8 @@
  *   "teilweise", "nicht eingerichtet"), plus the emergency switches the RUNNING functions see (`KILL_*`).
  * - `unknown`: environment names that look like ours but are not in the list (a typo is the commonest cause of "it does
  *   not work").
+ * - `production` (Runde 11): states of a production deploy (`CONTEXT=production`) that are no missing group but wrong – Stripe not set up
+ *   (the functions then run CLOSED unless `ALLOW_UNGATED=true`), `IP_HASH_PEPPER` missing. While one stands the verdict is never `bereit`.
  * - `?probe=1`: one read-only request per CONFIGURED service (Supabase, Stripe, Resend, Twilio); unconfigured ones are
  *   "nicht geprüft". `?stats=1`: counts of the last 24 h (registrations, sync runs, jobs, webhooks, billing, errors).
  *
@@ -86,6 +88,8 @@ export default handler(async (req, ctx) => {
     functions: report.functions,
     switches: report.switches,
     unknown: report.unknown,
+    // Runde 11: wrong states of a PRODUCTION deploy (Stripe missing → the functions run closed; no IP_HASH_PEPPER). Empty = none.
+    production: report.production,
     variables: ENV_SPEC.filter((e) => e.scope === "functions" && !e.planned).map((e) => ({ name: e.name, set: !!envOptional(e.name as ServerEnvName), need: e.need, group: e.group })),
   };
   if (url.searchParams.get("probe") === "1") out.probes = await runProbes();

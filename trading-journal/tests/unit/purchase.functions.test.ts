@@ -104,6 +104,8 @@ function query(db: Db, table: string) {
     select: () => ((wantRows = true), q),
     eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
     neq: (c: string, v: unknown) => (filters.push((r) => r[c] !== v), q),
+    lte: (c: string, v: unknown) => (filters.push((r) => r[c] === undefined || r[c] === null || String(r[c]) <= String(v)), q),
+    in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), q),
     order: () => q,
     limit: (n: number) => ((limitN = n), q),
     maybeSingle: () => ((single = true), exec()),
@@ -256,6 +258,7 @@ function fakeStripe(): FakeStripe {
         return s;
       },
     },
+    invoicePayments: { list: async () => ({ data: [] }) },
     invoices: { list: async () => ({ data: [] }) },
     promotionCodes: { list: async () => ({ data: [] }) },
     prices: { retrieve: async (id) => ({ id, active: true, unit_amount: PRICES[id]?.amount ?? 0, currency: "eur", recurring: { interval: PRICES[id]?.interval ?? "month" } }) as unknown as Stripe.Price },

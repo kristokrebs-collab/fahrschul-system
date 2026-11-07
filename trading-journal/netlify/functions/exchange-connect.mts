@@ -18,16 +18,16 @@
  */
 import type { Config } from "@netlify/functions";
 import { z } from "zod";
-import { autoSyncAllowed } from "../../src/billing/plans";
+import { autoSyncAllowed, limitOf } from "../../src/billing/plans";
 import { audit } from "./_lib/audit";
 import { requireUser } from "./_lib/auth";
 import { clientIp, handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
-import { paymentsConfigured, requireAutoSync, requireExchangeAccess, requireLimit } from "./_lib/plan";
+import { gatesOpen, requireAutoSync, requireExchangeAccess, requireLimit } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { exchangeHttpError, requireExchangeSetup } from "./_lib/exchanges/api";
 import { cleanSymbols } from "./_lib/exchanges/binance";
 import { adapterFor, keyRights } from "./_lib/exchanges/registry";
-import { connectionInfo, insertConnection, listConnections, updateConnection } from "./_lib/exchanges/store";
+import { connectionInfo, deleteConnection, insertConnection, listConnections, updateConnection } from "./_lib/exchanges/store";
 import { EXCHANGE_IDS, EXCHANGE_MARKETS, type ExchangeCredentials, type ExchangeMarket } from "./_lib/exchanges/types";
 import { assertRunning } from "./_lib/killswitch";
 
@@ -58,7 +58,8 @@ const PatchBody = z
 
 export default handler(async (req, ctx) => {
   requireMethod(req, "POST", "PATCH");
-  const user = await requireUser(req, { aal2: "ifEnrolled" });
+  // storing or changing an exchange key: the Auth server must confirm the session is alive (Runde 11)
+  const user = await requireUser(req, { aal2: "ifEnrolled", live: true });
   assertRunning("sync");
   await enforceRateLimit(rateKey("exchange-connect", user.id), 10, 600, { failClosed: true });
 
@@ -123,7 +124,18 @@ export default handler(async (req, ctx) => {
     const symbols = cleanSymbols(body.symbols);
     if (symbols.length) meta.symbols = symbols;
   }
-  const row = await insertConnection({ userId: user.id, exchange, label, creds, journalAccount: body.journalAccount, permissions, syncEnabled: !paymentsConfigured() || autoSyncAllowed(info.plan), ...(Object.keys(meta).length ? { meta } : {}) });
+  const row = await insertConnection({ userId: user.id, exchange, label, creds, journalAccount: body.journalAccount, permissions, syncEnabled: gatesOpen() || autoSyncAllowed(info.plan), ...(Object.keys(meta).length ? { meta } : {}) });
+  // The count above and this insert are two steps: ten parallel requests with different labels all saw "0 of 1" (Runde 11, Linse 1 #4).
+  // So the limit is checked AGAIN now that the row exists: the connections in the order they were created, ours must be within the limit,
+  // else it is removed again. Racing requests can no longer exceed the plan – at worst the later ones are turned away.
+  if (!gatesOpen()) {
+    const limit = limitOf(info.plan, "exchangeConnections");
+    const mine = [...(await listConnections(user.id))].sort((a, b) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")) || a.id.localeCompare(b.id));
+    if (mine.findIndex((c) => c.id === row.id) >= limit) {
+      await deleteConnection(user.id, row.id);
+      throw new HttpError(402, "limit_reached", "Das Limit deines Tarifs ist erreicht.", { key: "exchangeConnections", limit, plan: info.plan });
+    }
+  }
   await audit(user.id, "exchange.connect", { exchange, market, last4: row.key_last4 }, clientIp(req, ctx));
   return json(
     {

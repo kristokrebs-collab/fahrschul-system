@@ -20,8 +20,9 @@ import { limitOf } from "../../src/billing/plans";
 import { requireUser } from "./_lib/auth";
 import { envOptional } from "./_lib/env";
 import { handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
+import { enforceBudget } from "./_lib/budget";
 import { assertRunning, killed } from "./_lib/killswitch";
-import { paymentsConfigured, requireFeature } from "./_lib/plan";
+import { gatesOpen, requireFeature } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 
 export const DEFAULT_COACH_MODEL = "claude-opus-5-5";
@@ -147,10 +148,11 @@ export default handler(async (req) => {
   if (!apiKey) throw new HttpError(503, "coach_ai_unavailable", COACH_OFF_MESSAGE);
   const plan = await requireFeature(user.id, "coachAi");
   await enforceRateLimit(rateKey("coach-ask", user.id), 10, 600);
-  const daily = paymentsConfigured() ? limitOf(plan.plan, "coachAiPerDay") : DEFAULT_DAILY;
+  const daily = gatesOpen() ? DEFAULT_DAILY : limitOf(plan.plan, "coachAiPerDay");
   if (!(daily > 0)) throw new HttpError(402, "limit_reached", "Das Limit deines Tarifs ist erreicht.", { key: "coachAiPerDay", limit: daily, plan: plan.plan });
   if (Number.isFinite(daily)) await enforceRateLimit(rateKey("coach-ask-day", user.id), daily, 86_400);
   const body = await readJson(req, AskBody, { maxBytes: 8 * 1024 });
+  await enforceBudget("ai");
   const model = envOptional("COACH_MODEL") ?? DEFAULT_COACH_MODEL;
   return json(await rephrase(body, apiKey, model));
 });

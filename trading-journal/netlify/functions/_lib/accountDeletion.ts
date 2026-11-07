@@ -99,3 +99,31 @@ export async function verifyErased(userId: string, sb: SupabaseClient = supabase
   }
   return left;
 }
+
+/**
+ * Before the auth user is deleted: the personal traces that would stay behind WITHOUT a user id (Runde 11, Linse 3 #7).
+ *  - `audit_log`: the user's rows are deleted (they carry the address pseudonym and what the user did); the closing "deleted" row is
+ *    written afterwards without a user id and without any detail of the person;
+ *  - `contract_requests`: the declarations of cancellation / withdrawal are PROOFS (kind, time, status stay), but the free text the person
+ *    typed (`declared_name`, `contract_hint`) and the address hash are blanked and the link token removed.
+ * Best effort: a failed step is counted, never blocks the deletion (the nightly retention purge catches the rest). Returns what it did.
+ */
+export async function erasePersonalTrails(userId: string, sb: SupabaseClient = supabaseAdmin()): Promise<{ audit: boolean; requests: boolean }> {
+  const out = { audit: false, requests: false };
+  try {
+    const a = await sb.from("audit_log").delete().eq("user_id", userId);
+    out.audit = !a.error;
+  } catch {
+    /* counted as not done */
+  }
+  try {
+    const r = await sb
+      .from("contract_requests")
+      .update({ declared_name: null, contract_hint: null, token_hash: null, email_hash: "0".repeat(64) })
+      .eq("user_id", userId);
+    out.requests = !r.error || isMissingTable(r.error);
+  } catch {
+    /* counted as not done */
+  }
+  return out;
+}

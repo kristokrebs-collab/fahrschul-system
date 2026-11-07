@@ -37,7 +37,13 @@ interface State {
   tables: Record<string, Row[]>;
   claims: Row | null;
   rpcCalls: string[];
+  /** What `rate_hit` answers for a key (default 1); the keys it was asked for are in `rateKeys`. */
+  rateOf?: (key: string) => number;
+  rateKeys?: string[];
 }
+
+/** Rows get a strictly increasing `created_at` (the faked clock stands still) – like rows inserted one after the other. */
+let createdSeq = 0;
 
 const getPath = (row: Row, col: string): unknown => {
   const m = /^(\w+)((?:->>?\w+)+)$/.exec(col);
@@ -65,7 +71,7 @@ function query(state: State, name: string) {
   const matches = () => all().filter((r) => filters.every((f) => f(r)));
   const exec = (): { data: unknown; error: unknown } => {
     if (op === "insert") {
-      const rows = (Array.isArray(patch) ? patch : [patch!]).map((r): Row => ({ id: r.id ?? crypto.randomUUID(), created_at: new Date().toISOString(), ...r }));
+      const rows = (Array.isArray(patch) ? patch : [patch!]).map((r): Row => ({ id: r.id ?? crypto.randomUUID(), created_at: new Date(Date.now() + ++createdSeq).toISOString(), ...r }));
       for (const r of rows) {
         if (name === "exchange_connections" && all().some((x) => x.user_id === r.user_id && x.exchange === r.exchange && x.label === r.label)) return { data: null, error: { code: "23505" } };
         if (name === "sync_runs") Object.assign(r, { started_at: r.started_at ?? new Date().toISOString(), fetched: 0, inserted: 0, updated: 0, unchanged: 0, skipped: 0, meta: {} });
@@ -173,11 +179,15 @@ function fakeAdmin(state: State): SupabaseClient {
   return {
     auth: {
       getClaims: vi.fn(async () => (state.claims ? { data: { claims: state.claims }, error: null } : { data: null, error: { message: "bad" } })),
+      getUser: vi.fn(async () => (state.claims ? { data: { user: { id: String(state.claims.sub) } }, error: null } : { data: null, error: { message: "bad" } })),
       admin: { mfa: { listFactors: vi.fn(async () => ({ data: { factors: [] }, error: null })) } },
     },
     rpc: vi.fn(async (fn: string, args: Row) => {
       state.rpcCalls.push(fn);
-      if (fn === "rate_hit") return { data: 1, error: null };
+      if (fn === "rate_hit") {
+        (state.rateKeys ??= []).push(String(args.p_key));
+        return { data: state.rateOf ? state.rateOf(String(args.p_key)) : 1, error: null };
+      }
       if (fn === "upsert_synced_trades") return { data: upsertSynced(state, args.p_user as string, args.p_items as never), error: null };
       return { data: null, error: { code: "42883" } };
     }),
@@ -710,5 +720,111 @@ describe("API tokens, REST, TradingView webhook", () => {
     const bad = await read(await hookFn(new Request(`https://journal.test/api/v1/hooks/tradingview/${t}`, { method: "POST", body: "BTC long now!" }), ctx({ token: t })));
     expect(bad.status).toBe(422);
     expect((await hookFn(new Request("https://journal.test/api/v1/hooks/tradingview/tj_wrong", { method: "POST", body: "{}" }), ctx({ token: "tj_wrong" }))).status).toBe(401);
+  });
+});
+
+describe("Runde 11: the connection limit holds under parallel requests, sensitive actions ask the Auth server", () => {
+  const pro = () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_x";
+    process.env.STRIPE_PRICE_PRO_MONTHLY = "price_x";
+    state.tables.profiles = [{ id: U1, plan: "pro", plan_status: "active", trial_end: null, tz: "Europe/Berlin" }];
+  };
+
+  it("ten parallel connects with different labels on Pro (limit 1) leave exactly ONE connection – before the fix all ten were stored", async () => {
+    pro();
+    const results = await Promise.all(Array.from({ length: 10 }, (_, i) => connect({ label: `Konto${i}` })));
+    expect(state.tables.exchange_connections).toHaveLength(1);
+    expect(results.filter((r) => r.status === 201)).toHaveLength(1);
+    const refused = results.filter((r) => r.status === 402);
+    expect(refused.length).toBe(9);
+    expect((refused[0]!.body.error as Row).code).toBe("limit_reached");
+    expect((refused[0]!.body.error as Row).details).toMatchObject({ key: "exchangeConnections", limit: 1, plan: "pro" });
+    // the connection that stayed is a whole one (the sync reads it)
+    expect(state.tables.exchange_connections![0]).toMatchObject({ status: "active" });
+  });
+
+  it("sequential connects still work up to the plan's limit and not beyond (Premium: five)", async () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_x";
+    process.env.STRIPE_PRICE_PRO_MONTHLY = "price_x";
+    state.tables.profiles = [{ id: U1, plan: "premium", plan_status: "active", trial_end: null, tz: "Europe/Berlin" }];
+    const codes: number[] = [];
+    for (let i = 0; i < 7; i++) codes.push((await connect({ label: `K${i}` })).status);
+    expect(codes).toEqual([201, 201, 201, 201, 201, 402, 402]);
+    expect(state.tables.exchange_connections).toHaveLength(5);
+  });
+
+  it("connecting an exchange asks the Auth server whether the session is alive: a signed-out token stores nothing", async () => {
+    const client = (await import("../../netlify/functions/_lib/supabase")).supabaseAdmin() as unknown as { auth: { getUser: ReturnType<typeof vi.fn> } };
+    client.auth.getUser.mockResolvedValueOnce({ data: { user: null }, error: { message: "session_not_found" } });
+    const r = await connect();
+    expect(r.status).toBe(401);
+    expect((r.body.error as Row).code).toBe("invalid_token");
+    expect(state.tables.exchange_connections ?? []).toHaveLength(0);
+    expect(venue.calls).toEqual([]); // nothing was sent to the exchange either
+  });
+
+  it("creating an API token asks the Auth server too; reading the token list does not need to", async () => {
+    const client = (await import("../../netlify/functions/_lib/supabase")).supabaseAdmin() as unknown as { auth: { getUser: ReturnType<typeof vi.fn> } };
+    client.auth.getUser.mockResolvedValueOnce({ data: { user: null }, error: { message: "session_not_found" } });
+    const denied = await read(await tradesFn(req("POST", "/api/v1/trades/tokens", { name: "Bot", scopes: ["trades:read"] }), ctx()));
+    expect(denied.status).toBe(401);
+    expect(state.tables.api_tokens ?? []).toHaveLength(0);
+    client.auth.getUser.mockClear();
+    expect((await tradesFn(req("GET", "/api/v1/trades/tokens"), ctx())).status).toBe(200);
+    expect(client.auth.getUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("Runde 11: the TradingView webhook is as hard as the signal receiver", () => {
+  const url = (t: string) => `https://journal.test/api/v1/hooks/tradingview/${t}`;
+  const post = (t: string, body: BodyInit = "{}", headers: Record<string, string> = {}) => hookFn(new Request(url(t), { method: "POST", body, headers }), ctx({ token: t }));
+  async function token(scopes: string[]) {
+    const r = await read(await tradesFn(req("POST", "/api/v1/trades/tokens", { name: "Bot", scopes }), ctx()));
+    return { token: r.body.token as string, id: (r.body.info as Row).id as string };
+  }
+
+  it("a wrong shape, an unknown token, a revoked one and one without the scope all get the SAME 401 – never a 403", async () => {
+    const good = await token(["webhook:tradingview"]);
+    const noScope = await token(["trades:read"]);
+    const revoked = await token(["webhook:tradingview"]);
+    expect((await tradesFn(req("DELETE", `/api/v1/trades/tokens/${revoked.id}`), ctx())).status).toBe(200);
+    const answers: string[] = [];
+    for (const t of ["tj_wrong", `tj_${"x".repeat(43)}`, revoked.token, noScope.token]) {
+      const res = await post(t);
+      expect(res.status, t).toBe(401);
+      answers.push(await res.text());
+    }
+    expect(new Set(answers).size).toBe(1); // identical bodies: nothing tells which case it was
+    expect((await post(good.token, JSON.stringify({ action: "test", symbol: "BTCUSDT" }))).status).toBe(200);
+  });
+
+  it("it limits per calling address as well (a flood of random tokens) – before any token is looked up", async () => {
+    state.rateOf = (key) => (key.startsWith("signals-ip:") ? 301 : 1);
+    state.rateKeys = [];
+    const lookups: string[] = [];
+    const real = state.tables;
+    Object.defineProperty(real, "api_tokens", { get: () => (lookups.push("api_tokens"), []), configurable: true });
+    const res = await post(`tj_${"y".repeat(43)}`);
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toMatch(/^\d+$/);
+    expect(state.rateKeys!.some((k) => k.startsWith("signals-ip:"))).toBe(true);
+    expect(lookups).toEqual([]); // the token table was never touched
+  });
+
+  it("the body is read with a 16 KiB cap: a long stream is cut off, a declared length over the cap is refused outright", async () => {
+    const { token: t } = await token(["webhook:tradingview"]);
+    let pulled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1024;
+        controller.enqueue(new Uint8Array(1024).fill(97));
+        if (pulled > 5 * 1024 * 1024) controller.close();
+      },
+    });
+    const big = await hookFn(new Request(url(t), { method: "POST", body: stream, duplex: "half" } as RequestInit), ctx({ token: t }));
+    expect(big.status).toBe(413);
+    expect(pulled).toBeLessThan(64 * 1024); // it stopped reading near the cap, not after 5 MB
+    const declared = await post(t, "x", { "content-length": String(1_000_000) });
+    expect(declared.status).toBe(413);
   });
 });

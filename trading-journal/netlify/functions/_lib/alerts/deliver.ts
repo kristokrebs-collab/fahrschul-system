@@ -28,7 +28,7 @@ import { alertLimits, phoneBrakes } from "./limits";
 import { buildEventMail } from "./mail";
 import type { AlertStore, DeliveryRecord, JobRecord } from "./store";
 import { createCall, getCall, twilioConfig, type TwilioConfig } from "./twilio";
-import { planOf } from "../plan";
+import { costPlanOf } from "../plan";
 import type { PlanId } from "../../../../src/billing/types";
 
 export const WORKER_BUDGET_MS = 20_000;
@@ -56,7 +56,7 @@ export function defaultDeliverDeps(store: AlertStore): DeliverDeps {
     mail: mailConfig(),
     twilio: twilioConfig(),
     recipient: recipientOf,
-    plan: async (u) => (await planOf(u)).plan,
+    plan: async (u) => (await costPlanOf(u)).plan, // a subscription in dunning (past_due) places no calls on the operator's money
     decryptNumber: (u, blob) => decrypt(blob, phoneAad(u)),
     appUrl: appOrigin(),
     brakes: phoneBrakes(),
@@ -114,6 +114,8 @@ async function emailJob(job: JobRecord, delivery: DeliveryRecord, d: DeliverDeps
     tally.skipped += 1;
     return void (await done(d, job, "switched_off"));
   }
+  // the operator's emergency switch (KILL_MAIL): no mail, the log says why. Not retried – an alarm that arrives hours late is worse than none
+  if (killed("mail")) return skip(d, job, delivery, "mail_off", tally);
   if (!d.mail) {
     await d.store.patchDelivery(delivery.id, { status: "failed", reason: "not_configured" });
     tally.failed += 1;

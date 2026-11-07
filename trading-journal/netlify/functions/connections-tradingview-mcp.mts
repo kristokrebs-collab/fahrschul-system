@@ -18,9 +18,10 @@ import { requireUser } from "./_lib/auth";
 import { clientIp, handler, HttpError, json, requireMethod } from "./_lib/http";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { tvMcpConfig } from "./_lib/tvmcp/config";
+import { disconnectTvMcp } from "./_lib/tvmcp/disconnect";
 import { readTest } from "./_lib/tvmcp/mcpClient";
-import { buildAuthorizeUrl, discover, exchangeCode, newState, pkcePair, revokeToken, stateShapeOk, TvMcpError } from "./_lib/tvmcp/oauth";
-import { accessTokenFor, consumeState, deleteConnection, markConnection, saveConnection, saveState, storedTokens } from "./_lib/tvmcp/store";
+import { buildAuthorizeUrl, discover, exchangeCode, newState, pkcePair, stateShapeOk, TvMcpError } from "./_lib/tvmcp/oauth";
+import { accessTokenFor, consumeState, markConnection, saveConnection, saveState } from "./_lib/tvmcp/store";
 import { mcpFetch } from "./_lib/tvmcp/status";
 
 function configured() {
@@ -50,20 +51,7 @@ export default handler(async (req, ctx) => {
   const f = mcpFetch();
 
   if (req.method === "DELETE" && tail === "") {
-    let revoked = false;
-    const c = tvMcpConfig();
-    const tokens = await storedTokens(user.id).catch(() => null);
-    if (c.ok && tokens) {
-      try {
-        const meta = await discover(c.config.resourceUrl, f);
-        const r = tokens.refresh ? await revokeToken(meta, c.config, tokens.refresh, "refresh_token", f) : false;
-        const a = tokens.access ? await revokeToken(meta, c.config, tokens.access, "access_token", f) : false;
-        revoked = r || a;
-      } catch {
-        revoked = false;
-      }
-    }
-    await deleteConnection(user.id);
+    const { revoked } = await disconnectTvMcp(user.id);
     await audit(user.id, "connection.tvmcp.disconnect", { revokedAtProvider: revoked }, ip);
     return json({ ok: true, revoked });
   }

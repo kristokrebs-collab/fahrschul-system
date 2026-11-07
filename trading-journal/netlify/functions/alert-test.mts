@@ -20,7 +20,7 @@ import { recipientOf } from "./_lib/alertWatch/recipient";
 import { logEmailDelivery } from "./_lib/alerts/log";
 import { loadHeartbeat } from "./_lib/alertWatch/store";
 import { handler, HttpError, json, requireMethod } from "./_lib/http";
-import { paymentsConfigured, planOf, requireFeature } from "./_lib/plan";
+import { gatesOpen, planOf, requireFeature } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { supabaseAdmin } from "./_lib/supabase";
 
@@ -40,7 +40,7 @@ export default handler(async (req) => {
     const [plan, rcpt, lastRun] = await Promise.all([planOf(user.id), recipientOf(user.id), loadHeartbeat()]);
     return json({
       configured: mailConfig() !== null,
-      entitled: !paymentsConfigured() || planIncludes(plan.plan, "boxScanner"),
+      entitled: gatesOpen() || planIncludes(plan.plan, "boxScanner"),
       hasEmail: rcpt !== null,
       emailConfirmed: rcpt?.confirmed ?? false,
       lastRun,

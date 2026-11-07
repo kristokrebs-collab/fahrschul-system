@@ -18,7 +18,10 @@ import { supabaseAdmin } from "./supabase";
 
 /** The part of the Stripe SDK this module uses (structural, so tests inject a fake). */
 export interface StripeLike {
-  customers: { search(params: { query: string; limit?: number }): Promise<{ data: { id: string }[] }> };
+  customers: {
+    search(params: { query: string; limit?: number }): Promise<{ data: { id: string }[] }>;
+    update(id: string, params: Record<string, unknown>): Promise<{ id: string }>;
+  };
   subscriptions: {
     list(params: { customer: string; status: "all"; limit: number }): Promise<{ data: { id: string; status: string }[] }>;
     cancel(id: string, params?: { invoice_now?: boolean; prorate?: boolean }): Promise<{ id: string; status: string }>;
@@ -46,6 +49,8 @@ export interface BillingCleanupResult {
   canceled: number;
   /** Customers looked at. */
   customers: number;
+  /** The Stripe customers of the user (for `anonymizeBillingCustomers` once the account is really gone). */
+  customerIds: string[];
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -71,7 +76,7 @@ export async function cancelBillingForUser(userId: string): Promise<BillingClean
   const key = envOptional("STRIPE_SECRET_KEY");
   if (!key) {
     if (open || known.length) throw new HttpError(409, "subscription_active", "Dein Abo läuft noch. Kündige es zuerst unter Konto → Abo, dann kannst du das Konto löschen.");
-    return { canceled: 0, customers: 0 };
+    return { canceled: 0, customers: 0, customerIds: [] };
   }
   try {
     const stripe = await factory(key);
@@ -86,10 +91,47 @@ export async function cancelBillingForUser(userId: string): Promise<BillingClean
         canceled++;
       }
     }
-    return { canceled, customers: customers.length };
+    return { canceled, customers: customers.length, customerIds: customers };
   } catch (e) {
     if (e instanceof HttpError) throw e;
     console.error("[fn] stripe cleanup failed", e instanceof Error ? e.name : typeof e);
     throw new HttpError(502, "billing_unavailable", "Das Abo konnte gerade nicht gekündigt werden. Dein Konto wurde nicht gelöscht – bitte versuche es später erneut.");
   }
+}
+
+/**
+ * After the account is gone: the Stripe customer objects of the user lose their personal data (Runde 11, Linse 3 #7 – only the
+ * subscriptions were ended, the customer kept e-mail, name, address and the link to the deleted account). They are ANONYMISED, not
+ * deleted: the invoices stay at Stripe (German retention duties, and a deleted customer would take the link to them with it), but a
+ * finalised invoice carries its own copy of the details at the time; the customer record itself is emptied (e-mail, name, phone, address,
+ * shipping, the `supabase_user_id` metadata). Best effort and never throws – a failure is counted, the deletion has happened.
+ * Returns how many customers were anonymised / could not be.
+ */
+export async function anonymizeBillingCustomers(customerIds: readonly string[]): Promise<{ anonymized: number; failed: number }> {
+  const out = { anonymized: 0, failed: 0 };
+  const key = envOptional("STRIPE_SECRET_KEY");
+  if (!key || !customerIds.length) return out;
+  try {
+    const stripe = await factory(key);
+    for (const id of customerIds) {
+      try {
+        await stripe.customers.update(id, {
+          email: "",
+          name: "",
+          phone: "",
+          description: "Konto gelöscht",
+          address: "",
+          shipping: "",
+          metadata: { supabase_user_id: "" },
+        });
+        out.anonymized++;
+      } catch (e) {
+        out.failed++;
+        console.error("[fn] stripe customer anonymise failed", (e as { code?: string }).code ?? (e instanceof Error ? e.name : ""));
+      }
+    }
+  } catch {
+    out.failed += customerIds.length - out.anonymized;
+  }
+  return out;
 }

@@ -4,7 +4,7 @@
 import { autoSyncAllowed, exchangeAccessAllowed, limitOf } from "../../../../src/billing/plans";
 import { envBool } from "../env";
 import { HttpError } from "../http";
-import { paymentsConfigured, planOf } from "../plan";
+import { gatesOpen, planOf } from "../plan";
 import { encryptionConfigured } from "./store";
 import { ExchangeError } from "./types";
 
@@ -40,7 +40,7 @@ export interface ExchangePlanState {
 
 export async function exchangePlanState(userId: string): Promise<ExchangePlanState> {
   const info = await planOf(userId);
-  const gated = paymentsConfigured();
+  const gated = !gatesOpen();
   const limit = gated ? limitOf(info.plan, "exchangeConnections") : Infinity;
   return { plan: info.plan, entitled: !gated || exchangeAccessAllowed(info.plan), autoSync: !gated || autoSyncAllowed(info.plan), limit: Number.isFinite(limit) ? limit : null, gated };
 }

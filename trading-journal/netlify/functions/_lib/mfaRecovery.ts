@@ -21,7 +21,8 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMissingTable } from "./account";
-import { purposeKey } from "./audit";
+import { pepperConfigured, purposeKey, purposeKeys } from "./audit";
+import { isProduction } from "./env";
 import { HttpError } from "./http";
 import { supabaseAdmin } from "./supabase";
 
@@ -60,8 +61,14 @@ export function normalizeCode(input: string): string | null {
   return new RegExp(`^[${ALPHABET}]{${RECOVERY_LENGTH}}$`).test(c) ? c : null;
 }
 
+/** The hash a NEW code is stored with: HMAC under the newest key of the pepper ring. */
 export function hashCode(userId: string, code: string): string {
   return createHmac("sha256", purposeKey("mfa-recovery")).update(`${userId}:${code}`).digest("hex");
+}
+
+/** The hash of `code` under EVERY key of the pepper ring (newest first): a set made before a pepper rotation still matches (Runde 11). */
+export function hashCodeAll(userId: string, code: string): string[] {
+  return purposeKeys("mfa-recovery").map((k) => createHmac("sha256", k).update(`${userId}:${code}`).digest("hex"));
 }
 
 export function newCodes(): string[] {
@@ -139,6 +146,12 @@ export async function recoveryStatus(userId: string, sb: SupabaseClient = supaba
 
 /** Stores a fresh set (replacing any old one) and returns the plain codes – the only time they exist outside the user's hands. */
 export async function generateRecovery(userId: string, now: Date = new Date(), sb: SupabaseClient = supabaseAdmin()): Promise<{ codes: string[]; createdAt: string }> {
+  // production needs the operator's OWN pepper: a key derived from the Supabase secret would make every code useless the day that secret
+  // is rotated, and the user locked out of 2FA with it (Runde 11, Linse 3 #9). Codes already made keep working (the ring still holds that key).
+  if (isProduction() && !pepperConfigured()) {
+    console.error("[fn] recovery: IP_HASH_PEPPER is missing in production – no new codes");
+    throw unavailable();
+  }
   const plain = newCodes();
   const value: RecoveryValue = { v: 1, createdAt: now.toISOString(), codes: plain.map((c) => ({ h: hashCode(userId, c), usedAt: null })) };
   // the table of migration 0015; while it is pending the old app_config row is written (and nothing breaks)
@@ -178,12 +191,14 @@ export const INVALID_CODE = "Dieser Code passt nicht oder wurde schon benutzt.";
 export async function consumeRecovery(userId: string, input: string, now: Date = new Date(), sb: SupabaseClient = supabaseAdmin()): Promise<boolean> {
   const code = normalizeCode(input);
   const row = await readRow(userId, sb);
-  // always compare against every stored hash, also for junk input: the time does not tell which case it was
-  const probe = Buffer.from(hashCode(userId, code ?? "INVALID000"), "hex");
+  // always compare against every stored hash under every key, also for junk input: the time does not tell which case it was
+  const probes = hashCodeAll(userId, code ?? "INVALID000").map((h) => Buffer.from(h, "hex"));
   let hit = -1;
   row?.value.codes.forEach((c, i) => {
     const stored = Buffer.from(c.h, "hex");
-    if (stored.length === probe.length && timingSafeEqual(stored, probe) && !c.usedAt && code) hit = i;
+    let match = false;
+    for (const probe of probes) if (stored.length === probe.length && timingSafeEqual(stored, probe)) match = true;
+    if (match && !c.usedAt && code) hit = i;
   });
   if (!row || hit < 0) return false;
   const next: RecoveryValue = { ...row.value, codes: row.value.codes.map((c, i) => (i === hit ? { ...c, usedAt: now.toISOString() } : c)) };
@@ -196,8 +211,8 @@ export async function restoreRecovery(userId: string, input: string, sb: Supabas
     const code = normalizeCode(input);
     const row = await readRow(userId, sb);
     if (!code || !row) return;
-    const h = hashCode(userId, code);
-    const next: RecoveryValue = { ...row.value, codes: row.value.codes.map((c) => (c.h === h ? { ...c, usedAt: null } : c)) };
+    const hs = hashCodeAll(userId, code);
+    const next: RecoveryValue = { ...row.value, codes: row.value.codes.map((c) => (hs.includes(c.h) ? { ...c, usedAt: null } : c)) };
     await writeBack(userId, row, next, null, sb);
   } catch {
     console.error("[fn] recovery restore failed");

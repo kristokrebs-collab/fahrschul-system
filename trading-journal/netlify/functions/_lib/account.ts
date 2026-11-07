@@ -439,10 +439,55 @@ export interface NightlyResult {
   /** Users left for the next run because the time budget ran out. */
   deferred: boolean;
   purgedErrors: boolean;
+  /** `audit_log` rows older than `AUDIT_KEEP_DAYS` removed (Runde 11: the log no longer grows for ever). */
+  purgedAudit: boolean;
+  /** Public contract requests that found no contract, older than `REQUEST_KEEP_DAYS`, removed. */
+  purgedRequests: boolean;
+  /** Trial tombstones older than `TRIAL_TOMBSTONE_KEEP_DAYS` removed. */
+  purgedTombstones: boolean;
+  /** Staged exports (full data dumps with signed links) older than an hour removed from the backups bucket. */
+  stagedExportsRemoved: number;
 }
 
 /** Days `app_errors` rows are kept. */
 export const ERROR_KEEP_DAYS = 30;
+/**
+ * Retention of the security log (`audit_log`), the public cancel / withdraw requests that never matched a contract and the trial tombstones
+ * (Runde 11, Linse 3 #7: kept without any limit before). PROPOSALS – the operator confirms them together with the privacy text
+ * (docs/RECHT/datenschutz.md), a lawyer decides the final periods. Requests that DID match a contract (`received`, `executed`, `late`) are
+ * proofs of a declaration and stay.
+ */
+export const AUDIT_KEEP_DAYS = 365;
+export const REQUEST_KEEP_DAYS = 30;
+export const TRIAL_TOMBSTONE_KEEP_DAYS = 730;
+/** A staged export is only the download link's source: it is useless (and a PII dump) after this long. */
+export const STAGED_EXPORT_MAX_AGE_MS = 3_600_000;
+
+/**
+ * Removes the staged exports (`backups/<uid>/exports/…`) older than an hour of EVERY user – until now only a new export or a backup listing of
+ * that user cleaned them, so a full PII dump with its signed links could sit there for ever (Runde 11, Linse 3 #11). Bounded by `maxFolders`
+ * per run. Returns the number of files removed.
+ */
+export async function sweepStagedExports(now: Date, sb: SupabaseClient = supabaseAdmin(), maxFolders = 500, stop: () => boolean = () => false): Promise<number> {
+  let removed = 0;
+  let seen = 0;
+  try {
+    for (let offset = 0; seen < maxFolders; offset += LIST_PAGE) {
+      const { data, error } = await sb.storage.from(BACKUP_BUCKET).list("", { limit: LIST_PAGE, offset, sortBy: { column: "name", order: "asc" } });
+      if (error || !data?.length) break;
+      for (const e of data as StorageEntry[]) {
+        if (stop() || seen >= maxFolders) return removed;
+        if (e.id) continue; // a file at the top level, not a user's folder
+        seen++;
+        removed += await removeStagedExports(e.name, { olderThanMs: STAGED_EXPORT_MAX_AGE_MS, now }, sb);
+      }
+      if (data.length < LIST_PAGE) break;
+    }
+  } catch {
+    console.error("[fn] staged export sweep failed");
+  }
+  return removed;
+}
 
 /**
  * The nightly job: one JSON backup per user whose journal changed (`backups/<id>/<YYYY-MM-DD>.json`, same format as
@@ -456,7 +501,7 @@ export async function runNightlyBackup(opts: NightlyOptions = {}): Promise<Night
   const started = clock();
   const budget = opts.budgetMs ?? 22_000;
   const since = new Date(now.getTime() - (opts.sinceMs ?? 50 * 3_600_000)).toISOString();
-  const out: NightlyResult = { users: 0, uploaded: 0, removed: 0, failed: 0, deferred: false, purgedErrors: false };
+  const out: NightlyResult = { users: 0, uploaded: 0, removed: 0, failed: 0, deferred: false, purgedErrors: false, purgedAudit: false, purgedRequests: false, purgedTombstones: false, stagedExportsRemoved: 0 };
   await ensureBackupBucket(sb);
   const day = backupDay(now);
   let after: string | null = null;
@@ -497,5 +542,21 @@ export async function runNightlyBackup(opts: NightlyOptions = {}): Promise<Night
   const purge = await sb.from("app_errors").delete().lt("at", cutoff);
   out.purgedErrors = !purge.error;
   if (purge.error) console.error("[fn] app_errors purge failed", purge.error.code);
+  // retention (Runde 11): the security log, requests that found no contract, trial tombstones, staged exports
+  const DAY_MS = 86_400_000;
+  const audit = await sb.from("audit_log").delete().lt("at", new Date(now.getTime() - AUDIT_KEEP_DAYS * DAY_MS).toISOString());
+  out.purgedAudit = !audit.error;
+  if (audit.error) console.error("[fn] audit_log purge failed", audit.error.code);
+  const reqs = await sb
+    .from("contract_requests")
+    .delete()
+    .in("status", ["unknown", "none", "expired"])
+    .lt("received_at", new Date(now.getTime() - REQUEST_KEEP_DAYS * DAY_MS).toISOString());
+  out.purgedRequests = !reqs.error;
+  if (reqs.error && !isMissingTable(reqs.error)) console.error("[fn] contract_requests purge failed", reqs.error.code);
+  const tomb = await sb.from("trial_tombstones").delete().lt("created_at", new Date(now.getTime() - TRIAL_TOMBSTONE_KEEP_DAYS * DAY_MS).toISOString());
+  out.purgedTombstones = !tomb.error;
+  if (tomb.error && !isMissingTable(tomb.error)) console.error("[fn] trial_tombstones purge failed", tomb.error.code);
+  out.stagedExportsRemoved = await sweepStagedExports(now, sb, 500, () => clock() - started > budget + 3_000);
   return out;
 }
