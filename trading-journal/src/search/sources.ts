@@ -138,6 +138,7 @@ export const SETTING_SECTIONS: readonly { title: string; words: string[] }[] = [
   { title: "Grundregeln", words: ["Regeln", "Checkliste", "Disziplin"] },
   { title: "Disziplin-Grenzen", words: ["Limits", "Verlust pro Tag", "Max. Trades", "Grenzen"] },
   { title: "Version & Speicher", words: ["Speicher", "Version", "App installieren", "Vollbild"] },
+  { title: "Rechtliches", words: ["Impressum", "Datenschutz", "AGB", "Widerruf", "Risikohinweis", "Cookies", "Hinweise"] },
   { title: "Darstellung", words: ["Theme", "Hell", "Dunkel", "System", "Light Mode", "Dark Mode", "Akzent", "Farbe"] },
 ];
 

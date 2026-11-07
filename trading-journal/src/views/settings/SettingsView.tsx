@@ -30,9 +30,11 @@ import { DraftField } from "./fields";
 import { ChangedDot, SaveButton, useActionPhase, type ActionPhase } from "./fx";
 import { HyblockConnectorCard, type HyblockTestConfig } from "./HyblockConnectorCard";
 import { LageCard } from "./LageCard";
+import { LegalCard } from "./LegalCard";
 import { LimitsCard } from "./LimitsCard";
 import { MoreSettingsCard } from "./MoreSettingsCard";
 import { ThemeCard } from "@/app/ThemeCard";
+import { legalShown } from "@/legal/config";
 import { OnboardingCard } from "@/onboarding/OnboardingCard";
 import { LiveDataCard } from "./LiveDataCard";
 import { MistakesCard } from "./MistakesCard";
@@ -380,6 +382,13 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
           <LateCard size={SIZE.more} className="lg:col-span-2">
             <MoreSettingsCard />
           </LateCard>
+
+          {/* Rechtliches: the documents of this build with their honest status (drafts are marked); small and static, so it mounts with the page */}
+          {legalShown() && (
+            <div className="flex min-w-0 flex-col lg:col-span-2 [&>*]:flex-1">
+              <LegalCard />
+            </div>
+          )}
         </SettingsGroup>
 
         <div className="flex justify-end lg:col-span-2">

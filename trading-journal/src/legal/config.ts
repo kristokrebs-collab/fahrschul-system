@@ -12,6 +12,30 @@ import { hasClaudeRuntime } from "@/store/capability";
 
 export const LEGAL_DOCS = ["impressum", "datenschutz", "agb", "widerruf"] as const;
 export type LegalDoc = (typeof LEGAL_DOCS)[number];
+/** The pages of the legal sheet: the four documents of the operator plus „Hinweise“ (Risiko, Preise & Steuern, Partnerlinks, Marken – no operator URL, always the in-app text). */
+export const LEGAL_PAGES = [...LEGAL_DOCS, "hinweise"] as const;
+export type LegalPage = (typeof LEGAL_PAGES)[number];
+
+/**
+ * Every `VITE_LEGAL_*` variable the app reads. The single list the placeholder names in the draft texts, `.env.example`,
+ * `env.d.ts`, SETUP.md and the unit test are checked against.
+ */
+export const LEGAL_ENV_VARS = [
+  "VITE_LEGAL_OPERATOR",
+  "VITE_LEGAL_ADDRESS",
+  "VITE_LEGAL_EMAIL",
+  "VITE_LEGAL_PHONE",
+  "VITE_LEGAL_REPRESENTATIVE",
+  "VITE_LEGAL_REGISTER",
+  "VITE_LEGAL_VAT_ID",
+  "VITE_LEGAL_RESPONSIBLE",
+  "VITE_LEGAL_IMPRESSUM_URL",
+  "VITE_LEGAL_DATENSCHUTZ_URL",
+  "VITE_LEGAL_AGB_URL",
+  "VITE_LEGAL_WIDERRUF_URL",
+  "VITE_LEGAL_DRAFTS_REVIEWED",
+] as const;
+export type LegalEnvVar = (typeof LEGAL_ENV_VARS)[number];
 
 export interface LegalConfig {
   /** Name / company of the operator */
@@ -28,6 +52,11 @@ export interface LegalConfig {
   /** person responsible for the content */
   responsible: string | null;
   urls: Readonly<Record<LegalDoc, string | null>>;
+  /**
+   * The operator states that the in-app draft texts (`docs/RECHT/`) were reviewed by a lawyer (`VITE_LEGAL_DRAFTS_REVIEWED=true`):
+   * only then the „Entwurf“ bar over them is gone. The app checks nothing – it is the operator's own declaration.
+   */
+  draftsReviewed: boolean;
 }
 
 type Env = Partial<Record<string, string | undefined>>;
@@ -71,6 +100,7 @@ export function legalConfigOf(env: Env): LegalConfig {
       agb: safeLegalUrl(env.VITE_LEGAL_AGB_URL),
       widerruf: safeLegalUrl(env.VITE_LEGAL_WIDERRUF_URL),
     },
+    draftsReviewed: (env.VITE_LEGAL_DRAFTS_REVIEWED ?? "").trim().toLowerCase() === "true",
   };
 }
 
@@ -112,21 +142,22 @@ export function legalShown(): boolean {
   return !hasClaudeRuntime();
 }
 
-export const LEGAL_LABEL: Readonly<Record<LegalDoc, string>> = {
+export const LEGAL_LABEL: Readonly<Record<LegalPage, string>> = {
   impressum: "Impressum",
   datenschutz: "Datenschutz",
   agb: "AGB",
   widerruf: "Widerruf",
+  hinweise: "Hinweise",
 };
 
 /** Deep link of a document inside the app. */
-export const legalDeepLink = (doc: LegalDoc): string => `?rechtliches=${doc}`;
+export const legalDeepLink = (doc: LegalPage): string => `?rechtliches=${doc}`;
 
 /** The document a URL asks for (`?rechtliches=impressum`), or null. */
-export function legalDocOfUrl(href: string): LegalDoc | null {
+export function legalDocOfUrl(href: string): LegalPage | null {
   try {
     const v = new URL(href).searchParams.get("rechtliches");
-    return v && (LEGAL_DOCS as readonly string[]).includes(v) ? (v as LegalDoc) : null;
+    return v && (LEGAL_PAGES as readonly string[]).includes(v) ? (v as LegalPage) : null;
   } catch {
     return null;
   }

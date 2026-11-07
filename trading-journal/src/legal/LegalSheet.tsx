@@ -8,7 +8,8 @@ import { Sheet } from "@/motion/Sheet";
 import { StaggerItem } from "@/motion/Stagger";
 import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
-import { LEGAL_LABEL, legalConfig, type LegalConfig, type LegalDoc } from "./config";
+import { LEGAL_LABEL, legalConfig, type LegalConfig, type LegalDoc, type LegalPage } from "./config";
+import { LegalDocument } from "./LegalDocument";
 import { closeLegal, openLegal, useLegal } from "./store";
 
 export const LEGAL_STRINGS = {
@@ -90,13 +91,17 @@ function ExternalDoc({ doc, c }: { doc: Exclude<LegalDoc, "impressum">; c: Legal
       ) : doc === "widerruf" && c.urls.agb ? (
         <p className="text-[12.5px] text-mute">{LEGAL_STRINGS.widerrufInAgb}</p>
       ) : (
-        <Placeholder env={env} />
+        <>
+          <Placeholder env={env} />
+          {/* no page of the operator yet: the in-app DRAFT (docs/RECHT), marked as a draft */}
+          <LegalDocument page={doc} config={c} />
+        </>
       )}
     </div>
   );
 }
 
-const OPTIONS = (["impressum", "datenschutz", "agb", "widerruf"] as const).map((v) => ({ v, label: LEGAL_LABEL[v] }));
+const OPTIONS = (["impressum", "datenschutz", "agb", "widerruf", "hinweise"] as const).map((v) => ({ v, label: LEGAL_LABEL[v] }));
 
 export default function LegalSheet() {
   const doc = useLegal((s) => s.open);
@@ -106,9 +111,11 @@ export default function LegalSheet() {
       {doc && (
         <div className="grid gap-4" data-testid="legal-sheet" data-doc={doc}>
           <StaggerItem>
-            <Segmented<LegalDoc> aria-label={LEGAL_STRINGS.title} size="sm" value={doc} onChange={openLegal} options={OPTIONS} className="w-full" />
+            <Segmented<LegalPage> aria-label={LEGAL_STRINGS.title} size="sm" value={doc} onChange={openLegal} options={OPTIONS} className="w-full" />
           </StaggerItem>
-          <StaggerItem>{doc === "impressum" ? <Impressum c={c} /> : <ExternalDoc doc={doc} c={c} />}</StaggerItem>
+          <StaggerItem>
+            {doc === "impressum" ? <Impressum c={c} /> : doc === "hinweise" ? <LegalDocument page="hinweise" config={c} /> : <ExternalDoc doc={doc} c={c} />}
+          </StaggerItem>
         </div>
       )}
     </Sheet>

@@ -283,6 +283,7 @@ alles Fehlende sichtbar als **„Platzhalter – vom Betreiber auszufüllen“**
 | `VITE_LEGAL_DATENSCHUTZ_URL` | ja | deine Datenschutzerklärung (https-Link oder Pfad auf dieser Site) |
 | `VITE_LEGAL_AGB_URL` | ja | deine AGB |
 | `VITE_LEGAL_WIDERRUF_URL` | nein | eigene Widerrufsbelehrung; ohne sie verweist die App auf die AGB |
+| `VITE_LEGAL_DRAFTS_REVIEWED` | nein | `true` nur, wenn ein Anwalt die Entwurfstexte der App (`docs/RECHT/`) geprüft hat; blendet die Leiste „Entwurf – Prüfung durch Anwalt nötig“ aus. Eigene Erklärung des Betreibers, die App prüft nichts |
 
 Wo die Links erscheinen: im Footer jeder Seite, auf **Konto**, im Rechtshinweis der **Preise**, bei der Registrierung
 (Pflicht-Häkchen „Ich akzeptiere die AGB und habe die Datenschutzerklärung gelesen“ – auch vor einer Registrierung über
@@ -294,6 +295,13 @@ Datenschutz eintragen. Innerhalb von claude.ai (persönliches Journal) wird nich
 Die Texte selbst (Datenschutzerklärung mit Supabase/Netlify/Stripe/Binance als Empfänger, AGB mit Laufzeit und Kündigung,
 Widerrufsbelehrung für digitale Abos, ggf. AVV) musst du als Betreiber erstellen bzw. von einem Anwalt oder
 Rechtstext-Dienst prüfen lassen – die App liefert dafür keine Vorlage, die als fertig gelten könnte.
+
+Als Ausgangspunkt für das Gespräch mit dem Anwalt liegen **Entwürfe** in `docs/RECHT/` (Impressum, Datenschutz, AGB,
+Widerruf mit Muster-Formular und Zustimmung zum sofortigen Beginn, Preise und Steuern, Risikohinweis, Partnerlinks,
+Marken) und die Liste der offenen Anwaltsfragen. Die App zeigt diese Entwürfe unter **Einstellungen › Rechtliches** (und
+über die Links im Fußbereich), solange du keine eigene Seite hinterlegt hast – immer mit der Leiste „Entwurf – Prüfung
+durch Anwalt nötig“ und gelb markierten Platzhaltern für alles, was du ausfüllen musst. Die Checkliste mit dem Stand der
+Mechanik (Kaufstrecke, Speicher, Länder-Hinweise) steht in `docs/RECHT-CHECKLISTE.md`. Das ist keine Rechtsberatung.
 
 ---
 

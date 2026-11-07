@@ -129,7 +129,7 @@ function LegalRow({ expanded, index }: { expanded: boolean; index: number }) {
       />
     );
   }
-  return <LegalLinks roomy className="-mx-1" />;
+  return <LegalLinks roomy extended={false} className="-mx-1" />;
 }
 
 function SidebarPanel() {
