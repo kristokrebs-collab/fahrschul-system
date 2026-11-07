@@ -4,6 +4,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DOC_COLUMNS, rowsToBackup, type BackupShape, type DocRow } from "../../../src/cloud/sync/docs";
+import { screenshotManifest, type ShotManifest } from "./accountShots";
 import { HttpError } from "./http";
 import { supabaseAdmin } from "./supabase";
 
@@ -148,6 +149,8 @@ export interface AccountExport {
    * backups AND lets the user fetch them (review DSGVO-01). A file without a link is still listed in `files`.
    */
   links: { expiresAt: string } & Record<UserBucket, { path: string; url: string }[]>;
+  /** B1: hash list of the screenshots (recorded SHA-256 per picture, the server's SHA-256 of the stored bytes, orphans, missing files). */
+  screenshots: ShotManifest;
 }
 
 /** Validity of the file links in an export (24 h). */
@@ -186,6 +189,8 @@ export async function collectExport(userId: string, now: Date = new Date(), sb: 
   const links = { expiresAt: new Date(now.getTime() + FILE_LINK_TTL_S * 1000).toISOString() } as AccountExport["links"];
   // staged exports (`exports/`) are the export itself, not stored data
   for (const b of USER_BUCKETS) links[b] = await signedLinks(b, files[b].filter((p) => !p.startsWith(`${userId}/${EXPORTS_DIR}/`)), FILE_LINK_TTL_S, sb);
+  const journal = await journalBackup(userId, now, sb);
+  const screenshots = await screenshotManifest(journal.trades, files.screenshots, sb);
   return {
     format: "trade-journal-account-export",
     version: 1,
@@ -197,10 +202,11 @@ export async function collectExport(userId: string, now: Date = new Date(), sb: 
       lastSignInAt: user?.last_sign_in_at ?? null,
       factors: (user?.factors ?? []).map((f) => ({ type: f.factor_type, friendlyName: f.friendly_name ?? null, status: f.status, createdAt: f.created_at ?? null })),
     },
-    journal: await journalBackup(userId, now, sb),
+    journal,
     tables,
     files,
     links,
+    screenshots,
   };
 }
 

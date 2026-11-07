@@ -14,6 +14,7 @@ import { clientTz, requireExchangeSetup } from "./_lib/exchanges/api";
 import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
 import { loadConnection, profileTz } from "./_lib/exchanges/store";
 import { runSync } from "./_lib/exchanges/sync";
+import { assertRunning } from "./_lib/killswitch";
 
 const Body = z.object({
   connectionId: z.string().uuid(),
@@ -30,6 +31,7 @@ export default handler(async (req) => {
   requireMethod(req, "POST");
   requireExchangeSetup();
   const user = await requireUser(req, { aal2: "ifEnrolled" });
+  assertRunning("sync");
   await enforceRateLimit(rateKey("exchange-backfill", user.id), 3, 3600, { failClosed: true });
   const body = await readJson(req, Body, { maxBytes: 1024 });
   await requireExchangeAccess(user.id);

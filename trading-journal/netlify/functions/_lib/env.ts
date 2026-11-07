@@ -29,6 +29,11 @@ export const SERVER_ENV = [
   "RESEND_API_KEY",
   "ALERT_FROM",
   "SEC_USER_AGENT",
+  "OPS_TOKEN",
+  "KILL_SYNC",
+  "KILL_CALLS",
+  "KILL_AI",
+  "KILL_CHECKOUT",
 ] as const;
 
 /** Known names plus further key versions for rotation (`EXCHANGE_ENC_KEY_V2`, …). */

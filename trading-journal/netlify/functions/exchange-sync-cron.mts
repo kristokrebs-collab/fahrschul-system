@@ -23,6 +23,7 @@ import { cronEnabled } from "./_lib/exchanges/api";
 import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
 import { CONNECTION_COLUMNS, loadConnection, profileTz, rotateStaleConnections, runningRun, type ConnectionRow, type RotationSweep } from "./_lib/exchanges/store";
 import { runSync } from "./_lib/exchanges/sync";
+import { killed } from "./_lib/killswitch";
 
 export const CRON_TOTAL_MS = 24_000;
 export const CRON_PER_CONNECTION_MS = 8_000;
@@ -90,7 +91,7 @@ async function schedule(row: CronRow, nextAt: number, failures: number): Promise
 }
 
 export async function runExchangeCron(now = Date.now()): Promise<CronSummary> {
-  const summary: CronSummary = { enabled: cronEnabled(), considered: 0, synced: 0, skipped: 0, failed: 0 };
+  const summary: CronSummary = { enabled: cronEnabled() && !killed("sync"), considered: 0, synced: 0, skipped: 0, failed: 0 };
   if (!summary.enabled) return summary;
   const end = now + CRON_TOTAL_MS;
   const { rows, scheduled } = await dueConnections();

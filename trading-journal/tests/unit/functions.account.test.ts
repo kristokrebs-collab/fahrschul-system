@@ -296,7 +296,7 @@ describe("account-delete", () => {
   it("never deletes while a subscription runs and Stripe is not configured", async () => {
     state.tables.profiles![0]!.plan = "pro";
     state.tables.profiles![0]!.plan_status = "active";
-    const r = await accountDelete(post("/api/v1/account/delete", { confirm: "LÖSCHEN" }), ctx);
+    const r = await accountDelete(post("/api/v1/account/delete", { confirm: "LÖSCHEN", acknowledgeSubscription: true }), ctx);
     expect(r.status).toBe(409);
     expect((await r.json()).error.code).toBe("subscription_active");
     expect(state.deleted).toEqual([]);
@@ -346,7 +346,7 @@ describe("account-delete", () => {
       subscriptions: { list: vi.fn(async () => ({ data: [{ id: "sub_team", status: "active" }] })), cancel: vi.fn(async (id: string) => ({ id, status: "canceled" })) },
     };
     setStripeForTests(async () => stripe);
-    const r = await accountDelete(post("/api/v1/account/delete", { confirm: "LÖSCHEN" }), ctx);
+    const r = await accountDelete(post("/api/v1/account/delete", { confirm: "LÖSCHEN", acknowledgeSubscription: true }), ctx);
     expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({ deleted: true, canceledSubscriptions: 1, releasedSeats: 2 });
     expect(state.tables.team_seats).toEqual([]);

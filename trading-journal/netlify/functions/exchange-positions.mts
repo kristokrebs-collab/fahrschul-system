@@ -13,10 +13,12 @@ import { mapOpenPosition, type LivePosition } from "./_lib/exchanges/mapping";
 import { adapterFor } from "./_lib/exchanges/registry";
 import { credentialsOf, listConnections, loadConnection, rotateIfNeeded } from "./_lib/exchanges/store";
 import { syncErrorMessage } from "./_lib/exchanges/sync";
+import { assertRunning } from "./_lib/killswitch";
 
 export default handler(async (req) => {
   requireMethod(req, "GET");
   const user = await requireUser(req, { aal2: "ifEnrolled" });
+  assertRunning("sync");
   await enforceRateLimit(rateKey("exchange-positions", user.id), 120, 600);
   await requireExchangeAccess(user.id);
   const positions: LivePosition[] = [];

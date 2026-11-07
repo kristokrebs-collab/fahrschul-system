@@ -20,6 +20,7 @@ import { clientTz, CRON_EVERY_MIN, cronEnabled, exchangePlanState, nextCronAt, S
 import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
 import { connectionInfo, encryptionConfigured, listConnections, loadConnection, parseCursor, profileTz, pullSyncedTrades, recentRuns, runningRun } from "./_lib/exchanges/store";
 import { runSync } from "./_lib/exchanges/sync";
+import { assertRunning } from "./_lib/killswitch";
 
 const Body = z.object({
   connectionId: z.string().uuid().optional(),
@@ -55,6 +56,7 @@ export default handler(async (req) => {
     });
   }
 
+  assertRunning("sync");
   await enforceRateLimit(rateKey("exchange-sync", user.id), 30, 600);
   const dryRun = url.searchParams.get("dryRun") === "1";
   const body = req.headers.get("content-type")?.startsWith("application/json") ? await readJson(req, Body, { maxBytes: 1024 }) : {};
