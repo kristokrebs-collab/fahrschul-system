@@ -2767,7 +2767,6 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     anchor: { testid: "api-card" },
     keywords: ["Webhook", "API", "Token", "TradingView", "Alert", "Bot", "Schnittstelle"],
     intents: ["webhook", "tradingview alert", "api token", "bot anbinden", "automatisch eintragen", "alert zu trade", "api zugang"],
-    see: ["pine-export"],
     see: ["pine-export", "tradingview-verbinden"],
     status: "teilweise",
     note: "Der Webhook legt nur echte Trades an (open/close); er füttert den Signal-Posteingang im Coach nicht, und Alerts ohne Trade (Einstieg/Stop/Ziel) werden nicht gesammelt. Ein Testsignal (`action: test`) legt nie einen Trade an und geht in jedem Tarif durch – es erscheint nur im Empfangsprotokoll des Verbindungs-Assistenten.",
