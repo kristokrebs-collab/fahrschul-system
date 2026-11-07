@@ -20,6 +20,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import { privacyGuard } from "./scripts/privacyGuard.ts";
+import { secretGuard } from "./scripts/secretGuard.ts";
 
 type FileEdition = "personal" | "share";
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
@@ -97,7 +98,7 @@ export default defineConfig(({ mode }) => {
   return {
     base: "./",
     publicDir: false, // public/ only holds the NOTICE, which travels inside the file
-    plugins: [react(), tailwindcss(), singleFile(edition), ...(edition === "share" ? [privacyGuard()] : [])],
+    plugins: [react(), tailwindcss(), singleFile(edition), secretGuard(), ...(edition === "share" ? [privacyGuard()] : [])],
     resolve: { alias: { "@": here("./src") } },
     define: { __TJ_EDITION__: JSON.stringify(edition), __TJ_TARGET__: JSON.stringify("file") },
     build: {

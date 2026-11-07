@@ -15,6 +15,7 @@ import { fileURLToPath, URL } from "node:url";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { privacyGuard } from "./scripts/privacyGuard.ts";
+import { secretGuard } from "./scripts/secretGuard.ts";
 import { OCR_URL_ROOT, OCR_VERSION, ocrSources } from "./src/journal/ocr/assets.ts";
 
 /**
@@ -140,7 +141,7 @@ export default defineConfig(({ mode }) => {
   const share = mode === "share";
   return {
     base: share ? SHARE_BASE : "/",
-    plugins: [offlineTolerantLazy(), react(), tailwindcss(), ocrAssets(share), ...(share ? [privacyGuard(), shareAppName()] : [keepLegacyDashboard()])],
+    plugins: [offlineTolerantLazy(), react(), tailwindcss(), secretGuard(), ocrAssets(share), ...(share ? [privacyGuard(), shareAppName()] : [keepLegacyDashboard()])],
     define: {
       __TJ_EDITION__: JSON.stringify(share ? "share" : "personal"),
       __TJ_TARGET__: JSON.stringify("web"),

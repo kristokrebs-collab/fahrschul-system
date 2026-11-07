@@ -3,6 +3,7 @@ import { JsonBackupSchema } from "@/domain/schemas";
 import { toJsonBackup, tradesToCsv } from "@/domain/csv";
 import { normalizeDayNotes, normalizeSettings } from "@/domain/normalize";
 import { fmt } from "@/lib/format";
+import { isUnsafeKey, parseJsonSafe } from "@/lib/unsafeKeys";
 import { download } from "./download";
 import { freshSnapshot, getEnriched, useJournal } from "./journalStore";
 import type { StorageSnapshot } from "./adapters/StoreApi";
@@ -207,7 +208,8 @@ export function previewText(p: ImportPreview): string {
 export function parseBackup(text: string): ParsedBackup {
   let json: unknown;
   try {
-    json = JSON.parse(text);
+    // keys like `__proto__` are dropped while parsing (they would reach a prototype setter in the merge below)
+    json = parseJsonSafe(text);
   } catch {
     return { ok: false, error: "Kein gültiges JSON", path: "" };
   }
@@ -282,7 +284,9 @@ const isPlain = (v: unknown): v is Record<string, unknown> => typeof v === "obje
 
 /** `{ ...cur, ...inc }`: the incoming record wins, keys only the current record has survive (lossless upsert). */
 function overlay<T extends object>(cur: T, inc: T): T {
-  return { ...cur, ...inc };
+  const out = { ...cur, ...inc } as Record<string, unknown>;
+  for (const k of Object.keys(out)) if (isUnsafeKey(k)) delete out[k];
+  return out as T;
 }
 
 function mergeById<T extends { id: string }>(current: T[], incoming: T[], incomingWins: (cur: T, inc: T) => boolean): T[] {
@@ -304,8 +308,9 @@ function mergeById<T extends { id: string }>(current: T[], incoming: T[], incomi
 export function fillMissing<T>(current: T, incoming: unknown): T {
   if (!isPlain(current) || !isPlain(incoming)) return current;
   const out: Record<string, unknown> = { ...current };
+  for (const k of Object.keys(out)) if (isUnsafeKey(k)) delete out[k];
   for (const [k, v] of Object.entries(incoming)) {
-    if (v === undefined) continue;
+    if (v === undefined || isUnsafeKey(k)) continue;
     if (!(k in out) || out[k] === undefined) out[k] = v;
     else out[k] = fillMissing(out[k], v);
   }
@@ -366,6 +371,7 @@ function mergeTrades(current: Trade[], incoming: Trade[]): Trade[] {
 function mergeDays(current: DayNotes, incoming: DayNotes): DayNotes {
   const out: DayNotes = { ...current };
   for (const [date, inc] of Object.entries(incoming)) {
+    if (isUnsafeKey(date)) continue;
     const cur = out[date];
     out[date] = !cur ? inc : newer(inc, cur) ? overlay(cur, inc) : overlay(inc, cur);
   }

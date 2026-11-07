@@ -26,9 +26,8 @@
         background: #0a0a0a;
       }
     </style>
-    <!-- the market bootstraps over REST and then streams over WebSocket: open both connections while the bundle loads -->
-    <link rel="preconnect" href="https://fapi.binance.com" crossorigin />
-    <link rel="dns-prefetch" href="https://fstream.binance.com" />
+    <!-- no connect-ahead hint to an exchange here: the browser would send the visitor's IP address to Binance on every page view,
+         before any choice was made (DSGVO, docs/RECHT-CHECKLISTE.md). The market connection opens when the app asks for it. -->
     <!-- fonts: embedded woff2 (src/styles/fonts.css, decision 24) – no third-party font request -->
   </head>
   <body>

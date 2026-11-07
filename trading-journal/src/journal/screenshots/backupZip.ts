@@ -8,8 +8,11 @@
  *
  * Export reads each picture from this device, else (signed in) from the cloud, hashes the bytes it actually writes and
  * says so when a picture could not be reached or no longer matches the hash stored with it. Restore checks every file
- * against the manifest before it is written back; a file whose hash differs is NOT restored and is named. Old JSON
- * backups with base64 pictures (`backupShots.ts`) are still read.
+ * against the manifest (CRC-32 of the archive and SHA-256) before it is written back; a file whose hash differs is NOT
+ * restored and is named. The hashes only show that a file is UNDAMAGED ("unversehrt") – the manifest is in the same
+ * archive, so a forged backup carries matching hashes. Therefore a restore also runs the entry checks of
+ * `restoreGuard.ts` (real image bytes, size and measures) and never replaces a picture the device already holds. Old
+ * JSON backups with base64 pictures (`backupShots.ts`) are still read, with the same checks.
  */
 import { toJsonBackup } from "@/domain/csv";
 import type { JsonBackup, ScreenshotRef, Trade } from "@/domain/types";
@@ -17,12 +20,19 @@ import { getEnriched, useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
 import { extOfMime, isOriginal } from "./info";
 import { loadOriginal, saveBlob } from "./original";
+import { MAX_INPUT_BYTES } from "./image";
+import { emptyReport, inspectRestoredImage, keyState, RESTORE_MAX_FILES, restoreSummary as summaryOf, SHOT_KEY_RE, type RestoreReport } from "./restoreGuard";
 import { sha256Hex } from "./sha256";
 import { localKeyOf, putShotBlobChecked } from "./store";
 import { buildZip, readZip, type ZipEntry } from "./zip";
 
 export const BACKUP_ZIP_FORMAT = "tj-backup-zip/1";
-const KEY_RE = /^[A-Za-z0-9_-]{1,80}$/;
+const KEY_RE = SHOT_KEY_RE;
+/** Largest `manifest.json` / `journal.json` the restore reads (a journal of tens of thousands of trades is a few MB). */
+export const MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
+export const MAX_JOURNAL_BYTES = 64 * 1024 * 1024;
+/** Where a picture may sit inside the archive: `shots/<name>` – one level, no `..`, no further folders. */
+const SHOT_FILE_RE = /^shots\/[A-Za-z0-9_][A-Za-z0-9_.-]{0,120}$/;
 
 export interface ManifestShot {
   /** Local blob key (`shot_…`) – the restore writes the file back under it. */
@@ -220,17 +230,30 @@ export const ZIP_BACKUP_MESSAGES = {
   badManifest: "Das Manifest im ZIP ist unlesbar.",
   noJournal: "Im ZIP fehlt die Journal-Datei (journal.json).",
   journalChanged: "Die Journal-Datei im ZIP stimmt nicht mit dem Manifest überein (Hash verschieden). Das Backup wurde verändert oder ist beschädigt.",
+  tooBig: "Das ZIP enthält eine Manifest- oder Journal-Datei, die für ein Backup dieses Journals viel zu groß ist.",
+  tooMany: "Das Manifest listet unglaublich viele Bilder – das ist kein Backup dieses Journals.",
 } as const;
 
 const isHex = (s: unknown): s is string => typeof s === "string" && /^[0-9a-f]{64}$/.test(s);
+
+/** Thrown by `readManifest` for a manifest that lists more pictures than any journal can carry. */
+class TooManyShots extends Error {}
 
 function readManifest(raw: unknown): BackupManifest | null {
   if (!raw || typeof raw !== "object") return null;
   const m = raw as Partial<BackupManifest>;
   if (m.format !== BACKUP_ZIP_FORMAT || m.journal !== "journal.json" || !isHex(m.journalSha256) || !Array.isArray(m.shots)) return null;
+  if (m.shots.length > RESTORE_MAX_FILES) throw new TooManyShots();
   const shots: ManifestShot[] = [];
+  // one row per key AND per archive file: a second row for the same key or the same file is dropped (it could only make the
+  // restore read one entry again and again, or write a key twice)
+  const seenKey = new Set<string>();
+  const seenFile = new Set<string>();
   for (const s of m.shots as Partial<ManifestShot>[]) {
-    if (!s || typeof s.key !== "string" || !KEY_RE.test(s.key) || !isHex(s.sha256) || typeof s.file !== "string" || !s.file.startsWith("shots/") || typeof s.mime !== "string" || !s.mime.startsWith("image/")) continue;
+    if (!s || typeof s.key !== "string" || !KEY_RE.test(s.key) || !isHex(s.sha256) || typeof s.file !== "string" || !SHOT_FILE_RE.test(s.file) || typeof s.mime !== "string" || !s.mime.startsWith("image/")) continue;
+    if (seenKey.has(s.key) || seenFile.has(s.file)) continue;
+    seenKey.add(s.key);
+    seenFile.add(s.file);
     shots.push({
       key: s.key,
       file: s.file,
@@ -264,17 +287,22 @@ export async function readBackupZip(file: Blob): Promise<ZipBackup> {
   const byName = new Map(list.map((e) => [e.name, e]));
   const mEntry = byName.get("manifest.json");
   if (!mEntry) throw new Error(ZIP_BACKUP_MESSAGES.noManifest);
+  if (mEntry.size > MAX_MANIFEST_BYTES) throw new Error(ZIP_BACKUP_MESSAGES.tooBig);
+  const mText = await (await mEntry.checkedData()).text(); // a damaged archive says so (CRC) instead of "unlesbar"
   let manifest: BackupManifest | null;
   try {
-    manifest = readManifest(JSON.parse(await (await mEntry.data()).text()));
-  } catch {
+    manifest = readManifest(JSON.parse(mText));
+  } catch (e) {
+    if (e instanceof TooManyShots) throw new Error(ZIP_BACKUP_MESSAGES.tooMany, { cause: e });
     manifest = null;
   }
   if (!manifest) throw new Error(ZIP_BACKUP_MESSAGES.badManifest);
   const jEntry = byName.get("journal.json");
   if (!jEntry) throw new Error(ZIP_BACKUP_MESSAGES.noJournal);
+  if (jEntry.size > MAX_JOURNAL_BYTES) throw new Error(ZIP_BACKUP_MESSAGES.tooBig);
   const jBlob = await jEntry.data();
   if ((await sha256Hex(jBlob)) !== manifest.journalSha256) throw new Error(ZIP_BACKUP_MESSAGES.journalChanged);
+  await jEntry.checkedData(); // the SHA fits: now the archive's own CRC (a damaged directory entry is told apart from an edit)
   const entries = new Map<string, ZipEntry>();
   for (const s of manifest.shots) {
     const e = byName.get(s.file);
@@ -288,17 +316,16 @@ export function zipShotInfo(z: ZipBackup): { embedded: number; missing: number }
   return { embedded: z.manifest.shots.filter((s) => z.entries.has(s.key)).length, missing: z.manifest.missing.length };
 }
 
-export interface ZipRestoreResult {
-  written: number;
-  /** Keys whose bytes do not match the manifest hash (or whose file is missing from the ZIP): NOT written. */
-  corrupt: string[];
-  /** Written, but only into memory (device storage full or unavailable). */
-  notSaved: number;
-}
+/** Outcome of a ZIP restore (see `RestoreReport`). */
+export type ZipRestoreResult = RestoreReport;
 
-/** After an import: writes the pictures of the ZIP into this device's store, each one only if its SHA-256 matches the manifest. */
+/**
+ * After an import: writes the pictures of the ZIP into this device's store. A picture is written only if its CRC-32 and
+ * SHA-256 fit, its bytes are a real image of sane size and measures (`restoreGuard.ts`), and this device holds no
+ * different picture under the same key.
+ */
 export async function restoreShotsFromZip(z: ZipBackup, onProgress?: (done: number, total: number) => void): Promise<ZipRestoreResult> {
-  const out: ZipRestoreResult = { written: 0, corrupt: [], notSaved: 0 };
+  const out = emptyReport();
   const total = z.manifest.shots.length;
   let done = 0;
   for (const s of z.manifest.shots) {
@@ -310,12 +337,31 @@ export async function restoreShotsFromZip(z: ZipBackup, onProgress?: (done: numb
       continue;
     }
     try {
-      const raw = await e.data();
+      if (e.size > MAX_INPUT_BYTES) {
+        out.rejected.push({ key: s.key, reason: "size" });
+        continue;
+      }
+      const raw = await e.checkedData();
       if ((await sha256Hex(raw)) !== s.sha256) {
         out.corrupt.push(s.key);
         continue;
       }
-      const blob = raw.type === s.mime ? raw : new Blob([raw], { type: s.mime });
+      const seen = await inspectRestoredImage(raw);
+      if (!seen.ok) {
+        out.rejected.push({ key: s.key, reason: seen.reason });
+        continue;
+      }
+      const state = await keyState(s.key, s.sha256);
+      if (state === "same") {
+        out.alreadyThere += 1;
+        continue;
+      }
+      if (state === "taken") {
+        out.kept.push(s.key);
+        continue;
+      }
+      // the type is the one the bytes show, not the one the manifest claims
+      const blob = raw.type === seen.mime ? raw : new Blob([raw], { type: seen.mime });
       const put = await putShotBlobChecked(blob, s.key);
       out.written += 1;
       if (put.where === "ram") out.notSaved += 1;
@@ -327,12 +373,4 @@ export async function restoreShotsFromZip(z: ZipBackup, onProgress?: (done: numb
 }
 
 /** German toast for a finished restore (`null` = nothing to tell). */
-export function restoreSummary(r: ZipRestoreResult): { kind: "success" | "error"; title: string; detail: string } | null {
-  if (!r.written && !r.corrupt.length) return null;
-  const parts: string[] = [];
-  if (r.written) parts.push(`${r.written === 1 ? "1 Bild" : `${r.written} Bilder`} bytegleich wiederhergestellt (Hash geprüft)`);
-  if (r.corrupt.length) parts.push(`${r.corrupt.length === 1 ? "1 Bild" : `${r.corrupt.length} Bilder`} nicht übernommen: Hash stimmt nicht oder Datei fehlt`);
-  if (r.notSaved) parts.push(`${r.notSaved === 1 ? "1 Bild ist" : `${r.notSaved} Bilder sind`} nicht dauerhaft gespeichert (Speicher voll)`);
-  const bad = r.corrupt.length > 0 || r.notSaved > 0;
-  return { kind: bad ? "error" : "success", title: bad ? "Bilder nur teilweise wiederhergestellt" : "Bilder wiederhergestellt", detail: `${parts.join(" · ")}.` };
-}
+export const restoreSummary = summaryOf;

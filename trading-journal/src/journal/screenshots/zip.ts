@@ -6,7 +6,9 @@
  * Writer: local headers + data + central directory + end record, UTF-8 names, CRC-32 computed in 256 KiB slices with
  * rests (the page stays free). Reader: finds the end record, reads the central directory and hands out each entry as a
  * lazy slice; only unencrypted, unsplit, "stored" archives of at most 65,535 entries and 4 GiB (no ZIP64) are accepted –
- * exactly what the writer produces. Every other archive is refused with a clear German message.
+ * exactly what the writer produces. Every other archive is refused with a clear German message. The CRC-32 of an entry
+ * is checked when a caller asks for `checkedData()` (the backup restore does, for every file it uses); like the SHA-256
+ * in the backup's manifest it catches damage, not a forged archive.
  */
 import { bytesOf, yieldToMain } from "./sha256";
 
@@ -115,12 +117,15 @@ export interface ZipEntry {
   crc: number;
   /** The entry's bytes as a lazy slice of the archive (nothing is copied). */
   data(): Promise<Blob>;
+  /** Like `data()`, but reads the bytes once and rejects (`ZIP_MESSAGES.crc`) when their CRC-32 differs from the archive's directory. */
+  checkedData(): Promise<Blob>;
 }
 
 export const ZIP_MESSAGES = {
   notZip: "Das ist keine ZIP-Datei.",
   unsupported: "Dieses ZIP ist nicht von diesem Journal erzeugt (komprimiert, verschlüsselt oder ZIP64). Entpacke es nicht neu und wähle die Original-Datei.",
   broken: "Das ZIP ist beschädigt oder unvollständig.",
+  crc: "Eine Datei im ZIP ist beschädigt (CRC-32 stimmt nicht).",
 } as const;
 
 const u16 = (v: DataView, o: number) => v.getUint16(o, true);
@@ -171,17 +176,23 @@ export async function readZip(file: Blob): Promise<ZipEntry[]> {
     if (method !== 0 || (flags & 1) !== 0 || csize !== usize) throw new Error(ZIP_MESSAGES.unsupported);
     const name = dec.decode(cd.subarray(o + 46, o + 46 + nameLen));
     o += 46 + nameLen + extraLen + commentLen;
+    const data = async (): Promise<Blob> => {
+      const lh = await bytesOf(file.slice(local, local + 30));
+      const lv = new DataView(lh.buffer, lh.byteOffset, lh.byteLength);
+      if (lh.length < 30 || u32(lv, 0) !== 0x04034b50) throw new Error(ZIP_MESSAGES.broken);
+      const start = local + 30 + u16(lv, 26) + u16(lv, 28);
+      if (start + usize > file.size) throw new Error(ZIP_MESSAGES.broken);
+      return file.slice(start, start + usize);
+    };
     out.push({
       name,
       size: usize,
       crc,
-      async data() {
-        const lh = await bytesOf(file.slice(local, local + 30));
-        const lv = new DataView(lh.buffer, lh.byteOffset, lh.byteLength);
-        if (lh.length < 30 || u32(lv, 0) !== 0x04034b50) throw new Error(ZIP_MESSAGES.broken);
-        const start = local + 30 + u16(lv, 26) + u16(lv, 28);
-        if (start + usize > file.size) throw new Error(ZIP_MESSAGES.broken);
-        return file.slice(start, start + usize);
+      data,
+      async checkedData() {
+        const blob = await data();
+        if ((await crc32OfBlob(blob)) !== crc) throw new Error(ZIP_MESSAGES.crc);
+        return blob;
       },
     });
   }

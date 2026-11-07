@@ -9,6 +9,15 @@ with TOTP 2FA, see and sign out the other devices, and sync the journal across d
 lossless. DSGVO tools (export, deletion, nightly backups, audit trail) run in the Netlify functions
 (`netlify/functions/README.md`), the schema in `supabase/`.
 
+## No secret in the browser bundle
+
+`VITE_*` values are copied as text into the public JavaScript. `cloud/publicKey.ts` says which Supabase keys may be public
+(`sb_publishable_…` and the legacy `anon` JWT); `cloudConfig()` hands nothing else to the client, and `scripts/secretGuard.ts`
+(Vite plugin of `vite.config.ts` and `vite.single.config.ts`) FAILS the build when a `VITE_*` variable is named like a secret,
+when `VITE_SUPABASE_PUBLISHABLE_KEY` is a `sb_secret_…` / `service_role` key, or when a secret-shaped string (Supabase, Stripe,
+Anthropic, PEM) is found in any emitted file. The message names the variable or file, never the value. Server keys belong in
+Netlify with scope Functions only.
+
 ## Bundle shape
 
 | module | weight | what |

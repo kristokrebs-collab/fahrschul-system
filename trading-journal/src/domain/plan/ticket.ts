@@ -3,6 +3,7 @@
  * Richtung, Einstieg, Stop, Ziel, Größe, maximaler Verlust, Quelle und Stand der Kerzen. Die App sendet nie eine Order und
  * hat keine Broker-Anbindung; das Ticket ist Text, den die Person selbst bei ihrer Börse eingibt, wenn sie es will.
  */
+import { neutralizeFormula } from "@/lib/csvSafe";
 import { splitSymbol } from "@/market/symbol";
 import type { Side } from "../types";
 import { moneyText, num, pctText, priceText, qtyText } from "./format";
@@ -80,8 +81,10 @@ export const baseOf = (symbol: string): string => splitSymbol(symbol)?.base ?? s
 export const unitOf = (market: MarketKind | undefined, symbol: string): string => (market === "stocks" ? "Stück" : baseOf(symbol));
 
 function csvCell(v: string): string {
-  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
+/** A text column (symbol, source, management lines): a leading `=`, `+`, `-`, `@` is written as text (spreadsheet formula injection). */
+const textCol = neutralizeFormula;
 const plain = (x: number, d = 8): string => String(Number(x.toFixed(d)));
 const iso = (ms: number): string => new Date(ms).toISOString().replace(".000Z", "Z");
 
@@ -111,7 +114,7 @@ export function buildTicket(p: TicketPlan): Ticket {
   const text = ["HANDELSPLAN – Ticket zum Kopieren", ...rows.map(([k, v]) => `${k}: ${v}`), ...(p.manage?.length ? [MANAGE_NOTE] : []), TICKET_NOTE].join("\n");
   const header = ["Symbol", "Richtung", "Einstieg", "Stop", "Ziel", "Menge", "Positionswert", "Max_Verlust", "Max_Verlust_Prozent", "Chance_Risiko", "Flat_by_UTC", "Ampel", "Quelle", "Kerzen_bis_UTC", "Abgerufen_UTC", ...(p.manage?.length ? ["Verwaltung"] : [])];
   const cells = [
-    p.symbol,
+    textCol(p.symbol),
     p.side,
     plain(p.entry),
     plain(p.stop),
@@ -123,10 +126,10 @@ export function buildTicket(p: TicketPlan): Ticket {
     p.rr != null ? plain(p.rr, 3) : "",
     p.flatByMs != null ? iso(p.flatByMs) : "",
     LIGHT_WORD[p.light],
-    p.sourceLabel,
+    textCol(p.sourceLabel),
     p.candlesUntil != null ? iso(p.candlesUntil) : "",
     p.fetchedAt != null ? iso(p.fetchedAt) : "",
-    ...(p.manage?.length ? [p.manage.map((l) => `${l.label}: ${l.text}`).join(" | ")] : []),
+    ...(p.manage?.length ? [textCol(p.manage.map((l) => `${l.label}: ${l.text}`).join(" | "))] : []),
   ];
   const csv = `${header.join(",")}\n${cells.map(csvCell).join(",")}`;
   return { text, csv, rows };

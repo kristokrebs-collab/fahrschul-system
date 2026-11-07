@@ -416,7 +416,7 @@ describe("backup → restore in a fresh profile", () => {
     expect(journal.trades[0]!.screenshots![1]).toMatchObject({ id: "old", sha256: nodeHex(fakePng(20_000, 800, 400, 33)) });
     expect(journal.trades[0]!.screenshots![1]!.original).toBeUndefined();
     const res = await bz.restoreShotsFromZip(opened);
-    expect(res).toEqual({ written: 3, corrupt: [], notSaved: 0 });
+    expect(res).toEqual({ written: 3, corrupt: [], notSaved: 0, rejected: [], kept: [], alreadyThere: 0 });
     expect(bz.restoreSummary(res)).toMatchObject({ kind: "success", title: "Bilder wiederhergestellt" });
     for (const t of journal.trades.slice(0, 2)) for (const ref of t.screenshots!) {
       if (ref.store !== "idb" || ref.key === "shot_gone") continue;

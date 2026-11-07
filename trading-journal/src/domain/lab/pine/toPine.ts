@@ -74,7 +74,13 @@ export const DEFAULT_PINE_ENGINE: PineEngine = { capital: 10_000, riskPct: 1, ma
 
 // ── small formatting helpers ──────────────────────────────────────────────────────────────────────────────────
 
-const q = (s: string): string => `"${s.replace(/"/g, "'").replace(/\\/g, "/")}"`;
+/**
+ * One line of text: every control character and Unicode line separator becomes a space. A line break in a name (a setup title
+ * from an imported file) would end a `//` comment or a string literal, and what follows would be read as Pine CODE in the
+ * script the trader pastes into TradingView.
+ */
+const oneLine = (s: string): string => s.replace(/[\p{Cc}\u2028\u2029]+/gu, " ");
+const q = (s: string): string => `"${oneLine(s).replace(/"/g, "'").replace(/\\/g, "/")}"`;
 const num = (p: LeafParams, k: string): number => Number(p[k]);
 const str = (p: LeafParams, k: string): string => String(p[k]);
 const fl = (v: number): string => (Number.isInteger(v) ? v.toFixed(1) : String(Math.round(v * 1e6) / 1e6));
@@ -552,12 +558,12 @@ export function toPine(config: CustomConfig, options: PineOptions = {}): PineRes
 
   const L: string[] = [];
   const add = (...s: string[]): void => void L.push(...s);
-  const name = (config.name || "Eigene Idee").replace(/"/g, "'");
+  const name = oneLine(config.name || "Eigene Idee").replace(/"/g, "'");
 
   add("//@version=6");
   add("// ════════════════════════════════════════════════════════════════════════════════");
-  add(`// Trading-Journal · Labor → Pine${options.stamp ? ` · ${options.stamp}` : ""}`);
-  add(`// Idee: ${name}${options.symbol ? ` · Markt im Labor: ${options.symbol}` : ""} · Ausführung ${TF_LABEL[config.interval]}`);
+  add(`// Trading-Journal · Labor → Pine${options.stamp ? ` · ${oneLine(options.stamp)}` : ""}`);
+  add(`// Idee: ${name}${options.symbol ? ` · Markt im Labor: ${oneLine(options.symbol)}` : ""} · Ausführung ${TF_LABEL[config.interval]}`);
   add("//");
   add("// So liest sich die Idee:");
   for (const side of sides) add(`//   ${side === "long" ? "Long" : "Short"} wenn ${nodeText(config[side])}.`);
@@ -776,7 +782,7 @@ export function toPine(config: CustomConfig, options: PineOptions = {}): PineRes
 
   return {
     code: `${L.join("\n")}\n`,
-    fileName: `Eigene-Idee_${slug(config.name)}${options.symbol ? `_${options.symbol}` : ""}.pine`,
+    fileName: `Eigene-Idee_${slug(config.name)}${options.symbol ? `_${options.symbol.replace(/[^A-Za-z0-9]+/g, "")}` : ""}.pine`,
     gaps,
     notes,
     translated: leaves.length - gaps.length,
