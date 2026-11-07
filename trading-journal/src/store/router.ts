@@ -1,3 +1,4 @@
+import { loadChunk } from "@/lib/chunkLoad";
 import { create } from "zustand";
 import type { TradeFilter } from "@/domain/types";
 import { parseShareHash, SHARE_ROUTE } from "@/social/links";
@@ -284,7 +285,8 @@ export function ensureSeam(page: Page): Promise<QuerySeam | null> {
   if (!load) return Promise.resolve(null);
   let p = seamLoads[page];
   if (!p) {
-    p = load()
+    // `loadChunk`: offline the seam waits for `online` instead of firing a request that fails – a failed module fetch stays failed for the page's own chunk too
+    p = loadChunk(load)
       .then((seam) => {
         seams[page] = seam;
         const q = pendingQuery[page];
