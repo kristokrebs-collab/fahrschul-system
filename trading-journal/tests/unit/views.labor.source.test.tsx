@@ -148,7 +148,8 @@ describe("Labor: Quelle der Kerzen", () => {
       fireEvent.click(retry);
     });
     await waitFor(() => expect(screen.getByTestId("labor-run")).toHaveAttribute("data-status", "done"), { timeout: 30_000 });
-    expect(screen.queryByTestId("labor-retry")).toBeNull();
+    // the status flips before the retry button unmounts (one render later) – wait for it instead of reading it in the same tick
+    await waitFor(() => expect(screen.queryByTestId("labor-retry")).toBeNull());
     expect(screen.getByTestId("labor-stand")).toHaveTextContent("Quelle: Binance USDⓈ-M");
   }, 60_000);
 
