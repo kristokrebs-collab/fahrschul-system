@@ -70,6 +70,7 @@ export const EDITOR = {
   pricePlaceholder: "z. B. 80.000",
   priceHelp: "Komma oder Punkt. Erkannt als:",
   priceBad: "Bitte einen Preis über 0 eingeben.",
+  takePrice: (p: string) => `Aktuellen Preis übernehmen (${p})`,
   symbol: "Markt",
   tf: "Zeiteinheit",
   tfHelp: "Nur Zeiteinheiten, die der Markt-Feed wirklich liefert. Eine andere wird nie still eingesetzt.",

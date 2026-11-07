@@ -22,6 +22,10 @@ export const EX = {
   otherVenues: "Binance, Bybit, OKX & Co., Wallets und DEX: per CSV-Export.",
   upgradeLine: "Der automatische Börsen-Sync ist ab Pro dabei.",
   upgrade: "Pro freischalten",
+  /** Free: one read-only connection, synced by hand; the automatic sync belongs to Pro (tariff contract A1) */
+  manualLine: "In Free gleichst du diese Börse von Hand ab (Knopf „Jetzt synchronisieren“). Der automatische Abgleich im Hintergrund ist ab Pro dabei.",
+  manualFact: { k: "auto", title: "Von Hand", text: "Ein Knopfdruck holt die neuen Trades. Automatisch ab Pro." },
+  autoLocked: "ab Pro",
   loading: "Lade Verbindung …",
   syncNow: "Jetzt synchronisieren",
   syncing: "Synchronisiert …",

@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import { FEATURE_GROUPS, FEATURE_REGISTRY, PLAN_TIERS, featureById, tierOf, type FeatureAction } from "@/app/features";
 import { PAGE_LABELS } from "@/app/navGroups";
 import { LAZY_PAGES, isLazyPage } from "@/app/pages";
-import { FEATURES } from "@/billing/types";
+import { FEATURES, LIMIT_KEYS } from "@/billing/types";
 import { PAGES } from "@/store/uiStore";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -82,6 +82,7 @@ describe("function register", () => {
       expect(groups.has(f.group), `${f.id}: group ${f.group}`).toBe(true);
       if (f.action) expect(ACTIONS, `${f.id}: action ${f.action}`).toContain(f.action);
       if (f.gate) expect(FEATURES as readonly string[], `${f.id}: gate ${f.gate}`).toContain(f.gate);
+      if (f.limit) expect(LIMIT_KEYS as readonly string[], `${f.id}: limit ${f.limit}`).toContain(f.limit);
     }
     // the new page is a lazy chunk of its own
     expect(LAZY_PAGES).toContain("funktionen");

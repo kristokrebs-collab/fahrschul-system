@@ -9,7 +9,7 @@
  * reports the real Stripe prices (`/api/v1/billing/status` → `config.prices`), which then win – the page never shows a
  * price that Stripe would not charge. The Stripe price ids live in the server env (`STRIPE_PRICE_<PLAN>_<MONTHLY|YEARLY>`).
  */
-import { FEATURES, LIMIT_KEYS, PLAN_IDS, type BillingInterval, type Feature, type LimitKey, type PlanId } from "./types";
+import { FEATURES, GOAL_IDS, LIMIT_KEYS, PLAN_IDS, type BillingInterval, type Feature, type GoalId, type LimitKey, type PlanId } from "./types";
 
 export const PAID_PLANS = ["pro", "premium", "team"] as const;
 export type PaidPlanId = (typeof PAID_PLANS)[number];
@@ -21,40 +21,58 @@ export const PLAN_RANK: Readonly<Record<PlanId, number>> = { free: 0, pro: 1, pr
 
 /* ------------------------------------------------------------------ features */
 
-export type FeatureGroup = "sync" | "analyse" | "coach" | "tools" | "team";
+/**
+ * The goals of a trader, in the order of the day. The tiles of the page "Funktionen" (`src/app/features.ts`
+ * `FEATURE_GROUPS`) and the groups of the price comparison read THIS list, so a goal has one name everywhere.
+ */
+export const GOAL_NAME: Readonly<Record<GoalId, string>> = {
+  heute: "Heute vorbereiten",
+  pruefen: "Trade prüfen & Chart",
+  aktien: "Aktien beobachten & bewerten",
+  planen: "Trade planen",
+  risiko: "Risiko & Disziplin",
+  testen: "Strategie entwickeln & testen",
+  lernen: "Aus Fehlern lernen",
+  auswerten: "Auswerten & Berichte",
+  wachsen: "Üben & Wachsen",
+  daten: "Trades eintragen & Daten",
+  community: "Community & Teilen",
+  konto: "Konto, Einstellungen & Hilfe",
+};
 
 export interface FeatureInfo {
   /** Short German name (pricing table row, upgrade sheet title). */
   label: string;
   /** One sentence: what it does for the trader. */
   pitch: string;
-  group: FeatureGroup;
+  /** The goal it serves – the comparison on the pricing page is grouped by it. */
+  goal: GoalId;
 }
 
 export const FEATURE_INFO: Readonly<Record<Feature, FeatureInfo>> = {
-  cloudSync: { label: "Cloud-Sync", pitch: "Dein Journal auf allen Geräten – offline zuerst, lokal immer dabei.", group: "sync" },
-  csvImport: { label: "CSV-Import", pitch: "Bestehende Trades aus Tabellen und Börsen-Exporten übernehmen.", group: "sync" },
+  cloudSync: { label: "Cloud-Sync", pitch: "Dein Journal auf allen Geräten – offline zuerst, lokal immer dabei.", goal: "daten" },
+  csvImport: { label: "CSV-Import", pitch: "Bestehende Trades aus Tabellen und Börsen-Exporten übernehmen.", goal: "daten" },
   // honest scope (review F10): the API sync speaks Bitunix; every other venue comes in through its CSV export
-  exchangeSync: { label: "Börsen-Sync", pitch: "Trades kommen automatisch von Bitunix – andere Börsen per CSV-Export.", group: "sync" },
-  screenshotsCloud: { label: "Screenshots in der Cloud", pitch: "Chart-Screenshots sicher gespeichert und auf jedem Gerät da.", group: "sync" },
-  apiAccess: { label: "API & Webhooks", pitch: "TradingView-Alerts und eigene Tools direkt anbinden.", group: "sync" },
-  analyticsPro: { label: "Profi-Statistik", pitch: "Sharpe, Sortino und Breakdowns mit ehrlicher Unsicherheit.", group: "analyse" },
-  monteCarlo: { label: "Monte Carlo & Ruin-Risiko", pitch: "Wie robust ist dein Edge über tausend mögliche Verläufe?", group: "analyse" },
-  riskLive: { label: "Live-Risiko", pitch: "Limits, Exposure und Szenarien in Echtzeit im Blick.", group: "analyse" },
-  replay: { label: "Trade-Replay", pitch: "Jeden Trade Kerze für Kerze nachspielen.", group: "analyse" },
-  boxScanner: { label: "Box-Scanner", pitch: "Viele Märkte gleichzeitig auf Ausbrüche prüfen – mit Alarm.", group: "analyse" },
-  coach: { label: "Coach", pitch: "Erkennt Revenge-Trades, Overtrading und deine teuersten Muster.", group: "coach" },
-  coachAi: { label: "KI-Coach", pitch: "Formuliert deine Wochenanalyse in klaren, persönlichen Worten.", group: "coach" },
-  reports: { label: "Berichte", pitch: "Wochen- und Monatsberichte auf Knopfdruck.", group: "coach" },
-  reportsPdf: { label: "PDF-Export", pitch: "Berichte als PDF – für dich, dein Archiv oder deinen Mentor.", group: "coach" },
-  growth: { label: "Ziele & Gewohnheiten", pitch: "Challenges, Streaks und Routinen, die dich dranbleiben lassen.", group: "coach" },
-  backtestLab: { label: "Backtest-Labor", pitch: "Strategien gegen Historie testen – Walk-Forward inklusive.", group: "tools" },
-  customDashboards: { label: "Eigene Dashboards", pitch: "Cockpit-Layouts genau für deinen Workflow.", group: "tools" },
-  shotExtract: { label: "Screenshot-Import", pitch: "Liest Einstieg, Ausstieg, Stop und Ergebnis aus Börsen-Screenshots – du prüfst nur die unsicheren Werte.", group: "tools" },
+  exchangeSync: { label: "Automatischer Börsen-Sync", pitch: "Trades kommen von allein von Bitunix – eine Börse lässt sich schon in Free von Hand abgleichen, andere per CSV-Export.", goal: "daten" },
+  screenshotsCloud: { label: "Screenshots in der Cloud", pitch: "Chart-Screenshots sicher gespeichert und auf jedem Gerät da.", goal: "daten" },
+  apiAccess: { label: "API & Webhooks", pitch: "TradingView-Alerts und eigene Tools direkt anbinden.", goal: "daten" },
+  analyticsPro: { label: "Profi-Statistik", pitch: "Sharpe, Sortino und Breakdowns mit ehrlicher Unsicherheit.", goal: "auswerten" },
+  monteCarlo: { label: "Monte Carlo & Ruin-Risiko", pitch: "Wie robust ist dein Edge über tausend mögliche Verläufe?", goal: "risiko" },
+  riskLive: { label: "Live-Risiko", pitch: "Limits, Exposure und Szenarien in Echtzeit im Blick.", goal: "risiko" },
+  replay: { label: "Trade-Replay", pitch: "Jeden Trade Kerze für Kerze nachspielen.", goal: "lernen" },
+  boxScanner: { label: "Box-Scanner", pitch: "Viele Märkte gleichzeitig auf Ausbrüche prüfen – mit Alarm.", goal: "pruefen" },
+  coach: { label: "Coach", pitch: "Erkennt Revenge-Trades, Overtrading und deine teuersten Muster.", goal: "lernen" },
+  coachAi: { label: "KI-Coach", pitch: "Formuliert deine Wochenanalyse in klaren, persönlichen Worten.", goal: "lernen" },
+  reports: { label: "Berichte", pitch: "Wochen- und Monatsberichte auf Knopfdruck.", goal: "auswerten" },
+  reportsPdf: { label: "PDF-Export", pitch: "Berichte als PDF – für dich, dein Archiv oder deinen Mentor.", goal: "auswerten" },
+  growth: { label: "Ziele & Gewohnheiten", pitch: "Challenges, Streaks und Routinen, die dich dranbleiben lassen.", goal: "wachsen" },
+  backtestLab: { label: "Backtest-Labor", pitch: "Strategien gegen Historie testen – Walk-Forward inklusive.", goal: "testen" },
+  customDashboards: { label: "Eigene Dashboards", pitch: "Cockpit-Layouts genau für deinen Workflow.", goal: "konto" },
+  shotExtract: { label: "Screenshot-Import", pitch: "Liest Einstieg, Ausstieg, Stop und Ergebnis aus Börsen-Screenshots – du prüfst nur die unsicheren Werte.", goal: "daten" },
   // honest scope: reported numbers of US filers from SEC filings (no consensus, no price data), a DCF range and a thesis with refutation criteria
-  stockAnalysis: { label: "Aktien-Analyse", pitch: "Quartalszahlen aus den SEC-Berichten, DCF-Spanne und überwachte Kaufthese – ohne Konsens, ohne Kursdaten.", group: "analyse" },
-  community: { label: "Community", pitch: "Gruppen und Ranglisten – anonym und nur mit Zustimmung.", group: "team" },
-  mentor: { label: "Mentor-Modus", pitch: "Trades gezielt mit Mentor oder Schülern teilen.", group: "team" },
+  stockAnalysis: { label: "Aktien-Analyse", pitch: "Quartalszahlen aus den SEC-Berichten, DCF-Spanne und überwachte Kaufthese – ohne Konsens, ohne Kursdaten.", goal: "aktien" },
+  community: { label: "Community", pitch: "Gruppen und Ranglisten – anonym und nur mit Zustimmung.", goal: "community" },
+  mentor: { label: "Mentor-Modus", pitch: "Trades gezielt mit Mentor oder Schülern teilen.", goal: "community" },
 };
 
 const FREE_FEATURES: readonly Feature[] = ["cloudSync", "csvImport", "community"];
@@ -82,23 +100,115 @@ export const PLAN_FEATURES: Readonly<Record<PlanId, ReadonlySet<Feature>>> = {
   team: new Set(FEATURES),
 };
 
-/** Numeric limits per plan (`Infinity` = unlimited; owner-editable). Team limits are per seat. */
+/**
+ * Numeric limits per plan (`Infinity` = unlimited; owner-editable). Team limits are per seat.
+ *
+ * Tariff contract A1 (`docs/TARIFE.md`): the values marked "Vorschlag" there are proposals the operator releases (E8); this
+ * table is the ONE place they are read from – the price page, the account page, the server (`requireLimit`) and the cron.
+ * Free: one read-only exchange connection with manual sync and one TradingView connection (the operator's decision).
+ */
 export const PLAN_LIMITS: Readonly<Record<PlanId, Readonly<Record<LimitKey, number>>>> = {
-  free: { exchangeConnections: 0, screenshotStorageMb: 0, savedViews: 3, dashboards: 1, groups: 1, coachAiPerDay: 0, shotExtractPerDay: 0 },
-  pro: { exchangeConnections: 1, screenshotStorageMb: 2048, savedViews: 25, dashboards: 3, groups: 3, coachAiPerDay: 0, shotExtractPerDay: 0 },
-  premium: { exchangeConnections: 5, screenshotStorageMb: 20480, savedViews: Infinity, dashboards: Infinity, groups: 10, coachAiPerDay: 50, shotExtractPerDay: 30 },
-  team: { exchangeConnections: 5, screenshotStorageMb: 20480, savedViews: Infinity, dashboards: Infinity, groups: Infinity, coachAiPerDay: 50, shotExtractPerDay: 30 },
+  free: {
+    exchangeConnections: 1,
+    backgroundSyncConnections: 0,
+    tvConnections: 1,
+    alertChannels: 1,
+    phoneCallsPerMonth: 0,
+    screenshotStorageMb: 0,
+    shotExtractPerDay: 0,
+    coachAiPerDay: 0,
+    simulationsPerDay: 20,
+    savedViews: 3,
+    dashboards: 1,
+    groups: 1,
+  },
+  pro: {
+    exchangeConnections: 1,
+    backgroundSyncConnections: 1,
+    tvConnections: 1,
+    alertChannels: 2,
+    phoneCallsPerMonth: 0,
+    screenshotStorageMb: 2048,
+    shotExtractPerDay: 0,
+    coachAiPerDay: 0,
+    simulationsPerDay: 200,
+    savedViews: 25,
+    dashboards: 3,
+    groups: 3,
+  },
+  premium: {
+    exchangeConnections: 5,
+    backgroundSyncConnections: 5,
+    tvConnections: 5,
+    alertChannels: 3,
+    phoneCallsPerMonth: 30,
+    screenshotStorageMb: 20480,
+    shotExtractPerDay: 20,
+    coachAiPerDay: 50,
+    simulationsPerDay: Infinity,
+    savedViews: Infinity,
+    dashboards: Infinity,
+    groups: 10,
+  },
+  team: {
+    exchangeConnections: 5,
+    backgroundSyncConnections: 5,
+    tvConnections: 5,
+    alertChannels: 3,
+    phoneCallsPerMonth: 60,
+    screenshotStorageMb: 20480,
+    shotExtractPerDay: 20,
+    coachAiPerDay: 50,
+    simulationsPerDay: Infinity,
+    savedViews: Infinity,
+    dashboards: Infinity,
+    groups: Infinity,
+  },
 };
 
-export const LIMIT_INFO: Readonly<Record<LimitKey, { label: string; unit?: string }>> = {
-  exchangeConnections: { label: "Börsen-Verbindungen" },
-  screenshotStorageMb: { label: "Screenshot-Speicher", unit: "MB" },
-  savedViews: { label: "Gespeicherte Ansichten" },
-  dashboards: { label: "Dashboards" },
-  groups: { label: "Gruppen" },
-  coachAiPerDay: { label: "KI-Coach pro Tag" },
-  shotExtractPerDay: { label: "Screenshot-Import pro Tag" },
+export interface LimitDetail {
+  label: string;
+  unit?: string;
+  /**
+   * `live` = the function exists and the limit is read where it is used (shown on the price page and in the account).
+   * `geplant` = defined in the contract, but the function behind it is not built yet (a later package): NOT shown anywhere
+   * a customer could read it as a promise – flip to `live` together with the package that enforces it.
+   */
+  state: "live" | "geplant";
+  /** Where it is enforced (the tariff document says it honestly): the package or the file. */
+  enforcedBy: string;
+}
+
+export const LIMIT_INFO: Readonly<Record<LimitKey, LimitDetail>> = {
+  exchangeConnections: { label: "Börsen-Verbindungen", state: "live", enforcedBy: "Server: exchange-connect (requireLimit)" },
+  backgroundSyncConnections: { label: "Automatischer Abgleich im Hintergrund", state: "live", enforcedBy: "Server: exchange-sync-cron (Tarif-Prüfung je Verbindung)" },
+  tvConnections: { label: "TradingView-Verbindungen", state: "geplant", enforcedBy: "Paket B3 (TradingView-Verbindung)" },
+  alertChannels: { label: "Alarm-Kanäle", state: "geplant", enforcedBy: "Paket C2 (vier Alarme und Zustellung)" },
+  phoneCallsPerMonth: { label: "Telefon-Anrufe pro Monat", state: "geplant", enforcedBy: "Paket C2 (Telefonie)" },
+  screenshotStorageMb: { label: "Screenshot-Speicher", unit: "MB", state: "live", enforcedBy: "Datenbank: Speicher-Richtlinien des Buckets screenshots" },
+  shotExtractPerDay: { label: "Screenshot-Import pro Tag", state: "live", enforcedBy: "Server: shot-extract (Tageszähler)" },
+  coachAiPerDay: { label: "KI-Coach pro Tag", state: "live", enforcedBy: "Server: coach-ask, assistant-route, strategy-compile (Tageszähler)" },
+  simulationsPerDay: { label: "Simulationen pro Tag", state: "geplant", enforcedBy: "Paket A3 (Zeitmaschine persistent)" },
+  savedViews: { label: "Gespeicherte Ansichten", state: "live", enforcedBy: "Browser: Ansichtenleiste (useLimit)" },
+  dashboards: { label: "Dashboards", state: "live", enforcedBy: "Browser: Cockpit (useLimit)" },
+  groups: { label: "Gruppen", state: "live", enforcedBy: "Server: social-groups (requireLimit)" },
 };
+
+/** The order the limits are listed in (price page, account, document). */
+export const LIMIT_ORDER: readonly LimitKey[] = [
+  "exchangeConnections",
+  "backgroundSyncConnections",
+  "tvConnections",
+  "alertChannels",
+  "phoneCallsPerMonth",
+  "screenshotStorageMb",
+  "shotExtractPerDay",
+  "coachAiPerDay",
+  "simulationsPerDay",
+  "savedViews",
+  "dashboards",
+  "groups",
+];
 
 /* ------------------------------------------------------------------ catalog */
 
@@ -127,7 +237,7 @@ export const PLAN_CATALOG: Readonly<Record<PlanId, PlanCatalogEntry>> = {
     id: "free",
     name: "Free",
     tagline: "Für den Start – dein Journal, deine Daten.",
-    highlights: ["Journal, Übersicht & Kalender", "Cloud-Sync auf allen Geräten", "CSV-Import", "Local-first: alles bleibt bei dir"],
+    highlights: ["Journal, Übersicht & Kalender", "Cloud-Sync auf allen Geräten", "CSV-Import und 1 Börse lesend (von Hand)", "Local-first: alles bleibt bei dir"],
     glyph: "FREE",
   },
   pro: {
@@ -177,7 +287,8 @@ export interface Offer {
 // `Offer.coachAi` = "the server has an AI key" (`ANTHROPIC_API_KEY`): the screenshot import (vision) needs the same key.
 const NEEDS_AI_KEY: readonly (Feature | LimitKey)[] = ["coachAi", "coachAiPerDay", "shotExtract", "shotExtractPerDay"];
 export const featureOffered = (f: Feature, o: Offer): boolean => !NEEDS_AI_KEY.includes(f) || o.coachAi;
-export const limitOffered = (k: LimitKey, o: Offer): boolean => !NEEDS_AI_KEY.includes(k) || o.coachAi;
+/** A limit is offered when the function behind it exists (`LIMIT_INFO[k].state`) and the server can deliver it (AI key). */
+export const limitOffered = (k: LimitKey, o: Offer): boolean => LIMIT_INFO[k].state === "live" && (!NEEDS_AI_KEY.includes(k) || o.coachAi);
 
 /** The plan's highlights as they can honestly be sold right now. */
 export function highlightsFor(plan: PlanId, o: Offer): string[] {
@@ -229,6 +340,22 @@ export function upgradePlanForLimit(key: LimitKey, current: PlanId, used: number
   return "premium";
 }
 
+/**
+ * Automatic sync in the background (the cron): the plan has the feature `exchangeSync` AND a quota for it. Free syncs its
+ * one read-only connection by hand only. The server cron, `exchangePlanState` and the account card read THIS.
+ */
+export function autoSyncAllowed(plan: PlanId): boolean {
+  return planIncludes(plan, "exchangeSync") && limitOf(plan, "backgroundSyncConnections") > 0;
+}
+
+/**
+ * Manual use of a read-only exchange connection (connect, sync by hand, open positions, import): the plan has a quota for
+ * connections (Free: 1). Replaces the old rule "needs the feature `exchangeSync`", which left Free without any connection.
+ */
+export function exchangeAccessAllowed(plan: PlanId): boolean {
+  return limitOf(plan, "exchangeConnections") > 0;
+}
+
 /** Highest-ranked plan of a list (`free` for none). */
 export function bestPlan(plans: readonly PlanId[]): PlanId {
   return plans.reduce<PlanId>((best, p) => (PLAN_RANK[p] > PLAN_RANK[best] ? p : best), "free");
@@ -259,27 +386,43 @@ export function discounted(amountCents: number, coupon: { percentOff?: number | 
   return Math.max(0, out);
 }
 
-/** Comparison table rows (feature rows grouped; limits as extra rows). */
-export const COMPARISON_GROUPS: readonly { group: FeatureGroup; label: string }[] = [
-  { group: "sync", label: "Daten & Sync" },
-  { group: "analyse", label: "Analyse" },
-  { group: "coach", label: "Coach & Wachstum" },
-  { group: "tools", label: "Werkzeuge" },
-  { group: "team", label: "Gemeinsam" },
-];
+/** Comparison table groups: the goals of a trader (the same names as the tiles of the page "Funktionen"), in the order of the day. */
+export const COMPARISON_GOALS: readonly { goal: GoalId; label: string }[] = GOAL_IDS.map((goal) => ({ goal, label: GOAL_NAME[goal] }));
 
-/** Contract check (tests): every feature has info, every limit key a value, `team` has everything. */
+/** The features of one goal, in the order of `FEATURES`. */
+export const featuresOfGoal = (goal: GoalId): Feature[] => FEATURES.filter((f) => FEATURE_INFO[f].goal === goal);
+
+/**
+ * The cheapest plan from which `key` is more than nothing (limit > 0), `null` when no plan has it.
+ * Used by the tariff document and the "next step" line of a function whose quota is 0 in the user's plan.
+ */
+export function minPlanForLimit(key: LimitKey): PlanId | null {
+  for (const p of PLAN_IDS) if (PLAN_LIMITS[p][key] > 0) return p;
+  return null;
+}
+
+/** Contract check (tests): every feature has info, every limit key a value, `team` has everything, the limits fit the features. */
 export function catalogProblems(): string[] {
   const out: string[] = [];
   for (const f of FEATURES) {
     if (!FEATURE_INFO[f]) out.push(`feature ${f} has no info`);
+    else if (!(GOAL_IDS as readonly string[]).includes(FEATURE_INFO[f].goal)) out.push(`feature ${f} has an unknown goal`);
     if (!PLAN_FEATURES.team.has(f)) out.push(`team misses ${f}`);
   }
   for (const p of PLAN_IDS) for (const k of LIMIT_KEYS) if (typeof PLAN_LIMITS[p][k] !== "number") out.push(`${p} misses limit ${k}`);
+  for (const k of LIMIT_KEYS) if (!LIMIT_INFO[k]) out.push(`limit ${k} has no info`);
+  if (LIMIT_ORDER.length !== LIMIT_KEYS.length || LIMIT_KEYS.some((k) => !LIMIT_ORDER.includes(k))) out.push("LIMIT_ORDER is not the list of limit keys");
   for (let i = 1; i < PLAN_IDS.length; i++) {
     const lower = PLAN_IDS[i - 1]!;
     const higher = PLAN_IDS[i]!;
     for (const f of PLAN_FEATURES[lower]) if (!PLAN_FEATURES[higher].has(f)) out.push(`${higher} drops ${f} of ${lower}`);
+    // a higher plan never gets less of anything (team limits are per seat and equal Premium's or more)
+    for (const k of LIMIT_KEYS) if (PLAN_LIMITS[higher][k] < PLAN_LIMITS[lower][k]) out.push(`${higher} has a smaller limit ${k} than ${lower}`);
+  }
+  // the automatic background sync is the feature `exchangeSync` – the limit says how many connections it may serve
+  for (const p of PLAN_IDS) {
+    if (PLAN_FEATURES[p].has("exchangeSync") !== PLAN_LIMITS[p].backgroundSyncConnections > 0) out.push(`${p}: exchangeSync and backgroundSyncConnections disagree`);
+    if (PLAN_LIMITS[p].backgroundSyncConnections > PLAN_LIMITS[p].exchangeConnections) out.push(`${p}: more background syncs than connections`);
   }
   return out;
 }

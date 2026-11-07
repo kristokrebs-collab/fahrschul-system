@@ -15,6 +15,8 @@ export interface FieldProps {
   error?: ReactNode;
   /** Unit suffix inside the control (`USDT`, `x`, `%`). */
   suffix?: ReactNode;
+  /** A field the form cannot be saved without: a small "Pflicht" after the label (and "Pflichtfeld" for a screen reader). Optional fields stay unmarked. */
+  required?: boolean;
   /**
    * Shake + invalid-border pulse trigger: every time this changes to a new non-empty value (e.g. a submit counter
    * or `Date.now()` of the failed save) the field shakes once. Never fires on mount.
@@ -29,7 +31,7 @@ export interface FieldProps {
  * that newly appears (no `invalidKey` given) shakes the field once too. `[data-rich]` pages: the label lights up while the
  * field has focus and turns loss-red while the control is `aria-invalid` (`controls.css`).
  */
-export function Field({ label, htmlFor, children, help, error, suffix, invalidKey, className }: FieldProps) {
+export function Field({ label, htmlFor, children, help, error, suffix, required, invalidKey, className }: FieldProps) {
   const reduced = useReducedFx();
   const root = useRef<HTMLDivElement>(null);
   const seenKey = useRef(invalidKey);
@@ -54,6 +56,14 @@ export function Field({ label, htmlFor, children, help, error, suffix, invalidKe
     <div ref={root} data-field="" className={cn("grid min-w-0 content-start gap-1.5", className)}>
       <label htmlFor={htmlFor} className="label">
         {label}
+        {required && (
+          <>
+            <span className="sr-only"> (Pflichtfeld)</span>
+            <span aria-hidden="true" data-testid="field-required" className="ml-1.5 font-mono text-[9.5px] font-medium normal-case tracking-[0.08em] text-mute">
+              Pflicht
+            </span>
+          </>
+        )}
       </label>
       {suffix ? (
         <div className="relative">

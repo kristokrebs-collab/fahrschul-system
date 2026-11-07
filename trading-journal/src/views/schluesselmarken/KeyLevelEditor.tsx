@@ -7,6 +7,7 @@ import { useId, useMemo, useState, type FormEvent } from "react";
 import { KEY_TIMEFRAMES, PLAN_ROLES, STAGE_LABEL, TRIGGER_KINDS, type KeyLevel, type KeyTf, type TfAvailability } from "@/domain/keylevels";
 import { price as fmtPrice } from "@/lib/format";
 import { newId } from "@/lib/ids";
+import { toInputString } from "@/lib/parse";
 import { MorphSelect } from "@/motion/pulse/MorphSelect";
 import { Switch } from "@/motion/Switch";
 import { Button } from "@/primitives/Button";
@@ -40,7 +41,11 @@ export function KeyLevelEditor({ level, symbol, tf, price, onSave, onCancel, cla
   const [f, setF] = useState<EditorForm>(() => (level ? formFromLevel(level) : emptyForm()));
   const [errors, setErrors] = useState<EditorErrors>({});
   const [shake, setShake] = useState(0);
-  const set = <K extends keyof EditorForm>(k: K, v: EditorForm[K]) => setF((cur) => ({ ...cur, [k]: v }));
+  // a field's error goes away as soon as it is edited (it said what was wrong with the OLD value)
+  const set = <K extends keyof EditorForm>(k: K, v: EditorForm[K]) => {
+    setF((cur) => ({ ...cur, [k]: v }));
+    setErrors((cur) => (cur[k as keyof EditorErrors] ? { ...cur, [k]: undefined } : cur));
+  };
   const available = useMemo(() => new Set<KeyTf>(tf.filter((t) => t.ok).map((t) => t.tf)), [tf]);
   const blocked = tf.filter((t) => !t.ok);
   const parsed = parsePriceInput(f.price, price);
@@ -76,11 +81,22 @@ export function KeyLevelEditor({ level, symbol, tf, price, onSave, onCancel, cla
         <Field
           label={E.price}
           htmlFor={id("price")}
+          required
           invalidKey={errors.price ? shake : null}
           error={errors.price}
           help={parsed != null && parsed > 0 ? `${E.priceHelp} ${fmtPrice(parsed)}` : undefined}
         >
           <Input id={id("price")} numeric value={f.price} placeholder={price ? new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(price) : E.pricePlaceholder} invalid={!!errors.price} aria-describedby={errors.price ? `${id("price")}-error` : undefined} onChange={(e) => set("price", e.target.value)} autoComplete="off" />
+          {price != null && price > 0 && (
+            <button
+              type="button"
+              onClick={() => set("price", toInputString(price))}
+              data-testid="keylevel-use-price"
+              className="justify-self-start text-[12px] text-mute underline decoration-line-2 underline-offset-4 outline-none transition-colors hover:text-fg hover:decoration-fg focus-visible:outline-2 pointer-coarse:min-h-11"
+            >
+              {E.takePrice(fmtPrice(price))}
+            </button>
+          )}
         </Field>
 
         <div className={cn("grid gap-1.5", wide)}>

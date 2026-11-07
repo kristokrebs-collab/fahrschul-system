@@ -121,7 +121,8 @@ describe("modes + entitlements", () => {
     expect(result.current).toEqual({ mc: true, sync: true, ex: Infinity });
     act(() => useBilling.setState({ config: CONFIG }));
     rerender();
-    expect(result.current).toEqual({ mc: false, sync: true, ex: 0 });
+    // tariff contract A1: Free holds one read-only exchange connection (manual sync)
+    expect(result.current).toEqual({ mc: false, sync: true, ex: 1 });
   });
 
   it("signed in: the server's plan, kept per user across a reload (cache), never for another user", async () => {

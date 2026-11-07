@@ -3,7 +3,7 @@
  * `profiles.plan` / `plan_status` / `trial_end`, which only the Stripe webhook (service role) writes.
  * P10 adds the feature matrix (`src/billing/plans.ts`) and `requireFeature` / `requireLimit` on top (end of this file).
  */
-import { FEATURE_INFO, limitOf, PAID_PLANS, planIncludes, upgradePlanFor } from "../../../src/billing/plans";
+import { autoSyncAllowed, exchangeAccessAllowed, FEATURE_INFO, limitOf, PAID_PLANS, planIncludes, upgradePlanFor } from "../../../src/billing/plans";
 import { FREE_PLAN, grantsPlan, isPlanId, isPlanStatus, type Feature, type LimitKey, type PlanId, type PlanInfo } from "../../../src/billing/types";
 import { isMissingTable } from "./account";
 import { envOptional, type ServerEnvName } from "./env";
@@ -62,6 +62,24 @@ export async function requireFeature(userId: string, feature: Feature): Promise<
   const info = await planOf(userId);
   if (planIncludes(info.plan, feature) || !paymentsConfigured()) return info;
   throw new HttpError(402, "plan_required", `${FEATURE_INFO[feature].label} ist in deinem Tarif nicht enthalten.`, { feature, required: upgradePlanFor(feature), plan: info.plan });
+}
+
+/**
+ * Manual use of a read-only exchange connection (connect, sync by hand, open positions, import): the plan needs a
+ * connection quota (`exchangeAccessAllowed`; Free: 1). Not gated while payments are not set up. The AUTOMATIC sync is a
+ * different question (`autoSyncAllowed`, the cron) – both read `src/billing/plans.ts`, the browser too.
+ */
+export async function requireExchangeAccess(userId: string): Promise<PlanInfo> {
+  const info = await planOf(userId);
+  if (exchangeAccessAllowed(info.plan) || !paymentsConfigured()) return info;
+  throw new HttpError(402, "plan_required", "Börsen-Verbindungen sind in deinem Tarif nicht enthalten.", { feature: "exchangeSync", required: upgradePlanFor("exchangeSync"), plan: info.plan });
+}
+
+/** Throws 402 `plan_required` unless the plan syncs by itself in the background (Pro and up). Not gated while payments are not set up. */
+export async function requireAutoSync(userId: string): Promise<PlanInfo> {
+  const info = await planOf(userId);
+  if (autoSyncAllowed(info.plan) || !paymentsConfigured()) return info;
+  throw new HttpError(402, "plan_required", `${FEATURE_INFO.exchangeSync.label} ist in deinem Tarif nicht enthalten.`, { feature: "exchangeSync", required: upgradePlanFor("exchangeSync"), plan: info.plan });
 }
 
 /**

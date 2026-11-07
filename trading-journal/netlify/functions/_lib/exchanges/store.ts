@@ -188,6 +188,8 @@ export interface NewConnection {
   journalAccount: "makro" | "scalp";
   permissions: string[];
   id?: string;
+  /** the automatic sync starts on (default); a plan without it (Free) connects with the switch off */
+  syncEnabled?: boolean;
 }
 
 /** Encrypts and stores a new connection; the id is generated BEFORE encryption (it is part of the AAD). */
@@ -206,7 +208,7 @@ export async function insertConnection(c: NewConnection, ring: Keyring = keyring
     permissions: c.permissions,
     status: "active",
     journal_account: c.journalAccount,
-    sync_enabled: true,
+    sync_enabled: c.syncEnabled ?? true,
   };
   const { data, error } = await supabaseAdmin().from("exchange_connections").insert(row).select(CONNECTION_COLUMNS).single();
   if (error) {

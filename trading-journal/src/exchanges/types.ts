@@ -49,6 +49,8 @@ export interface SyncRun extends SyncCounts {
 export interface ExchangePlan {
   plan: string;
   entitled: boolean;
+  /** The plan syncs by itself in the background (Pro and up); absent on an older server = yes. */
+  autoSync?: boolean;
   /** Allowed connections, `null` = unlimited. */
   limit: number | null;
   gated: boolean;

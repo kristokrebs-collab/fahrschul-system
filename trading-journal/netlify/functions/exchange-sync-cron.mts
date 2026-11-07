@@ -15,7 +15,7 @@
  * (`keys.remaining`) says when the old key can be removed.
  */
 import type { Config } from "@netlify/functions";
-import { planIncludes } from "../../src/billing/plans";
+import { autoSyncAllowed } from "../../src/billing/plans";
 import { errorFrom, json } from "./_lib/http";
 import { paymentsConfigured, planOf } from "./_lib/plan";
 import { supabaseAdmin } from "./_lib/supabase";
@@ -111,7 +111,7 @@ export async function runExchangeCron(now = Date.now()): Promise<CronSummary> {
         await plan(meta, Date.parse(meta.last_sync_at) + CRON_MIN_GAP_MS, failures);
         continue;
       }
-      if (gated && !planIncludes((await planOf(meta.user_id)).plan, "exchangeSync")) {
+      if (gated && !autoSyncAllowed((await planOf(meta.user_id)).plan)) {
         summary.skipped++;
         await plan(meta, now + CRON_PLAN_RECHECK_MS, failures);
         continue;

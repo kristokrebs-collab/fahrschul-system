@@ -2,12 +2,12 @@
  * GET /api/v1/exchange/positions → `{ positions, errors, at }` (P11; consumer: P05 exposure / margin / liquidation via
  * `useExchangePositions()`). Open positions of every active connection, read-only, with the mark price from the
  * public tickers (fallback: derived from the unrealized P&L). One failing venue does not hide the others – it is listed
- * in `errors` with a German message. 120 calls per 10 min; plan feature `exchangeSync`.
+ * in `errors` with a German message. 120 calls per 10 min; plan: a connection quota (`requireExchangeAccess`, Free has one).
  */
 import type { Config } from "@netlify/functions";
 import { requireUser } from "./_lib/auth";
 import { handler, json, requireMethod } from "./_lib/http";
-import { requireFeature } from "./_lib/plan";
+import { requireExchangeAccess } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { mapOpenPosition, type LivePosition } from "./_lib/exchanges/mapping";
 import { adapterFor } from "./_lib/exchanges/registry";
@@ -18,7 +18,7 @@ export default handler(async (req) => {
   requireMethod(req, "GET");
   const user = await requireUser(req, { aal2: "ifEnrolled" });
   await enforceRateLimit(rateKey("exchange-positions", user.id), 120, 600);
-  await requireFeature(user.id, "exchangeSync");
+  await requireExchangeAccess(user.id);
   const positions: LivePosition[] = [];
   const errors: { connectionId: string; code: string; message: string }[] = [];
   for (const meta of await listConnections(user.id)) {

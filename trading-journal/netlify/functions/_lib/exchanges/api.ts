@@ -1,7 +1,7 @@
 /**
  * Shared pieces of the exchange functions (P11): availability check, plan state, error mapping, schedule info.
  */
-import { limitOf, planIncludes } from "../../../../src/billing/plans";
+import { autoSyncAllowed, exchangeAccessAllowed, limitOf } from "../../../../src/billing/plans";
 import { envBool } from "../env";
 import { HttpError } from "../http";
 import { paymentsConfigured, planOf } from "../plan";
@@ -29,8 +29,10 @@ export function exchangeHttpError(e: unknown): unknown {
 
 export interface ExchangePlanState {
   plan: string;
-  /** The plan includes the automatic sync (or payments are not set up yet – then nothing is gated). */
+  /** The plan has a connection quota (Free: 1) – or payments are not set up yet, then nothing is gated. */
   entitled: boolean;
+  /** The plan syncs by itself in the background (Pro and up; `autoSyncAllowed`). */
+  autoSync: boolean;
   /** Connections the plan allows (`null` = unlimited). */
   limit: number | null;
   gated: boolean;
@@ -40,7 +42,7 @@ export async function exchangePlanState(userId: string): Promise<ExchangePlanSta
   const info = await planOf(userId);
   const gated = paymentsConfigured();
   const limit = gated ? limitOf(info.plan, "exchangeConnections") : Infinity;
-  return { plan: info.plan, entitled: !gated || planIncludes(info.plan, "exchangeSync"), limit: Number.isFinite(limit) ? limit : null, gated };
+  return { plan: info.plan, entitled: !gated || exchangeAccessAllowed(info.plan), autoSync: !gated || autoSyncAllowed(info.plan), limit: Number.isFinite(limit) ? limit : null, gated };
 }
 
 export function cronEnabled(): boolean {

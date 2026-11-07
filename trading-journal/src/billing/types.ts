@@ -42,8 +42,28 @@ export const FEATURES = [
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
-/** Numeric limits per plan (`useLimit`); `Infinity` = unlimited. */
-export const LIMIT_KEYS = ["exchangeConnections", "screenshotStorageMb", "savedViews", "dashboards", "groups", "coachAiPerDay", "shotExtractPerDay"] as const;
+/** The goals a trader works towards (tiles of the page "Funktionen", groups of the price comparison) – ids are persisted nowhere, but stable. */
+export const GOAL_IDS = ["heute", "pruefen", "aktien", "planen", "risiko", "testen", "lernen", "auswerten", "wachsen", "daten", "community", "konto"] as const;
+export type GoalId = (typeof GOAL_IDS)[number];
+
+/**
+ * Numeric limits per plan (`useLimit`); `Infinity` = unlimited. The first seven are the original keys; the last six came
+ * with the tariff contract (`docs/TARIFE.md`, A1) – new keys are appended, never renamed.
+ */
+export const LIMIT_KEYS = [
+  "exchangeConnections", // read-only exchange connections (Free: 1, manual sync)
+  "screenshotStorageMb",
+  "savedViews",
+  "dashboards",
+  "groups",
+  "coachAiPerDay",
+  "shotExtractPerDay", // screenshot import (AI reading) per day
+  "backgroundSyncConnections", // connections that sync by themselves in the background (cron)
+  "tvConnections", // TradingView connections
+  "alertChannels", // alert channels (browser, e-mail, phone …)
+  "phoneCallsPerMonth", // phone alerts per month
+  "simulationsPerDay", // time machine / what-if / stress runs per day
+] as const;
 export type LimitKey = (typeof LIMIT_KEYS)[number];
 
 /** Effective plan of a user (server: `planOf(userId)`, client: `usePlan()`). */

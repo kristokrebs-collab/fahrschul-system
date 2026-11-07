@@ -10,7 +10,7 @@
 | plan cards | `PlanGrid.tsx` | dealt in (`CardSpread deal`), each in a `NotchedFrame` (art grey → colour on hover), prices on `RollingDigits` under a `TextPrism` lens, ONE `BorderBeam` lap on the recommended plan once in view, highlight ticks draw in; a valid code decodes the new price (`TextScramble`) with a green `ValueFlash`; team seat stepper |
 | promotion code | `CodeField.tsx` | server-checked preview; invalid → `Field` shake + reason; valid → terms decode in |
 | stats band | `StatsMarquee.tsx` | `Marquee` – true-by-construction facts + the visitor's own trade count, nothing invented |
-| comparison | `PlanComparison.tsx` | the full `plans.ts` matrix + limits; cells cascade from the recommended column (`HeatGridReveal`), ticks draw; a visually hidden real `<table>` for screen readers, the animated grid is `aria-hidden` |
+| comparison | `PlanComparison.tsx` | the full `plans.ts` matrix + quotas, **grouped by the goals of a trader** (same names as the tiles of the page „Funktionen“) and **foldable** (A1): the first group open, the others a frosted header row of fixed height each (no layout jump while closed), „Alle aufklappen“; cells of an opened group cascade from the recommended column (`HeatGridReveal`), ticks draw; one visually hidden real `<table>` with EVERY row for screen readers, the animated grid is `aria-hidden`. Quotas of functions that are not built yet (`LIMIT_INFO.state = "geplant"`) stay out. No purchase flow here (B4) |
 | FAQ | `PricingFaq.tsx` | rows cascade (`RevealGroup`), answers `Collapse`, `+` turns 45° |
 | legal line | `PreiseView.tsx` `LegalLine` | "Verträge hier kündigen" → `CancelSheet` (signed out: login first) |
 

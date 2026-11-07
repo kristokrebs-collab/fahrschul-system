@@ -8,13 +8,13 @@
  * POST /api/v1/exchange/sync[?dryRun=1] `{ connectionId?, tz?, from? }` → one incremental sync (≈ 8 s budget; `more`
  *      = call again to continue). `dryRun=1` reads and maps without writing and returns the preview + per-position checks.
  *
- * aal2 when 2FA is on; POST 30 per 10 min; plan feature `exchangeSync` (not gated while payments are not set up).
+ * aal2 when 2FA is on; POST 30 per 10 min; plan: a connection quota (`requireExchangeAccess`; not gated while payments are not set up).
  */
 import type { Config } from "@netlify/functions";
 import { z } from "zod";
 import { requireUser } from "./_lib/auth";
 import { handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
-import { requireFeature } from "./_lib/plan";
+import { requireExchangeAccess } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { clientTz, CRON_EVERY_MIN, cronEnabled, exchangePlanState, nextCronAt, SYNC_BUDGET_MS } from "./_lib/exchanges/api";
 import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
@@ -58,7 +58,7 @@ export default handler(async (req) => {
   await enforceRateLimit(rateKey("exchange-sync", user.id), 30, 600);
   const dryRun = url.searchParams.get("dryRun") === "1";
   const body = req.headers.get("content-type")?.startsWith("application/json") ? await readJson(req, Body, { maxBytes: 1024 }) : {};
-  await requireFeature(user.id, "exchangeSync");
+  await requireExchangeAccess(user.id);
 
   const rows = await listConnections(user.id);
   const meta = body.connectionId ? rows.find((r) => r.id === body.connectionId) : rows.find((r) => r.status !== "revoked");

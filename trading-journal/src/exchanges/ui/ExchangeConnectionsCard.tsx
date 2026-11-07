@@ -67,6 +67,7 @@ function ConnPill({ conn, status }: { conn: ExchangeConnection; status: Exchange
   const now = useTick(60_000);
   const outcome = useExchange((s) => s.outcome);
   if (conn.status === "invalid") return <StatusPill tone="error" expanded label={EX.pillInvalid} />;
+  if (status.plan.autoSync === false) return <StatusPill tone="muted" expanded label={EX.pillManual} />;
   if (!conn.syncEnabled) return <StatusPill tone="muted" expanded label={EX.pillPaused} />;
   if (!status.cron.enabled) return <StatusPill tone="warn" expanded label={EX.pillManual} />;
   const every = status.cron.everyMin;
@@ -206,6 +207,8 @@ function Bridge({ flowing = false }: { flowing?: boolean }) {
 
 function Hero({ status }: { status: ExchangeStatus }) {
   const entitled = status.plan.entitled;
+  // a plan with a connection but without the automatic sync (Free): the sync runs by hand, said plainly
+  const manual = entitled && status.plan.autoSync === false;
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-8" data-testid="exchange-hero">
       <div className="grid content-start gap-5">
@@ -215,11 +218,22 @@ function Hero({ status }: { status: ExchangeStatus }) {
           <p className="text-[13.5px] leading-relaxed text-mute">{EX.heroLead}</p>
         </div>
         {entitled ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="primary" onClick={() => openConnect()} data-testid="exchange-connect">
-              {EX.connect}
-            </Button>
-            <Button onClick={openCsvImport}>{EX.csv}</Button>
+          <div className="grid gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="primary" onClick={() => openConnect()} data-testid="exchange-connect">
+                {EX.connect}
+              </Button>
+              <Button onClick={openCsvImport}>{EX.csv}</Button>
+            </div>
+            {manual && (
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px] text-mute" data-testid="exchange-manual">
+                <Badge tone="steel">Free</Badge>
+                {EX.manualLine}
+                <Button variant="ghost" size="sm" onClick={() => openUpgrade("exchangeSync", "pro")}>
+                  {EX.upgrade}
+                </Button>
+              </span>
+            )}
           </div>
         ) : (
           <div className="grid gap-2.5 rounded-xl border border-line bg-ink-950/40 p-3">
@@ -239,7 +253,7 @@ function Hero({ status }: { status: ExchangeStatus }) {
         )}
         <p className="text-[11.5px] text-faint">{EX.otherVenues}</p>
       </div>
-      <FactList facts={EX.facts} vertical />
+      <FactList facts={manual ? EX.facts.map((f) => (f.k === "auto" ? EX.manualFact : f)) : EX.facts} vertical />
     </div>
   );
 }
@@ -275,6 +289,8 @@ function Connected({ conn, status }: { conn: ExchangeConnection; status: Exchang
   const importing = !!backfill && !backfill.done && backfill.connectionId === conn.id;
   const scanning = busy === "sync" || busy === "dry" || importing;
   const invalid = conn.status === "invalid";
+  // Free syncs by hand only: the automatic switch is off and says "ab Pro" (the server refuses it as well)
+  const noAuto = status.plan.autoSync === false;
 
   // one beam lap + confetti per outcome that brought new trades (adjusting state while rendering)
   const [seenKey, setSeenKey] = useState(mine?.key ?? 0);
@@ -430,9 +446,9 @@ function Connected({ conn, status }: { conn: ExchangeConnection; status: Exchang
           <label className="flex items-center justify-between gap-3 sm:justify-end">
             <span className="grid gap-0.5 sm:text-right">
               <span className="text-[13px] text-fg">{EX.autoSync}</span>
-              <span className="text-[11px] text-faint">{status.cron.enabled ? `alle ${status.cron.everyMin} Min` : "auf diesem Server aus"}</span>
+              <span className="text-[11px] text-faint">{noAuto ? EX.autoLocked : status.cron.enabled ? `alle ${status.cron.everyMin} Min` : "auf diesem Server aus"}</span>
             </span>
-            <Switch checked={conn.syncEnabled} onCheckedChange={(v) => void updateConnection(conn.id, { syncEnabled: v })} aria-label={EX.autoSync} />
+            <Switch checked={conn.syncEnabled && !noAuto} disabled={noAuto} onCheckedChange={(v) => void updateConnection(conn.id, { syncEnabled: v })} aria-label={EX.autoSync} />
           </label>
         </div>
 

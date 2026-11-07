@@ -159,6 +159,15 @@ function OwnForm({ tz, onDone }: { tz: string; onDone: () => void }) {
   const [importance, setImportance] = useState<Importance>("mittel");
   const [note, setNote] = useState("");
   const [err, setErr] = useState<{ title?: string; at?: string; save?: string }>({});
+  // a field's error goes away as soon as the field is edited (it said what was wrong with the OLD value)
+  const editTitle = (v: string): void => {
+    setTitle(v);
+    setErr((cur) => (cur.title ? { ...cur, title: undefined } : cur));
+  };
+  const editAt = (v: string): void => {
+    setAt(v);
+    setErr((cur) => (cur.at ? { ...cur, at: undefined } : cur));
+  };
   const submit = async (): Promise<void> => {
     const e: typeof err = {};
     if (!title.trim()) e.title = T.own.errTitle;
@@ -182,11 +191,11 @@ function OwnForm({ tz, onDone }: { tz: string; onDone: () => void }) {
     >
       <p className="text-[12px] leading-snug text-mute">{T.own.honest}</p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={T.own.title} htmlFor="own-title" error={err.title}>
-          <Input id="own-title" value={title} maxLength={80} placeholder={T.own.titlePh} onChange={(e) => setTitle(e.target.value)} autoComplete="off" invalid={!!err.title} aria-describedby={err.title ? "own-title-error" : undefined} />
+        <Field label={T.own.title} htmlFor="own-title" required error={err.title}>
+          <Input id="own-title" value={title} maxLength={80} placeholder={T.own.titlePh} onChange={(e) => editTitle(e.target.value)} autoComplete="off" invalid={!!err.title} aria-describedby={err.title ? "own-title-error" : undefined} />
         </Field>
-        <Field label={T.own.at} htmlFor="own-at" help={T.own.atHint} error={err.at}>
-          <Input id="own-at" type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} invalid={!!err.at} aria-describedby={err.at ? "own-at-error" : undefined} />
+        <Field label={T.own.at} htmlFor="own-at" required help={T.own.atHint} error={err.at}>
+          <Input id="own-at" type="datetime-local" value={at} onChange={(e) => editAt(e.target.value)} invalid={!!err.at} aria-describedby={err.at ? "own-at-error" : undefined} />
         </Field>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">

@@ -23,6 +23,7 @@ across reloads (also while a stored login is being restored); it is never applie
 |---|---|
 | `types.ts` | Wave-0 vocabulary (`PLAN_IDS`, `FEATURES`, `LIMIT_KEYS`, `PlanInfo`, `grantsPlan`) – pure, imported by the functions |
 | `plans.ts` | **owner-editable** catalog: feature matrix (`PLAN_FEATURES`), limits (`PLAN_LIMITS`), list prices (`LIST_PRICES`, cents), card copy (`PLAN_CATALOG`: tagline, the 4 strongest highlights, glyph, recommended), `FEATURE_INFO`; helpers `planIncludes`, `limitOf`, `upgradePlanFor`, `upgradePlanForLimit`, `featuresGained`, `yearlySavingsPct`, `discounted`, `catalogProblems` – pure, imported by the functions (`requireFeature`) |
+| `tariff.ts` | **A1 tariff contract per function** (`docs/TARIFE.md`): one row for each of F01–F74 – name, goal, `core` (feature needed at its heart, `null` = Free), `extras` (parts from higher plans), `limits` (quotas); `startPlanOf`, `fullPlanOf`, `accessOf`, `tariffByGoal`, `tariffSnapshot` – pure, imported by lazy pages and tests, not by the first load. `tests/unit/billing.tariff.test.ts` holds it against the register (`gate` / `limit`) and the server |
 | `contract.ts` | wire types of the functions (`BillingStatus`, `CheckoutRequest`, `PortalRequest`, `CodeLookup`, `ReferralInfo`, …) + validators (`normalizeRefCode`, `normalizePromoCode`, `safeReturnTo`) – pure, shared with the functions |
 | `entitlements.ts` | the Wave-0 contract, final: `useEntitlement(feature)`, `useLimit(key)`, `usePlan()`, `<Gate feature fallback>` |
 | `store.ts` | zustand store + flows: `loadBilling`, `startCheckout` (signed out → login sheet first, continued by the host), `openPortal(flow)`, `changeSubscription("cancel"|"resume"|"pause")`, `checkCode`, `verifyReferral`, `loadReferral`, `openUpgrade(feature?, plan?)`, `openCancel`; derived `useBillingMode`, `useEffectivePlan`, `useTrialDays` |
@@ -31,6 +32,14 @@ across reloads (also while a stored login is being restored); it is never applie
 | `format.ts` | German money / dates / status lines (`formatMoney`, `displayPrice` – Stripe's real price wins over the list price –, `nextLine`) |
 | `strings.ts` | German copy |
 | `ui/*` | components (below) |
+
+## Tariff contract (A1)
+
+Free: 1 read-only exchange connection with manual sync (`exchangeConnections: 1`, `backgroundSyncConnections: 0`), 1 TradingView connection. New limit keys: `backgroundSyncConnections`,
+`tvConnections`, `alertChannels`, `phoneCallsPerMonth`, `simulationsPerDay` (plus the existing `coachAiPerDay`, `shotExtractPerDay`); the values are a PROPOSAL the operator releases
+(`docs/TARIFE.md`, decision E8). `LIMIT_INFO[k].state` is `live` (the function exists, shown on the price page) or `geplant` (defined, function not built – hidden everywhere until its package
+ships: `tvConnections` B3, `alertChannels` / `phoneCallsPerMonth` C2, `simulationsPerDay` A3). Server, browser and cron read the same helpers (`autoSyncAllowed`, `exchangeAccessAllowed`,
+`planIncludes`, `limitOf`). The price comparison is grouped by the goals of a trader (`GOAL_NAME`, `COMPARISON_GOALS`, `featuresOfGoal`).
 
 ## Components (`@/billing/ui`)
 

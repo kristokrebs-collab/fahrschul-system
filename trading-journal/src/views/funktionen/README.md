@@ -42,7 +42,7 @@ Karte „Aufgabe → Seite → Abschnitt“.
 | `see` | „Siehe auch“: andere Funktionen in anderen Gruppen oder auf anderen Seiten |
 | `since`, `star` | Monat des Releases (`2026-10` → „Neu“ für zwei Monate) · einer der wenigen Einstiegspunkte („Empfohlen“) |
 | `status`, `note` | `fertig` / `teilweise` – nach dem Code; `teilweise` braucht eine `note`, die sagt, was fehlt |
-| `gate`, `device`, `needs`, `topics` | Plan-Gate (daraus `tierOf`), Gerätehinweis, Voraussetzung („erscheint nach einem fertigen Lauf“, „nur Cloud“), Interessen-Schlüssel des Assistenten-Gedächtnisses |
+| `gate`, `limit`, `device`, `needs`, `topics` | Plan-Gate (daraus `tierOf`), Kontingent (`LimitKey`, z. B. `shotExtractPerDay`; die F-ID-Zeile in `src/billing/tariff.ts` nennt es auch), Gerätehinweis, Voraussetzung („erscheint nach einem fertigen Lauf“, „nur Cloud“), Interessen-Schlüssel des Assistenten-Gedächtnisses |
 
 Neue Funktion eintragen = eine Zeile im Register (die Tests sagen, was fehlt: Aufgabe, Absichten, Anker, Gruppe) – danach findet sie die Seite, die
 Suche, der Finder und der Assistent.
@@ -91,3 +91,19 @@ Alarm-Funktionen (Alarme, E-Mail-Alarm) stehen zusammen unter „Heute vorbereit
 ## Runde 10 (Agent 7)
 
 Kacheln kommen in einer Diagonalwelle (`Reveal wave={gridCell(i, cols)}`, `useGridCols(2, 3)` passend zu `md:grid-cols-2 xl:grid-cols-3`), neigen sich mit der Maus ganz leicht (`useHoverTilt`, nur Maus, nur reiche Seite) und das Symbol hebt sich beim Hover. Treffer der Suche (`ResultItem`): neue Zeilen blenden ein, bleibende gleiten an ihren neuen Platz (`layout="position"`), wegfallende sind sofort weg – die Liste zeigt immer genau die Treffer. Geisterwort „Finden“ hinter der Kopfzeile (ab 1100 px). Test-IDs und Anker unveraendert (`funktionsfinder.spec`, `funktionen-anker.spec`, `funktionen.spec`).
+
+## A7 – Favoriten, zuletzt verwendet, Status, Symbol (Launch-Plan Welle A)
+
+- **Favoriten** (Stern an jeder Zeile, 44 px Tippfläche) und **Zuletzt verwendet** liegen im Einstellungen-Schlüssel `settings.funktionen = { v: 1, favorites: [{ id, at }], recent: [{ id, at }] }`
+  (`shelf.ts` rein, `shelfStore.ts` der eine Schreiber): versioniert, Passthrough (übersteht `normalizeSettings`, Backup und den Cloud-Merge – beide Listen sind Arrays von Objekten mit `id`, zwei Geräte
+  mischen je Id), höchstens 24 Favoriten und 12 zuletzt Benutzte. Jede Art, eine Funktion zu öffnen (diese Seite, die Suche, der Assistent), ruft `rememberFunction` in `openFeature`; die Seite zeigt
+  erst die Liste aus den Einstellungen, dann die der Suche (nur dieser Browser). Der Kasten „Favoriten“ erscheint nur mit Favoriten (sechs, „Alle n zeigen“).
+- **Status je Funktion** (`status.ts`, rein): `verfuegbar` / `einrichtung` (Konto, Server-Schlüssel, Gruppe, verbundene Börse – aus `needs` des Registers; Konto-Hinweise gelten als erfüllt, wenn man
+  angemeldet ist) / `tarif` (nur bei offenem Bezahlmodus und nicht im Tarif; `plan` = der billigste bezahlte Tarif, `next` = der nächste Schritt). Eine Funktion im höheren Tarif trägt unter der Zeile den
+  nächsten Schritt und „<Tarif> ansehen →“ (`openUpgrade(gate, plan)`); „Einrichtung nötig“ zeigt den Schritt in den Details („Nächster Schritt“). Ohne eingerichtete Zahlungen ist nie etwas „im höheren Tarif“.
+- **Ein Symbol je Funktion** (`glyphs.tsx`): rund zwei Dutzend gezeichnete Symbole, je eines für eine Art Arbeit (Ampel, Glocke, Kolben, Würfel …), zugeordnet nach Register-Id; alles andere zeigt das Symbol
+  seiner Gruppe. Dazu der Punkt für den Stand der Funktion (grün fertig, bernstein teilweise) an der Ecke des Symbols.
+- **Gestaffelte Einblendung** nur dort, wo sie hingehört: `Reveal` zählt erst, wenn die Kachel/Zeile ins Bild kommt (nur Sichtbares animiert), und die Versatz-Staffel `i % 3` gilt nur auf der
+  reichen Seite (`data-rich`, `useRich`); in Tests, bei reduzierter Bewegung und außerhalb gibt es keine Staffel. Übersicht und Cockpit sind nicht berührt (diese Seite ist keine von beiden).
+- Die Suche benutzt weiter das vorhandene Eingabefeld (`Input`) – die Einbindung ist ein einziger Aufruf in `FunktionenView`, austauschbar gegen die neue Suchfeld-Grundkomponente.
+- Tests: `tests/unit/views.funktionen.shelf.test.tsx` (Regal, Status, Symbole, Sterne, nächster Schritt), die bestehenden `views.funktionen.test.tsx`, e2e `funktionen.spec.ts`.

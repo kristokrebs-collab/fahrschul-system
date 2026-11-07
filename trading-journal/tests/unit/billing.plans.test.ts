@@ -74,7 +74,9 @@ describe("plan catalog", () => {
   });
 
   it("limits and the best plan", () => {
-    expect(limitOf("free", "exchangeConnections")).toBe(0);
+    // tariff contract A1: Free holds one read-only exchange connection (manual sync); the automatic sync starts with Pro
+    expect(limitOf("free", "exchangeConnections")).toBe(1);
+    expect(limitOf("free", "backgroundSyncConnections")).toBe(0);
     expect(limitOf("pro", "exchangeConnections")).toBe(1);
     expect(limitOf("premium", "savedViews")).toBe(Infinity);
     expect(bestPlan(["pro", "team", "free"])).toBe("team");

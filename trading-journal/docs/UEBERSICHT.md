@@ -3,6 +3,8 @@
 Karte **Aufgabe → Seite → Abschnitt**. Sie ist aus dem Funktionsregister (`src/app/features.ts`) erzeugt und mit der echten App abgeglichen (Playwright,
 390 und 1280 px, Seed-Journal, Stand 24.10.2026). Dieselben Zeilen stehen in der Seite „Funktionen“, in der Suche, im Menü-Finder und beim Assistenten;
 `tests/unit/features.registry.test.ts` hält sie ehrlich, `tests/e2e/funktionen-anker.spec.ts` prüft, dass jeder Anker im DOM seiner Seite steht.
+Je Punkt des Bauplans mit Start, minimalen Eingaben, Zuständen und Tarif: [UX-Matrix der 74 Funktionen](UX-MATRIX-74.md); wer was bekommt: [Tarifvertrag](TARIFE.md).
+Die Seite „Funktionen“ zeigt zu jeder Zeile, was jetzt geht (verfügbar / Einrichtung nötig / im höheren Tarif, mit nächstem Schritt), und merkt sich Favoriten und zuletzt Benutztes.
 
 ## 1. Bestandsaufnahme (vor dem Umbau)
 
@@ -423,19 +425,25 @@ _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
 
 ### Trades eintragen & Daten
 
-_Trades hineinbekommen, ordnen, sichern und prüfen._ · 16 Funktionen
+_Trades hineinbekommen, ordnen, sichern und prüfen._ · 17 Funktionen
 
-**Eintragen & importieren**
+**Eintragen**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Einen Trade von Hand eintragen | Trade eintragen | Übersicht › Trade eintragen | fertig |
 | Festlegen, welche Felder du beim Eintragen immer siehst | Trade-Formular anpassen | Übersicht › Trade eintragen › Felder anpassen | fertig |
 | Einen neuen Trade mit den Einstellungen des letzten starten | Letzten Trade duplizieren | Trades › Alle Trades | fertig |
+
+**Importieren & verbinden**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
 | Trades aus einem Screenshot deiner Börsen-Historie eintragen | Screenshot importieren | Trades (Fenster: shotImport) | fertig |
 | Einen Trade aus einem Screenshot übernehmen | Aus Screenshot übernehmen (KI, optional) | Übersicht › Trade eintragen | fertig |
 | Trades aus einer CSV-Datei einlesen | CSV-Import | Einstellungen › Daten | fertig |
 | Deine Börse verbinden, damit Trades von selbst kommen | Börsen-Anbindung (Bitunix) | Konto | fertig |
+| Neue Trades im Hintergrund von der Börse holen lassen | Automatischer Börsen-Abgleich | Konto › Börse | fertig |
 | Trades per TradingView-Alert oder Webhook anlegen lassen | TradingView-Webhook & API | Konto | teilweise |
 
 **Ansehen & ordnen**
@@ -472,7 +480,7 @@ _Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 7 Funktionen
 
 ### Konto, Einstellungen & Hilfe
 
-_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 20 Funktionen
+_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 21 Funktionen
 
 **Konto & Tarif**
 
@@ -496,15 +504,21 @@ _Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 20 Funktionen
 | Hyblock-Daten anbinden | Hyblock-Connector | Einstellungen › Hyblock-Connector | fertig |
 | App installieren, Speicher und Version ansehen | Version & Speicher | Einstellungen › Version & Speicher | fertig |
 
-**Hilfe & Oberfläche**
+**Oberfläche**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Hell, Dunkel und Akzentfarbe wählen | Darstellung: Hell, Dunkel, Akzent | Einstellungen › Darstellung | fertig |
 | Dein eigenes Dashboard zusammenstellen | Eigenes Dashboard (Cockpit) | Cockpit | fertig |
+| Eine Seite finden, ohne zu suchen | Seitenleiste und Menü | Übersicht – Handy: „Mehr“ unten → Menü · Tablet und Computer: Seitenleiste links (einklappbar) | fertig |
+| Die App am Handy mit dem Daumen bedienen | Klare mobile Oberfläche | Übersicht – Handy: untere Leiste → Mehr → Menü mit Suchfeld · Hell/Dunkel unter Einstellungen → Darstellung | teilweise |
+
+**Hilfe**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
 | Fragen stellen und die App per Sprache bedienen | Assistent | Übersicht (Fenster: assistant) | teilweise |
 | Mit Tasten schneller navigieren | Tastenkürzel | Einstellungen (Fenster: shortcuts) | fertig |
-| Eine Seite finden, ohne zu suchen | Seitenleiste und Menü | Übersicht – Handy: „Mehr“ unten → Menü · Tablet und Computer: Seitenleiste links (einklappbar) | fertig |
 | Nachlesen, was eine Kennzahl bedeutet | Erklärungen zu Kennzahlen | Übersicht – Karten und Kacheln mit Info-Symbol antippen (Übersicht, Markt, Setups) | teilweise |
 | Die Einführung noch einmal ansehen | Einführung noch einmal ansehen | Einstellungen › Einführung & Hilfe | fertig |
 | Die App in fünf Schritten mit Beispieldaten ausprobieren | Demo mit Beispieldaten | Funktionen › Demo ausprobieren | fertig |

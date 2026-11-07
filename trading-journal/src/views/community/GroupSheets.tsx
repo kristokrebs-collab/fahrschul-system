@@ -72,7 +72,7 @@ export function CreateGroupSheet() {
           </p>
         </StaggerItem>
         <StaggerItem>
-          <Field label={GROUPS.name} htmlFor={nameId} invalidKey={shake || null} error={shake && name.trim().length < 2 ? "Mindestens 2 Zeichen." : undefined}>
+          <Field label={GROUPS.name} htmlFor={nameId} required invalidKey={shake || null} error={shake && name.trim().length < 2 ? "Mindestens 2 Zeichen." : undefined}>
             <Input id={nameId} value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder={GROUPS.namePlaceholder} data-testid="group-name" />
           </Field>
         </StaggerItem>

@@ -2,13 +2,13 @@
  * POST /api/v1/exchange/backfill `{ connectionId, from, runId, tz? }` (P11, Netlify BACKGROUND function: answers 202 at
  * once and runs up to 15 min). The first import: every closed position since `from` (≤ 366 days back), with fills and
  * TP/SL, through the same `runSync` as the manual sync. Progress and result land in `sync_runs` under the client's
- * `runId` (the client polls `GET /api/v1/exchange/sync`). 3 per hour; plan feature `exchangeSync`.
+ * `runId` (the client polls `GET /api/v1/exchange/sync`). 3 per hour; plan: a connection quota (`requireExchangeAccess`).
  */
 import type { Config } from "@netlify/functions";
 import { z } from "zod";
 import { requireUser } from "./_lib/auth";
 import { handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
-import { requireFeature } from "./_lib/plan";
+import { requireExchangeAccess } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { clientTz, requireExchangeSetup } from "./_lib/exchanges/api";
 import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
@@ -32,7 +32,7 @@ export default handler(async (req) => {
   const user = await requireUser(req, { aal2: "ifEnrolled" });
   await enforceRateLimit(rateKey("exchange-backfill", user.id), 3, 3600, { failClosed: true });
   const body = await readJson(req, Body, { maxBytes: 1024 });
-  await requireFeature(user.id, "exchangeSync");
+  await requireExchangeAccess(user.id);
   const connection = await loadConnection(user.id, body.connectionId);
   if (!connection) throw new HttpError(404, "connection_not_found", "Diese Verbindung gibt es nicht (mehr).");
   const tz = clientTz(body.tz) ?? (await profileTz(user.id)) ?? DEFAULT_TZ;

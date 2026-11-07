@@ -314,15 +314,42 @@ describe("connect / disconnect", () => {
     expect(String((r.body.error as Row).message)).toMatch(/noch nicht eingerichtet/);
   });
 
-  it("plan gate once payments are set up: Free has no exchange connection", async () => {
+  // Changed on purpose with the tariff contract (A1, docs/TARIFE.md): Free holds ONE read-only connection with manual sync;
+  // the automatic sync (cron, the switch) starts with Pro. Before, Free had no connection at all.
+  it("plan gate once payments are set up: Free holds one connection and syncs by hand, Pro adds the automatic sync", async () => {
     process.env.STRIPE_SECRET_KEY = "sk_test_x";
     process.env.STRIPE_PRICE_PRO_MONTHLY = "price_1";
-    expect((await connect()).status).toBe(402);
+    const first = await connect();
+    expect(first.status).toBe(201);
+    // Free connects with the automatic switch OFF
+    expect(first.body.connection).toMatchObject({ syncEnabled: false });
+    const id = (first.body.connection as Row).id as string;
+    expect((await connect({ label: "Zweitkonto" })).status).toBe(402);
+    // the switch cannot be turned on in Free (402 plan_required) – turning it off is always fine
+    const on = await read(await connectFn(req("PATCH", "/api/v1/exchange/connect", { connectionId: id, syncEnabled: true }), ctx()));
+    expect(on.status).toBe(402);
+    expect(on.body.error).toMatchObject({ code: "plan_required" });
+    expect((await read(await connectFn(req("PATCH", "/api/v1/exchange/connect", { connectionId: id, syncEnabled: false }), ctx()))).status).toBe(200);
+    // the status tells the page: connection yes, automatic sync no
+    const st = await read(await syncFn(req("GET", "/api/v1/exchange/sync"), ctx()));
+    expect(st.body.plan).toMatchObject({ plan: "free", entitled: true, autoSync: false, limit: 1, gated: true });
+    // Pro: the switch can be turned on, still one connection
     state.tables.profiles![0]!.plan = "pro";
     state.tables.profiles![0]!.plan_status = "active";
-    expect((await connect()).status).toBe(201);
-    // Pro allows one connection
+    expect((await read(await connectFn(req("PATCH", "/api/v1/exchange/connect", { connectionId: id, syncEnabled: true }), ctx()))).status).toBe(200);
+    expect((await read(await syncFn(req("GET", "/api/v1/exchange/sync"), ctx()))).body.plan).toMatchObject({ plan: "pro", autoSync: true, limit: 1 });
     expect((await connect({ label: "Zweitkonto" })).status).toBe(402);
+  });
+
+  it("the cron leaves a Free connection alone: no automatic sync below Pro", async () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_x";
+    process.env.STRIPE_PRICE_PRO_MONTHLY = "price_1";
+    // a leftover switch-on (a downgraded Pro) must not make the cron sync
+    const id = ((await connect()).body.connection as Row).id as string;
+    state.tables.exchange_connections!.find((c) => c.id === id)!.sync_enabled = true;
+    const s = await runExchangeCron();
+    expect(s).toMatchObject({ synced: 0 });
+    expect(state.tables.sync_runs ?? []).toHaveLength(0);
   });
 
   it("other venues answer an honest 501 until phase 2", async () => {

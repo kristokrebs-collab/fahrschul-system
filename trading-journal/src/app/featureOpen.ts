@@ -7,7 +7,7 @@
  * in one honest toast instead of silently staying at the top of the page.
  *
  * Used by the page `Funktionen`, the search action `feature` and the assistant's "Wo finde ich …?". Opening counts as
- * "Zuletzt benutzt" through the search's own recent list (`rememberRecent`, local to this browser) – no extra tracker.
+ * "Zuletzt benutzt" twice: in the search's own recent list (`rememberRecent`, local to this browser) and in `settings.funktionen` (the page's list, synced).
  */
 import { featureSearchId } from "@/app/featureQuery";
 import { PLAN_TIER_LABEL, featureById, tierOf, type FeatureAction, type FeatureAnchor, type FeatureEntry } from "@/app/features";
@@ -19,6 +19,7 @@ import { entitledNow } from "@/billing/entitlements";
 import { openUpgrade } from "@/billing/store";
 import { rememberRecent } from "@/search/searchStore";
 import { navigate } from "@/store/router";
+import { rememberFunction } from "@/views/funktionen/shelfStore";
 import { pushToast, useUi } from "@/store/uiStore";
 import { openTraining } from "@/views/ueben/trainingStore";
 
@@ -59,7 +60,11 @@ function tell(f: FeatureEntry, detail: string): void {
 export function openFeature(id: string, opts: { remember?: boolean } = {}): boolean {
   const f = featureById(id);
   if (!f) return false;
-  if (opts.remember !== false) rememberRecent(featureSearchId(f.id));
+  if (opts.remember !== false) {
+    rememberRecent(featureSearchId(f.id));
+    // the page "Funktionen" keeps its own list in the settings (synced, versioned) – see `views/funktionen/shelf.ts`
+    rememberFunction(f.id);
+  }
   if (f.action) {
     ACTIONS[f.action](f);
     return true;

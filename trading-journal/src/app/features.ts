@@ -24,14 +24,15 @@
  *     das Öffnen sagt dann ehrlich, warum die Stelle fehlt, statt still oben zu bleiben;
  *   - eine F-ID mit Status „fehlt“ in `docs/COVERAGE.md` gehört NICHT ins Register.
  */
-import { PLAN_FEATURES, PLAN_RANK } from "@/billing/plans";
-import type { Feature } from "@/billing/types";
+import { GOAL_NAME, PLAN_FEATURES, PLAN_RANK } from "@/billing/plans";
+import type { Feature, GoalId, LimitKey } from "@/billing/types";
 import type { IconName } from "@/primitives/icons";
 import type { Page } from "@/store/uiStore";
 
 /* ------------------------------------------------------------------------------------------------------- types */
 
-export type FeatureGroupId = "heute" | "pruefen" | "aktien" | "planen" | "risiko" | "testen" | "lernen" | "auswerten" | "wachsen" | "daten" | "community" | "konto";
+/** The goals of a trader; the names live in `@/billing/plans` (`GOAL_NAME`) – one name for the tile, the price page and the document. */
+export type FeatureGroupId = GoalId;
 export type FeatureStatus = "fertig" | "teilweise";
 /** Sheets and dialogs that open over the current page (no navigation). */
 export type FeatureAction = "training" | "assistant" | "newTrade" | "csvImport" | "shortcuts" | "shotImport" | "demo";
@@ -77,6 +78,8 @@ export interface FeatureEntry {
   note?: string;
   /** plan feature behind it (`src/billing/plans.ts`); absent = free */
   gate?: Feature;
+  /** quota that bounds it (`PLAN_LIMITS`, e.g. `shotExtractPerDay`); the F-ID's row in `src/billing/tariff.ts` lists it too */
+  limit?: LimitKey;
   /** device / browser hint (microphone, keyboard, downloads …) */
   device?: string;
   /** a precondition: why the anchor may be missing right now, or what the function needs ("Erscheint nach einem fertigen Lauf.", "Nur in der Cloud-Version mit Konto.") */
@@ -95,18 +98,18 @@ export interface FeatureGroup {
 
 /** The groups, in the order of a trader's day (prepare, check, stocks, plan, risk, build, learn, evaluate …) – each a tile on the page "Funktionen". */
 export const FEATURE_GROUPS: readonly FeatureGroup[] = [
-  { id: "heute", name: "Heute vorbereiten", lead: "Lage, Plan, Marken und Check-in vor dem ersten Trade.", icon: "target" },
-  { id: "pruefen", name: "Trade prüfen & Chart", lead: "Einstieg prüfen, Chancen finden, den Chart lesen.", icon: "candles" },
-  { id: "aktien", name: "Aktien beobachten & bewerten", lead: "Scannen, beobachten, lesen und bewerten – Aktien und Krypto.", icon: "stocks" },
-  { id: "planen", name: "Trade planen", lead: "Vom Einstieg über Stop und Größe bis zum Ticket – und durchgespielt.", icon: "route" },
-  { id: "risiko", name: "Risiko & Disziplin", lead: "Limits, Exposure und Regeln, bevor es teuer wird.", icon: "shield" },
-  { id: "testen", name: "Strategie entwickeln & testen", lead: "Eine Idee bauen und gegen echte Historie prüfen.", icon: "flask" },
-  { id: "lernen", name: "Aus Fehlern lernen", lead: "Warum du verlierst, was du verpasst, was du ändern kannst.", icon: "coach" },
-  { id: "auswerten", name: "Auswerten & Berichte", lead: "Kennzahlen, Verläufe und Berichte zu deinen Trades.", icon: "chart" },
-  { id: "wachsen", name: "Üben & Wachsen", lead: "Training, Ziele, Gewohnheiten und Fortschritt.", icon: "sprout" },
-  { id: "daten", name: "Trades eintragen & Daten", lead: "Trades hineinbekommen, ordnen, sichern und prüfen.", icon: "list" },
-  { id: "community", name: "Community & Teilen", lead: "Gruppen, Mentoren und Teilen – freiwillig und datensparsam.", icon: "users" },
-  { id: "konto", name: "Konto, Einstellungen & Hilfe", lead: "Konto, Tarif, Oberfläche, Einstellungen und Hilfe.", icon: "sliders" },
+  { id: "heute", name: GOAL_NAME.heute, lead: "Lage, Plan, Marken und Check-in vor dem ersten Trade.", icon: "target" },
+  { id: "pruefen", name: GOAL_NAME.pruefen, lead: "Einstieg prüfen, Chancen finden, den Chart lesen.", icon: "candles" },
+  { id: "aktien", name: GOAL_NAME.aktien, lead: "Scannen, beobachten, lesen und bewerten – Aktien und Krypto.", icon: "stocks" },
+  { id: "planen", name: GOAL_NAME.planen, lead: "Vom Einstieg über Stop und Größe bis zum Ticket – und durchgespielt.", icon: "route" },
+  { id: "risiko", name: GOAL_NAME.risiko, lead: "Limits, Exposure und Regeln, bevor es teuer wird.", icon: "shield" },
+  { id: "testen", name: GOAL_NAME.testen, lead: "Eine Idee bauen und gegen echte Historie prüfen.", icon: "flask" },
+  { id: "lernen", name: GOAL_NAME.lernen, lead: "Warum du verlierst, was du verpasst, was du ändern kannst.", icon: "coach" },
+  { id: "auswerten", name: GOAL_NAME.auswerten, lead: "Kennzahlen, Verläufe und Berichte zu deinen Trades.", icon: "chart" },
+  { id: "wachsen", name: GOAL_NAME.wachsen, lead: "Training, Ziele, Gewohnheiten und Fortschritt.", icon: "sprout" },
+  { id: "daten", name: GOAL_NAME.daten, lead: "Trades hineinbekommen, ordnen, sichern und prüfen.", icon: "list" },
+  { id: "community", name: GOAL_NAME.community, lead: "Gruppen, Mentoren und Teilen – freiwillig und datensparsam.", icon: "users" },
+  { id: "konto", name: GOAL_NAME.konto, lead: "Konto, Tarif, Oberfläche, Einstellungen und Hilfe.", icon: "sliders" },
 ];
 
 /* ---------------------------------------------------------------------------------------------------- registry */
@@ -205,6 +208,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     status: "teilweise",
     note: "Im Browser laufen die Alarme nur, solange die App offen ist; bei geschlossener App gibt es nur den E-Mail-Alarm für Schlüsselmarken (siehe dort) – kein Push, keine Box-Alarme.",
     device: "Systembenachrichtigungen brauchen deine Erlaubnis im Browser.",
+    limit: "alertChannels",
   },
   {
     id: "email-alarm",
@@ -225,6 +229,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     note: "Nur Preis- und Schlüsselmarken-Alarme im 5-Minuten-Raster, nur per E-Mail (kein Push), nur mit Konto, Cloud-Sync und Tarif Pro; Box-Alarme und Einstiegs-Signale laufen weiter nur bei offener App. Ohne RESEND_API_KEY und ALERT_FROM auf dem Server steht „Einrichtung nötig“.",
     gate: "boxScanner",
     needs: "Nur in der Cloud-Version mit Konto, Cloud-Sync und einem eingerichteten Server.",
+    limit: "alertChannels",
   },
   {
     id: "checkin",
@@ -877,6 +882,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     gate: "backtestLab",
     needs: "Plan im Abschnitt „Zeitmaschine“ ganz unten im Labor eintragen und „Kerzen laden und durchspielen“ drücken; im Trade-Detail über den Knopf „Zeitmaschine“; im Handelsplan über „Plan durchspielen“.",
     topics: ["timemachine"],
+    limit: "simulationsPerDay",
   },
   {
     id: "handelsplan-ticket",
@@ -1068,6 +1074,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     see: ["risk-of-ruin", "risiko-serien", "monte-carlo-faecher"],
     status: "fertig",
     gate: "monteCarlo",
+    limit: "simulationsPerDay",
   },
   {
     id: "monte-carlo-faecher",
@@ -1857,6 +1864,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     since: "2026-10",
     status: "fertig",
     gate: "replay",
+    limit: "simulationsPerDay",
   },
   {
     id: "signal-beim-einstieg",
@@ -2612,7 +2620,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     task: "Einen Trade von Hand eintragen",
     benefit: "Einen neuen Trade mit Einstieg, Stop, Ziel, Setup und Notizen im Editor erfassen – auch von jeder Seite aus über den Plus-Knopf.",
     group: "daten",
-    sub: "Eintragen & importieren",
+    sub: "Eintragen",
     page: "overview",
     place: "Trade eintragen",
     action: "newTrade",
@@ -2629,7 +2637,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     task: "Festlegen, welche Felder du beim Eintragen immer siehst",
     benefit: "Das Formular zeigt zuerst nur sechs Kernfelder, alles andere liegt in sechs Bereichen. Mit „Felder anpassen“ holst du Felder in den Kern oder schiebst sie weg – pro Gerät gespeichert, mit „Zurücksetzen“.",
     group: "daten",
-    sub: "Eintragen & importieren",
+    sub: "Eintragen",
     page: "overview",
     place: "Trade eintragen › Felder anpassen",
     action: "newTrade",
@@ -2648,7 +2656,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     task: "Einen neuen Trade mit den Einstellungen des letzten starten",
     benefit: "Übernimmt Symbol, Richtung, Setup, Größe, Hebel, Zeitrahmen und Tags des letzten Trades – ohne Preise, Ergebnis, Zeiten und Notizen – und sagt in einem Satz, was übernommen wurde.",
     group: "daten",
-    sub: "Eintragen & importieren",
+    sub: "Eintragen",
     page: "trades",
     anchor: { testid: "trades-duplicate-last" },
     place: "Alle Trades",
@@ -2667,7 +2675,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     task: "Trades aus einem Screenshot deiner Börsen-Historie eintragen",
     benefit: "Screenshot einer Order-, Positions- oder Trade-Historie hochladen, ziehen oder einfügen – alle Trades werden direkt im Browser erkannt (nichts verlässt dein Gerät), in einer Vorschau geprüft und mit einem Klick eingetragen, mit „Rückgängig“.",
     group: "daten",
-    sub: "Eintragen & importieren",
+    sub: "Importieren & verbinden",
     page: "trades",
     action: "shotImport",
     path: "Alle Trades → Screenshot importieren",
@@ -2686,7 +2694,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     task: "Einen Trade aus einem Screenshot übernehmen",
     benefit: "Liest Einstieg, Ausstieg, Stop und Ergebnis aus Börsen-Screenshots und Orderhistorien – du prüfst die unsicheren Werte; gespeichert wird erst im Editor.",
     group: "daten",
-    sub: "Eintragen & importieren",
+    sub: "Importieren & verbinden",
     page: "overview",
     place: "Trade eintragen",
     action: "newTrade",
@@ -2699,6 +2707,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     note: "Der Knopf erscheint nur mit Konto, Tarif und eingerichtetem Server-Schlüssel (siehe Einstellungen → Daten → Screenshot-Import). Eine Schließung ohne sichtbare Eröffnung fragt den Einstieg ab; „Einstieg aus PnL berechnen“ ist eine Annahme und nur auf Knopfdruck.",
     gate: "shotExtract",
     needs: "Nur in der Cloud-Version mit Konto.",
+    limit: "shotExtractPerDay",
   },
   {
     id: "csv-import",
@@ -2707,7 +2716,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     task: "Trades aus einer CSV-Datei einlesen",
     benefit: "Trades aus Börsen-Exporten übernehmen (Bitunix, Binance, Bybit, OKX, Kraken, Coinbase, MetaTrader, IBKR, TradingView) – mit Vorschau und Dublettenprüfung.",
     group: "daten",
-    sub: "Eintragen & importieren",
+    sub: "Importieren & verbinden",
     page: "settings",
     place: "Daten",
     action: "csvImport",
@@ -2723,9 +2732,9 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     fids: ["F30", "F42", "F56"],
     name: "Börsen-Anbindung (Bitunix)",
     task: "Deine Börse verbinden, damit Trades von selbst kommen",
-    benefit: "Trades kommen lesend und automatisch von Bitunix, Teil-Ein- und -Ausstiege inklusive; andere Börsen über den CSV-Import.",
+    benefit: "Trades kommen lesend von Bitunix, Teil-Ein- und -Ausstiege inklusive – in Free per Knopfdruck, ab Pro von selbst; andere Börsen über den CSV-Import.",
     group: "daten",
-    sub: "Eintragen & importieren",
+    sub: "Importieren & verbinden",
     page: "konto",
     anchor: { testid: "exchange-card" },
     keywords: ["Bitunix", "API", "Sync", "Börse", "Verbindung", "lesend", "Positionen", "automatisch"],
@@ -2733,8 +2742,28 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     see: ["csv-import"],
     status: "fertig",
     note: "Per API nur Bitunix, nur die Futures-Schnittstelle: kein Spot-Konto, jede Position wird als linearer USDT-Kontrakt gerechnet (Coin-M nicht unterstützt), Hedge-Modus: beide Seiten kommen als getrennte Trades.",
-    gate: "exchangeSync",
     needs: "Nur in der Cloud-Version mit Konto.",
+    limit: "exchangeConnections",
+  },
+  {
+    id: "boerse-auto-sync",
+    fids: ["F30", "F56"],
+    name: "Automatischer Börsen-Abgleich",
+    task: "Neue Trades im Hintergrund von der Börse holen lassen",
+    benefit: "Der Server holt neue Trades deiner verbundenen Börse alle 30 Minuten selbst – in Free gleichst du die eine Verbindung per Knopf ab.",
+    group: "daten",
+    sub: "Importieren & verbinden",
+    page: "konto",
+    anchor: { testid: "exchange-connected" },
+    place: "Börse",
+    keywords: ["Auto-Sync", "automatisch", "Hintergrund", "Börse", "Bitunix", "alle 30 Minuten", "Zeitplan", "Abgleich"],
+    intents: ["automatisch abgleichen", "von selbst importieren", "auto sync", "börse im hintergrund", "ohne knopf synchronisieren", "alle 30 minuten"],
+    see: ["boerse-sync"],
+    status: "fertig",
+    note: "Nur Bitunix, nur mit Konto und Tarif Pro oder höher; in Free ist der Schalter aus und der Server lehnt das Einschalten ab.",
+    gate: "exchangeSync",
+    needs: "Erscheint, sobald eine Börse verbunden ist (Cloud-Version mit Konto).",
+    limit: "backgroundSyncConnections",
   },
   {
     id: "tradingview-webhook",
@@ -2743,7 +2772,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     task: "Trades per TradingView-Alert oder Webhook anlegen lassen",
     benefit: "Alerts und eigene Tools legen Trades per Webhook mit persönlichem Token an – idempotent und widerrufbar.",
     group: "daten",
-    sub: "Eintragen & importieren",
+    sub: "Importieren & verbinden",
     page: "konto",
     anchor: { testid: "api-card" },
     keywords: ["Webhook", "API", "Token", "TradingView", "Alert", "Bot", "Schnittstelle"],
@@ -2753,6 +2782,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     note: "Der Webhook legt nur echte Trades an (open/close); er füttert den Signal-Posteingang im Coach nicht, und Alerts ohne Trade (Einstieg/Stop/Ziel) werden nicht gesammelt.",
     gate: "apiAccess",
     needs: "Nur in der Cloud-Version mit Konto.",
+    limit: "tvConnections",
   },
   {
     id: "trade-filter",
@@ -2769,6 +2799,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     see: ["trade-eintragen"],
     status: "fertig",
     topics: ["list", "page:trades"],
+    limit: "savedViews",
   },
   {
     id: "setup-zuordnen",
@@ -2911,6 +2942,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     note: "Kein Profil, kein Folgen, keine Kontaktanfragen und kein Blockieren (das braucht erst Moderation und Rechtstexte – offen als Entscheidung).",
     gate: "community",
     needs: "Nur in der Cloud-Version mit Konto.",
+    limit: "groups",
   },
   {
     id: "mentor",
@@ -3220,7 +3252,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     task: "Hell, Dunkel und Akzentfarbe wählen",
     benefit: "Zwischen dunkel, hell und Systemvorgabe wechseln und die Akzentfarbe wählen.",
     group: "konto",
-    sub: "Hilfe & Oberfläche",
+    sub: "Oberfläche",
     page: "settings",
     anchor: { heading: "Darstellung" },
     place: "Darstellung",
@@ -3236,7 +3268,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     task: "Dein eigenes Dashboard zusammenstellen",
     benefit: "Widgets nach Wunsch anordnen und mehrere Boards für deinen Workflow anlegen.",
     group: "konto",
-    sub: "Hilfe & Oberfläche",
+    sub: "Oberfläche",
     page: "cockpit",
     anchor: { testid: "cockpit" },
     keywords: ["Cockpit", "Widgets", "Board", "Dashboard", "Anordnen", "Layout"],
@@ -3247,47 +3279,13 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     topics: ["page:cockpit"],
   },
   {
-    id: "assistent",
-    fids: ["F74"],
-    name: "Assistent",
-    task: "Fragen stellen und die App per Sprache bedienen",
-    benefit: "Fragen in eigenen Worten, per Text oder Mikrofon: Zahlen aus dem Journal, Einstieg prüfen, Laborlauf erklären, Seiten öffnen, Notizen merken.",
-    group: "konto",
-    sub: "Hilfe & Oberfläche",
-    page: "overview",
-    action: "assistant",
-    keywords: ["Assistent", "KI", "Sprache", "Mikrofon", "Chat", "Frage", "Hilfe", "merken", "Wo finde ich"],
-    intents: ["assistent", "hilfe", "frage", "sprache", "mikrofon", "ki", "chat", "wo finde ich", "sprachbefehl", "frag die app", "sprachsteuerung", "per sprache bedienen"],
-    see: ["coach-fragen", "tastenkuerzel"],
-    since: "2026-10",
-    status: "teilweise",
-    note: "Keine Alarme oder Regeländerungen per Sprache und keine Testserien aus dem Gespräch; der KI-Router ist optional (Konto, Tarif, Server-Schlüssel) und liefert nie Zahlen.",
-    device: "Das Mikrofon braucht einen Browser mit Spracherkennung (z. B. Chrome, Edge, Safari); ohne bleibt die Texteingabe.",
-  },
-  {
-    id: "tastenkuerzel",
-    fids: [],
-    name: "Tastenkürzel",
-    task: "Mit Tasten schneller navigieren",
-    benefit: "G und ein Buchstabe springen zu Seiten, / sucht, A öffnet den Assistenten, N trägt einen Trade ein – ? zeigt die ganze Liste.",
-    group: "konto",
-    sub: "Hilfe & Oberfläche",
-    page: "settings",
-    action: "shortcuts",
-    keywords: ["Tastatur", "Shortcut", "Kürzel", "g-Taste", "Hilfe", "Navigation"],
-    intents: ["tastenkürzel", "shortcuts", "tastatur", "g taste", "schnell navigieren", "hotkeys", "tasten"],
-    see: ["assistent"],
-    status: "fertig",
-    device: "Braucht eine Tastatur.",
-  },
-  {
     id: "navigation",
     fids: [],
     name: "Seitenleiste und Menü",
     task: "Eine Seite finden, ohne zu suchen",
     benefit: "Alle 19 Seiten in vier Gruppen, jede mit einem Wort, das sagt, wofür sie da ist. Am Handy unter „Mehr“ mit Suchfeld, ab 768 Pixel als Seitenleiste: die schmale zeigt die Namen, sobald du darüberfährst, sie antippst oder mit der Tastatur erreichst.",
     group: "konto",
-    sub: "Hilfe & Oberfläche",
+    sub: "Oberfläche",
     page: "overview",
     path: "Handy: „Mehr“ unten → Menü · Tablet und Computer: Seitenleiste links (einklappbar)",
     keywords: ["Navigation", "Menü", "Seitenleiste", "Mehr", "Seiten", "Gruppen", "Erfassen", "Prüfen", "Auswerten", "Rechtliches", "Impressum", "Namen anzeigen"],
@@ -3297,13 +3295,64 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     status: "fertig",
   },
   {
+    id: "mobile-oberflaeche",
+    fids: ["F55"],
+    name: "Klare mobile Oberfläche",
+    task: "Die App am Handy mit dem Daumen bedienen",
+    benefit: "Am Handy eine Leiste unten (Dock) mit den häufigsten Seiten und „Mehr“ für den Rest, Tippflächen ab 44 Pixel, hell und dunkel, die letzten fünf Trades auf der Übersicht.",
+    group: "konto",
+    sub: "Oberfläche",
+    page: "overview",
+    path: "Handy: untere Leiste → Mehr → Menü mit Suchfeld · Hell/Dunkel unter Einstellungen → Darstellung",
+    keywords: ["Handy", "Smartphone", "mobil", "Dock", "Daumen", "Tippfläche", "Touch", "Hochformat", "Dunkel", "Hell"],
+    intents: ["am handy bedienen", "mobile ansicht", "mit dem daumen", "app am smartphone", "untere leiste", "touch bedienung", "kleiner bildschirm"],
+    see: ["darstellung", "navigation"],
+    status: "teilweise",
+    note: "Dunkel/Hell, Dock und die letzten fünf Trades sind da; die RSI-Höhe im Chart ist fest (keine ziehbare Grenze), und der graue Balken über dem Dock ist Browser-Oberfläche, nicht die der App. Geräteprüfung an echten Telefonen steht aus.",
+  },
+  {
+    id: "assistent",
+    fids: ["F74"],
+    name: "Assistent",
+    task: "Fragen stellen und die App per Sprache bedienen",
+    benefit: "Fragen in eigenen Worten, per Text oder Mikrofon: Zahlen aus dem Journal, Einstieg prüfen, Laborlauf erklären, Seiten öffnen, Notizen merken.",
+    group: "konto",
+    sub: "Hilfe",
+    page: "overview",
+    action: "assistant",
+    keywords: ["Assistent", "KI", "Sprache", "Mikrofon", "Chat", "Frage", "Hilfe", "merken", "Wo finde ich"],
+    intents: ["assistent", "hilfe", "frage", "sprache", "mikrofon", "ki", "chat", "wo finde ich", "sprachbefehl", "frag die app", "sprachsteuerung", "per sprache bedienen"],
+    see: ["coach-fragen", "tastenkuerzel"],
+    since: "2026-10",
+    status: "teilweise",
+    note: "Keine Alarme oder Regeländerungen per Sprache und keine Testserien aus dem Gespräch; der KI-Router ist optional (Konto, Tarif, Server-Schlüssel) und liefert nie Zahlen.",
+    device: "Das Mikrofon braucht einen Browser mit Spracherkennung (z. B. Chrome, Edge, Safari); ohne bleibt die Texteingabe.",
+    limit: "coachAiPerDay",
+  },
+  {
+    id: "tastenkuerzel",
+    fids: [],
+    name: "Tastenkürzel",
+    task: "Mit Tasten schneller navigieren",
+    benefit: "G und ein Buchstabe springen zu Seiten, / sucht, A öffnet den Assistenten, N trägt einen Trade ein – ? zeigt die ganze Liste.",
+    group: "konto",
+    sub: "Hilfe",
+    page: "settings",
+    action: "shortcuts",
+    keywords: ["Tastatur", "Shortcut", "Kürzel", "g-Taste", "Hilfe", "Navigation"],
+    intents: ["tastenkürzel", "shortcuts", "tastatur", "g taste", "schnell navigieren", "hotkeys", "tasten"],
+    see: ["assistent"],
+    status: "fertig",
+    device: "Braucht eine Tastatur.",
+  },
+  {
     id: "erklaerungen",
     fids: ["F48"],
     name: "Erklärungen zu Kennzahlen",
     task: "Nachlesen, was eine Kennzahl bedeutet",
     benefit: "Info-Symbole und antippbare Kacheln öffnen Formel, Rechenweg und Einordnung zu Kennzahlen, Marktwerten und Signalen.",
     group: "konto",
-    sub: "Hilfe & Oberfläche",
+    sub: "Hilfe",
     page: "overview",
     anchor: { testid: "hero-net" },
     path: "Karten und Kacheln mit Info-Symbol antippen (Übersicht, Markt, Setups)",
@@ -3320,7 +3369,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     task: "Die Einführung noch einmal ansehen",
     benefit: "Die Einführungs-Tour neu starten und die Liste der Tastenkürzel öffnen.",
     group: "konto",
-    sub: "Hilfe & Oberfläche",
+    sub: "Hilfe",
     page: "settings",
     anchor: { heading: "Einführung & Hilfe" },
     place: "Einführung & Hilfe",
@@ -3336,7 +3385,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     task: "Die App in fünf Schritten mit Beispieldaten ausprobieren",
     benefit: "Beispiel-CSV importieren, eine Idee in Regeln übersetzen, sie auf Beispiel-Kerzen testen, einen Paper-Trade durchspielen und eine Marke mit Alarm setzen – mit den echten Rechenfunktionen der App, alles als Beispiel markiert, nichts wird gespeichert.",
     group: "konto",
-    sub: "Hilfe & Oberfläche",
+    sub: "Hilfe",
     page: "funktionen",
     anchor: { testid: "funktionen-demo" },
     place: "Demo ausprobieren",

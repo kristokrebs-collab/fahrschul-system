@@ -7,15 +7,16 @@
  *       last 4 characters of the key ever leave the server again.
  * PATCH /api/v1/exchange/connect `{ connectionId, journalAccount?, syncEnabled?, label? }` → `{ connection }`.
  *
- * aal2 when 2FA is on; 10 attempts per 10 min (fail-closed); plan: `exchangeSync` + `exchangeConnections` limit. Request
+ * aal2 when 2FA is on; 10 attempts per 10 min (fail-closed); plan: a connection quota (`requireExchangeAccess` + `exchangeConnections` limit; Free has one, read-only, manual sync – switching the automatic sync on needs `requireAutoSync`). Request
  * bodies are never logged.
  */
 import type { Config } from "@netlify/functions";
 import { z } from "zod";
+import { autoSyncAllowed } from "../../src/billing/plans";
 import { audit } from "./_lib/audit";
 import { requireUser } from "./_lib/auth";
 import { clientIp, handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
-import { requireFeature, requireLimit } from "./_lib/plan";
+import { paymentsConfigured, requireAutoSync, requireExchangeAccess, requireLimit } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { exchangeHttpError, requireExchangeSetup } from "./_lib/exchanges/api";
 import { adapterFor } from "./_lib/exchanges/registry";
@@ -54,6 +55,8 @@ export default handler(async (req, ctx) => {
     if (!own) throw new HttpError(404, "connection_not_found", "Diese Verbindung gibt es nicht (mehr).");
     const patch: Parameters<typeof updateConnection>[2] = {};
     if (body.journalAccount) patch.journal_account = body.journalAccount;
+    // switching the AUTOMATIC sync on is a Pro feature; switching it off is always allowed
+    if (body.syncEnabled === true) await requireAutoSync(user.id);
     if (body.syncEnabled !== undefined) patch.sync_enabled = body.syncEnabled;
     if (body.label !== undefined) patch.label = body.label;
     await updateConnection(user.id, own.id, patch);
@@ -63,7 +66,7 @@ export default handler(async (req, ctx) => {
   requireExchangeSetup();
   const body = await readJson(req, ConnectBody, { maxBytes: 2048 });
   const exchange = body.exchange as (typeof EXCHANGE_IDS)[number];
-  await requireFeature(user.id, "exchangeSync");
+  const info = await requireExchangeAccess(user.id);
   const existing = await listConnections(user.id);
   await requireLimit(user.id, "exchangeConnections", existing.length);
   const label = body.label ?? "";
@@ -82,7 +85,7 @@ export default handler(async (req, ctx) => {
 
   // Bitunix offers no way to read a key's rights (review EX-01): the validation call only proves it can READ – trade /
   // withdraw rights stay unknown, so nothing is claimed (the user confirmed "read-only", the UI says exactly that)
-  const row = await insertConnection({ userId: user.id, exchange, label, creds, journalAccount: body.journalAccount, permissions: [] });
+  const row = await insertConnection({ userId: user.id, exchange, label, creds, journalAccount: body.journalAccount, permissions: [], syncEnabled: !paymentsConfigured() || autoSyncAllowed(info.plan) });
   await audit(user.id, "exchange.connect", { exchange, last4: row.key_last4 }, clientIp(req, ctx));
   return json(
     {

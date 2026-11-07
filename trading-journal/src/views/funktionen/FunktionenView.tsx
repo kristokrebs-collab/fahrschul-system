@@ -11,21 +11,23 @@
  *               a tile opens the group: its functions under sub headings, each a row that opens the place, with the details
  *               (what is missing, what it needs, "Siehe auch") one fold away
  *
- * Nothing is stored or sent by this page: "Empfohlen" reads `settings.assistant.interests` (counters the assistant keeps
- * anyway), "Zuletzt benutzt" reads the search's recent list (`feature:<id>`, this browser only). The open group is also a
+ * Favourites (a star on every row) and "Zuletzt benutzt" are kept in `settings.funktionen` (versioned, `shelf.ts`: backup and
+ * cloud sync carry them; every way of opening a function counts, `featureOpen.ts`), next to the search's recent list. "Empfohlen"
+ * reads `settings.assistant.interests` (counters the assistant keeps anyway). Every row says what you can do with the function
+ * right now – verfügbar / Einrichtung nötig / im höheren Tarif, with the next step (`status.ts`). Nothing is sent. The open group is also a
  * back entry (`openBackEntry`): the system back button returns to the tiles instead of leaving the page. Motion: the page
  * header's words and the staggered fade-in (`Reveal`, reduced motion → static). Registered as page `funktionen` (not in the
  * dock, not a dashboard card): reached via the command navigation, the search, `g f`, the settings and the assistant.
  */
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { groupFeatures, recentFeatures, searchFeatures, STRONG_HIT, subGroups, suggestFeatures } from "@/app/featureQuery";
-import { FEATURE_COUNT, FEATURE_REGISTRY, type FeatureEntry, type FeatureGroupId } from "@/app/features";
+import { featureSearchId, groupFeatures, recentFeatures, searchFeatures, STRONG_HIT, subGroups, suggestFeatures } from "@/app/featureQuery";
+import { FEATURE_COUNT, FEATURE_REGISTRY, featureById, type FeatureEntry, type FeatureGroupId } from "@/app/features";
 import { openFeature } from "@/app/featureOpen";
 import { preloadPage } from "@/app/pages";
 import { memoryOf } from "@/assistant/memory";
 import { openAssistant } from "@/assistant/open";
-import { planIncludes } from "@/billing/plans";
-import { useBillingMode, useEffectivePlan } from "@/billing/store";
+import { openUpgrade, useBillingMode, useEffectivePlan } from "@/billing/store";
+import { useCloudSession } from "@/cloud/session";
 import { cn } from "@/lib/cn";
 import { Reveal } from "@/motion/Reveal";
 import { gridCell, useGridCols, useRich } from "@/motion/rich";
@@ -44,12 +46,17 @@ import { PageHeader } from "@/views/setups/PageHeader";
 import { FeatureRow } from "./FeatureRow";
 import { GroupTile } from "./GroupTile";
 import { ResultItem } from "./ResultItem";
+import { shelfOf } from "./shelf";
+import { toggleFavoriteFunction } from "./shelfStore";
+import { availabilityOf } from "./status";
 import { FUNKTIONEN } from "./strings";
 
 export const FUNKTIONEN_LEAD_FILL = { storageKey: storageKey("fill-funktionen"), highlight: FUNKTIONEN.highlight } as const;
 
 /** Rows shown for a query (the best ones – a longer list is not an answer). */
 const RESULT_MAX = 12;
+/** Favourites shown before "Alle … zeigen". */
+const FAVORITES_SHOWN = 6;
 
 /** Hover / focus warms the target page's chunk (the lazy pages), exactly like the command navigation does. */
 function warm(id: string): void {
@@ -69,6 +76,8 @@ export function FunktionenView({ className }: { className?: string }) {
   const recent = useSearch((s) => s.recent);
   const mode = useBillingMode();
   const plan = useEffectivePlan();
+  const signedIn = useCloudSession((st) => st.phase === "signedIn");
+  const [allFavs, setAllFavs] = useState(false);
   const inputId = useId();
   const groupHead = useRef<HTMLHeadingElement>(null);
   const groupTop = useRef<HTMLElement>(null);
@@ -76,7 +85,12 @@ export function FunktionenView({ className }: { className?: string }) {
   const field = useRef<HTMLInputElement>(null);
 
   const interests = useMemo(() => memoryOf(settings).interests, [settings]);
-  const lastUsed = useMemo(() => recentFeatures(recent, 3), [recent]);
+  const shelf = useMemo(() => shelfOf(settings), [settings]);
+  // the page's own list (settings, synced) first, then what the search remembers in this browser
+  const lastUsed = useMemo(() => recentFeatures([...shelf.recent.map((r) => featureSearchId(r.id)), ...recent], 3), [shelf, recent]);
+  const favorites = useMemo(() => shelf.favorites.map((f) => featureById(f.id)).filter((f): f is FeatureEntry => !!f), [shelf]);
+  const favIds = useMemo(() => new Set(favorites.map((f) => f.id)), [favorites]);
+  const shownFavorites = allFavs ? favorites : favorites.slice(0, FAVORITES_SHOWN);
   // four at most; on a phone the first two – the tiles below are the page
   const picks = useMemo(() => suggestFeatures({ interests, now, skip: lastUsed.map((f) => f.id), k: 4 }), [interests, now, lastUsed]);
   const both = lastUsed.length > 0 && picks.length > 0;
@@ -87,7 +101,11 @@ export function FunktionenView({ className }: { className?: string }) {
   const weak = shown.length > 0 && shown[0]!.score < STRONG_HIT;
   const current = groupId ? grouped.find((g) => g.group.id === groupId) : undefined;
   const view = query ? "search" : current ? "group" : "tiles";
-  const locked = (f: FeatureEntry): boolean => mode === "open" && !!f.gate && !planIncludes(plan.plan, f.gate);
+  const status = (f: FeatureEntry) => availabilityOf(f, { open: mode === "open", plan: plan.plan, signedIn });
+  const upgrade = (f: FeatureEntry): void => openUpgrade(f.gate, status(f).plan);
+  // the staggered fade-in belongs to the rich page; elsewhere (and under reduced motion) everything is simply there
+  const stagger = (i: number): number => (rich ? i % 3 : 0);
+  const rowProps = (f: FeatureEntry) => ({ entry: f, availability: status(f), now, onOpen: open, onIntent: warm, onUpgrade: upgrade, favorite: favIds.has(f.id), onToggleFavorite: toggleFavoriteFunction });
 
   // an open group is a back entry: the system back button returns to the tiles instead of leaving the page
   useEffect(() => {
@@ -202,7 +220,7 @@ export function FunktionenView({ className }: { className?: string }) {
             <ul className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
               {shown.map((h) => (
                 <ResultItem key={h.entry.id}>
-                  <FeatureRow entry={h.entry} locked={locked(h.entry)} now={now} onOpen={open} onIntent={warm} showGroup weak={weak} />
+                  <FeatureRow {...rowProps(h.entry)} showGroup weak={weak} />
                 </ResultItem>
               ))}
             </ul>
@@ -211,6 +229,34 @@ export function FunktionenView({ className }: { className?: string }) {
 
       {view === "tiles" && (
         <>
+          {favorites.length > 0 && (
+            <Reveal index={1} className="grid min-w-0 gap-2.5" data-testid="funktionen-favorites" data-n={favorites.length}>
+              <section aria-labelledby={`${inputId}-favs`} className="grid min-w-0 gap-2.5">
+                <div className="grid gap-0.5">
+                  <Label as="h2" id={`${inputId}-favs`}>
+                    {FUNKTIONEN.favorites.title}
+                    <span className="ml-1 font-mono text-[11px] font-normal text-mute">{favorites.length}</span>
+                  </Label>
+                  <p className="text-[12px] text-mute">{FUNKTIONEN.favorites.note}</p>
+                </div>
+                <ul className="grid gap-2 md:grid-cols-2">
+                  {shownFavorites.map((f, i) => (
+                    <Reveal key={f.id} as="li" index={stagger(i)} className="min-w-0">
+                      <FeatureRow {...rowProps(f)} showGroup compact testId="feature-favorite" />
+                    </Reveal>
+                  ))}
+                </ul>
+                {favorites.length > FAVORITES_SHOWN && (
+                  <div>
+                    <Button variant="ghost" size="sm" onClick={() => setAllFavs((v) => !v)} aria-expanded={allFavs} data-testid="funktionen-favorites-more">
+                      {allFavs ? FUNKTIONEN.favorites.less : FUNKTIONEN.favorites.more(favorites.length)}
+                    </Button>
+                  </div>
+                )}
+              </section>
+            </Reveal>
+          )}
+
           {(lastUsed.length > 0 || picks.length > 0) && (
             <Reveal index={1} className={cn("grid min-w-0 gap-4", both && "lg:grid-cols-2")} data-testid="funktionen-weiter">
               {lastUsed.length > 0 && (
@@ -224,7 +270,7 @@ export function FunktionenView({ className }: { className?: string }) {
                   <ul className="grid gap-2">
                     {lastUsed.map((f, i) => (
                       <li key={f.id} className={cn(i >= 2 && "max-md:hidden")}>
-                        <FeatureRow entry={f} locked={locked(f)} now={now} onOpen={open} onIntent={warm} showGroup compact testId="feature-quick" />
+                        <FeatureRow {...rowProps(f)} showGroup compact testId="feature-quick" />
                       </li>
                     ))}
                   </ul>
@@ -241,7 +287,7 @@ export function FunktionenView({ className }: { className?: string }) {
                   <ul className={cn("grid gap-2", !both && "md:grid-cols-2")}>
                     {picks.map((p, i) => (
                       <li key={p.entry.id} className={cn(i >= 2 && "max-md:hidden")}>
-                        <FeatureRow entry={p.entry} locked={locked(p.entry)} now={now} onOpen={open} onIntent={warm} showGroup compact testId="feature-quick" reason={p.reason} />
+                        <FeatureRow {...rowProps(p.entry)} showGroup compact testId="feature-quick" reason={p.reason} />
                       </li>
                     ))}
                   </ul>
@@ -318,8 +364,8 @@ export function FunktionenView({ className }: { className?: string }) {
               )}
               <ul className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
                 {sg.items.map((f, i) => (
-                  <Reveal key={f.id} as="li" index={(i + k) % 3} className="min-w-0">
-                    <FeatureRow entry={f} locked={locked(f)} now={now} onOpen={open} onIntent={warm} />
+                  <Reveal key={f.id} as="li" index={stagger(i + k)} className="min-w-0">
+                    <FeatureRow {...rowProps(f)} />
                   </Reveal>
                 ))}
               </ul>

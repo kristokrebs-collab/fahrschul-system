@@ -1,6 +1,7 @@
 /** German copy of the page "Funktionen" (the register's own texts live in `src/app/features.ts`). */
 import type { FeatureStatus, PlanTier } from "@/app/features";
 import type { PickReason } from "@/app/featureQuery";
+import type { Availability } from "./status";
 
 export const FUNKTIONEN = {
   title: "Funktionen",
@@ -45,6 +46,32 @@ export const FUNKTIONEN = {
     team: "Ab Team",
   } satisfies Record<PlanTier, string>,
   locked: "nicht in deinem Tarif",
+  /** what you can do with a function right now (`status.ts`) */
+  availability: {
+    verfuegbar: "Verfügbar",
+    einrichtung: "Einrichtung nötig",
+    tarif: "Im höheren Tarif",
+  } satisfies Record<Availability, string>,
+  availabilityText: {
+    verfuegbar: "Verfügbar – du kannst es jetzt öffnen.",
+    einrichtung: "Einrichtung nötig – das Öffnen zeigt dir die Stelle, der nächste Schritt steht darunter.",
+    tarif: "Im höheren Tarif – deine Daten bleiben, die Funktion schaltet sich mit dem Tarif frei.",
+  } satisfies Record<Availability, string>,
+  statusLabel: "Verfügbarkeit",
+  next: "Nächster Schritt",
+  seePlan: (plan: string) => `${plan} ansehen`,
+  favorite: {
+    add: (name: string) => `${name} zu den Favoriten`,
+    remove: (name: string) => `${name} aus den Favoriten nehmen`,
+    addTitle: "Zu den Favoriten",
+    removeTitle: "Aus den Favoriten nehmen",
+  },
+  favorites: {
+    title: "Favoriten",
+    note: "Mit dem Stern gemerkt. Liegt in deinen Einstellungen: im Backup und, mit Cloud-Sync, auf all deinen Geräten.",
+    more: (n: number) => `Alle ${n} Favoriten zeigen`,
+    less: "Weniger zeigen",
+  },
   isNew: "Neu",
   tag: {
     "fuer-dich": "Für dich",
@@ -66,7 +93,7 @@ export const FUNKTIONEN = {
   where: "Zu finden",
   recent: {
     title: "Zuletzt benutzt",
-    note: "Über diese Seite, die Suche oder den Assistenten geöffnet – nur in diesem Browser.",
+    note: "Über diese Seite, die Suche oder den Assistenten geöffnet.",
   },
   picks: {
     title: "Empfohlen",
