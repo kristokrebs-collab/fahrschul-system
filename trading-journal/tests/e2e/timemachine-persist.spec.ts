@@ -31,15 +31,22 @@ async function runPlan(page: Page): Promise<void> {
   await expect(page.getByTestId("tm-card")).toHaveAttribute("data-status", "done", { timeout: 120_000 });
 }
 
-/** Non-transparent pixels of the path canvas (read through a copy, the way the Branchen spec reads its charts). */
+/**
+ * Non-transparent pixels of the path canvas, read through a copy at the size it is SHOWN (a canvas handed to a worker keeps its first
+ * 300 × 150 attributes; the frame the worker committed is scaled into the copy). The worker commits a frame a moment after its last
+ * stroke, so the callers poll.
+ */
 async function ink(page: Page): Promise<number> {
   return page.getByTestId("tm-paths-host").locator("canvas").evaluate((c: HTMLCanvasElement) => {
+    const r = c.getBoundingClientRect();
+    const w = Math.max(1, Math.round(r.width));
+    const h = Math.max(1, Math.round(r.height));
     const copy = document.createElement("canvas");
-    copy.width = c.width;
-    copy.height = c.height;
+    copy.width = w;
+    copy.height = h;
     const ctx = copy.getContext("2d", { willReadFrequently: true })!;
-    ctx.drawImage(c, 0, 0);
-    const d = ctx.getImageData(0, 0, c.width, c.height).data;
+    ctx.drawImage(c, 0, 0, w, h);
+    const d = ctx.getImageData(0, 0, w, h).data;
     let n = 0;
     for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) n++;
     return n;
@@ -119,7 +126,7 @@ test.describe("Zeitmaschine · gespeicherte Simulation", () => {
     await expect(box).toHaveAttribute("data-computed", "10000");
     await expect(box).toHaveAttribute("data-drawn", "10000");
     await expect(box).toHaveAttribute("data-engine", /worker|main/);
-    expect(await ink(page)).toBeGreaterThan(2_000);
+    await expect.poll(() => ink(page), { timeout: 15_000 }).toBeGreaterThan(5_000);
     await expect(box.locator('[data-line="stop"]')).toHaveCount(1);
     await expect(box.locator('[data-line="target"]')).toHaveCount(1);
     await expect(page.getByTestId("tm-paths-done")).toContainText(/Gezeichnet in \d+ ms/);
@@ -141,7 +148,7 @@ test.describe("Zeitmaschine · gespeicherte Simulation", () => {
     await expect(page.getByTestId("tm-paths-title")).toContainText("berechnet: 10.000 · gezeichnet: 2.000");
     await expect(page.getByTestId("tm-paths-title")).toContainText("jeder 5. Lauf");
     await expect(page.getByTestId("tm-paths-sample")).toContainText("Stichprobe: 2.000 von 10.000 berechneten Läufen");
-    expect(await ink(page)).toBeGreaterThan(500);
+    await expect.poll(() => ink(page), { timeout: 15_000 }).toBeGreaterThan(2_000);
     await screenshot(page, info, "tm-paths-sample");
     await box.screenshot({ path: `/tmp/shots/${info.project.name}-tm-paths-sample-el.png` });
     await page.getByRole("radio", { name: "Alle 10.000" }).click();
@@ -256,7 +263,16 @@ test.describe("Trade · gespeicherte Zeitmaschine", () => {
     await expect(page.getByRole("heading", { name: /Alle Trades/ })).toBeVisible();
     await page.locator('[data-trade-id="t_tm_a"]:visible').first().click();
     await expect(page.getByTestId("trade-simulation")).toHaveAttribute("data-sim-id", id, { timeout: 15_000 });
+    // the sheet again: the same plan on the same candles is the same simulation – shown from the device, not computed anew
+    await page.getByTestId("trade-simulation-open").click();
+    await expect(page.getByTestId("tm-card")).toHaveAttribute("data-status", "done", { timeout: 180_000 });
+    await expect(page.getByTestId("tm-sim-id")).toHaveText(id);
+    await expect(page.getByTestId("tm-sim-restored")).toBeVisible();
+    await expect(page.getByTestId("tm-busy")).toHaveCount(0);
+    await page.keyboard.press("Escape"); // the sheet closes, the detail comes back
+    await expect(detail).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect(detail).toBeHidden();
 
     // another trade has none
     await page.locator('[data-trade-id="t_tm_other"]:visible').first().click();
