@@ -24,7 +24,8 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import type { WhaleMark } from "@/domain/alerts/replay";
-import { netTitle, NET_SERIES, NET_SERIES_IDS, netPointsToCsv, type NetFlip, type NetPoint, type NetSeriesId, type NetTitleSegment, type TraderNetView } from "@/domain/signals";
+import { netTitle, type NetFlip, type NetPoint, type NetTitleSegment, type TraderNetView } from "@/domain/signals";
+import { NET_SERIES, NET_SERIES_IDS, netPointsToCsv, type NetSeriesId } from "@/domain/signals/netSeries";
 import { cn } from "@/lib/cn";
 import { useProvider, useTraderNet } from "@/market";
 import { useNetArchive } from "@/market/netArchive";

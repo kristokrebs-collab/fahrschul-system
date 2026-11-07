@@ -18,7 +18,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ink, withAlpha } from "@/chart/ink";
 import type { WhaleMark } from "@/domain/alerts/replay";
-import { netDayText, type NetFlip, type NetGap, type NetPoint } from "@/domain/signals";
+import { netDayText, type NetFlip, type NetPoint } from "@/domain/signals";
+import type { NetGap } from "@/domain/signals/netSeries";
 import { cn } from "@/lib/cn";
 import { playWaapi } from "@/motion/fx/shared";
 import { useFirstInView } from "@/motion/inView";

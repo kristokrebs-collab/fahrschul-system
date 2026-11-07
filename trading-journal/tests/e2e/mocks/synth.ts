@@ -15,6 +15,9 @@
  *   delta +3,7 pp, rising = retail green) for the mirrored market. `flat`: gentle swings around 55 / 53 / 54 % (delta
  *   ≈ −1 pp: retail red for a long, nothing else met). `flip-short`: like `flat`, but the top-trader POSITION series is net
  *   short (43 % long) for the newest 60 periods and net long (55 %) before – one sign change, for "Top-Trader netto".
+ *   `slide-account` (Wal-Karte): the POSITION series as in `flip-short`, and the ACCOUNT series sits at 55 % long, then slides
+ *   0,15 pp per period down to 46 % over the newest 60 periods – so the account series passes the alert rule's Vorwarnung
+ *   (about 33 periods ago) and its Bestätigung (about 13 periods ago) and the position series gives one Bestätigung (the jump).
  */
 export const SYNTH_INTERVAL_MS: Record<string, number> = {
   "1m": 60_000,
@@ -157,10 +160,13 @@ export function synthKlines(interval: string, q: RangeQuery, anchor: number, now
 }
 
 export type RatioKind = "top-position" | "top-account" | "global";
-export type RatioScript = "whale-long" | "whale-short" | "flat" | "flip-short";
+export type RatioScript = "whale-long" | "whale-short" | "flat" | "flip-short" | "slide-account";
 
 /** `flip-short`: the top-trader POSITION series has been net short for the newest `FLIP_PERIODS` points and net long before. */
 export const FLIP_PERIODS = 60;
+
+/** `slide-account`: the account series slides down over the newest `SLIDE_PERIODS` points. */
+export const SLIDE_PERIODS = 60;
 
 /** Newest snapshots the scripts shape (1 h of 5-min points); older ones swing gently like `flat`. */
 const SCRIPT_POINTS = 12;
@@ -180,7 +186,9 @@ export function ratioLongPct(kind: RatioKind, i: number, script: RatioScript): n
   }
   // older points / `flat`: top accounts 53 %, all accounts 54 % → delta ≈ −1 pp (below 0 = retail red for a long only)
   // `flip-short`: the position series sits at 43 % long (net −14 ± 4 pp) for the newest FLIP_PERIODS points, 55 % before
-  const base = kind === "global" ? 54 : kind === "top-account" ? 53 : script === "flip-short" && i < FLIP_PERIODS ? 43 : 55;
+  if (script === "slide-account" && kind === "top-account") return 55 - 9 * (1 - Math.min(i, SLIDE_PERIODS) / SLIDE_PERIODS) + 0.2 * Math.sin(i * 0.9);
+  const flips = script === "flip-short" || script === "slide-account";
+  const base = kind === "global" ? 54 : kind === "top-account" ? 53 : flips && i < FLIP_PERIODS ? 43 : 55;
   return base + 1.5 * Math.sin(i * 0.9) + 0.5 * Math.sin(i * 2.3);
 }
 

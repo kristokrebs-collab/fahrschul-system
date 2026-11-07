@@ -122,7 +122,7 @@ test.describe("Top-Trader: Netto Long/Short on the Markt page", () => {
     expect(errors.filter((e) => !/willReadFrequently/.test(e))).toEqual([]);
   });
 
-  test("range switch: 7 Tage, 14 Tage and Alles with the real length; the card keeps its size", async ({ page }) => {
+  test("range switch: 7 / 30 / 90 Tage and Alles with the real length (the ranges the history does not fill are disabled); the card keeps its size", async ({ page }) => {
     const { card } = await openMarkt(page);
     await expect(card).toHaveAttribute("data-state", "ok", { timeout: 25_000 });
     const plot = card.getByTestId("trader-net-plot");
@@ -130,8 +130,12 @@ test.describe("Top-Trader: Netto Long/Short on the Markt page", () => {
     const all = Number(await plot.getAttribute("data-points"));
     expect(all).toBe(500);
     const group = card.getByRole("radiogroup", { name: "Zeitraum" });
-    await expect(group.getByRole("radio")).toHaveCount(3);
+    await expect(group.getByRole("radio")).toHaveCount(4);
     await expect(group.getByRole("radio", { name: "Alles · 20 Tage" })).toBeChecked();
+    // 20 days of history: 7 Tage can be taken, 30 and 90 are shown but not offered
+    await expect(group.getByRole("radio", { name: "7 Tage" })).toBeEnabled();
+    await expect(group.getByRole("radio", { name: "30 Tage" })).toBeDisabled();
+    await expect(group.getByRole("radio", { name: "90 Tage" })).toBeDisabled();
     const before = (await card.boundingBox())!.height;
     await group.getByRole("radio", { name: "7 Tage" }).click();
     await expect(plot).toHaveAttribute("data-points", /^1[67]\d$/);
@@ -139,8 +143,6 @@ test.describe("Top-Trader: Netto Long/Short on the Markt page", () => {
     await expect(plot).not.toHaveAttribute("data-flip", "none");
     await expect(plot).toHaveAttribute("data-drawn", "true", { timeout: 5_000 });
     expect(Math.abs((await card.boundingBox())!.height - before)).toBeLessThan(1.5);
-    await group.getByRole("radio", { name: "14 Tage" }).click();
-    await expect(plot).toHaveAttribute("data-points", /^3[3-9]\d$/);
     await group.getByRole("radio", { name: "Alles · 20 Tage" }).click();
     await expect(plot).toHaveAttribute("data-points", "500");
     expect(Math.abs((await card.boundingBox())!.height - before)).toBeLessThan(1.5);
@@ -151,7 +153,7 @@ test.describe("Top-Trader: Netto Long/Short on the Markt page", () => {
     await expect(card).toHaveAttribute("data-state", "ok", { timeout: 25_000 });
     const plot = card.getByTestId("trader-net-plot");
     await expect(plot).toBeVisible();
-    await expect(plot).toHaveAccessibleName(/^Top-Trader \(Binance\) netto, 500 Punkte von \d\d\.\d\d\. bis \d\d\.\d\d\.: zuletzt −\d+,\d Pkt\., letzter Umschlag zu Short am \d\d\.\d\d\.\.$/);
+    await expect(plot).toHaveAccessibleName(/^Top-Trader \(Binance\) netto, 500 Punkte von \d\d\.\d\d\. bis \d\d\.\d\d\.: zuletzt −\d+,\d Pkt\., letzter Umschlag zu Short am \d\d\.\d\d\.\. Marken der Alarm-Regel: 1 Marke \(Rot-Bestätigung \d\d\.\d\d\.\)\.$/);
     // fixed box: 256 px on a phone, 336 px from lg
     const box = (await plot.boundingBox())!;
     const lg = (page.viewportSize()?.width ?? 0) >= 1024;
@@ -274,7 +276,7 @@ test.describe("Top-Trader: Netto Long/Short on the Markt page", () => {
     expect(await clears(), "canvas clears while the crosshair moves").toBe(rest0);
     // a range switch replays a short wipe: both canvases are cleared once per frame (base + glow), the wipe lasts 0.65 s
     const group = card.getByRole("radiogroup", { name: "Zeitraum" });
-    await group.getByRole("radio", { name: "14 Tage" }).click();
+    await group.getByRole("radio", { name: "7 Tage" }).click();
     await expect(plot).toHaveAttribute("data-drawn", "true", { timeout: 8_000 });
     await page.waitForTimeout(300);
     const wipe = (await clears()) - rest0;

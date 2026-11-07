@@ -5,7 +5,8 @@
  * The geometry itself is the one of the small chart on the Übersicht (`netGeometry`); the data and the net/flip logic come from
  * `@/domain/signals/traderNet` – nothing is calculated twice.
  */
-import { durationText, gapText, netDayText, netText, pctText, type NetFlip, type NetGap, type NetPoint, type TraderNetView } from "@/domain/signals";
+import { durationText, netDayText, netText, pctText, type NetFlip, type NetPoint, type TraderNetView } from "@/domain/signals";
+import { gapText, type NetGap } from "@/domain/signals/netSeries";
 import { n0, n1, price } from "@/lib/format";
 import type { NetGeometry, NetPad } from "@/views/overview/traderNetChart";
 

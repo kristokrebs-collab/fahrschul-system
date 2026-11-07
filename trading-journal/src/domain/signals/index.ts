@@ -220,5 +220,4 @@ export {
   type TraderNetStatus,
   type TraderNetView,
 } from "./traderNet";
-export * from "./netSeries";
 export { WHALE_DRAFT_KEYS, WHALE_WEIGHTS, parseWhalePeriods, whaleToDraft, defaultWhaleDraft, whaleFromDraft, type WhaleDraft, type WhaleDraftKey, type WhaleFromDraft, type StoredWhale } from "./whaleDraft";

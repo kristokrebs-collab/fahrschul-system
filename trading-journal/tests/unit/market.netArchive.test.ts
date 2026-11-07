@@ -8,7 +8,8 @@ import "fake-indexeddb/auto";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ARCHIVE_KEEP_MS, type ArchivedNetPoint, type NetPoint } from "@/domain/signals";
+import { ARCHIVE_KEEP_MS, type ArchivedNetPoint } from "@/domain/signals/netSeries";
+import type { NetPoint } from "@/domain/signals";
 import { NET_ARCHIVE_CFG_KEY, NetArchiveUnavailable, __resetNetArchive, getNetArchiveOn, openNetArchive, setNetArchiveOn, useNetArchive } from "@/market/netArchive";
 
 const H = 3_600_000;

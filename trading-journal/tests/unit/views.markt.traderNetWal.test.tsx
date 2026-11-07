@@ -8,7 +8,8 @@
  */
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildTraderNet, findNetGaps, type ArchivedNetPoint, type NetPriceBar, type NetRatioPoint } from "@/domain/signals";
+import { buildTraderNet, type NetPriceBar, type NetRatioPoint } from "@/domain/signals";
+import { findNetGaps, type ArchivedNetPoint } from "@/domain/signals/netSeries";
 import type { LiveTraderNet } from "@/market";
 import type { NetArchiveState } from "@/market/netArchive";
 import { installDomPolyfills } from "./views.overview.harness";

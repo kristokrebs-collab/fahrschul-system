@@ -11,21 +11,8 @@
  *  - the marks are the alert engine's own rules (`replayWhale`) with the default thresholds; they look back, they do not predict.
  */
 import { DEFAULT_WHALE_PARAMS, replayWhale, type WhaleMark } from "@/domain/alerts/replay";
-import {
-  buildTraderNetFromPoints,
-  durationText,
-  findNetGaps,
-  latestRun,
-  mergeNetPoints,
-  NET_SERIES,
-  netDayText,
-  netStampText,
-  type ArchivedNetPoint,
-  type NetGap,
-  type NetPoint,
-  type NetSeriesId,
-  type TraderNetView,
-} from "@/domain/signals";
+import { buildTraderNetFromPoints, durationText, netDayText, type NetPoint, type TraderNetView } from "@/domain/signals";
+import { findNetGaps, latestRun, mergeNetPoints, NET_SERIES, netStampText, type ArchivedNetPoint, type NetGap, type NetSeriesId } from "@/domain/signals/netSeries";
 import type { LiveTraderNet } from "@/market/traderNet";
 
 const HOUR = 3_600_000;

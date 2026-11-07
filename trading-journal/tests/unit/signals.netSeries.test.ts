@@ -4,6 +4,7 @@
  * already-built points, the CSV, and the two feeds of the live series (`deriveLiveTraderNet` with the account feed).
  */
 import { describe, expect, it } from "vitest";
+import { buildTraderNetFromPoints, netTitle, type NetPoint } from "@/domain/signals";
 import {
   ARCHIVE_GRID_MS,
   ARCHIVE_KEEP_MS,
@@ -12,7 +13,6 @@ import {
   archiveStepOf,
   archivedOf,
   archivedToNet,
-  buildTraderNetFromPoints,
   findNetGaps,
   gapText,
   gapsIn,
@@ -21,11 +21,9 @@ import {
   mergeNetPoints,
   netPointsToCsv,
   netStampText,
-  netTitle,
   pointsForArchive,
   runsOf,
-  type NetPoint,
-} from "@/domain/signals";
+} from "@/domain/signals/netSeries";
 import { buildFeedSpecs, deriveLiveTraderNet, initialHealth, type RatioPoint, type Stamped } from "@/market";
 
 const H = 3_600_000;

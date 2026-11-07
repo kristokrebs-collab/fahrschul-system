@@ -11,7 +11,8 @@
  * Browser storage can be missing (private window) or full: the card then works as before, without a history (`status`).
  */
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { ARCHIVE_KEEP_MS, archivedOf, pointsForArchive, type ArchivedNetPoint, type NetPoint, type NetSeriesId } from "@/domain/signals";
+import { ARCHIVE_KEEP_MS, archivedOf, pointsForArchive, type ArchivedNetPoint, type NetSeriesId } from "@/domain/signals/netSeries";
+import type { NetPoint } from "@/domain/signals/traderNet";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 
 export const NET_ARCHIVE_DB = storageKey("net-archive");
