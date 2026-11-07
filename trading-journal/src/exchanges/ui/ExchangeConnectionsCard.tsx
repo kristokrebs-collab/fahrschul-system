@@ -8,6 +8,7 @@ import { agoLabel } from "@/cloud/device";
 import { celebrateFrom } from "@/motion/Celebrate";
 import { chevronFrames, DotMatrix } from "@/motion/DotMatrix";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
+import { ThinkingOrb } from "@/motion/ThinkingOrb";
 import { RadarSweep } from "@/motion/fx/RadarSweep";
 import { HoldConfirm, useConfirmFocus } from "@/motion/HoldConfirm";
 import { RollingDigits } from "@/motion/RollingDigits";
@@ -325,7 +326,7 @@ function Connected({ conn, status }: { conn: ExchangeConnection; status: Exchang
               </span>
             </div>
             <span className="flex basis-full items-center gap-1.5 text-[11.5px] text-faint sm:shrink-0 sm:basis-auto">
-              {scanning && <DotMatrix preset="snake" size={2} gap={1} tone="win" playing />}
+              {scanning && <ThinkingOrb variant="search" size={18} className="text-win" />}
               <TextRoll text={scanning ? EX.syncing : `${EX.lastSync} ${conn.lastSyncAt ? agoLabel(conn.lastSyncAt, now) : EX.never}`} />
             </span>
           </div>
@@ -367,7 +368,7 @@ function Connected({ conn, status }: { conn: ExchangeConnection; status: Exchang
               transition={{ y: spring.enter, opacity: tween.fade }}
               data-testid="exchange-backfill"
             >
-              <DotMatrix preset="wave" size={3} gap={1.5} tone="fg" playing />
+              <ThinkingOrb variant="calc" size={22} />
               <span className="min-w-0 flex-1">{CONNECT.importRunning}</span>
               {backfill?.run && <span className="num font-mono text-fg">{backfill.run.inserted}</span>}
             </motion.div>

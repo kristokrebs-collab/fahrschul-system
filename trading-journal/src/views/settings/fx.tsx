@@ -14,14 +14,15 @@ import { Button, type ButtonProps } from "@/primitives/Button";
 /** How long a finished action keeps showing its ✓ before returning to idle (`dwell.done`, in ms for the timers). */
 export const DONE_HOLD_MS = dwell.done * 1000;
 
-export type ActionPhase = "idle" | "busy" | "done";
+export type ActionPhase = "idle" | "busy" | "done" | "failed";
 
 /**
  * `run(fn)`: `busy` while `fn` runs, then `done` for `DONE_HOLD_MS` and back to `idle`. Resolves `true` on success;
  * a throw or an explicit `false` from `fn` (e.g. a download that could not start) returns straight to `idle` and
- * resolves `false`. Safe against unmounting mid-run.
+ * resolves `false` – or, with `keepFailed` (the save of the settings page), shows `failed` ("Erneut versuchen") until the
+ * next run: a refused write is never passed off as idle. Safe against unmounting mid-run.
  */
-export function useActionPhase(holdMs = DONE_HOLD_MS): { phase: ActionPhase; run: (fn: () => unknown) => Promise<boolean> } {
+export function useActionPhase(holdMs = DONE_HOLD_MS, keepFailed = false): { phase: ActionPhase; run: (fn: () => unknown) => Promise<boolean> } {
   const [phase, setPhase] = useState<ActionPhase>("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const alive = useRef(true);
@@ -43,11 +44,11 @@ export function useActionPhase(holdMs = DONE_HOLD_MS): { phase: ActionPhase; run
         ok = false;
       }
       if (!alive.current) return ok;
-      setPhase(ok ? "done" : "idle");
+      setPhase(ok ? "done" : keepFailed ? "failed" : "idle");
       if (ok) timer.current = setTimeout(() => alive.current && setPhase("idle"), holdMs);
       return ok;
     },
-    [holdMs],
+    [holdMs, keepFailed],
   );
   return { phase, run };
 }
@@ -83,6 +84,12 @@ export function PhaseGlyph({ phase, icon, spinIcon = false, className }: { phase
   const reduced = useReducedFx();
   let glyph: ReactNode = null;
   if (phase === "done") glyph = <DrawnCheck />;
+  else if (phase === "failed")
+    glyph = (
+      <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+        <path d="M8 3.2v5.6M8 12v.1" />
+      </svg>
+    );
   else if (phase === "busy") glyph = spinIcon && icon ? <span className="grid size-3.5 animate-spin place-items-center [&>svg]:size-full">{icon}</span> : <Spinner />;
   else if (icon) glyph = <span className="grid size-3.5 place-items-center [&>svg]:size-full">{icon}</span>;
   return (
@@ -126,7 +133,7 @@ export function ActionButton({ children, icon, spinIcon, onRun, disabled, ...res
   );
 }
 
-export const SAVE_LABELS: Record<ActionPhase, string> = { idle: "Speichern", busy: "Speichert …", done: "Gespeichert" };
+export const SAVE_LABELS: Record<ActionPhase, string> = { idle: "Speichern", busy: "Speichert …", done: "Gespeichert", failed: "Erneut versuchen" };
 
 export interface SaveButtonProps extends Omit<ButtonProps, "children" | "variant"> {
   phase: ActionPhase;
@@ -134,7 +141,8 @@ export interface SaveButtonProps extends Omit<ButtonProps, "children" | "variant
 
 /**
  * Save button (21st.dev "Interactive Hover Button" state morph): `Speichern` → spinner + `Speichert …` → drawn ✓ +
- * `Gespeichert` on a win wash for `DONE_HOLD_MS` → back. Letters morph (`TextRoll`), the glyph sits left of the
+ * `Gespeichert` on a win wash for `DONE_HOLD_MS` → back; a refused write turns it into `Erneut versuchen` on a red wash (R11, it stays
+ * until the next try). Letters morph (`TextRoll`), the glyph sits left of the
  * centred label so nothing shifts, and the width is fixed to the longest state – no layout animation needed.
  * The accessible name is exactly the current label (`Speichern` when idle).
  */
@@ -147,6 +155,13 @@ export function SaveButton({ phase, className, disabled, ...rest }: SaveButtonPr
         className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] bg-win"
         initial={false}
         animate={{ opacity: phase === "done" ? 1 : 0 }}
+        transition={reduced ? { duration: 0 } : tween.crossfade}
+      />
+      <motion.span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] bg-loss"
+        initial={false}
+        animate={{ opacity: phase === "failed" ? 1 : 0 }}
         transition={reduced ? { duration: 0 } : tween.crossfade}
       />
       <span className="relative inline-flex items-center">

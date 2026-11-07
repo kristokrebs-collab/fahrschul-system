@@ -3,6 +3,7 @@ import type { ScreenshotRef } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { toInputString } from "@/lib/parse";
 import { Sheet, StaggerItem } from "@/motion/Sheet";
+import { ThinkingOrb } from "@/motion/ThinkingOrb";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
 import { CheckboxRow } from "@/primitives/CheckboxRow";
@@ -213,7 +214,7 @@ export default function ExtractSheet() {
         {busy && (
           <StaggerItem>
             <p role="status" aria-live="polite" className="flex items-center gap-3 rounded-xl border border-line bg-ink-950/40 px-3.5 py-3 text-[13px] text-mute" data-testid="extract-busy">
-              <span aria-hidden="true" className="size-2 shrink-0 animate-pulse rounded-full bg-signal" />
+              <ThinkingOrb variant={phase.name === "preparing" ? "calc" : "plan"} size={20} className="text-mute" />
               {phase.name === "preparing" ? S.preparing : S.reading}
             </p>
             <Button

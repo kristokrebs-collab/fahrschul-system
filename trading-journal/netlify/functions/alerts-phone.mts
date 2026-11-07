@@ -12,7 +12,7 @@
  *        settings are switched off → `{ status: "revoked" }`.
  *
  * Guards: signed in (aal2 if 2FA), the plan has calls (`phoneCallsPerMonth` > 0 – Premium and Team), rate limits per account (fail-closed),
- * `TWILIO_*` and `EXCHANGE_ENC_KEY_V1` configured (else 503 `phone_unavailable`, German "Einrichtung nötig"). The number is stored only encrypted
+ * the emergency switch `KILL_CALLS` off (start and test answer 503 `switched_off`; opt-out always works), `TWILIO_*` and `EXCHANGE_ENC_KEY_V1` configured (else 503 `phone_unavailable`, German "Einrichtung nötig"). The number is stored only encrypted
  * (+ a keyed hash), never logged, never returned (only the masked form).
  */
 import type { Config } from "@netlify/functions";
@@ -28,6 +28,7 @@ import { CONSENT_VERSION, numberHash, openNumber, phoneState, sealNumber } from 
 import { supabaseAlertStore } from "./_lib/alerts/store";
 import { twilioConfig, verifyCheck, verifyStart } from "./_lib/alerts/twilio";
 import { handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
+import { assertRunning } from "./_lib/killswitch";
 import { planOf } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { supabaseAdmin } from "./_lib/supabase";
@@ -70,6 +71,9 @@ export default handler(async (req) => {
   if (!(alertLimits(plan.plan).phoneCallsPerMonth > 0)) {
     throw new HttpError(402, "plan_required", "Anrufe sind in deinem Tarif nicht enthalten.", { feature: "phoneCallsPerMonth", required: "premium", plan: plan.plan });
   }
+
+  // KILL_CALLS: no SMS code (Twilio Verify) and no test call while the operator has the phone switched off. Opting out (DELETE, above) stays possible.
+  if (body.action === "start" || body.action === "test") assertRunning("calls");
 
   if (body.action === "start") {
     if (!tw.verifySid) throw new HttpError(503, "verify_unavailable", "Die Nummernprüfung ist auf diesem Server nicht eingerichtet (Einrichtung nötig).");

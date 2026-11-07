@@ -29,6 +29,7 @@ import { cleanSymbols } from "./_lib/exchanges/binance";
 import { adapterFor, keyRights } from "./_lib/exchanges/registry";
 import { connectionInfo, insertConnection, listConnections, updateConnection } from "./_lib/exchanges/store";
 import { EXCHANGE_IDS, EXCHANGE_MARKETS, type ExchangeCredentials, type ExchangeMarket } from "./_lib/exchanges/types";
+import { assertRunning } from "./_lib/killswitch";
 
 const KEY = z.string().trim().min(8).max(200).regex(/^[A-Za-z0-9_\-.=+/]+$/);
 
@@ -58,6 +59,7 @@ const PatchBody = z
 export default handler(async (req, ctx) => {
   requireMethod(req, "POST", "PATCH");
   const user = await requireUser(req, { aal2: "ifEnrolled" });
+  assertRunning("sync");
   await enforceRateLimit(rateKey("exchange-connect", user.id), 10, 600, { failClosed: true });
 
   if (req.method.toUpperCase() === "PATCH") {

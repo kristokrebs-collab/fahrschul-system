@@ -43,6 +43,11 @@ export const SERVER_ENV = [
   "ALERT_PHONE_DAILY_MAX",
   "ALERT_PHONE_USER_DAILY_MAX",
   "ALERTS_CRON_ENABLED",
+  "OPS_TOKEN",
+  "KILL_SYNC",
+  "KILL_CALLS",
+  "KILL_AI",
+  "KILL_CHECKOUT",
 ] as const;
 
 /** Known names plus further key versions for rotation (`EXCHANGE_ENC_KEY_V2`, …). */

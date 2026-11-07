@@ -14,10 +14,12 @@
  * Pure state + parsing; the effect (navigate, open) is in `ReturnHost.tsx`.
  */
 import { create } from "zustand";
+import { parseOrderParam } from "@/billing/purchase/order";
 import { storageKey } from "@/store/storage";
 import { PAGES, type Page } from "@/store/uiStore";
 
-export type ReturnTarget = { kind: "feature"; id: string } | { kind: "page"; page: Page };
+/** `order`: the purchase order (B4) – `<plan>.<interval>.<seats>`, e.g. `pro.year.1`; after the login the order sheet opens with exactly this choice. */
+export type ReturnTarget = { kind: "feature"; id: string } | { kind: "page"; page: Page } | { kind: "order"; order: string };
 export type ReturnWait = { on: "signedIn" } | { on: "entitled"; feature: string } | { on: "connected" };
 
 export interface ReturnTo {
@@ -45,10 +47,11 @@ export function parseReturnParam(raw: string | null | undefined): ReturnTarget |
   const rest = raw.slice(i + 1);
   if (kind === "feature" && FEATURE_ID.test(rest)) return { kind: "feature", id: rest };
   if (kind === "page" && (PAGES as readonly string[]).includes(rest)) return { kind: "page", page: rest as Page };
+  if (kind === "order" && parseOrderParam(rest)) return { kind: "order", order: rest };
   return null;
 }
 
-export const formatReturnParam = (t: ReturnTarget): string => (t.kind === "feature" ? `feature:${t.id}` : `page:${t.page}`);
+export const formatReturnParam = (t: ReturnTarget): string => (t.kind === "feature" ? `feature:${t.id}` : t.kind === "order" ? `order:${t.order}` : `page:${t.page}`);
 
 /** The hash of a login / plan page that brings the person back to `target` afterwards. */
 export const returnHash = (page: Page, target: ReturnTarget): string => `#${page}?returnTo=${formatReturnParam(target)}`;
@@ -68,7 +71,7 @@ function sanitize(v: unknown, now: number): ReturnTo | null {
 }
 
 function formatReturnLike(t: Record<string, unknown>): string {
-  return t.kind === "feature" ? `feature:${String(t.id)}` : t.kind === "page" ? `page:${String(t.page)}` : "";
+  return t.kind === "feature" ? `feature:${String(t.id)}` : t.kind === "page" ? `page:${String(t.page)}` : t.kind === "order" ? `order:${String(t.order)}` : "";
 }
 
 function read(): ReturnTo | null {

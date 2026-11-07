@@ -50,6 +50,14 @@ function ipPepper(): string {
   return sb ? createHash("sha256").update(`tj-ip-pepper:${sb}`).digest("hex") : "tj-local-only";
 }
 
+/**
+ * Server-secret key for ONE purpose (B1 recovery codes): HMAC of the purpose label with the pepper, hex. A purpose label
+ * keeps two uses of the same secret from ever producing comparable values.
+ */
+export function purposeKey(purpose: string): string {
+  return createHmac("sha256", ipPepper()).update(`tj-purpose:${purpose}`).digest("hex");
+}
+
 /** Pseudonym of an IP for the audit log: truncated HMAC-SHA-256 with the server secret (`null` passes through). */
 export function hashIp(ip: string | null): string | null {
   return ip ? createHmac("sha256", ipPepper()).update(`tj-audit:${ip}`).digest("hex").slice(0, 32) : null;

@@ -19,7 +19,7 @@ import { PageHeader } from "@/views/setups/PageHeader";
 const SIZE = {
   security: { base: 721, lg: 656 },
   privacy: { base: 470, lg: 656 },
-  data: { base: 718, lg: 364 },
+  data: { base: 1212, lg: 714 },
 } as const satisfies Record<string, ReserveHeight>;
 
 export const KONTO_LEAD_FILL = { storageKey: storageKey("fill-konto"), highlight: KONTO.leadHighlight } as const;

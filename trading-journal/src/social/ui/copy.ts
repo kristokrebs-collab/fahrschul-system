@@ -36,4 +36,16 @@ export async function nativeShare(url: string, title: string): Promise<boolean> 
   }
 }
 
+/** The system share sheet with a text only (no link yet): the redacted one-line summary of a trade. Same API as `nativeShare`, nothing sent anywhere by us. */
+export async function nativeShareText(title: string, text: string): Promise<boolean> {
+  const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
+  if (typeof nav.share !== "function") return false;
+  try {
+    await nav.share({ title, text });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const canNativeShare = (): boolean => typeof (navigator as Navigator & { share?: unknown }).share === "function";

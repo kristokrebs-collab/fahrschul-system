@@ -5,6 +5,7 @@ import { adjacentTradedDays, dayView } from "@/domain/insights";
 import { cn } from "@/lib/cn";
 import { colorClass, n2, pct0, r as fmtR } from "@/lib/format";
 import { MotionNumber } from "@/motion/MotionNumber";
+import { SaveBadge } from "@/motion/SaveMorph";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Textarea } from "@/primitives/Input";
@@ -26,7 +27,6 @@ const MOODS: { v: DayMood; label: string }[] = [
 const AUTOSAVE_MS = 700;
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
-const SAVE_TEXT: Record<SaveState, string> = { idle: "", dirty: "Ungespeichert …", saving: "Speichert …", saved: "Gespeichert", error: "Nicht gespeichert – erneut versuchen" };
 
 /**
  * The day's journal entry (`tj2-days` via `saveDay`). Never discards input: it saves itself after a typing pause, on
@@ -117,15 +117,16 @@ function DayNoteEditor({ dayKey }: { dayKey: string }) {
         onBlur={() => void flush()}
         className="min-h-[84px] resize-y text-[13px]"
       />
-      <span aria-live="off" className={cn("min-h-4 text-[11px]", state === "error" ? "text-loss" : "text-faint")}>
-        {state === "error" ? (
-          <button type="button" className="underline underline-offset-2" onClick={() => void flush()}>
-            {SAVE_TEXT.error}
-          </button>
-        ) : (
-          SAVE_TEXT[state]
-        )}
-      </span>
+      {/* Speicher-Morph: „Speichert …“ → „Gespeichert“ only after `saveDay` resolved; a failed write says so and retries the same text */}
+      <div className="flex justify-end">
+        <SaveBadge
+          phase={state === "error" ? "failed" : state}
+          showDirty
+          testId="day-note-saved"
+          saved="Gespeichert"
+          onRetry={() => void flush()}
+        />
+      </div>
     </div>
   );
 }

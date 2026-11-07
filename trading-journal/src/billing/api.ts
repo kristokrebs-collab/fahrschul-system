@@ -4,7 +4,7 @@
  * the URL the server returned, and only to an https `*.stripe.com` host.
  */
 import { ApiError, apiFetch } from "@/cloud/api";
-import type { BillingStatus, CheckoutRequest, CheckoutResponse, CodeLookup, PortalRequest, PortalResponse, ReferralCheck, ReferralInfo } from "./contract";
+import type { BillingStatus, CheckoutRequest, CheckoutResponse, CodeLookup, ContractConfirmResponse, ContractDeclaration, ContractReceipt, PortalRequest, PortalResponse, ReferralCheck, ReferralInfo } from "./contract";
 
 export function fetchBillingStatus(opts: { invoices?: boolean; signal?: AbortSignal } = {}): Promise<BillingStatus> {
   return apiFetch<BillingStatus>("/billing/status", { query: opts.invoices ? { invoices: 1 } : undefined, signal: opts.signal });
@@ -12,6 +12,16 @@ export function fetchBillingStatus(opts: { invoices?: boolean; signal?: AbortSig
 
 export function postCheckout(body: CheckoutRequest): Promise<CheckoutResponse> {
   return apiFetch<CheckoutResponse>("/billing/checkout", { method: "POST", body });
+}
+
+/** § 312k / § 356a BGB: cancel or withdraw WITHOUT a login (public route); `auth` only when signed in, so a login of that address runs it at once. */
+export function postContract(body: ContractDeclaration, auth: boolean): Promise<ContractReceipt> {
+  return apiFetch<ContractReceipt>("/billing/contract", { method: "POST", body, auth });
+}
+
+/** The link of the confirmation mail (public, no token needed beyond the one in the link). */
+export function postContractConfirm(token: string): Promise<ContractConfirmResponse> {
+  return apiFetch<ContractConfirmResponse>("/billing/contract/confirm", { method: "POST", body: { token }, auth: false });
 }
 
 export function postPortal(body: PortalRequest): Promise<PortalResponse> {

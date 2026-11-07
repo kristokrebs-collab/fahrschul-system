@@ -1,13 +1,14 @@
 import { motion } from "motion/react";
 import { useEffect, useId } from "react";
 import { cn } from "@/lib/cn";
+import { SaveBadge, SaveSurface, useSaveMorph } from "@/motion/SaveMorph";
 import { Switch } from "@/motion/Switch";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
-import { setPrivacy, usePrivacy, type PrivacyPrefs } from "../privacy";
+import { resyncPrivacy, setPrivacy, usePrivacy, type PrivacyPrefs } from "../privacy";
 import { cloudEnabled } from "../env";
 import { useCloudSession } from "../session";
 import { DATA_CARD_ID, PRIVACY_CARD } from "./strings";
@@ -37,6 +38,11 @@ export function PrivacyCard({ className }: { className?: string }) {
   const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const reduced = useReducedFx();
   const id = useId();
+  // Speicher-Morph: a switch is "gespeichert" only when this device's storage took it AND (signed in) the account answered
+  const save = useSaveMorph();
+  const change = (key: keyof PrivacyPrefs, v: boolean) => void save.run(async () => (await setPrivacy({ [key]: v })) || Promise.reject(new Error("Die Änderung gilt vorerst nur auf diesem Gerät.")));
+  // „Erneut versuchen“ sends the account keys again (the local value is already set)
+  const retry = () => void save.run(async () => (await resyncPrivacy()) || Promise.reject(new Error("Der Account hat die Änderung nicht angenommen.")));
   // the ranking row is the same switch as Community's „In der Rangliste erscheinen“: it follows the server's opt-in
   // as soon as the card shows (P1-03) – the social store loads on demand, it stays out of this chunk
   useEffect(() => {
@@ -44,7 +50,8 @@ export function PrivacyCard({ className }: { className?: string }) {
     void import("@/social/store").then((m) => m.followServerOptIn()).catch(() => undefined);
   }, [signedIn]);
   return (
-    <Card title={PRIVACY_CARD.title} className={className}>
+    <Card title={PRIVACY_CARD.title} className={className} action={<SaveBadge phase={save.phase} error={save.error} onRetry={retry} testId="privacy-saved" />}>
+      <SaveSurface phase={save.phase} className="flex min-h-0 flex-1 flex-col">
       <p className="mb-4 text-[13px] leading-relaxed text-mute">{PRIVACY_CARD.intro}</p>
       <ul className={cn("grid gap-2", signedIn && "mb-4")}>
         {ROWS.map((r, i) => {
@@ -73,7 +80,7 @@ export function PrivacyCard({ className }: { className?: string }) {
                 </label>
                 <span className="text-[11.5px] leading-snug text-faint">{r.help}</span>
               </span>
-              <Switch id={sid} className="relative" checked={on} disabled={disabled} tone={r.key === "sync" ? "fg" : "win"} onCheckedChange={(v) => setPrivacy({ [r.key]: v })} />
+              <Switch id={sid} className="relative" checked={on} disabled={disabled} tone={r.key === "sync" ? "fg" : "win"} onCheckedChange={(v) => change(r.key, v)} />
             </motion.li>
           );
         })}
@@ -88,6 +95,7 @@ export function PrivacyCard({ className }: { className?: string }) {
           </Button>
         </div>
       )}
+      </SaveSurface>
     </Card>
   );
 }

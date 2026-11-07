@@ -16,6 +16,9 @@
     "build:e2e-cloud": "VITE_SUPABASE_URL=https://e2e-mock.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_e2e vite build --outDir dist-e2e-cloud --emptyOutDir",
     "build:single": "tsc -b && node scripts/build-single.mjs",
     "budget": "node scripts/bundleBudget.mjs",
+    "release:check": "node scripts/releaseCheck.mjs",
+    "restore:probe": "node scripts/restoreProbe.mjs",
+    "env:doc": "node scripts/envDoc.mjs --write",
     "ocr:check": "node scripts/ocrCheck.ts"
   },
   "dependencies": {

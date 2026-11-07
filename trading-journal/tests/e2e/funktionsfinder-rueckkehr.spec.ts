@@ -14,10 +14,9 @@ import { cloudUrl, collectErrors, seed } from "./helpers";
 import { mockBilling } from "./mocks/billing";
 import { mockSocial } from "./mocks/social";
 import { mockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const PROJECTS = ["mobile", "desktop"];
-const EMAIL = "trader@example.com";
-const PASSWORD = "richtig-geheim-42";
 const RETURN_KEY = "tj2-return-to";
 
 /** What the app has noted for the way back (this tab's `sessionStorage`, `src/store/returnTo.ts`). */
@@ -31,6 +30,7 @@ const layer = (page: Page, key: string) => page.locator(`[data-page="${key}"][da
 
 async function setup(page: Page) {
   const errors = collectErrors(page);
+  await blockExternalNetwork(page);
   await mockSupabase(page);
   await mockBilling(page, { enabled: false });
   await mockSocial(page, {});
@@ -40,15 +40,7 @@ async function setup(page: Page) {
 
 /** Signs in through the sheet that is open (or the header pill) and closes the welcome sheet once the first sync is live. */
 async function signInInOpenSheet(page: Page): Promise<void> {
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.locator("[inert]")).toHaveCount(0);
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await signInViaSheet(page, { fromPill: false, synced: true });
 }
 
 test.describe("Finder: zurück zur Aufgabe nach der Anmeldung", () => {

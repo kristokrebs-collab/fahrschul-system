@@ -1,3 +1,4 @@
+import { PRICE_TAX_NOTE } from "@/legal/consentTexts";
 /** German copy of the pricing page (P10). */
 export const PREISE = {
   title: "Preise",
@@ -12,7 +13,7 @@ export const PREISE = {
     days > 0
       ? `${days} Tage kostenlos testen. Danach monatlich oder jährlich, jederzeit zum Laufzeitende kündbar.`
       : "Monatlich oder jährlich, jederzeit zum Laufzeitende kündbar.",
-  heroCta: (days: number) => (days > 0 ? "Pro testen" : "Pro holen"),
+  heroCta: () => "Pro wählen",
   plansTitle: "Tarife",
   interval: "Abrechnung",
   monthly: "Monatlich",
@@ -30,7 +31,10 @@ export const PREISE = {
   currentShort: "Du",
   ctaFree: "Kostenlos starten",
   ctaFreeSignedIn: "Im Free-Tarif",
-  ctaTrial: (days: number) => (days > 0 ? `${days} Tage gratis testen` : "Abonnieren"),
+  /** The way to the order summary – NOT the order button (that one says "Zahlungspflichtig bestellen", `BUTTON_LABELS.order`). */
+  ctaOrder: "Weiter zur Bestellung",
+  ctaLocked: "Noch nicht bestellbar",
+  details: "Tarif im Detail",
   ctaManage: "Abo verwalten",
   ctaSwitch: "Wechseln",
   ctaSoon: "Noch nicht buchbar",
@@ -59,7 +63,7 @@ export const PREISE = {
   faqTitle: "Häufige Fragen",
   legalCancel: "Verträge hier kündigen",
   legalNoContract: "Es läuft gerade kein Vertrag.",
-  legalNote: "Preise in Euro. Zahlung und Rechnungen über Stripe. Es gelten die Dokumente des Betreibers:",
+  legalNote: `${PRICE_TAX_NOTE} Zahlung und Rechnungen über Stripe. Es gelten die Dokumente des Betreibers:`,
   closedCta: "Alles freigeschaltet",
 } as const;
 

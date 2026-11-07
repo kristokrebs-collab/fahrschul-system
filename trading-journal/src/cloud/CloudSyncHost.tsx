@@ -3,13 +3,16 @@ import { useEntitlement } from "@/billing/entitlements";
 import { hasClaudeRuntime } from "@/store/capability";
 import { pushToast } from "@/store/uiStore";
 import { cloudEnabled } from "./env";
+import { refreshOpsFlags } from "./flags";
 import { watchIdle } from "./idle";
 import { installErrorReporting } from "./report";
 import { bootCloud, ensureCloud, setSyncEntitled } from "./runtime";
 import { useCloudSession } from "./session";
+import { useTakeover } from "./takeover";
 import { SECURITY } from "./ui/strings";
 
 const AuthSheet = lazy(() => import("./ui/AuthSheet").then((m) => ({ default: m.AuthSheet })));
+const TakeoverDialog = lazy(() => import("./ui/TakeoverDialog").then((m) => ({ default: m.TakeoverDialog })));
 
 export interface CloudSyncHostProps {
   /** Opens the Konto page from the account panel (`() => navigate("konto")`). */
@@ -32,6 +35,9 @@ export function CloudSyncHost({ onOpenAccount }: CloudSyncHostProps) {
   const entitled = useEntitlement("cloudSync");
   const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const mounted = useCloudSession((s) => s.sheet.mounted);
+  const takeoverMounted = useTakeover((s) => s.mounted);
+  // one sheet at a time: while the takeover question is open the login sheet is unmounted (two sheets sharing the morph layer brought the closed one back)
+  const takeoverOpen = useTakeover((s) => s.phase !== "idle");
 
   useEffect(() => {
     if (!enabled) return;
@@ -44,6 +50,16 @@ export function CloudSyncHost({ onOpenAccount }: CloudSyncHostProps) {
     setSyncEntitled(entitled);
   }, [entitled]);
 
+  // C4: the operator's emergency switches (public, four booleans) – read once after sign-in, then every 5 minutes while visible
+  useEffect(() => {
+    if (!enabled || !signedIn) return;
+    void refreshOpsFlags();
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void refreshOpsFlags();
+    }, 5 * 60_000);
+    return () => clearInterval(t);
+  }, [enabled, signedIn]);
+
   useEffect(() => {
     if (!enabled || !signedIn) return;
     return watchIdle({
@@ -55,11 +71,13 @@ export function CloudSyncHost({ onOpenAccount }: CloudSyncHostProps) {
     });
   }, [enabled, signedIn]);
 
-  if (!enabled || !mounted) return null;
+  if (!enabled || (!mounted && !takeoverMounted)) return null;
   return (
     <div data-layer="CloudAuth">
       <Suspense fallback={null}>
-        <AuthSheet onOpenAccount={onOpenAccount} />
+        {mounted && !takeoverOpen && <AuthSheet onOpenAccount={onOpenAccount} />}
+        {/* B1: the data-takeover dialog – its chunk loads when the engine first asks */}
+        {takeoverMounted && <TakeoverDialog />}
       </Suspense>
     </div>
   );

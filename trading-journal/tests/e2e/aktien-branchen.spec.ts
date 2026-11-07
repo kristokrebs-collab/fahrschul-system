@@ -132,7 +132,9 @@ test.describe("Branchen-Trend", () => {
 
   test("während die Daten kommen, stehen 48 Platzhalter in Kachelgröße – danach ändert sich die Höhe kaum", async ({ page }, info) => {
     const { errors, mock } = await open(page, info);
-    mock.delayMs = 1500;
+    // the answer is held until the placeholders are measured (a fixed delay raced with a slow runner)
+    let release!: () => void;
+    mock.hold = new Promise<void>((r) => (release = r));
     await go(page);
     const loading = page.getByTestId("branchen-grid-loading");
     await expect(loading).toBeVisible();
@@ -142,6 +144,7 @@ test.describe("Branchen-Trend", () => {
     const section = page.getByTestId("aktien-branchen");
     const h0 = (await loading.boundingBox())!.height;
     const top0 = (await loading.boundingBox())!.y - (await section.boundingBox())!.y;
+    release();
     await ready(page);
     const grid = page.getByTestId("branchen-grid");
     const h1 = (await grid.boundingBox())!.height;

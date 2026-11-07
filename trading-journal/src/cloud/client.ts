@@ -12,9 +12,10 @@
 import { createClient, type AuthChangeEvent, type Factor, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { pushToast } from "@/store/uiStore";
 import { KEYS } from "@/store/storage";
-import { apiFetch, setAccessTokenProvider } from "./api";
+import { ApiError, apiFetch, setAccessTokenProvider } from "./api";
 import { authErrorText, type AuthErrorText } from "./authErrors";
 import { cloudConfig, type OAuthProvider } from "./env";
+import { primeOpsFlags } from "./flags";
 import { ACCOUNT_PRIVACY_KEYS, onPrivacyChange, parsePrivacy, setPrivacy, usePrivacy, type PrivacyPrefs } from "./privacy";
 import { openAuthSheet, SIGNED_OUT, useCloudSession } from "./session";
 import { activeSync, startSyncController } from "./sync/controller";
@@ -157,8 +158,10 @@ export function initClient(): Promise<void> {
       void adoptProfilePrivacy();
       if (useCloudSession.getState().needsMfa) openAuthSheet("mfa", "callback");
     }
+    // C4: the operator's switches are read before the first sync may start (fail open after 3 s)
+    void primeOpsFlags();
     stopController ??= startSyncController(sb);
-    onPrivacyChange((next, changed) => void pushProfilePrivacy(next, changed));
+    onPrivacyChange((next, changed) => pushProfilePrivacy(next, changed));
   })());
 }
 
@@ -180,16 +183,21 @@ async function adoptProfilePrivacy(): Promise<void> {
   }
 }
 
-async function pushProfilePrivacy(next: PrivacyPrefs, changed: (keyof PrivacyPrefs)[]): Promise<void> {
+/** Mirrors the account keys into the profile. Resolves `false` when the server refused (the toast says so too); nothing to push = `true`. */
+async function pushProfilePrivacy(next: PrivacyPrefs, changed: (keyof PrivacyPrefs)[]): Promise<boolean> {
   const uid = useCloudSession.getState().user?.id;
-  if (!uid || !changed.some((k) => (ACCOUNT_PRIVACY_KEYS as readonly string[]).includes(k))) return;
+  if (!uid || !changed.some((k) => (ACCOUNT_PRIVACY_KEYS as readonly string[]).includes(k))) return true;
   const sb = getClient();
   const { data } = await sb.from("profiles").select("privacy").eq("id", uid).maybeSingle();
   const cur = (data as { privacy?: Record<string, unknown> } | null)?.privacy ?? {};
   const privacy = { ...cur, ...Object.fromEntries(ACCOUNT_PRIVACY_KEYS.map((k) => [k, next[k]])) };
   const { error } = await sb.from("profiles").update({ privacy }).eq("id", uid);
-  if (error) pushToast({ kind: "error", title: "Datenschutz-Einstellung nicht gespeichert", detail: "Sie gilt vorerst nur auf diesem Gerät." });
-  else auditEvent("privacy.update", Object.fromEntries(ACCOUNT_PRIVACY_KEYS.map((k) => [k, next[k]])));
+  if (error) {
+    pushToast({ kind: "error", title: "Datenschutz-Einstellung nicht gespeichert", detail: "Sie gilt vorerst nur auf diesem Gerät." });
+    return false;
+  }
+  auditEvent("privacy.update", Object.fromEntries(ACCOUNT_PRIVACY_KEYS.map((k) => [k, next[k]])));
+  return true;
 }
 
 /* ------------------------------------------------------------------ auth actions */
@@ -266,16 +274,30 @@ export async function resendConfirmation(email: string): Promise<ActionResult> {
   }
 }
 
-/** New password (after the reset link, or "Passwort ändern" while signed in). */
-export async function updatePassword(password: string, reason: "reset" | "change"): Promise<ActionResult> {
+/**
+ * New password (after the reset link, or "Passwort ändern" while signed in). B1 session rule: a new password ends every
+ * OTHER session (a stolen device must not stay signed in with the old secret); this device keeps its session. The
+ * password is saved even when the sign-out of the others fails – `othersSignedOut` says which it was.
+ */
+export async function updatePassword(password: string, reason: "reset" | "change"): Promise<ActionResult<{ othersSignedOut: boolean }>> {
   try {
-    const { error } = await getClient().auth.updateUser({ password });
+    const sb = getClient();
+    const { error } = await sb.auth.updateUser({ password });
     if (error) return fail(error);
     auditEvent(reason === "reset" ? "auth.password.reset" : "auth.password.change");
-    return { ok: true };
+    const out = await sb.auth.signOut({ scope: "others" }).catch(() => ({ error: new Error("signout") }));
+    const othersSignedOut = !out.error;
+    if (othersSignedOut) auditEvent("auth.sessions.revoke", { reason: "password" });
+    return { ok: true, value: { othersSignedOut } };
   } catch (e) {
     return fail(e);
   }
+}
+
+/** "Rückgängig" of the data takeover (the dialog asks again afterwards). False when no sync runs or the window is over. */
+export async function undoTakeover(): Promise<boolean> {
+  const a = activeSync();
+  return a ? a.engine.undoTakeover() : false;
 }
 
 export async function signOutScope(scope: "local" | "global" | "others"): Promise<ActionResult> {
@@ -356,6 +378,52 @@ export async function unenrollTotp(factorId: string): Promise<ActionResult> {
     return { ok: true };
   } catch (e) {
     return fail(e);
+  }
+}
+
+/* ------------------------------------------------------------------ recovery codes (B1) */
+
+export interface RecoveryStatus {
+  total: number;
+  remaining: number;
+  createdAt: string | null;
+}
+
+function apiFail(e: unknown): { ok: false } & AuthErrorText {
+  if (e instanceof ApiError) return { ok: false, message: e.message, field: null };
+  return { ok: false, message: "Der Server ist gerade nicht erreichbar.", field: null };
+}
+
+/** How many recovery codes are left (never the codes). Needs the code step when 2FA is on. */
+export async function recoveryStatus(): Promise<ActionResult<RecoveryStatus>> {
+  try {
+    return { ok: true, value: await apiFetch<RecoveryStatus>("/account/mfa-recovery") };
+  } catch (e) {
+    return apiFail(e);
+  }
+}
+
+/** A fresh set of 8 single-use codes (replaces the old set); shown once – the caller must show them at once. */
+export async function generateRecoveryCodes(): Promise<ActionResult<{ codes: string[]; createdAt: string }>> {
+  try {
+    return { ok: true, value: await apiFetch<{ codes: string[]; createdAt: string }>("/account/mfa-recovery", { method: "POST", body: { action: "generate" } }) };
+  } catch (e) {
+    return apiFail(e);
+  }
+}
+
+/**
+ * Lost device: a recovery code (with the password session) removes the 2FA factor. Afterwards the session is refreshed and
+ * the account works with the password until the user sets 2FA up again.
+ */
+export async function redeemRecoveryCode(code: string): Promise<ActionResult> {
+  try {
+    await apiFetch("/account/mfa-recovery", { method: "POST", body: { action: "redeem", code } });
+    await getClient().auth.refreshSession().catch(() => undefined);
+    await refreshAuthState({ factors: true });
+    return { ok: true };
+  } catch (e) {
+    return apiFail(e);
   }
 }
 

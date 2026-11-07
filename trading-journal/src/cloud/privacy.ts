@@ -40,7 +40,8 @@ export function readPrivacy(): PrivacyPrefs {
 
 export const usePrivacy = create<PrivacyPrefs>()(() => readPrivacy());
 
-type PrivacyListener = (next: PrivacyPrefs, changed: (keyof PrivacyPrefs)[]) => void;
+/** A listener may answer with a promise: resolving `false` = it could not store the change (the account mirror failed); anything else = ok. */
+type PrivacyListener = (next: PrivacyPrefs, changed: (keyof PrivacyPrefs)[]) => unknown;
 const listeners = new Set<PrivacyListener>();
 
 /** Account-sync hook (`client.ts` pushes account keys to the profile). */
@@ -49,15 +50,38 @@ export function onPrivacyChange(fn: PrivacyListener): () => void {
   return () => listeners.delete(fn);
 }
 
-/** Changes prefs locally (persisted) and notifies the account mirror. `silent` = adopted from the profile. */
-export function setPrivacy(patch: Partial<PrivacyPrefs>, opts: { silent?: boolean } = {}): void {
+/**
+ * Changes prefs locally (persisted) and notifies the account mirror. `silent` = adopted from the profile. Resolves `true` when
+ * the change is stored where it must be: this device's storage took it AND (signed in, an account key) the account mirror
+ * answered ok – the Konto card shows its ✓ only then (Speicher-Morph). Callers that do not care ignore the promise.
+ */
+export function setPrivacy(patch: Partial<PrivacyPrefs>, opts: { silent?: boolean } = {}): Promise<boolean> {
   const cur = usePrivacy.getState();
   const next = parsePrivacy(patch, cur);
   const changed = (Object.keys(next) as (keyof PrivacyPrefs)[]).filter((k) => next[k] !== cur[k]);
-  if (!changed.length) return;
-  writeJson(PRIVACY_KEY, next);
+  if (!changed.length) return Promise.resolve(true);
+  const stored = writeJson(PRIVACY_KEY, next);
   usePrivacy.setState(next);
-  if (!opts.silent) for (const l of listeners) l(next, changed);
+  if (opts.silent) return Promise.resolve(stored);
+  return notify(next, changed).then((mirrored) => stored && mirrored);
+}
+
+async function notify(next: PrivacyPrefs, changed: (keyof PrivacyPrefs)[]): Promise<boolean> {
+  const answers = await Promise.all(
+    [...listeners].map(async (l) => {
+      try {
+        return (await l(next, changed)) !== false;
+      } catch {
+        return false;
+      }
+    }),
+  );
+  return answers.every(Boolean);
+}
+
+/** Sends the account keys to the account again (the „Erneut versuchen“ of a mirror that failed). Resolves whether it worked. */
+export function resyncPrivacy(): Promise<boolean> {
+  return notify(usePrivacy.getState(), [...ACCOUNT_PRIVACY_KEYS]);
 }
 
 /** Community ranking opt-in (P12). */

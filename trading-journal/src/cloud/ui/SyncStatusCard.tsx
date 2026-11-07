@@ -13,12 +13,14 @@ import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { ActionButton } from "@/views/settings/fx";
 import { agoLabel } from "../device";
+import { OPS_SYNC_PAUSED, useOpsFlags } from "../flags";
 import { setPrivacy } from "../privacy";
 import { ensureCloud } from "../runtime";
 import { openAuthSheet, useCloudSession } from "../session";
 import { useSyncStatus } from "../sync/status";
 import { syncPill } from "./pill";
 import { SYNC_CARD } from "./strings";
+import { TakeoverUndoLine } from "./TakeoverUndoLine";
 
 /** Re-renders every `ms` (relative-time labels; 1 render per 30 s, never per frame). */
 export function useTick(ms = 30_000): number {
@@ -49,6 +51,7 @@ export function SyncStatusCard({ className }: { className?: string }) {
   const auth = useCloudSession((s) => s.phase);
   const st = useSyncStatus();
   const entitled = useEntitlement("cloudSync");
+  const opsPaused = useOpsFlags((s) => s.sync);
   const reduced = useReducedFx();
   const now = useTick();
   const pill = syncPill(st.phase, auth);
@@ -74,6 +77,10 @@ export function SyncStatusCard({ className }: { className?: string }) {
             {SYNC_CARD.enterCode}
           </Button>
         </div>
+      ) : st.phase === "paused" && opsPaused ? (
+        <p className="text-[13px] leading-relaxed text-mute" data-testid="sync-ops-paused">
+          {OPS_SYNC_PAUSED}
+        </p>
       ) : st.phase === "paused" ? (
         <div className="grid gap-3">
           <p className="text-[13px] text-mute">{SYNC_CARD.pausedText}</p>
@@ -151,6 +158,7 @@ export function SyncStatusCard({ className }: { className?: string }) {
           >
             {SYNC_CARD.now}
           </ActionButton>
+          <TakeoverUndoLine />
         </div>
       )}
     </Card>

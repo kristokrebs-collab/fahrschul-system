@@ -21,6 +21,7 @@ import { ensureCloud } from "../runtime";
 import { useCloudSession } from "../session";
 import { CODE_LENGTH, CodeSlots } from "./CodeSlots";
 import { QrReveal } from "./QrReveal";
+import { RecoverySection } from "./RecoverySection";
 import { SECURITY } from "./strings";
 import { useTick } from "./SyncStatusCard";
 
@@ -202,6 +203,7 @@ function MfaSection() {
           </motion.div>
         )}
       </AnimatePresence>
+      {verified && !enroll && (aal === "aal2" ? <RecoverySection /> : null)}
     </section>
   );
 }

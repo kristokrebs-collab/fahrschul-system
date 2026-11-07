@@ -23,6 +23,7 @@ import { decrypt } from "../crypto";
 import { sendMail, type MailConfig, type SendCode } from "../alertWatch/mail";
 import { appOrigin, mailConfig } from "../alertWatch/mail";
 import { recipientOf, type Recipient } from "../alertWatch/recipient";
+import { killed } from "../killswitch";
 import { alertLimits, phoneBrakes } from "./limits";
 import { buildEventMail } from "./mail";
 import type { AlertStore, DeliveryRecord, JobRecord } from "./store";
@@ -170,6 +171,9 @@ async function phoneJob(job: JobRecord, delivery: DeliveryRecord, d: DeliverDeps
   }
   if (TERMINAL.has(delivery.status)) return void (await done(d, job, "already"));
   if (job.attempts > job.maxAttempts) return giveUp(d, job, delivery, "retries_used_up", tally);
+
+  // the operator's emergency switch (KILL_CALLS): no call, no budget used, the log says why. Not retried – an alarm that arrives hours late is worse than none
+  if (killed("calls")) return skip(d, job, delivery, "calls_off", tally);
 
   const stored = await d.store.prefsOf(delivery.userId);
   const prefs = alertPrefsOf(stored?.prefs);

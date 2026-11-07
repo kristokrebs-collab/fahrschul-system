@@ -1,8 +1,8 @@
 /**
  * Wordings the draft texts (`docs/RECHT/`) quote and the purchase flow, the cancel flow and the partner links need.
  * ALL OF THEM ARE DRAFTS – „Entwurf – Prüfung durch Anwalt nötig“: they are proposals, not a statement that anything is
- * compliant. Pure data (no React), so the Netlify functions and the purchase package may import it. Wiring them into
- * the purchase flow is NOT done here (that package owns the files); `docs/RECHT-CHECKLISTE.md` lists the open points.
+ * compliant. Pure data (no React), so the Netlify functions and the purchase package may import it. The purchase
+ * flow (`src/billing/purchase/`, package B4) reads them; `docs/RECHT-CHECKLISTE.md` lists the open points.
  * `tests/unit/legal.drafts.test.ts` checks that the drafts quote these texts verbatim.
  */
 
@@ -21,8 +21,8 @@ export const PARTNER_LINK_LABEL = "Werbung · Partnerlink – wir erhalten ggf. 
 
 /** Labels the law names (proposals; § 312j Abs. 3, § 312k Abs. 2, § 356a BGB). */
 export const BUTTON_LABELS = {
-  /** § 312j Abs. 3 BGB: „zahlungspflichtig bestellen“ or an equally clear wording – for the last step of the order. */
-  order: "Zahlungspflichtig abonnieren",
+  /** § 312j Abs. 3 BGB: „zahlungspflichtig bestellen“ – the statutory wording, the ONLY label of the order button (never „N Tage gratis testen“, never „Jetzt abonnieren“). */
+  order: "Zahlungspflichtig bestellen",
   orderTrial: "Testphase starten – danach zahlungspflichtig",
   /** § 312k Abs. 2 BGB: the cancel button and the confirmation button. */
   cancel: "Verträge hier kündigen",

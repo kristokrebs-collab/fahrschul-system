@@ -1,10 +1,12 @@
 import { AnimatePresence, motion } from "motion/react";
 import { lazy, Suspense, useState } from "react";
-import { spring, tween } from "@/motion/tokens";
+import { spring } from "@/motion/tokens";
+import { trashExit } from "@/motion/trash/trashMotion";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { useUi } from "@/store/uiStore";
 import { useOcrImport } from "@/journal/ocr/store";
-import { discardQueue, openNextDraft, useShotImport } from "./store";
+import { discardQueueToTrash, openNextDraft, useShotImport } from "./store";
 
 /** The preview sheet is its own chunk: it (and the maths behind it) only loads when the trader starts the import. */
 const ExtractSheet = lazy(() => import("./ExtractSheet"));
@@ -21,6 +23,7 @@ export function ShotImportHost() {
   const queue = useShotImport((s) => s.queue);
   const editorOpen = useUi((s) => s.editor.open);
   const ocrOpen = useOcrImport((s) => s.open);
+  const reduced = useReducedFx();
   // keep the sheet mounted after its first opening, so it can play its exit
   const [seen, setSeen] = useState(false);
   if (open && !seen) setSeen(true);
@@ -48,7 +51,7 @@ export function ShotImportHost() {
             className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] z-[55] mx-auto flex max-w-[460px] flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-line-2 bg-ink-800 px-3.5 py-3 shadow-[0_18px_50px_rgb(0_0_0/0.5)]"
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0, transition: spring.pop }}
-            exit={{ opacity: 0, y: 8, transition: tween.exit }}
+            exit={trashExit(reduced)}
           >
             <p className="min-w-0 flex-1 text-[13px] leading-snug">
               <strong className="font-semibold">{queue.length === 1 ? "Noch 1 Entwurf" : `Noch ${queue.length} Entwürfe`}</strong> aus dem Screenshot warten.
@@ -56,7 +59,7 @@ export function ShotImportHost() {
             <Button variant="primary" size="sm" onClick={openNextDraft} data-testid="extract-next">
               Nächsten öffnen
             </Button>
-            <Button size="sm" onClick={discardQueue} data-testid="extract-discard">
+            <Button size="sm" onClick={discardQueueToTrash} data-testid="extract-discard">
               Verwerfen
             </Button>
           </motion.div>

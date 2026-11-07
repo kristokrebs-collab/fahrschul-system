@@ -16,11 +16,10 @@ import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, seed } fr
 import { mockBilling } from "./mocks/billing";
 import { mockExchange, WRONG_SECRET, type MockExchangeOptions } from "./mocks/exchange";
 import { mockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const URL_ = process.env.PW_BOERSE_URL ?? cloudUrl("konto");
 const SHOTS = process.env.P11_SHOTS_DIR;
-const EMAIL = "trader@example.com";
-const PASSWORD = "richtig-geheim-42";
 const PROJECTS = ["mobile", "desktop"];
 
 async function shot(page: Page, info: TestInfo, name: string, target?: Locator): Promise<void> {
@@ -47,6 +46,7 @@ async function goTo(page: Page, hash: string, h1: string): Promise<void> {
 
 async function setup(page: Page, ex: MockExchangeOptions = {}, docs?: NonNullable<Parameters<typeof mockSupabase>[1]>["docs"]) {
   const errors = collectErrors(page);
+  await blockExternalNetwork(page);
   const sb = await mockSupabase(page, docs ? { docs } : {});
   const mx = await mockExchange(page, sb, ex);
   await seed(page);
@@ -54,16 +54,7 @@ async function setup(page: Page, ex: MockExchangeOptions = {}, docs?: NonNullabl
 }
 
 async function signIn(page: Page): Promise<void> {
-  await page.locator('[data-cloud-pill="signin"]').click();
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.locator("[inert]")).toHaveCount(0);
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await signInViaSheet(page, { synced: true });
 }
 
 const card = (page: Page) => page.getByTestId("exchange-card");
