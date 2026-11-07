@@ -9,11 +9,12 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, seed, finishSignIn } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, seed } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockBilling, mockSubscription } from "./mocks/billing";
 import { mockSocial } from "./mocks/social";
 import { mockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const PROJECTS = ["mobile", "desktop"];
 const THEMES = ["dark", "light"] as const;
@@ -72,19 +73,12 @@ async function expectAccessible(page: Page, key: string): Promise<void> {
 }
 
 async function signIn(page: Page): Promise<void> {
-  await page.locator('[data-cloud-pill="signin"]').click();
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.locator("[inert]")).toHaveCount(0);
-  await sheet.getByLabel("E-Mail").fill("trader@example.com");
-  await sheet.getByLabel("Passwort", { exact: true }).fill("richtig-geheim-42");
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await finishSignIn(page);
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await signInViaSheet(page, { synced: true });
 }
 
 /** The cloud mocks, a signed-in session (stored by the first sign-in), then a fresh load of `hash`. */
 async function openSignedIn(page: Page, hash: string, theme: "dark" | "light" = "dark"): Promise<void> {
+  await blockExternalNetwork(page);
   await mockSupabase(page);
   await mockBilling(page, { plan: { plan: "pro", status: "active", trialEnd: null }, subscription: mockSubscription({ plan: "pro", status: "active" }) });
   await mockSocial(page, { optIn: true });

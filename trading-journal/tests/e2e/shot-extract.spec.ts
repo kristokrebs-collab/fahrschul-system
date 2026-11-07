@@ -9,8 +9,9 @@
  * second draft is offered by the queue pill. Plus the honest states: not signed in, server without key, server error.
  */
 import { expect, test, type Page, type Route, type TestInfo } from "@playwright/test";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed, finishSignIn } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed } from "./helpers";
 import { mockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const PROJECTS = ["mobile", "desktop"];
 /** `EXTRACT_SHOTS=<dir>` writes review screenshots of the preview. */
@@ -20,8 +21,6 @@ async function snap(page: Page, info: TestInfo, name: string): Promise<void> {
   await page.waitForTimeout(700);
   await page.screenshot({ path: `${SHOTS}/extract-${name}-${info.project.name}.png`, animations: "disabled" });
 }
-const EMAIL = "trader@example.com";
-const PASSWORD = "richtig-geheim-42";
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 
 const conf = (v: number, over: Record<string, number> = {}) => ({ market: v, side: v, entries: v, exits: v, stop: v, targets: v, leverage: v, fees: v, funding: v, realizedPnl: v, exchange: v, productType: v, status: v, ...over });
@@ -94,15 +93,7 @@ async function mockExtract(page: Page, opts: MockExtractOptions = {}): Promise<M
 }
 
 async function signIn(page: Page): Promise<void> {
-  await page.locator('[data-cloud-pill="signin"]').click();
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.locator("[inert]")).toHaveCount(0);
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await finishSignIn(page);
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await signInViaSheet(page, { synced: true });
 }
 
 const fab = (page: Page) => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" });
@@ -122,6 +113,7 @@ async function openEditorWithShots(page: Page, n = 2) {
 
 async function start(page: Page, ex: MockExtractOptions = {}, extraTrades: unknown[] = [], signedIn = true) {
   const errors = collectErrors(page);
+  await blockExternalNetwork(page);
   await mockSupabase(page);
   const mock = await mockExtract(page, ex);
   await seed(page, { extra: extraTrades.length ? { "tj2-trades": [...(fixture["tj2-trades"] as unknown[]), ...extraTrades] } : undefined });

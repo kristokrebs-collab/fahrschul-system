@@ -9,14 +9,13 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, seed, toast, finishSignIn } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, seed, toast } from "./helpers";
 import { mockBilling } from "./mocks/billing";
 import { mockSocial, type MockGroup, type MockSocialOptions } from "./mocks/social";
 import { mockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const COMMUNITY_URL = cloudUrl("community");
-const EMAIL = "trader@example.com";
-const PASSWORD = "richtig-geheim-42";
 const ME = "00000001-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 const PROJECTS = ["mobile", "desktop"];
@@ -51,6 +50,7 @@ async function open(page: Page, url = COMMUNITY_URL): Promise<void> {
 async function setup(page: Page, social: MockSocialOptions = {}) {
   const errors = collectErrors(page);
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => undefined);
+  await blockExternalNetwork(page);
   await mockSupabase(page);
   await mockBilling(page, { enabled: false });
   const soc = await mockSocial(page, social);
@@ -59,15 +59,7 @@ async function setup(page: Page, social: MockSocialOptions = {}) {
 }
 
 async function signIn(page: Page): Promise<void> {
-  await page.locator('[data-cloud-pill="signin"]').click();
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.locator("[inert]")).toHaveCount(0);
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await finishSignIn(page);
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await signInViaSheet(page, { synced: true });
 }
 
 async function expectAccessible(page: Page, include: string, what: string): Promise<void> {
@@ -121,6 +113,7 @@ test.describe("Community: Belege, Rangliste, Chartfälle", () => {
     // the public page (no login needed: another tab with the same mocks opens the share URL)
     await page.keyboard.press("Escape");
     const pub = await page.context().newPage();
+    await blockExternalNetwork(page);
     await mockSupabase(pub);
     const viewer = await mockSocial(pub);
     viewer.shares.push(...soc.shares);

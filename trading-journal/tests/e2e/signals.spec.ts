@@ -11,10 +11,9 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed } from "./helpers";
 import { mockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
-const EMAIL = "trader@example.com";
-const PASSWORD = "richtig-geheim-42";
 const TOKEN = `tj_${"S".repeat(43)}`;
 
 type Sig = Record<string, unknown>;
@@ -115,23 +114,12 @@ async function mockApi(page: Page, o: { configured: boolean }): Promise<Mock> {
 }
 
 async function signIn(page: Page): Promise<void> {
-  const pill = page.locator('[data-cloud-pill="signin"]');
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await expect(pill).toBeVisible({ timeout: 20_000 });
-  await expect(async () => {
-    if (!(await sheet.isVisible())) await pill.click();
-    await expect(sheet).toBeVisible({ timeout: 3_000 });
-  }).toPass({ timeout: 25_000 });
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 45_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await signInViaSheet(page, { synced: true });
 }
 
 async function openSettings(page: Page, configured: boolean, search = ""): Promise<Mock> {
   collectErrors(page);
+  await blockExternalNetwork(page);
   await mockSupabase(page, {});
   const m = await mockApi(page, { configured });
   await seed(page);

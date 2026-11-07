@@ -14,14 +14,14 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed, toast, finishSignIn } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed, toast } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockBilling } from "./mocks/billing";
 import { mockSupabase, type MockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const SHOTS = process.env.EMAIL_SHOTS_DIR;
 const EMAIL = "trader@example.com";
-const PASSWORD = "richtig-geheim-42";
 const PROJECTS = process.env.EMAIL_PROJECTS?.split(",") ?? ["mobile", "desktop"];
 
 async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
@@ -83,15 +83,7 @@ async function mockAlertFn(page: Page, s: Server): Promise<void> {
 
 /** Signs in through the header pill and waits for the first sync (see cloud.spec.ts). */
 async function signIn(page: Page): Promise<void> {
-  await page.locator('[data-cloud-pill="signin"]').click();
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.locator("[inert]")).toHaveCount(0);
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await finishSignIn(page);
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await signInViaSheet(page, { synced: true });
 }
 
 type StoredAlerts = { email?: boolean; armedAt?: number; maxPerDay?: number; mails?: { day: string; n: number }; mem?: Record<string, unknown>; outbox?: unknown[] };
@@ -123,6 +115,7 @@ test.describe("E-Mail-Alarm bei geschlossener App", () => {
 
   test("cloud: signed out → Einrichtung nötig → off → on (reaches the database) → test mail → what the server writes survives the app's writes → off", async ({ page }, info) => {
     const errors = collectErrors(page);
+    await blockExternalNetwork(page);
     const sb = await mockSupabase(page);
     await mockBilling(page, { enabled: false });
     const server = newServer();
@@ -217,6 +210,7 @@ test.describe("E-Mail-Alarm bei geschlossener App", () => {
   });
 
   test("cloud: no horizontal scroll, no accessibility violations in the section (on, with the status lines)", async ({ page }) => {
+    await blockExternalNetwork(page);
     const sb = await mockSupabase(page);
     await mockBilling(page, { enabled: false });
     const server = newServer();
@@ -235,6 +229,7 @@ test.describe("E-Mail-Alarm bei geschlossener App", () => {
   });
 
   test("cloud: a plan without the alarm and an unreachable function are named, the switch stays off", async ({ page }) => {
+    await blockExternalNetwork(page);
     await mockSupabase(page);
     await mockBilling(page, { plan: { plan: "free", status: "none", trialEnd: null } });
     const server = newServer();
@@ -250,6 +245,7 @@ test.describe("E-Mail-Alarm bei geschlossener App", () => {
   });
 
   test("cloud: the function does not answer – „Server nicht erreichbar“ with the reason, nothing can be switched on", async ({ page }) => {
+    await blockExternalNetwork(page);
     await mockSupabase(page);
     await mockBilling(page, { enabled: false });
     const server = newServer();

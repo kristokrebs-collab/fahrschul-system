@@ -12,13 +12,12 @@
  */
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed, finishSignIn } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed } from "./helpers";
 import { mockSupabase } from "./mocks/supabase";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 
 const REPORT = { ...JSON.parse(readFileSync(new URL("../fixtures/orderhistory-bitunix-report.json", import.meta.url), "utf8")), model: "claude-opus-5-5" };
 const PROJECTS = ["mobile", "desktop"];
-const EMAIL = "trader@example.com";
-const PASSWORD = "richtig-geheim-42";
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 
 interface MockOptions {
@@ -41,15 +40,7 @@ async function mockExtract(page: Page, opts: MockOptions = {}): Promise<{ posts:
 }
 
 async function signIn(page: Page): Promise<void> {
-  await page.locator('[data-cloud-pill="signin"]').click();
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.locator("[inert]")).toHaveCount(0);
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await finishSignIn(page);
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await signInViaSheet(page, { synced: true });
 }
 
 const fab = (page: Page) => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" });
@@ -58,6 +49,7 @@ const journalCount = (page: Page) => page.evaluate(() => (window as unknown as J
 
 async function start(page: Page, ex: MockOptions = {}, extraTrades: unknown[] = []) {
   const errors = collectErrors(page);
+  await blockExternalNetwork(page);
   await mockSupabase(page);
   const mock = await mockExtract(page, ex);
   await seed(page, { extra: extraTrades.length ? { "tj2-trades": [...(fixture["tj2-trades"] as unknown[]), ...extraTrades] } : undefined });
@@ -328,6 +320,7 @@ test.describe("Screenshot-Import: Orderhistorie (2 Schließungen + 1 Eröffnung)
   test("Einstellungen: Server antwortet nicht → „Status unbekannt“ statt der Behauptung, es fehle ein Schlüssel", async ({ page }) => {
     const errors = collectErrors(page);
     void errors;
+    await blockExternalNetwork(page);
     await mockSupabase(page);
     await page.route("**/api/v1/shot-extract", (route) => route.abort("failed"));
     await seed(page);
