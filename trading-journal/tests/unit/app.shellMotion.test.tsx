@@ -422,16 +422,16 @@ describe("menu: a bottom sheet on a phone, the wipe from 768 px; the burger turn
     act(() => openCommandNav());
     const dialog = await screen.findByRole("dialog", { name: "Navigation" });
     const finder = within(dialog).getByTestId("nav-finder");
-    const box = () => finder.querySelector<HTMLElement>("[inert], .min-h-0")!;
+    const box = () => finder.querySelector<HTMLElement>(".sf-panel-in")!;
     expect(box().hasAttribute("inert")).toBe(true);
-    const input = within(dialog).getByRole("searchbox", { name: "Was willst du tun?" });
+    const input = within(dialog).getByRole("combobox", { name: "Was willst du tun?" });
     fireEvent.change(input, { target: { value: "Wochenbericht" } });
     const list = await within(dialog).findByTestId("nav-finder-results", undefined, { timeout: 10_000 });
     expect(box().hasAttribute("inert")).toBe(false);
     const hits = Array.from(list.querySelectorAll("li"));
     expect(hits.length).toBeGreaterThan(0);
     expect(hits.map((h) => h.getAttribute("data-i"))).toEqual(hits.map((_, i) => String(i)));
-    expect(hits.every((h) => h.className.includes("nf-hit"))).toBe(true);
+    expect(hits.every((h) => h.className.includes("sf-opt"))).toBe(true);
     // emptied: inert at once (no tab stop in a folding box), the answers leave once it is shut
     fireEvent.change(input, { target: { value: "" } });
     expect(box().hasAttribute("inert")).toBe(true);

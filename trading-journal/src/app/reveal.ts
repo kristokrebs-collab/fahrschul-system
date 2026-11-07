@@ -29,14 +29,43 @@ const REALIGN_AT = [800, 1600, 2600] as const;
 /** Further than this from its line (px) the target is brought back. */
 const REALIGN_TOLERANCE = 24;
 
+/** A target that was replaced (a placeholder swapped for the real card) is looked for again for this long (ms) – no longer, no loop. */
+const REFIND_MS = 1500;
+
+/**
+ * A way to find `el` again once it was replaced in the DOM: the same `data-testid`, or the same heading text, inside the same page
+ * layer. `null` when the element has neither (then nothing can be followed).
+ */
+function refinder(el: HTMLElement): (() => HTMLElement | null) | null {
+  const testid = el.getAttribute("data-testid");
+  const page = el.closest("[data-page]")?.getAttribute("data-page") ?? null;
+  const heading = /^H[1-6]$/.test(el.tagName) ? (el.textContent ?? "").replace(/\s+/g, " ").trim() : "";
+  if (!testid && !heading) return null;
+  return () => {
+    const layer = page ? document.querySelector(`[data-page="${page}"][data-page-role="current"]`) : document.body;
+    if (!layer) return null;
+    if (testid) {
+      const byId = Array.from(layer.querySelectorAll<HTMLElement>("[data-testid]")).find((n) => n.getAttribute("data-testid") === testid);
+      if (byId) return byId;
+    }
+    return heading ? (Array.from(layer.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6")).find((h) => (h.textContent ?? "").replace(/\s+/g, " ").trim() === heading) ?? null) : null;
+  };
+}
+
 /**
  * Content above a target may still arrive after the jump (a lazy card swaps its skeleton for the card, a long page mounts its
  * cards one after another, an image loads): the target then sits lower than the line it was scrolled to. For a few seconds it is
  * brought back to that line – at the fixed moments and, where the browser can tell, at every change of the page's height – and
- * never against the person: any wheel, touch, key or press ends this at once.
+ * never against the person: any wheel, touch, key or press ends this at once. `holdMs`: how long the page's height is followed
+ * (default: until just after the last fixed moment; the finder asks for longer – a slow phone mounts a long page for seconds).
+ * A target that is REPLACED meanwhile (a skeleton / placeholder swapped for the real card: `isConnected` turns false) is looked for again
+ * by its `data-testid` or heading in the same page layer, for `REFIND_MS` at most, and the alignment follows the new element.
  */
-export function keepAligned(el: HTMLElement): void {
+export function keepAligned(target: HTMLElement, holdMs = REALIGN_AT[REALIGN_AT.length - 1]! + 100): void {
   if (typeof window === "undefined" || typeof window.scrollBy !== "function") return;
+  let el = target;
+  const refind = refinder(target);
+  const started = performance.now();
   const events = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
   const timers: ReturnType<typeof setTimeout>[] = [];
   let ro: ResizeObserver | undefined;
@@ -52,7 +81,13 @@ export function keepAligned(el: HTMLElement): void {
   const line = (): number => parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
   const align = (): void => {
     if (over) return;
-    if (!el.isConnected) return stop();
+    if (!el.isConnected) {
+      const next = refind?.();
+      if (next) el = next;
+      // the real card may still be on its way; after the grace time a vanished target ends the alignment
+      else if (refind && performance.now() - started < REFIND_MS) return;
+      else return stop();
+    }
     const d = el.getBoundingClientRect().top - line();
     if (Math.abs(d) > REALIGN_TOLERANCE) window.scrollBy({ top: d, behavior: "instant" });
   };
@@ -74,7 +109,7 @@ export function keepAligned(el: HTMLElement): void {
       }, REALIGN_AT[0]),
     );
   }
-  timers.push(setTimeout(stop, REALIGN_AT[REALIGN_AT.length - 1]! + 100));
+  timers.push(setTimeout(stop, holdMs));
   events.forEach((e) => window.addEventListener(e, stop, { passive: true, once: true }));
 }
 

@@ -8,6 +8,8 @@
  *
  *   __tjJournal  journal store (App)            __tjUi     ui store (App)          __tjTheme  theme store (App)
  *   __tjGuard    risk guard store (feature hosts chunk)
+ *   __tjSession  cloud session store (feature hosts chunk) – the finder spec "logs in" to see the return to the task
+ *   __tjArrival  arrival note store (feature hosts chunk) – the finder spec reads the note it left
  *   __tjCockpitRegistry  `registerWidget` of the cockpit (Cockpit chunk)
  */
 export const E2E_HOOKS_FLAG = "__e2e-hooks";

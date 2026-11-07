@@ -17,6 +17,8 @@ import { editDistance } from "@/assistant/fuzzy";
 import { PAGE_LABELS } from "@/app/navGroups";
 import { fold, matchFolded, mergeRanges, normalize, type FieldMatch, type Folded, type MatchRange } from "@/search/fuzzy";
 import { FEATURE_GROUPS, FEATURE_REGISTRY, featureById, type FeatureEntry, type FeatureGroup } from "./features";
+import { EVERYDAY } from "./featureSynonyms";
+import { isPageTargetId, pageTargets } from "./pageTargets";
 
 /** The search id of a register entry (`searchStore.recent`, search index) – the prefix is what "Zuletzt benutzt" reads. */
 export const FEATURE_ID_PREFIX = "feature:";
@@ -81,11 +83,15 @@ function prepare(f: FeatureEntry): Prepared {
     if (!text) return;
     for (const word of words(normalize(text))) if ((map.get(word) ?? 0) < w) map.set(word, w);
   };
+  const page = isPageTargetId(f.id);
+  // the everyday words of a person (`featureSynonyms.ts`) count like the register's own intents
+  const intents = [...(f.intents ?? []), ...(EVERYDAY[f.id] ?? [])];
   add(f.name, W.name);
-  for (const t of f.intents ?? []) add(t, W.intents);
+  for (const t of intents) add(t, W.intents);
   for (const t of f.keywords) add(t, W.keywords);
   add(f.task, W.task);
-  add(groupOf(f).name, W.where);
+  // a page has no group of its own: the group name would make every page of "Konto, Einstellungen & Hilfe" a hit for "Hilfe"
+  if (!page) add(groupOf(f).name, W.where);
   add(f.sub, W.where);
   add(f.place, W.where);
   add(PAGE_LABELS[f.page] ?? f.page, W.where);
@@ -93,7 +99,7 @@ function prepare(f: FeatureEntry): Prepared {
   for (const id of f.fids) add(id, W.misc);
   const phrases: Prepared["phrases"] = [
     { key: keyOf(f.name), kind: "name" as PhraseKind },
-    ...(f.intents ?? []).map((t) => ({ key: keyOf(t), kind: "intent" as PhraseKind })),
+    ...intents.map((t) => ({ key: keyOf(t), kind: "intent" as PhraseKind })),
     ...(f.task ? [{ key: keyOf(f.task), kind: "task" as PhraseKind }] : []),
     ...f.keywords.map((t) => ({ key: keyOf(t), kind: "keyword" as PhraseKind })),
   ].filter((x) => x.key);
@@ -231,6 +237,30 @@ export function searchFeatures(query: string, list: readonly FeatureEntry[] = FE
   if (!q) return [];
   const hits: (FeatureHit & { i: number })[] = [];
   list.forEach((entry, i) => {
+    const m = scoreFeature(entry, q);
+    if (m) hits.push({ entry, score: m.score, ranges: m.title, i });
+  });
+  return hits.sort((a, b) => b.score - a.score || a.i - b.i).map(({ i: _i, ...h }) => h);
+}
+
+/* ------------------------------------------------------------------------------------------------ pages + functions */
+
+const WITH_PAGES = new WeakMap<readonly FeatureEntry[], FeatureEntry[]>();
+
+/** A hit of the finders: a function of the register or a page (`entry.id` starts with `page:`). */
+export type TargetHit = FeatureHit;
+
+/**
+ * What the finders answer: functions AND pages, best first. At the same score a page comes first ("Preise" is the page before
+ * it is the comparison on it); beyond that the register order decides. Empty query → `[]`.
+ */
+export function searchTargets(query: string, list: readonly FeatureEntry[] = FEATURE_REGISTRY): TargetHit[] {
+  let all = WITH_PAGES.get(list);
+  if (!all) WITH_PAGES.set(list, (all = [...pageTargets(), ...list]));
+  const q = parseFeatureQuery(query, all);
+  if (!q) return [];
+  const hits: (FeatureHit & { i: number })[] = [];
+  all.forEach((entry, i) => {
     const m = scoreFeature(entry, q);
     if (m) hits.push({ entry, score: m.score, ranges: m.title, i });
   });

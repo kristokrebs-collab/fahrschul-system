@@ -13,6 +13,7 @@
  * | `RiskGuardHost` | P05 | limit / cooldown toasts after a save (gate `riskLive`) |
  * | `PostTradeReviewHost` | P08 | review prompt for closed trades + the review sheet (gate `growth`) |
  * | `DailyCheckinHost` | F61 | the daily check-in dialog at the first open of the day + the check-in sheet (gate `growth`) |
+ * | `ArrivalNote`, `ReturnHost` | A4 | the note a finder leaves where it landed (why a card is missing, the next step as a button); the return to the task after a login / plan change / connection (`src/store/returnTo.ts`) |
  * | `BillingHost` | P10 | upgrade / cancel sheets, Stripe return, `?ref=` (inert without billing) |
  * | `ExchangeHost` | P11 | connect / dry-run / CSV sheets, server pulls (CSV works without cloud) |
  * | `SocialHost` | P12 | the share sheet |
@@ -33,7 +34,11 @@
  * | `DemoMount` | F58 | the interactive demo with marked example data (import, rule draft, test, demo account, alarm) – its own chunk, fetched the first time it is opened; its state is a session in memory that is gone when it closes |
  */
 import { lazy, Suspense, type ReactNode } from "react";
+import { useArrival } from "@/app/arrival";
+import { ArrivalNote } from "@/app/ArrivalNote";
+import { useCloudSession } from "@/cloud/session";
 import { installE2eHooks } from "@/app/e2eHooks";
+import { ReturnHost } from "@/app/ReturnHost";
 import { HostSlot } from "@/app/HostSlot";
 import { useAssistantOpen } from "@/assistant/open";
 import { useConnectUi } from "@/connect/open";
@@ -168,7 +173,7 @@ function DemoMount() {
 }
 
 // e2e only (`src/app/e2eHooks.ts`): the risk guard's store (override / marks)
-installE2eHooks({ __tjGuard: useRiskGuardStore });
+installE2eHooks({ __tjGuard: useRiskGuardStore, __tjSession: useCloudSession, __tjArrival: useArrival });
 
 /** Renders a watcher only while the plan includes its feature. */
 function Entitled({ feature, children }: { feature: Feature; children: ReactNode }) {
@@ -188,6 +193,13 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Abo">
         <BillingHost onNavigate={(p) => navigate(p)} />
+      </HostSlot>
+      {/* A4: the note a finder leaves where it landed, and the way back to the task after a login / plan / connection */}
+      <HostSlot name="Fundort-Hinweis">
+        <ArrivalNote />
+      </HostSlot>
+      <HostSlot name="Rückkehr">
+        <ReturnHost />
       </HostSlot>
       <HostSlot name="Börse">
         <ExchangeHost />

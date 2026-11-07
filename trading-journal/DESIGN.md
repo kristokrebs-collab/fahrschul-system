@@ -97,6 +97,7 @@ Jeder Zustand eines Knopfes hat eine Stimme, die reichen Feinheiten gibt es nur 
 | Button (reich, Maus) | Glanzstreifen · Text-Rollen (Sekundär mit Text) · Magnet ≤ 4 px (große Primär/Sekundär) · Rand-Lauf (`run`, nur eine Hervorhebung) | `fx={false}` lässt Hauptaktionen (Speichern, Bezahlen, Anmelden, Löschen) unverändert |
 | Chip | Häkchen-Abzeichen an der Ecke springt auf (Feder), das Häkchen zeichnet sich | kein Platz im Fluss: nichts rückt |
 | Suchfeld | rundes „×“ springt auf, sobald Text da ist | nur reiche Seiten; sonst bleibt der Browser-Knopf |
+| Suchfeld (`SearchField`, Runde 11) | weiche „Clay“-Glasfläche (Innenlicht oben links, Schatten unten rechts, 90 % deckend, Blur mit Fallback), Fokusring + Anheben 200 ms, Treffer steigen in 220 ms ein, Auswahlplatte gleitet auf `spring.layout`, „×“ springt auf `spring.pop`; Statuszeile (`aria-live`), Filterchips, Combobox (↑ ↓ Enter Esc) | überall dieselbe Komponente (Finder im Menü; später Seite „Funktionen“, Trade-/Asset-Suche), auch außerhalb reicher Seiten; Quellen `docs/KOMPONENTEN-QUELLEN.md` |
 | Feld | Beschriftung leuchtet im Fokus, wird rot bei Fehler; ein neuer Fehler schüttelt das Feld einmal | `Field` |
 | Kopieren | Symbol → Häkchen, Text rollt „Kopieren“ → „Kopiert“, danach zurück; Breite bleibt | `CopyButton` |
 | Schritt-Feld | Ziffer rollt hoch/runter, Knöpfe federn beim Drücken | `Stepper` |

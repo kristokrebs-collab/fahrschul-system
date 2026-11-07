@@ -484,6 +484,10 @@ function Panel({ reduced, onFling }: { reduced: boolean; onFling: (info: SwipeDi
                   void import("@/app/featureOpen").then((m) => m.openFeature(id));
                 }}
                 onAll={() => go("funktionen")}
+                onAsk={() => {
+                  closeCommandNav(true);
+                  openAssistant();
+                }}
               />
             </Item>
             <nav aria-label={COMMAND_NAV_STRINGS.pages} className="grid gap-7">

@@ -78,7 +78,7 @@ describe("searchFeatures", () => {
     expect(strong.score).toBeGreaterThanOrEqual(STRONG_HIT);
     expect(strong.score).toBeLessThanOrEqual(200);
     expect(scoreFeature(featureById("labor")!, parseFeatureQuery("backup"))).toBeNull();
-    const guess = searchFeatures("Schrift größer")[0];
+    const guess = searchFeatures("Sprache ändern")[0];
     expect(!guess || guess.score < STRONG_HIT).toBe(true);
   });
 });

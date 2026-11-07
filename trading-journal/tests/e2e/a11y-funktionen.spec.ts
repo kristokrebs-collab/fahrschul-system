@@ -56,7 +56,7 @@ test.describe("Barrierefreiheit: Funktionen (axe)", () => {
       await page.getByRole("button", { name: /Navigation öffnen|Menü/ }).first().click();
       const nav = page.getByRole("dialog", { name: "Navigation" });
       await expect(nav).toBeVisible();
-      await nav.getByRole("searchbox", { name: "Was willst du tun?" }).fill("Wochenbericht");
+      await nav.getByRole("combobox", { name: "Was willst du tun?" }).fill("Wochenbericht");
       await expect(nav.getByTestId("nav-finder-results")).toBeVisible({ timeout: 15_000 });
       await expectAccessible(page, '[data-testid="nav-finder"]', "Finder");
     });

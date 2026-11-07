@@ -52,13 +52,16 @@ describe("command navigation: recent functions", () => {
     );
     act(() => openCommandNav());
     const dialog = await screen.findByRole("dialog", { name: "Navigation" });
-    const input = within(dialog).getByRole("searchbox", { name: "Was willst du tun?" });
+    const input = within(dialog).getByRole("combobox", { name: "Was willst du tun?" });
     expect(within(dialog).queryByTestId("nav-finder-results")).toBeNull();
     fireEvent.change(input, { target: { value: "Wochenbericht" } });
     const list = await within(dialog).findByTestId("nav-finder-results", undefined, { timeout: 10_000 });
-    const hits = within(list).getAllByRole("button");
+    // the answers are the options of the field's listbox (combobox pattern), functions and pages
+    const hits = within(list).getAllByRole("option");
     expect(hits.length).toBeGreaterThan(0);
-    expect(hits.length).toBeLessThanOrEqual(5);
+    expect(hits.length).toBeLessThanOrEqual(6);
+    expect(input).toHaveAttribute("aria-expanded", "true");
+    expect(input).toHaveAttribute("aria-activedescendant", hits[0]!.id);
     expect(hits[0]).toHaveAttribute("data-feature", "berichte");
     expect(hits[0]).toHaveTextContent("Einen Bericht für Woche, Monat oder Jahr lesen");
     // the digits are text in the field, never a jump to a page
@@ -70,7 +73,8 @@ describe("command navigation: recent functions", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull(), { timeout: 3000 });
   });
 
-  it("says honestly when nothing fits and points to the full list; Escape clears the field before it closes the navigation", async () => {
+  it("finds PAGES as hits: 'Einstellungen' leads to the page first, filter chips narrow to pages / functions, Enter opens `page:settings`", { timeout: 30_000 }, async () => {
+    useSearch.setState({ recent: [] });
     render(
       <MotionRoot>
         <CommandNav />
@@ -78,10 +82,43 @@ describe("command navigation: recent functions", () => {
     );
     act(() => openCommandNav());
     const dialog = await screen.findByRole("dialog", { name: "Navigation" });
-    const input = within(dialog).getByRole("searchbox", { name: "Was willst du tun?" });
+    const input = within(dialog).getByRole("combobox", { name: "Was willst du tun?" });
+    fireEvent.change(input, { target: { value: "Einstellungen" } });
+    const list = await within(dialog).findByTestId("nav-finder-results", undefined, { timeout: 10_000 });
+    const hits = within(list).getAllByRole("option");
+    expect(hits[0]).toHaveAttribute("data-feature", "page:settings");
+    expect(hits[0]).toHaveAttribute("data-kind", "page");
+    expect(hits[0]).toHaveTextContent("Seite");
+    expect(hits.some((h) => h.getAttribute("data-feature") === "box-einstellungen")).toBe(true);
+    // the chips count and narrow
+    const chips = within(dialog).getByRole("group", { name: "Treffer eingrenzen" });
+    fireEvent.click(within(chips).getByRole("button", { name: /^Funktionen/ }));
+    const onlyFeatures = within(await within(dialog).findByTestId("nav-finder-results")).getAllByRole("option");
+    expect(onlyFeatures.every((h) => h.getAttribute("data-kind") === "feature")).toBe(true);
+    fireEvent.click(within(chips).getByRole("button", { name: /^Seiten/ }));
+    expect(within(within(dialog).getByTestId("nav-finder-results")).getAllByRole("option").every((h) => h.getAttribute("data-kind") === "page")).toBe(true);
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(open).toHaveBeenCalledWith("page:settings"));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull(), { timeout: 3000 });
+  });
+
+  it("says honestly when nothing fits and points to the full list and the assistant – no toast; Escape clears the field before it closes the navigation", async () => {
+    render(
+      <MotionRoot>
+        <CommandNav />
+      </MotionRoot>,
+    );
+    act(() => openCommandNav());
+    const dialog = await screen.findByRole("dialog", { name: "Navigation" });
+    const input = within(dialog).getByRole("combobox", { name: "Was willst du tun?" });
     fireEvent.change(input, { target: { value: "zzzqqq" } });
     const none = await within(dialog).findByTestId("nav-finder-none", undefined, { timeout: 10_000 });
     expect(none).toHaveTextContent("Dazu steht nichts in der Liste");
+    // never a dead end, never a toast: the full list and the assistant are right there, and the live status says it too
+    expect(within(none).getByRole("button", { name: "Alle Funktionen ansehen" })).toBeInTheDocument();
+    expect(within(none).getByTestId("nav-finder-ask")).toHaveTextContent("Assistent fragen");
+    expect(within(dialog).getByTestId("nav-finder-status")).toHaveTextContent("Kein Treffer");
+    expect(useUi.getState().toasts).toEqual([]);
     fireEvent.keyDown(input, { key: "Escape" });
     expect(input).toHaveValue("");
     expect(screen.getByRole("dialog", { name: "Navigation" })).toBeInTheDocument();

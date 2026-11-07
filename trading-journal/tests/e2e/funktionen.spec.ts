@@ -106,9 +106,9 @@ test.describe("Funktionen", () => {
     await page.getByRole("button", { name: /Navigation öffnen|Menü/ }).first().click();
     const nav = page.getByRole("dialog", { name: "Navigation" });
     await expect(nav).toBeVisible();
-    const finder = nav.getByRole("searchbox", { name: "Was willst du tun?" });
+    const finder = nav.getByRole("combobox", { name: "Was willst du tun?" });
     await finder.fill("Risiko berechnen");
-    const hits = nav.getByTestId("nav-finder-results").getByRole("button");
+    const hits = nav.getByTestId("nav-finder-results").getByRole("option");
     await expect(hits.first()).toBeVisible({ timeout: 15_000 });
     await expect(hits.first()).toHaveAttribute("data-feature", "positionsrechner");
     await expectNoHorizontalScroll(page);
