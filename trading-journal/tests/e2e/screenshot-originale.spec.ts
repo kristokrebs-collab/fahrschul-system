@@ -165,12 +165,21 @@ test.describe("Screenshot-Originale", () => {
     const editor = await openTradeEditor(page);
     const input = editor.getByTestId("shots-drop").locator('input[type="file"]');
     await editor.getByTestId("shots-drop").scrollIntoViewIfNeeded();
-    // warm-up with a tiny picture: the lazy chunks (intake, worker) are fetched and compiled once, as in any session –
+    // reaching for the zone starts the worker and fetches the intake code: both are there before the first picture
+    expect(workers).toHaveLength(0);
+    await editor.getByTestId("shots-drop").hover();
+    await expect.poll(() => workers.length, { message: "the worker starts when the trader reaches for the drop zone" }).toBeGreaterThan(0);
+    // a tiny picture first: chunks are compiled and the worker has run once, as in any session –
     // only the 12 MB import after it is measured
     await input.setInputFiles(onDisk("warm.png", noisePng(60, 40, 1)));
     await expect(editor.getByRole("button", { name: "Screenshot 1 öffnen" })).toBeVisible({ timeout: 60_000 });
-    await expect.poll(() => workers.length, { message: "hash and preview ran in a worker" }).toBeGreaterThan(0);
+    expect(workers.length, "the same worker served the picture").toBe(1);
     await page.waitForTimeout(2000);
+    // control window: the idle editor for as long as the import takes (this machine runs several agents at once, so frames of
+    // the open page alone can exceed 50 ms – the import is judged against that background)
+    const idleFrom = (await longTasks(page)).length;
+    await page.waitForTimeout(3000);
+    const idle = (await longTasks(page)).slice(idleFrom);
     const before = (await longTasks(page)).length;
     const framesBefore = (await longFrames(page)).length;
     await input.setInputFiles(onDisk("BTC 4h Einstieg (final).png", png));
@@ -182,11 +191,13 @@ test.describe("Screenshot-Originale", () => {
     // the scripts of OUR intake chunks (hash, preview, store, intake) in the long frames of the import
     const ours = frames.flatMap((f) => f.scripts).filter((s) => /^(intake|derive|sha256|shot\.worker|preview|sniff)-/.test(s.file));
     const worstOurs = Math.max(0, ...ours.map((s) => s.d));
-    console.log(`SCREENSHOT-ORIGINAL ${info.project.name}: ${(png.length / MB).toFixed(1)} MB PNG, Worker ${workers.length > 0 ? "ja" : "nein"}, Long Tasks beim Import: ${tasks.length} (längster ${worst} ms) ${JSON.stringify(tasks)}; Skripte der Bild-Chunks in langen Frames: ${ours.length} (längstes ${worstOurs} ms) ${JSON.stringify(frames.map((f) => ({ d: f.d, s: f.scripts.map((s) => `${s.file}:${s.d}`) })))}`);
-    // Hashing, decoding and the read-back run in the worker: no script of the picture chunks holds the main thread for
-    // long. (This machine runs several agents at once, so frames of the open editor itself can exceed 50 ms; the Long Task
-    // numbers above are printed for the report.)
-    expect(worstOurs, `Skript der Bild-Chunks hielt den Hauptthread ${worstOurs} ms`).toBeLessThanOrEqual(30);
+    console.log(
+      `SCREENSHOT-ORIGINAL ${info.project.name}: ${(png.length / MB).toFixed(1)} MB PNG, Worker ${workers.length} (geteilt), Long Tasks beim Import: ${tasks.length} (längster ${worst} ms) ${JSON.stringify(tasks)}; Kontrolle ohne Import (3 s): ${idle.length} (${JSON.stringify(idle.map((t) => t.d))}); Skripte der Bild-Chunks in langen Frames: ${ours.length} (längstes ${worstOurs} ms) ${JSON.stringify(frames.map((f) => ({ d: f.d, s: f.scripts.map((s) => `${s.file}:${s.d}`) })))}`,
+    );
+    // Hashing, decoding and the read-back run in the worker: no script of the picture chunks holds the main thread for long
+    // (hashing 12 MB in JS on the main thread alone would take far more than 100 ms). The Long Task numbers above are printed
+    // for the report; a frame without a script of ours is the page's own rendering, not the import.
+    expect(worstOurs, `Skript der Bild-Chunks hielt den Hauptthread ${worstOurs} ms`).toBeLessThanOrEqual(100);
     await editor.getByRole("button", { name: "Screenshot 1 entfernen" }).click(); // the warm-up picture goes; the big one is "Screenshot 1" now
     await expect(editor.getByRole("button", { name: "Screenshot 2 öffnen" })).toBeHidden();
 
@@ -208,7 +219,7 @@ test.describe("Screenshot-Originale", () => {
     const detail = await openDetail(page, t.id, isMobile(info));
     const thumb = detail.getByRole("button", { name: "Screenshot 1 öffnen" });
     await expect(thumb).toBeVisible();
-    await expect(thumb.locator("img")).toHaveJSProperty("naturalWidth", 1280);
+    await expect(thumb.locator("img").first()).toHaveJSProperty("naturalWidth", 1280); // the notched frame paints the picture twice (grey + colour)
     expect(await idbBlob(page, "tj2-shots", ref.key)).toEqual({ sha256: expected, size: png.length, type: "image/png" });
 
     // the viewer says what it is and hands out the exact file

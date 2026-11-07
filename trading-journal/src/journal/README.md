@@ -9,8 +9,10 @@ fields looks, derives and exports exactly as before (the fields themselves: `src
 ```
 editor/        form.ts (JournalForm ↔ trade, validation), ExecutionSection.tsx, PsychSection.tsx
 ui/            JournalDetail.tsx (detail block), ExcursionBar, FillsBar, FillsTimeline, RatingDots, TagInput
-screenshots/   store.ts (IndexedDB blobs), cloud.ts (Supabase Storage), release.ts (freeing cloud objects), image.ts
-               (intake), shots.ts (refs / URLs),
+screenshots/   store.ts (IndexedDB originals + previews), cloud.ts (Supabase Storage), release.ts (freeing cloud objects),
+               image.ts (checks), intake.ts (lazy: sniff, hash, preview, read-back), derive.ts + shot.worker.ts (worker session),
+               preview.ts, sha256.ts, sniff.ts, shots.ts (refs / URLs / upload), info.ts (labels, storage verdicts),
+               original.ts (view / download the exact bytes), zip.ts + backupZip.ts (backup with pictures), hashList.ts,
                ShotsField (editor), ShotThumb, ShotReel (detail), ShotLightbox
 ocr/           screenshot import without a key (local text recognition, parser, preview sheet) – see its README
 annotations/   AnnotationToolbar.tsx (tools / colours for the mini chart)
@@ -67,28 +69,57 @@ Grün / Rot, `Alle löschen`). `AnnotationPrimitive` stores points as TIME (UTC 
 at every zoom and interval (sub-bar interpolation, also right of the last bar); a new drawing draws itself in (520 ms,
 instant under reduced motion); a tap selects, `Zeichnung löschen` removes. Saved on `trade.annotations` right away.
 
-## Screenshots
-- Intake (`image.ts`): images only (PNG / JPG / WebP / GIF / AVIF / BMP), ≤ 15 MB; larger than 2000 px on the long side →
-  scaled down and re-encoded (WebP, JPEG fallback). Up to 12 per trade.
-- Local: blobs in IndexedDB `storageKey("shots")` (`tj2-shots` / `tj2share-shots`), the trade keeps only
-  `{ id, store: "idb", key, mime, w, h, at }`. Without IndexedDB the blobs live in memory for the session and the editor
-  says so. Blobs no trade references are collected when the editor closes.
-- Cloud (signed in, `cloud.ts`): every picture is also uploaded to the private Supabase bucket `screenshots`
-  (`<uid>/<id>.<ext>`, policies of `supabase/migrations/0001_core.sql`); the reference becomes `store: "cloud"` with the local
-  blob kept as `cacheKey` (offline display on this device). Display via signed URLs (1 h, renewed early). Without a
-  configured cloud or while signed out everything stays local – nothing pretends to sync.
+## Screenshots (A2: originals byte for byte)
+- **Intake keeps the file.** `prepareImage` (`image.ts`) only checks it – an image (PNG / JPG / WebP / GIF / AVIF / BMP, by `type`
+  or by its first bytes), ≤ 25 MB – and reads type and pixel size from the header (`sniff.ts`); it never decodes, shrinks or
+  re-encodes. Up to 12 per trade. What is stored IS the file the trader chose or pasted.
+- **Fields per picture** (`ScreenshotRef`, all optional – older references carry none): `sha256` (64 hex), `bytes`, `mime`,
+  `originalName`, `w` / `h`, `original: true`, `storage: "device" | "cloud" | "ram"`; plus `store`, `key`, `cacheKey`, `at`.
+- **Local original:** IndexedDB `storageKey("shots")` (`tj2-shots` / `tj2share-shots`), object store `blobs`, key = `ref.key`. After
+  the write the stored copy is read back and its hash compared (in the worker) – a copy that differs is refused, never kept.
+- **Derived preview (separate):** IndexedDB `storageKey("shots-preview")` (a cache, never in a backup), WebP ≤ 1280 px made by
+  `derivePreview` (`createImageBitmap` with a target size + `OffscreenCanvas`). Lists, thumbnails and the viewer's first paint use
+  it; a file ≤ 400 KB (or a GIF) is shown as it is; a picture without a preview (restore, other device) gets one on first view.
+- **Off the main thread:** hashing, decoding, preview and the read-back run in one short-lived inline worker per intake
+  (`derive.ts` / `shot.worker.ts`, `?worker&inline`); `crypto.subtle` hashes on the browser's own thread, an incremental pure-JS
+  SHA-256 (256 KiB slices with rests) covers insecure contexts; the whole `intake` chunk loads with the first picture. Without
+  a worker (single-file build, `file:`) the same code runs on the main thread.
+- **No silent shrinking, ever.** Storage verdicts (`putShotBlobChecked`): `device` = in IndexedDB; **`ram`** = only in memory of
+  this session – either no IndexedDB (the editor's standing note + panel say „nicht dauerhaft gespeichert“) or the store is
+  FULL (`QuotaExceededError`: a toast „Speicher voll“ and the same panel, the store is NOT declared broken so freed space
+  works again). The panel offers „Original herunterladen“ – the exact file – as the way out; signed in, the cloud copy makes a
+  RAM picture durable. A ram reference that comes back after a reload shows „Nicht gespeichert (war nur im Arbeitsspeicher)“.
+- **Cloud (signed in, `cloud.ts`):** the ORIGINAL blob is uploaded unchanged to the private bucket `screenshots`
+  (`<uid>/<id>.<ext>`); the reference becomes `store: "cloud"`, `storage: "cloud"` with the local blob kept as `cacheKey`.
+  The bucket accepts PNG / JPEG / WebP / GIF up to 5 MB (migration 0007): a larger or other-type original is NOT touched to fit –
+  it stays on the device and the editor says why (`UPLOAD_MESSAGES`); a failed upload says so as well. Nothing is promised
+  while signed out. Display via signed URLs (1 h, renewed early). `loadOriginal` fetches the object back (signed URL) and checks
+  its SHA-256 against the reference.
 - Cloud objects leave Storage with the trade (`release.ts`, DSGVO): a picture removed in the editor (on save), a
   deleted trade (editor, detail, Broker-Abgleich) and an upload of an editor closed without saving (also one that
   finishes after the close) are deleted – only objects of the own folder that no trade of the loaded journal still
   references, and also after a downgrade. There is deliberately no sweep over the folder (client or server): a device
   with cloud sync off holds references the server never sees. Account deletion removes the whole folder.
-- **The plain JSON backup does NOT contain the pictures** (only the references, PR #3 format); Daten says so as soon
-  as a picture lives only in this browser and offers **„Backup mit Bildern“** (`backupShots.ts`: the same JSON plus
-  `screenshots: { key: { mime, data } }` for the local blobs and the offline copies of cloud pictures – old importers
-  ignore the key). The import preview names what a file carries („inkl. n Screenshots“) or lacks („n Screenshots sind
-  nicht enthalten“) and an import writes the carried pictures back. Cloud screenshots come back with the account.
-- Display: `ShotThumb` (`NotchedFrame`), `ShotReel` (one picture: thumbnail; several: the pulse `ReelWindow` montage →
-  tableau), `ShotLightbox` (portal, `StripWipe` between pictures, swipe / arrows, Escape closes only the lightbox).
+- **Older pictures** (references without `original: true`, i.e. everything written before A2) were shrunk on intake: they stay
+  and are labelled **„Version (verkleinert)“** – in the viewer, on the thumbnail („verkleinert“), in the hash list and in the
+  backup manifest – and are never called the original. No data migration is needed: the fields are optional and read at
+  display time; an export computes a hash for them from the stored bytes.
+- **Viewing / downloading:** `ShotLightbox` shows the preview first; „Original ansehen“ lays the exact stored file over it as soon
+  as it is decoded; „Original herunterladen“ (`original.ts`) saves the exact bytes under the file's own name and checks the hash
+  (a mismatch is reported, never passed off as the original). The facts line says „Original · PNG · 3840 × 2160 · 12,4 MB“ and
+  shows the first characters of the SHA-256.
+- **Backup:** the plain JSON backup still carries only references (PR #3 format). **„Backup mit Bildern (ZIP)“** (`backupZip.ts`,
+  `zip.ts`: stored entries, CRC-32, no dependency, no compression) = `manifest.json` (format `tj-backup-zip/1`, journal hash, one
+  row per picture: key, file, `sha256`, bytes, mime, name, size, `original`, trades, `matchesReference`, and the pictures that
+  could not be reached) + `journal.json` + `shots/<key>.<ext>`. Every picture is read from the device, else (signed in) from
+  the cloud; references of pictures that were only in the cloud get an offline key in the exported copy. **Restore** (Backup
+  importieren accepts the ZIP) checks the journal's hash and then EVERY file against the manifest before it is written back –
+  a file that differs is not restored and is named. Old JSON backups with base64 pictures (`backupShots.ts`) are still read.
+- **„Bild-Hashes (CSV)“** (`hashList.ts`): one row per picture – trade, picture, file name, type, bytes, SHA-256, size, where it
+  lives, Original / Version (verkleinert), a note.
+- Display: `ShotThumb` (`NotchedFrame`, badges Lokal / Cloud / Nur Sitzung / verkleinert), `ShotReel` (one picture: thumbnail;
+  several: the pulse `ReelWindow` montage → tableau), `ShotLightbox` (portal, `StripWipe` between pictures, swipe / arrows, Escape
+  closes only the lightbox).
 
 ## Trades list: filters, saved views, grouping
 - `JournalFilterBar` under the bundle filters: `Ansicht` label (TextMorph between saved views), saved view chips (`+ Ansicht

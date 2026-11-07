@@ -41,6 +41,13 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
   const [busy, setBusy] = useState(0);
   const [view, setView] = useState<number | null>(null);
   const depth = useRef(0);
+  /** The trader reaches for the zone: fetch the intake code and start the worker now, so the first picture does not wait for them. */
+  const warmed = useRef(false);
+  const warm = () => {
+    if (warmed.current) return;
+    warmed.current = true;
+    void Promise.all([import("./intake"), import("./derive").then((m) => m.warmShotSession())]).catch(() => undefined);
+  };
   /** Cloud objects uploaded by this field (freed at unmount unless a saved trade references them). */
   const uploads = useRef(new Set<string>());
   const alive = useRef(true);
@@ -145,8 +152,12 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
     <div className="grid gap-3">
       <div
         className={cn("relative grid place-items-center gap-1 rounded-2xl border border-dashed px-4 py-5 text-center transition-colors", over ? "border-transparent bg-white/[0.05]" : "border-line-2")}
+        onPointerEnter={warm}
+        onFocusCapture={warm}
+        onPointerDownCapture={warm}
         onDragEnter={(e) => {
           if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+          warm();
           e.preventDefault();
           depth.current += 1;
           setOver(true);
