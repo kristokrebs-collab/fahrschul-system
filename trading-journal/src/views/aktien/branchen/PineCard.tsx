@@ -39,7 +39,7 @@ export function PineCard() {
         <div className="grid gap-1.5">
           <ConnectSlot service="tradingview" />
           <p className="max-w-[80ch] text-[11.5px] leading-snug text-faint" data-testid="branchen-pine-connect-note">
-            Die Zieladresse nimmt Signale an und zeigt, ob sie ankommen. Das Branchen-Signal (branchen-trend/1) wertet sie noch nicht aus – es legt keine Position an.
+            Die Zieladresse nimmt Signale an und zeigt, ob sie ankommen – auch das Branchen-Signal (branchen-trend/1). Es geht an die Papier-Brücke (nur Papier, nichts wird gesendet; veraltete Signale werden ignoriert); sie arbeitet, solange die App offen ist.
           </p>
         </div>
 

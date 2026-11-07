@@ -357,9 +357,12 @@ describe("TradingView assistant", () => {
     return screen.findByTestId("tv-wizard");
   };
 
-  it("says up front that this is no OAuth and no MCP", async () => {
+  // B3 changed the statement on purpose: the MCP / OAuth client now exists (behind the operator's setup), so "no OAuth, no MCP" would be wrong.
+  // The address itself still reads nothing from the TradingView account – and the dialog says that and points to the separate read-only way.
+  it("says up front that the address reads nothing from the account and that the OAuth way is a separate one", async () => {
     const w = await open();
-    expect(within(w).getByTestId("tv-honest").textContent).toMatch(/keine OAuth-Anbindung und kein TradingView-MCP/);
+    expect(within(w).getByTestId("tv-honest").textContent).toMatch(/liest nichts aus deinem TradingView-Konto/);
+    expect(within(w).getByTestId("tv-honest").textContent).toMatch(/zweiter, getrennter Weg/);
   });
 
   it("create the address (shown once) → alarm templates → test signal → the receipt appears", async () => {

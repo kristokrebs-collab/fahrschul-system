@@ -35,3 +35,27 @@ export function webhookUrl(token: string, serverOrigin: string | null, pageOrigi
 export function maskedUrl(url: string): string {
   return url.replace(/(\/tradingview\/tj_[A-Za-z0-9_-]{4})[A-Za-z0-9_-]+/, "$1••••••••");
 }
+
+/** signal/1: direction only, never an order size (`netlify/functions/_lib/signals/schema.ts`). `signalId` must be unique per signal: ticker + interval + bar time. */
+export const TV_SIGNAL_MESSAGE = `{"schema":"signal/1","source":"tradingview","signalId":"{{ticker}}-{{interval}}-{{time}}","strategy":"MEINE-STRATEGIE","market":"{{exchange}}","symbol":"{{ticker}}","direction":"long","time":"{{time}}"}`;
+export const TV_SIGNAL_FLAT_MESSAGE = `{"schema":"signal/1","source":"tradingview","signalId":"{{ticker}}-{{interval}}-{{time}}","strategy":"MEINE-STRATEGIE","market":"{{exchange}}","symbol":"{{ticker}}","direction":"flat","time":"{{time}}"}`;
+
+/** A small Pine v6 indicator whose alerts post signal/1 (long on the crossover, flat on the crossunder). A starting point, not advice. */
+export const TV_PINE_SIGNAL = `//@version=6
+indicator("Journal-Signal v1 (Beispiel)", overlay = true)
+// Webhook-URL gehört in den ALARM (Benachrichtigungen), nicht in diesen Code: <Seite>/api/v1/signals/DEIN-TOKEN
+fast = ta.sma(close, 20)
+slow = ta.sma(close, 50)
+goLong = ta.crossover(fast, slow)
+goFlat = ta.crossunder(fast, slow)
+plot(fast, "SMA 20")
+plot(slow, "SMA 50")
+alertcondition(goLong, title = "Journal: Signal long", message = '${TV_SIGNAL_MESSAGE}')
+alertcondition(goFlat, title = "Journal: Signal flat", message = '${TV_SIGNAL_FLAT_MESSAGE}')`;
+
+/** The address that takes ONLY signals (no journal trade): with the real token when this session knows it, else a placeholder. */
+export function signalsUrl(webhook: string | null, serverOrigin: string | null, pageOrigin: string): string {
+  const m = webhook ? /^(https?:\/\/[^/]+)\/api\/v1\/hooks\/tradingview\/(tj_[A-Za-z0-9_-]+)$/.exec(webhook) : null;
+  if (m) return `${m[1]}/api/v1/signals/${m[2]}`;
+  return `${(serverOrigin ?? pageOrigin).replace(/\/+$/, "")}/api/v1/signals/DEIN-TOKEN`;
+}
