@@ -16,14 +16,16 @@
  * so a mock of the seam does not need to know about loading.
  */
 import { useSyncExternalStore } from "react";
+import { isOffline, loadChunk } from "@/lib/chunkLoad";
 import { pushToast, useUi } from "@/store/uiStore";
 
 export type OverlayId = "editor" | "detail" | "setup";
 
+// every download waits for the network and is retried once (`loadChunk`): the idle chain never fires into a dead connection
 const LOADERS = {
-  editor: () => import("@/overlays/TradeEditor"),
-  detail: () => import("@/overlays/TradeDetail"),
-  setup: () => import("@/overlays/SetupEditor"),
+  editor: () => loadChunk(() => import("@/overlays/TradeEditor")),
+  detail: () => loadChunk(() => import("@/overlays/TradeDetail")),
+  setup: () => loadChunk(() => import("@/overlays/SetupEditor")),
 } as const;
 
 /** The module of an overlay chunk (`import("@/overlays/TradeEditor")` …). */
@@ -44,7 +46,10 @@ export function loadOverlay<K extends OverlayId>(id: K): Promise<Loaded<K>> {
   if (!p) {
     p = LOADERS[id]() as Promise<Loaded<K>>;
     // registered first, so every later `.then` (arming, the lazy component) already finds the module
-    void p.then((m) => void loaded.set(id, m));
+    p.then(
+      (m) => void loaded.set(id, m),
+      () => undefined, // the rejection itself is handled below and by the callers – this derived promise must not leak it
+    );
     // a failed download (offline, a deploy replaced the chunk) may be tried again
     p.catch(() => started.delete(id));
     started.set(id, p);
@@ -104,6 +109,8 @@ export function preloadOverlay(id: OverlayId): Promise<void> {
 export function openEditorWarm(opts?: Parameters<ReturnType<typeof useUi.getState>["openEditor"]>[0]): void {
   const open = () => useUi.getState().openEditor(opts);
   if (isOverlayArmed("editor")) return open();
+  // offline the chunk cannot come: the tap is answered honestly, the editor opens by itself once the connection is back
+  if (isOffline()) pushToast({ kind: "info", title: "Du bist offline", detail: "Der Editor öffnet sich, sobald du wieder verbunden bist." });
   void loadOverlay("editor").then(
     () => {
       armOverlay("editor");

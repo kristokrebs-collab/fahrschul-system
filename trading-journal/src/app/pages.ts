@@ -14,6 +14,7 @@
  */
 import { createElement, type ComponentType, type LazyExoticComponent } from "react";
 import { retryableLazy } from "@/app/retryableLazy";
+import { loadChunk } from "@/lib/chunkLoad";
 import type { Feature } from "@/billing/types";
 import type { Page } from "@/store/uiStore";
 
@@ -62,7 +63,8 @@ const started = new Map<LazyPage, Promise<{ default: ComponentType }>>();
 function load(page: LazyPage): Promise<{ default: ComponentType }> {
   let p = started.get(page);
   if (!p) {
-    p = LOADERS[page]();
+    // waits for the network, retried once (`loadChunk`): offline the page stays on its skeleton – with the offline note – until `online`
+    p = loadChunk(LOADERS[page]);
     // a failed download (offline, a deploy replaced the chunk) may be tried again – the page's error boundary offers it
     p.catch(() => started.delete(page));
     started.set(page, p);
@@ -81,7 +83,7 @@ const startedTabs = new Map<DeferredTab, Promise<{ default: ComponentType }>>();
 function loadTab(tab: DeferredTab): Promise<{ default: ComponentType }> {
   let p = startedTabs.get(tab);
   if (!p) {
-    p = STATIC_LOADERS[tab]();
+    p = loadChunk(STATIC_LOADERS[tab]);
     p.catch(() => startedTabs.delete(tab));
     startedTabs.set(tab, p);
   }

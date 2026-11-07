@@ -20,6 +20,7 @@ import { installViewportInset } from "@/app/pwa";
 import { ScenarioWatcher } from "@/app/ScenarioWatcher";
 import { ShortcutHost } from "@/app/ShortcutHost";
 import { preloadOverlay } from "@/app/overlayLoad";
+import { isOffline, whenOnline } from "@/lib/chunkLoad";
 import { LegalHost } from "@/legal/LegalHost";
 import { toIslandToast } from "@/app/toasts";
 import { useDetailCandles } from "@/app/useDetailCandles";
@@ -238,6 +239,11 @@ function IdlePreload() {
     const schedule = (i: number, timeout: number) => {
       const run = () => {
         if (cancelled) return;
+        // offline the chain pauses and goes on with the same step at the `online` event – it never fires into a dead network
+        if (isOffline()) {
+          void whenOnline().then(() => !cancelled && schedule(i, timeout));
+          return;
+        }
         IDLE_STEPS[i]?.();
         if (i + 1 < IDLE_STEPS.length) schedule(i + 1, 1500);
       };

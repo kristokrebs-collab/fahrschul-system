@@ -81,4 +81,61 @@ test.describe("data reliability", () => {
     await expect.poll(() => req.log.filter((r) => r.at >= back).length, { timeout: 20_000, message: "REST polls resume after `online`" }).toBeGreaterThan(0);
     expect(errors.filter((e) => !/ERR_INTERNET_DISCONNECTED|net::ERR/.test(e)), errors.join("\n")).toEqual([]);
   });
+
+  /**
+   * Budget-Schnitt follow-up: the idle preload (editor, detail, tabs …) and every lazy page are chunks. In CI the idle slot
+   * is early, so the offline window of the test above hit a chunk that was still on its way ("Unable to preload CSS for
+   * …/facts-….css" as page errors). Here every lazy chunk answers slowly, so the window hits the preload on purpose.
+   */
+  const slowChunks = async (page: Page, ms: number): Promise<void> => {
+    await page.route(/\/assets\/[^/]+\.(js|css)(\?.*)?$/, async (route) => {
+      // the first-load files (entry, vendor chunks) at normal speed – only what loads later is slow
+      if (/\/assets\/(index|react|motion|recharts|rolldown-runtime)-/.test(route.request().url())) return route.continue();
+      await new Promise((r) => setTimeout(r, ms));
+      await route.continue().catch(() => undefined);
+    });
+  };
+  const noNetErrors = (errors: string[]): string[] => errors.filter((e) => !/ERR_INTERNET_DISCONNECTED|net::ERR/.test(e));
+
+  test("offline while the idle preload downloads: no page error, the chunks arrive after `online`", async ({ page, context }) => {
+    const errors = collectErrors(page);
+    await seed(page);
+    await slowChunks(page, 1800);
+    await page.goto("/#overview");
+    await expect(page.getByTestId("market-panel")).toBeVisible();
+    // the idle chain has started (editor first) and its chunks are still in flight when the network goes away
+    await page.waitForTimeout(700);
+    await context.setOffline(true);
+    await page.waitForTimeout(4500);
+    expect(noNetErrors(errors), errors.join("\n")).toEqual([]);
+    await context.setOffline(false);
+    // the chain resumes by itself: the editor opens (its chunk was fetched again, with its stylesheet)
+    await page.getByRole("button", { name: "Trade eintragen" }).first().click();
+    const dialog = page.getByRole("dialog", { name: "Trade eintragen" });
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    // …and it is styled: the dialog is a fixed overlay with a real box, not an unstyled block in the flow
+    expect(await dialog.evaluate((el) => getComputedStyle(el.closest(".fixed") ?? el).position), "stylesheet of the chunk applied").toBe("fixed");
+    expect(noNetErrors(errors), errors.join("\n")).toEqual([]);
+  });
+
+  test("a page that is not loaded yet, opened offline: an honest placeholder, no error, and it loads once online", async ({ page, context }) => {
+    const errors = collectErrors(page);
+    await seed(page);
+    await slowChunks(page, 300);
+    await page.goto("/#overview");
+    await expect(page.getByTestId("market-panel")).toBeVisible();
+    await context.setOffline(true);
+    await page.evaluate(() => {
+      location.hash = "#analyse";
+    });
+    const wait = page.locator('[data-page-skeleton="analyse"]');
+    await expect(wait).toBeVisible({ timeout: 15_000 });
+    await expect(wait).toContainText("Du bist offline");
+    await expect(wait.getByRole("button", { name: "Wiederholen" })).toBeVisible();
+    expect(noNetErrors(errors), errors.join("\n")).toEqual([]);
+    await context.setOffline(false);
+    await expect(page.locator('[data-page="analyse"][data-page-role="current"] h1').first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("[data-page-skeleton]")).toHaveCount(0);
+    expect(noNetErrors(errors), errors.join("\n")).toEqual([]);
+  });
 });
