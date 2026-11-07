@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { cn } from "@/lib/cn";
 import { celebrateFrom } from "@/motion/Celebrate";
-import { DotMatrix } from "@/motion/DotMatrix";
+import { ThinkingOrb } from "@/motion/ThinkingOrb";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { Sheet } from "@/motion/Sheet";
 import { StaggerItem } from "@/motion/Stagger";
@@ -104,7 +104,7 @@ function HowTo() {
  * 1. How to create a READ-ONLY key on Bitunix (numbered steps, link to the API page, the IP-binding trade-off).
  * 2. Key + secret (the secret hidden by default; once typed, the key shows only as `••••last4`, decoded by
  *    TextScramble), journal account, the read-only confirmation. Invalid input shakes the field.
- * 3. The check against Bitunix (DotMatrix snake while it runs) → success: drawn ✓, BorderBeam lap, confetti, available
+ * 3. The check against Bitunix (a thinking orb while it runs) → success: drawn ✓, BorderBeam lap, confetti, available
  *    balance on rolling digits, and the first import (30 / 90 / 180 / 365 days) or a dry run first.
  * The key travels once over HTTPS to the server, is stored encrypted and never comes back.
  */
@@ -399,7 +399,7 @@ export function ConnectSheet() {
                 )}
                 {checking || !result ? (
                   <>
-                    <DotMatrix preset="snake" size={5} gap={2} tone="fg" playing={checking} />
+                    <ThinkingOrb variant="search" size={44} active={checking} />
                     <span className="text-[13px] text-mute">
                       <TextRoll text={CONNECT.checking} />
                     </span>

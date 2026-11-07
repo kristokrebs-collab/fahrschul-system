@@ -6,9 +6,10 @@
  * auf die Bestätigung von Stripe", claims nothing and offers "Status prüfen". Reuses the full-screen wipe of the app; reduced
  * motion = the wipe's instant fade, the orbs stand still.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { celebrateRecord } from "@/motion/fx/celebrate";
 import { AsciiCascade } from "@/motion/pulse/AsciiCascade";
+import { ThinkingOrb } from "@/motion/ThinkingOrb";
 import { FullscreenWipe, WipeItem } from "@/motion/pulse/FullscreenWipe";
 import { Button } from "@/primitives/Button";
 import { formatDay } from "@/billing/format";
@@ -108,11 +109,7 @@ export function ResultView() {
           <div className="grid gap-5">
             {state === "pending" && (
               <span aria-hidden="true" className="relative block size-10 text-fg">
-                <span className="pay-orbs">
-                  {[0, 1, 2, 3, 4, 5].map((k) => (
-                    <i key={k} style={{ "--k": k } as CSSProperties} />
-                  ))}
-                </span>
+                <ThinkingOrb variant="plan" size={40} active={!timedOut} />
               </span>
             )}
             <h2 className="text-[clamp(30px,6vw,56px)] font-medium leading-[1] tracking-[-0.03em] text-fg" data-testid="result-title" aria-live="polite">

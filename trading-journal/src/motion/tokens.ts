@@ -117,6 +117,8 @@ export const dwell = {
   holdCheck: 0.9, // HoldButton shows its ✓ after a completed hold
   armed: 4, // HoldButton's assistive-tech fallback waits this long for the confirming second activation
   heroFlicker: 4, // HeroBackdrop ambient flicker runs this long after mount / the last pointer activity on the hero, then the canvas rests (perf-05)
+  undo: 6, // Papierkorb (R11): how long a removed screenshot / draft can be taken back (`motion/trash`); the clock stops while the pill is hovered / focused
+  saveMin: 0.28, // SaveMorph (R11): the condensed "Speichert …" state stays at least this long, so a fast store does not flash it
   scrollSettle: 0.15, // scroll gate (`scrollGate.ts`): hover tracking stays off until this long after the last scroll event
 } as const;
 

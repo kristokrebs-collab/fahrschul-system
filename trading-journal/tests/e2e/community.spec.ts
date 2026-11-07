@@ -299,7 +299,9 @@ test.describe("Community", () => {
     await row.click();
     const detail = page.getByRole("dialog", { name: "Trade-Details" });
     await expect(detail).toBeVisible();
+    // R11: „Teilen“ opens the radial fan (Kopieren · Bild · Link · …); the link target opens the share sheet as the button did before
     await detail.getByTestId("share-button").click();
+    await page.getByTestId("radial-link").click();
     const sheet = page.getByRole("dialog", { name: "Teilen" });
     await shareReady(sheet);
     await sheet.getByTestId("share-opt-prices").click();

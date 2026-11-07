@@ -20,6 +20,7 @@ import { Later } from "@/primitives/Later";
 import { CardSkeleton, RESERVE_CLASS, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 import { Skeleton } from "@/primitives/Skeleton";
 import { useJournal } from "@/store/journalStore";
+import { persisted } from "@/store/persisted";
 import { navigate } from "@/store/router";
 import { storageKey } from "@/store/storage";
 import { useUi } from "@/store/uiStore";
@@ -100,6 +101,7 @@ export const SETTINGS_STRINGS = {
   toastFailed: "Speichern fehlgeschlagen",
   unsaved: "Ungespeicherte Änderungen",
   unsavedShort: "Ungespeichert",
+  failedBar: "Nicht gespeichert",
   discard: "Verwerfen",
   discardHold: "Halten …",
   discardTitle: "Gedrückt halten, um alle ungespeicherten Änderungen zu verwerfen",
@@ -194,7 +196,8 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
   const [importOpen, setImportOpen] = useState(false);
   /** which `Speichern` started the save: only that button plays the ✓ (the others just show the shared busy state) */
   const [origin, setOrigin] = useState<SaveOrigin>("page");
-  const { phase, run } = useActionPhase();
+  // R11: a refused write stays visible as `Erneut versuchen` (keepFailed) – the ✓ only follows the store's resolved promise
+  const { phase, run } = useActionPhase(undefined, true);
 
   // Re-hydrate the draft when the stored settings change (bundle `useEffect(..., [settings])`), done during
   // render (React "adjusting state on prop change"). Only a PRISTINE draft follows: a cloud snapshot or a
@@ -242,7 +245,7 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
     setInvalidField(null);
     setHoldBar(changed.size > 0);
     const ok = await run(async () => {
-      await saveSettings(res.settings);
+      await persisted(() => saveSettings(res.settings));
       setDirty(false);
     });
     pushToast(ok ? { kind: "success", title: SETTINGS_STRINGS.toastSaved } : { kind: "error", title: SETTINGS_STRINGS.toastFailed });
@@ -536,7 +539,7 @@ type SaveOrigin = "page" | "bar";
 
 /** Pure: the phase a `Speichern` shows – the originating button runs the whole morph, the others never play the ✓. */
 function buttonPhase(phase: ActionPhase, isOrigin: boolean): ActionPhase {
-  return isOrigin || phase === "busy" ? phase : "idle";
+  return isOrigin || phase === "busy" || phase === "failed" ? phase : "idle";
 }
 
 /** The bar's leading text per save phase (short variant below `sm`); stacked in one grid cell and crossfaded. */
@@ -544,6 +547,7 @@ const BAR_LABELS: readonly { phase: ActionPhase; long: string; short: string }[]
   { phase: "idle", long: S.unsaved, short: S.unsavedShort },
   { phase: "busy", long: S.saving, short: S.saving },
   { phase: "done", long: S.saved, short: S.saved },
+  { phase: "failed", long: S.failedBar, short: S.failedBar },
 ];
 
 /** Sticky offset of the bar: under the 64 px header + 8 px. */
@@ -650,7 +654,7 @@ function UnsavedBar({
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
           <motion.span className={cn("inline-flex", saved && "pointer-events-none")} aria-hidden={saved || undefined} initial={false} animate={{ opacity: saved ? 0 : 1 }} transition={fade}>
-            <HoldButton variant="secondary" size="sm" holdLabel={S.discardHold} title={S.discardTitle} onConfirm={onDiscard} disabled={phase !== "idle"}>
+            <HoldButton variant="secondary" size="sm" holdLabel={S.discardHold} title={S.discardTitle} onConfirm={onDiscard} disabled={phase === "busy" || phase === "done"}>
               {S.discard}
             </HoldButton>
           </motion.span>

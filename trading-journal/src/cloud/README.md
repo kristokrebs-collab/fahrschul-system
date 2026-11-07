@@ -148,3 +148,15 @@ tombstones, three-way edits, settings rev race, offline queue, account switch, s
 `cloud.ui.test.tsx`, `cloud.store.test.ts`, `cloud.contract.test.ts`; functions: `functions.account.test.ts`.
 e2e: `tests/e2e/cloud.spec.ts` with the full Supabase / functions mock `tests/e2e/mocks/supabase.ts` (GoTrue, PostgREST,
 Realtime over `routeWebSocket`, `/api/v1/*`); dev harness `dev/konto.html` until the page is routed.
+
+## Login/Signup-Morph (R11, `ui/AuthMorph.tsx`)
+
+`AuthSheet` sagt, WAS es zeigt; `AuthMorph` sagt, WIE es sich bewegt (damit spätere Änderungen am Inhalt, z. B. die Rückführung der Kaufstrecke, die Bewegung nicht berühren).
+Passwort · Magic Link · Neu hier sind EIN Schritt (`stepOf` = `entry`): das Formular bleibt eingehängt (E-Mail-Feld, Wert, Fokus und die Sicht des Passwort-Managers bleiben).
+Blöcke, die nur eine Art hat (Passwort-Stärke, Zustimmung, Hinweise), gleiten als `MorphItem` ein und aus, die übrigen Blöcke gleiten per `layout="position"`. Die anderen Schritte
+(2FA, gesendet, Reset, neues Passwort …) überblenden in derselben Karte (`popLayout`), deren Höhe federt (`MorphHeight` hält die alte Höhe schon im Layout-Effekt des Wechsels fest,
+bevor das Panel selbst misst – sonst liefe seine eigene FLIP-Animation obendrauf, gemessen: Höhe sprang erst zurück und dann vor). Felder: `name` und `autocomplete`
+(`username` bzw. `email`, `current-password` / `new-password`); ein abgelehntes Feld zeigt die Meldung am Feld und bekommt den Fokus; ein Fokus im verschwindenden Passwortfeld geht
+auf die E-Mail. Reduziert: sofortiger Wechsel.
+
+`privacy.ts`: `setPrivacy` liefert jetzt `Promise<boolean>` (Gerät hat gespeichert UND das Konto hat geantwortet); `resyncPrivacy()` sendet die Konto-Schlüssel erneut („Erneut versuchen“ der Karte Datenschutz).

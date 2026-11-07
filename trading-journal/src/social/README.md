@@ -74,3 +74,9 @@ in-memory server that validates every payload with the real strict schemas).
   each device from public Binance candles and never stored. That nobody has seen the candles before is a matter of trust – the sheet says so.
 Tests: `social.proof`, `social.cases`, `social.metrics`, `supabase.proofs`, `supabase.cases`, `views.community.{proof,cases}`, `functions.social`;
 e2e `tests/e2e/community-belege.spec.ts`.
+
+## Teilen als Fächer (R11)
+
+`ui/RadialShareButton.tsx` ersetzt im Trade-Detail den Knopf `ShareButton`: Der Auslöser (`data-testid="share-button"`) öffnet den Fächer `@/motion/RadialShare` mit Kopieren
+(die geschwärzte Kurzfassung `shareTitle(redactTrade(…))`, nie Beträge), Bild (`downloadShareCard`, nur R und %), Link (`openShare` – das Blatt sagt ehrlich, wenn Cloud/Konto fehlen) und
+Weitergeben (`nativeShareText`, nur wenn `navigator.share` existiert). `ShareButton` bleibt für Setup-Karten. Es wird nichts verschickt, was das Teilen-Blatt nicht auch zeigt.

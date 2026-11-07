@@ -3,6 +3,8 @@ import { useEffect, useId, useRef, useState, type ChangeEvent, type DragEvent } 
 import type { ScreenshotRef } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
+import { trashExit } from "@/motion/trash/trashMotion";
+import { settleTrashOwner } from "@/motion/trash/trashStore";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
@@ -16,6 +18,7 @@ import { ShotThumb } from "./ShotThumb";
 import { addShots, MAX_SHOTS, promoteShot } from "./shots";
 import { releaseCloudShots } from "./release";
 import { collectShotGarbage, isRamOnly, localKeyOf, referencedShotKeys, shotStorage } from "./store";
+import { insertShot, trashShot } from "./trash";
 
 export interface ShotsFieldProps {
   value: readonly ScreenshotRef[];
@@ -55,6 +58,15 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
   useEffect(() => {
     countRef.current = value.length;
   }, [value.length]);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  /** Removing a picture sends it to the Papierkorb: it shrinks away, „Rückgängig“ (6 s) puts the same reference back once its original bytes are verified (`./trash`). */
+  const remove = (shot: ScreenshotRef, index: number) => {
+    onChange((prev) => prev.filter((r) => r.id !== shot.id));
+    trashShot({ ref: shot, index, owner: id, put: (ref, at) => onChangeRef.current((prev) => insertShot(prev, ref, at)) });
+  };
 
   const take = async (files: readonly Blob[]) => {
     if (!files.length) return;
@@ -116,12 +128,14 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
     const mine = uploads.current;
     return () => {
       alive.current = false;
+      // the editor closes: a removed picture can no longer be put back where it came from – let go of it now, BEFORE the sweep below
+      settleTrashOwner(id);
       const s = useJournal.getState();
       if (!s.loaded) return;
       void collectShotGarbage(referencedShotKeys(s.trades));
       void releaseCloudShots(mine);
     };
-  }, []);
+  }, [id]);
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -202,7 +216,7 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
                 className="relative"
                 initial={reduced ? false : { opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9, transition: tween.exit }}
+                exit={trashExit(reduced)}
                 transition={{ scale: { ...spring.pop, delay: Math.min(i, stagger.max) * stagger.cards }, opacity: tween.fade, layout: spring.layout }}
                 style={{ borderRadius: radius.card }}
               >
@@ -210,7 +224,7 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
                 <button
                   type="button"
                   aria-label={`Screenshot ${i + 1} entfernen`}
-                  onClick={() => onChange((prev) => prev.filter((r) => r.id !== shot.id))}
+                  onClick={() => remove(shot, i)}
                   className="absolute right-1.5 top-1.5 grid size-7 place-items-center rounded-full bg-ink-950/85 text-mute transition-colors hover:text-loss pointer-coarse:size-11"
                 >
                   <svg viewBox="0 0 12 12" className="size-2.5" aria-hidden="true">

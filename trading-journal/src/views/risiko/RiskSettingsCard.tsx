@@ -6,17 +6,19 @@
  * one shakes its field and keeps the stored value. The maintenance tiers are an editable table (approximation).
  */
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { DEFAULT_TIERS, riskLimits, riskSettingsOf, sanitizeTiers, TIERS_MAX, withRiskSettings, type MaintTier, type RiskSettings } from "@/domain/risk";
 import { cn } from "@/lib/cn";
 import { n0 } from "@/lib/format";
+import { SaveBadge, SaveSurface, useSaveMorph } from "@/motion/SaveMorph";
 import { Switch } from "@/motion/Switch";
-import { dwell, spring, tween } from "@/motion/tokens";
+import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import { useJournal } from "@/store/journalStore";
+import { persisted } from "@/store/persisted";
 import { useUi } from "@/store/uiStore";
 import { parseInput, toInput } from "./riskStore";
 import { RISIKO } from "./strings";
@@ -27,9 +29,9 @@ const S = RISIKO.settings;
 type DisciplinePatch = Partial<{ maxLossDayPct: number; maxLossTradePct: number; maxTrades: { makro: number; scalp: number } }>;
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** Writes `settings.risk` / `settings.discipline` at once; "same" when nothing changes. */
-export async function writeRisk(patch: Partial<RiskSettings>, discipline?: DisciplinePatch): Promise<"ok" | "same" | "fail"> {
-  const { settings, saveSettings } = useJournal.getState();
+/** What a write of `patch` would store: "same" when nothing changes, else the full next settings (built from the CURRENT state). */
+export function planRisk(patch: Partial<RiskSettings>, discipline?: DisciplinePatch): { same: true } | { same: false; next: ReturnType<typeof useJournal.getState>["settings"] } {
+  const { settings } = useJournal.getState();
   const raw = settings as typeof settings & { risk?: unknown; discipline?: unknown };
   const risk = withRiskSettings(raw.risk, patch);
   const prevDisc = isObj(raw.discipline) ? raw.discipline : {};
@@ -38,9 +40,16 @@ export async function writeRisk(patch: Partial<RiskSettings>, discipline?: Disci
     const next = { ...prevDisc, ...discipline };
     if (JSON.stringify(next) !== JSON.stringify(prevDisc)) disc = next;
   }
-  if (risk === raw.risk && disc === raw.discipline) return "same";
+  if (risk === raw.risk && disc === raw.discipline) return { same: true };
+  return { same: false, next: { ...settings, risk, discipline: disc } as typeof settings };
+}
+
+/** Writes `settings.risk` / `settings.discipline` at once; "same" when nothing changes. */
+export async function writeRisk(patch: Partial<RiskSettings>, discipline?: DisciplinePatch): Promise<"ok" | "same" | "fail"> {
+  const plan = planRisk(patch, discipline);
+  if (plan.same) return "same";
   try {
-    await saveSettings({ ...settings, risk, discipline: disc } as typeof settings);
+    await useJournal.getState().saveSettings(plan.next);
     return "ok";
   } catch {
     return "fail";
@@ -256,30 +265,29 @@ function TierEditor({ tiers, onCommit }: { tiers: readonly MaintTier[]; onCommit
 }
 
 export function RiskSettingsCard() {
-  const reduced = useReducedFx();
   const settings = useJournal((s) => s.settings);
   const pushToast = useUi((s) => s.pushToast);
   const limits = riskLimits(settings);
   const stored = riskSettingsOf((settings as { risk?: unknown }).risk);
-  const [saved, setSaved] = useState(0);
-  useEffect(() => {
-    if (!saved) return;
-    const t = setTimeout(() => setSaved(0), dwell.done * 1000);
-    return () => clearTimeout(t);
-  }, [saved]);
+  // Speicher-Morph: ✓ only after the store's promise resolved; a failed write keeps „Erneut versuchen“ (the same write, rebuilt from the current state)
+  const save = useSaveMorph();
 
-  const done = (r: "ok" | "same" | "fail"): boolean => {
-    if (r === "fail") {
-      pushToast({ kind: "error", title: S.failed });
-      return false;
-    }
-    if (r === "ok") setSaved(Date.now());
-    return true;
+  /** One write: nothing to store → no morph; else saving → saved / failed. Resolves whether the value is stored. */
+  const saveRisk = async (patch: Partial<RiskSettings>, discipline?: DisciplinePatch): Promise<boolean> => {
+    if (planRisk(patch, discipline).same) return true;
+    const ok = await save.run(() =>
+      persisted(async () => {
+        const plan = planRisk(patch, discipline);
+        if (!plan.same) await useJournal.getState().saveSettings(plan.next);
+      }),
+    );
+    if (!ok) pushToast({ kind: "error", title: S.failed });
+    return ok;
   };
   const commitNum = async (spec: NumSpec, v: number): Promise<boolean> => {
     const p = spec.put(v);
     if (!p) return false;
-    return done(await writeRisk(p.risk ?? {}, p.discipline));
+    return saveRisk(p.risk ?? {}, p.discipline);
   };
 
   return (
@@ -287,25 +295,9 @@ export function RiskSettingsCard() {
       title={S.title}
       note={S.note}
       data-testid="risk-settings"
-      action={
-        <AnimatePresence>
-          {saved ? (
-            <motion.span
-              key={saved}
-              className="text-[11.5px] text-win"
-              initial={reduced ? false : { opacity: 0, y: 3 }}
-              animate={{ opacity: 1, y: 0, transitionEnd: { transform: "none" } }}
-              exit={{ opacity: 0, transition: tween.exit }}
-              transition={spring.enter}
-              data-testid="risk-settings-saved"
-            >
-              ✓ {S.saved}
-            </motion.span>
-          ) : null}
-        </AnimatePresence>
-      }
+      action={<SaveBadge phase={save.phase} error={save.error} onRetry={() => void save.retry()} testId="risk-settings-saved" saved={S.saved} />}
     >
-      <div className="grid gap-5">
+      <SaveSurface phase={save.phase} className="grid gap-5">
         <div className="flex items-start justify-between gap-4 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5">
           <span className="grid min-w-0 gap-0.5">
             <label htmlFor="rs-guard" className="cursor-pointer text-[13px] text-fg">
@@ -315,7 +307,7 @@ export function RiskSettingsCard() {
               {S.guardHelp}
             </span>
           </span>
-          <Switch id="rs-guard" checked={stored.guard} onCheckedChange={(guard) => void writeRisk({ guard }).then(done)} aria-describedby="rs-guard-help" className="touch-hit mt-0.5 shrink-0" tone="signal" />
+          <Switch id="rs-guard" checked={stored.guard} onCheckedChange={(guard) => void saveRisk({ guard })} aria-describedby="rs-guard-help" className="touch-hit mt-0.5 shrink-0" tone="signal" />
         </div>
         {GROUPS.map((g) => (
           <div key={g.title} className="grid gap-2.5">
@@ -329,9 +321,9 @@ export function RiskSettingsCard() {
           </div>
         ))}
         <div className="grid gap-3">
-          <TierEditor tiers={stored.tiers} onCommit={async (tiers) => done(await writeRisk({ tiers }))} />
+          <TierEditor tiers={stored.tiers} onCommit={(tiers) => saveRisk({ tiers })} />
         </div>
-      </div>
+      </SaveSurface>
     </RiskCard>
   );
 }

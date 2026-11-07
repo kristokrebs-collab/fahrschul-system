@@ -16,6 +16,7 @@ import { lazy, Suspense, useState, type ReactNode } from "react";
 import { assumptionsOf, costText, count, durationText, MIN_EVENTS, MIN_EVENTS_SHARES, MODEL_SCOPE, pc, pc0, planLine, rr, triggerText, TM_INTERVAL_TEXT, TM_RUNS, TM_SEED, type TmHistory, type TmResult, type Quart } from "@/domain/timemachine";
 import { cn } from "@/lib/cn";
 import { date as fmtDate, time as fmtTime } from "@/lib/format";
+import { ThinkingOrb } from "@/motion/ThinkingOrb";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
@@ -50,8 +51,11 @@ function Progress({ run }: { run: TimeMachineRun }) {
   return (
     <div className="grid gap-2 rounded-xl border border-line bg-ink-950/50 p-3.5" data-testid="tm-busy" data-phase={run.phase ?? "pool"}>
       <div className="flex items-center justify-between gap-3 text-[12.5px]">
-        <span className="text-fg">
-          {TM.running} · {TM.phase[run.phase ?? "pool"]}
+        <span className="flex min-w-0 items-center gap-2 text-fg">
+          <ThinkingOrb variant="calc" size={20} className="text-mute" />
+          <span className="min-w-0">
+            {TM.running} · {TM.phase[run.phase ?? "pool"]}
+          </span>
         </span>
         <span className="num font-mono text-mute">{pct} %</span>
       </div>

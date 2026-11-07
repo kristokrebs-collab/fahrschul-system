@@ -18,11 +18,11 @@ function focusables(root: HTMLElement): HTMLElement[] {
 
 /**
  * Elements that must stay live behind a dialog: the toast island and any other live region, plus the floating
- * layers of pulse selects / autocompletes (portalled to `<body>`, they belong to the field inside the dialog).
+ * layers of pulse selects / autocompletes and the fan of the radial share (portalled to `<body>`, they belong to the control inside the dialog).
  * `aria-live="off"` is no live region (e.g. the candle chart's OHLC legend, `role=status` muted): it is hidden with
  * the page like everything else, never left readable beside the dialog.
  */
-export const INERT_EXEMPT_SELECTOR = '[aria-live]:not([aria-live="off"]),[data-toast-island],[data-pulse-select],[data-pulse-autocomplete]';
+export const INERT_EXEMPT_SELECTOR = '[aria-live]:not([aria-live="off"]),[data-toast-island],[data-pulse-select],[data-pulse-autocomplete],[data-radial-share]';
 
 /**
  * Upper bound for the morph-aware deferrals: a dialog whose `settled` signal never arrives (no layout animation

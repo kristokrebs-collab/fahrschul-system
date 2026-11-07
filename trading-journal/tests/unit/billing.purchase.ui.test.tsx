@@ -201,8 +201,8 @@ describe("tariff detail", () => {
     expect(within(sheet).getByTestId("detail-included")).toHaveTextContent("Automatischer Börsen-Sync");
     expect(within(sheet).getByTestId("detail-limits")).toHaveTextContent("Screenshot-Speicher");
     expect(within(sheet).getByTestId("detail-limits")).toHaveTextContent("2.048 MB");
-    // "geplant" limits (TradingView connections, alert channels, phone calls, simulations) are not shown
-    expect(within(sheet).getByTestId("detail-limits")).not.toHaveTextContent(/Telefon|TradingView|Alarm-Kanäle|Simulationen/);
+    // "geplant" limits (TradingView connections, simulations) are not shown; the alert channels and phone calls became live with the alert package (A1/C2)
+    expect(within(sheet).getByTestId("detail-limits")).not.toHaveTextContent(/TradingView|Simulationen/);
     expect(within(sheet).getByTestId("detail-unlocks")).toBeInTheDocument();
     expect(within(sheet).getByTestId("detail-price")).toHaveTextContent("120 € pro Jahr");
     expect(within(sheet).getByTestId("detail-price")).toHaveTextContent("Jährlich −17 % gegenüber 12 Monatszahlungen");

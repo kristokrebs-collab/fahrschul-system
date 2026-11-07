@@ -6,7 +6,9 @@
  */
 import { create } from "zustand";
 import type { ScreenshotRef } from "@/domain/types";
+import { assertOriginalIntact } from "@/journal/screenshots/trash";
 import { localKeyOf, pinShotKeys, unpinShotKeys } from "@/journal/screenshots/store";
+import { putTrash } from "@/motion/trash/trashStore";
 import { useUi, type TradeDraft } from "@/store/uiStore";
 
 interface ShotImportState {
@@ -60,4 +62,28 @@ export function openNextDraft(): void {
 /** Drops the waiting drafts (their pictures are released again). */
 export function discardQueue(): void {
   setQueue([]);
+}
+
+/**
+ * Verwerfen of the waiting drafts, undoable for six seconds (Papierkorb): the queue empties at once, but the drafts and the
+ * pictures they carry stay pinned until the window is over. "Rückgängig" checks that every picture's original bytes are still
+ * there (hash) and then puts the drafts back in front of whatever was queued meanwhile; the end of the window lets go of the pins.
+ */
+export function discardQueueToTrash(): void {
+  const dropped = useShotImport.getState().queue;
+  if (!dropped.length) return;
+  const keys = keysOf(dropped);
+  useShotImport.setState({ queue: [] }); // the pins stay: nothing is released before the window is over
+  putTrash({
+    subject: dropped.length === 1 ? "1 Entwurf" : `${dropped.length} Entwürfe`,
+    kind: "draft",
+    restore: async () => {
+      for (const d of dropped) for (const r of d.screenshots ?? []) await assertOriginalIntact(r);
+      useShotImport.setState((s) => ({ queue: [...dropped, ...s.queue] }));
+    },
+    commit: () => {
+      const still = new Set(keysOf(useShotImport.getState().queue));
+      unpinShotKeys(keys.filter((k) => !still.has(k)));
+    },
+  });
 }

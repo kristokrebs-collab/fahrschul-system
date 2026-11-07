@@ -31,6 +31,7 @@
  * | `ArchiveMount` | F26 | the data archive's collector (public Binance numbers + analysis states into this browser's IndexedDB) – its own chunk, fetched only while the user has switched the archive on (default off), only while the app is open |
  * | `SqueezeMount` | F07 | the squeeze observation's alert (toast, only after the explicit switch `settings.squeeze.alerts`) – its own chunk, fetched only then |
  * | `ConnectMount` | Verbindungen | the connection dialog (TradingView assistant, Binance wizard, hand-offs) – its own chunk, fetched the first time a `ConnectSlot` was clicked |
+ * | `TrashMount` | R11 | the Papierkorb pills („Screenshot 2 entfernt · Rückgängig“, 6 s) – its own chunk, fetched the first time something is removed |
  * | `DemoMount` | F58 | the interactive demo with marked example data (import, rule draft, test, demo account, alarm) – its own chunk, fetched the first time it is opened; its state is a session in memory that is gone when it closes |
  */
 import { lazy, Suspense, type ReactNode } from "react";
@@ -68,6 +69,7 @@ import { ReplayHost } from "@/views/trades/replay/TradeReplay";
 import { useDemo } from "@/views/demo/demoStore";
 import { useTmSheet } from "@/views/timemachine/sheetStore";
 import { useWhatIf } from "@/views/trades/whatif/whatIfStore";
+import { useTrash } from "@/motion/trash/trashStore";
 import { useTraining } from "@/views/ueben/trainingStore";
 import { DailyCheckinHost } from "@/views/wachstum/DailyCheckinHost";
 import { PostTradeReviewHost } from "@/views/wachstum/PostTradeReview";
@@ -82,6 +84,7 @@ const SqueezeHost = lazy(() => import("@/market/squeeze/host"));
 const AlertFeedHost = lazy(() => import("@/views/settings/alerts/AlertFeedHost"));
 const DemoHost = lazy(() => import("@/views/demo/DemoHost"));
 const ConnectHost = lazy(() => import("@/connect/ConnectHost"));
+const TrashHost = lazy(() => import("@/motion/trash/TrashHost"));
 
 /** The assistant sheet: its chunk is fetched the first time it is opened and then stays mounted (close animation). */
 function AssistantMount() {
@@ -180,6 +183,16 @@ function DemoMount() {
   return used ? (
     <Suspense fallback={null}>
       <DemoHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Papierkorb (R11): the pills' chunk is fetched the first time something is removed, then stays mounted (exit animation, next removal). */
+function TrashMount() {
+  const used = useTrash((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <TrashHost />
     </Suspense>
   ) : null;
 }
@@ -297,6 +310,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Verbindungen">
         <ConnectMount />
+      </HostSlot>
+      <HostSlot name="Papierkorb">
+        <TrashMount />
       </HostSlot>
     </>
   );
