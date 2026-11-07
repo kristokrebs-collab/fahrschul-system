@@ -8,6 +8,7 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { blockExternalNetwork, completeSignIn, expectNotInert } from "./cloudSignIn";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockBilling, mockSubscription, type MockBillingOptions } from "./mocks/billing";
@@ -22,6 +23,7 @@ const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
 async function setup(page: Page, billing: MockBillingOptions = {}) {
   const errors = collectErrors(page);
+  await blockExternalNetwork(page);
   await mockSupabase(page);
   const bill = await mockBilling(page, billing);
   await seed(page);
@@ -30,7 +32,8 @@ async function setup(page: Page, billing: MockBillingOptions = {}) {
 
 async function ready(sheet: Locator): Promise<void> {
   await expect(sheet).toBeVisible();
-  await expect(sheet.locator("[inert]")).toHaveCount(0);
+  // the form is usable once neither the e-mail field nor its ancestors are inert (the morphing login keeps hidden views inert)
+  await expectNotInert(sheet.getByLabel("E-Mail"));
 }
 
 async function signInViaSheet(page: Page): Promise<void> {
@@ -42,8 +45,7 @@ async function signInViaSheet(page: Page): Promise<void> {
   await sheet.getByLabel("E-Mail").fill(EMAIL);
   await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
   await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
+  await completeSignIn(page, { synced: true });
 }
 
 async function signInHeader(page: Page): Promise<void> {

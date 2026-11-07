@@ -13,13 +13,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route, type TestInfo } from "@playwright/test";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed, waitForStableLayout } from "./helpers";
+import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockBilling } from "./mocks/billing";
 import { mockSupabase } from "./mocks/supabase";
 
 const SHOTS = process.env.ALARME_SHOTS_DIR;
-const EMAIL = "trader@example.com";
-const PASSWORD = "richtig-geheim-42";
 
 const OFF = { green_warn: false, green_confirm: false, red_warn: false, red_confirm: false };
 const prefs = (over: Record<string, unknown> = {}) => ({
@@ -119,17 +118,7 @@ async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
 }
 
 async function signIn(page: Page): Promise<void> {
-  await page.locator('[data-cloud-pill="signin"]').click();
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.locator("[inert]")).toHaveCount(0);
-  await sheet.getByLabel("E-Mail").fill(EMAIL);
-  await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Willkommen" })).toBeVisible();
-  await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Los geht’s" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await signInViaSheet(page, { synced: true });
 }
 
 const card = (page: Page) => page.getByTestId("alerts-settings");
@@ -137,6 +126,7 @@ const sw = (page: Page, channel: string, event: string) => page.getByTestId(`ev-
 
 /** Opens the settings page signed in and waits for the alarm card (the fold is open by default in the seed). */
 async function open(page: Page, s: Srv, opts: { foldsClosed?: boolean } = {}): Promise<void> {
+  await blockExternalNetwork(page);
   await mockSupabase(page);
   await mockBilling(page, { enabled: false });
   await mockAlertFns(page, s);

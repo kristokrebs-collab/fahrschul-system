@@ -10,10 +10,18 @@
  *   question that comes first (answered with `choice`). Whether the first sync is already live ("Alles synchron.") is
  *   only asserted when a spec asks for it (`synced`, welcome path).
  */
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 export const SIGN_IN_EMAIL = "trader@example.com";
 export const SIGN_IN_PASSWORD = "richtig-geheim-42";
+
+/**
+ * Waits until the control and none of its ancestors is `inert` (the sheet body is inert until its morph has settled, and the
+ * morphing login keeps other, hidden views inert for good – so "no inert element anywhere in the dialog" is the wrong test).
+ */
+export async function expectNotInert(control: Locator, timeout = 20_000): Promise<void> {
+  await expect.poll(() => control.evaluate((el) => el.closest("[inert]") === null), { timeout }).toBe(true);
+}
 
 export interface SignInOptions {
   email?: string;
@@ -50,9 +58,10 @@ export async function signInViaSheet(page: Page, o: SignInOptions = {}): Promise
   } else {
     await expect(sheet).toBeVisible({ timeout: 20_000 });
   }
-  await expect(sheet.locator("[inert]")).toHaveCount(0, { timeout: 20_000 });
   const mail = sheet.getByLabel("E-Mail");
   const pw = sheet.getByLabel("Passwort", { exact: true });
+  await expectNotInert(mail);
+  await expectNotInert(pw);
   await expect(async () => {
     await mail.fill(email);
     await pw.fill(password);
