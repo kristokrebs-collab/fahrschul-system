@@ -209,6 +209,18 @@ describe("alerts-phone: setup", () => {
     expect(db.tables.alert_phone_secrets).toBeUndefined();
   });
 
+  it("KILL_CALLS (emergency switch): no SMS code is sent – 503 switched_off, nothing stored; the opt-out still works", async () => {
+    vi.stubEnv("KILL_CALLS", "true");
+    const res = await start();
+    expect(res.status).toBe(503);
+    expect((await res.json()).error.code).toBe("switched_off");
+    expect(tw.verifications).toHaveLength(0);
+    expect(db.tables.alert_phones ?? []).toHaveLength(0);
+    expect((await phoneCall("DELETE")).status).toBe(200);
+    vi.unstubAllEnvs();
+    expect((await start()).status).toBe(200); // switched on again: works
+  });
+
   it("a good number: consent stored with time and version, the number only encrypted, the SMS goes to the E.164 number in the account's language", async () => {
     const res = await start();
     expect(res.status).toBe(200);
@@ -305,6 +317,17 @@ describe("alerts-phone: test call and opt-out", () => {
     expect(tw.calls[0]!.twiml).toContain("Testanruf");
   });
 
+  it("KILL_CALLS (emergency switch): no test call – 503 switched_off, nothing dialed, nothing counted", async () => {
+    await verifyNumber();
+    store.secrets.set(U, { numberEnc: db.tables.alert_phone_secrets![0]!.number_enc as string, verified: true });
+    vi.stubEnv("KILL_CALLS", "true");
+    const res = await phoneCall("POST", { action: "test" });
+    vi.unstubAllEnvs();
+    expect(res.status).toBe(503);
+    expect((await res.json()).error.code).toBe("switched_off");
+    expect(tw.calls).toHaveLength(0);
+  });
+
   it("a test call counts against the limits: the account's day (5) stops the sixth – and the test rate limit stops it earlier", async () => {
     await verifyNumber();
     store.secrets.set(U, { numberEnc: db.tables.alert_phone_secrets![0]!.number_enc as string, verified: true });
@@ -391,6 +414,7 @@ describe("alerts-twilio-status", () => {
   const post = (params: Record<string, string>, sig?: string | null) =>
     alertsStatus(
       new Request(URL_, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", ...(sig === null ? {} : { "x-twilio-signature": sig ?? twilioSignature("tok", URL_, params) }) }, body: new URLSearchParams(params).toString() }),
+      ctx,
     );
 
   beforeEach(async () => {
@@ -427,6 +451,6 @@ describe("alerts-twilio-status", () => {
     twilioEnv(false);
     expect((await post({ CallSid: SIDX, CallStatus: "ringing" })).status).toBe(503);
     twilioEnv();
-    expect((await alertsStatus(new Request(URL_, { method: "GET" }))).status).toBe(405);
+    expect((await alertsStatus(new Request(URL_, { method: "GET" }), ctx)).status).toBe(405);
   });
 });

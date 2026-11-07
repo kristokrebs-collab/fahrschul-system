@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Writes `docs/ENV.md` from the one list of environment variables (`netlify/functions/_lib/envSpec.ts`):
+ * Writes `docs/ENV.md` from the one list of environment variables (`netlify/functions/_lib/envSpec.ts`) plus the hand-written
+ * notes (`docs/ENV-HINWEISE.md`, appended unchanged):
  *   node scripts/envDoc.mjs --write     # (re)generate docs/ENV.md
  *   node scripts/envDoc.mjs             # print it
  * A unit test (`tests/unit/ops.env.test.ts`) fails when the file on disk differs from this output.
  */
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -64,9 +65,21 @@ export function renderFunctions(fns, labels) {
   return out;
 }
 
+/** The hand-written notes (`docs/ENV-HINWEISE.md`: background, sources, open questions) – appended unchanged, headings one level down. */
+export function renderNotes(text) {
+  const lines = text.split("\n");
+  const body = lines.filter((l, i) => !(i === 0 && l.startsWith("# ")) && !l.startsWith("> "));
+  const out = ["", "## Hinweise der Pakete", "", "Von Hand gepflegt in `docs/ENV-HINWEISE.md` und hier unverändert angehängt.", ""];
+  for (const l of body) out.push(l.startsWith("## ") ? `#${l}` : l);
+  while (out.length && out[out.length - 1] === "") out.pop();
+  out.push("");
+  return out;
+}
+
 export async function envDocText() {
   const { ENV_SPEC, ENV_GROUPS, FUNCTION_ENV, GROUP_LABELS } = await import(resolve(root, "netlify/functions/_lib/envSpec.ts"));
-  return [...renderEnvDoc(ENV_SPEC, ENV_GROUPS, GROUP_LABELS), ...renderFunctions(FUNCTION_ENV, GROUP_LABELS)].join("\n");
+  const notes = renderNotes(readFileSync(resolve(root, "docs/ENV-HINWEISE.md"), "utf8"));
+  return [...renderEnvDoc(ENV_SPEC, ENV_GROUPS, GROUP_LABELS), ...renderFunctions(FUNCTION_ENV, GROUP_LABELS), ...notes].join("\n");
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

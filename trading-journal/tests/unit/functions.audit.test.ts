@@ -30,8 +30,8 @@ function classify(f: string): Cls | null {
   const s = src(f);
   const cfg = /export const config[^=]*=\s*(\{[\s\S]*?\});/.exec(s)?.[1] ?? "";
   if (/schedule:\s*"/.test(cfg)) return "cron";
-  if (/verifyWebhook\(/.test(s)) return "webhook";
-  if (/OPS_TOKEN|hashToken\(|resolveToken\(/.test(s) && !/requireUser\(/.test(s)) return "token";
+  if (/verifyWebhook\(|validTwilioSignature\(/.test(s)) return "webhook";
+  if (/OPS_TOKEN|hashToken\(|resolveToken\(|resolveSignalOwner\(/.test(s) && !/requireUser\(/.test(s)) return "token";
   if (/requireUser\(/.test(s)) return "user";
   if (/optionalUser\(|stockGuard\(|enforceRateLimit\(|memoryLimit\(|limitIp\(|slots\./.test(s)) return "public";
   return null;
@@ -51,12 +51,14 @@ const OWN_LIMITER: Record<string, { pattern: RegExp; why: string }> = {
   "ops-status": { pattern: /fail\(who, now\)[\s\S]*OPS_MAX_FAILURES|locked\(who/, why: "lock-out after 10 wrong tokens per address pseudonym, per instance (must work when Supabase is down)" },
   "ops-flags": { pattern: /slots\.get\(key\)/, why: "per-instance counter; four booleans, no database" },
   "stripe-webhook": { pattern: /verifyWebhook\(/, why: "the Stripe signature is the gate; events are idempotent (`stripe_events`), body ≤ 1 MB" },
+  "signals-receive": { pattern: /receiveRateLimits\(/, why: "per token hash AND per address (`_lib/signals/receive.ts`), checked before the token is even looked up" },
 };
 
 /** Functions that read the raw body themselves (everything else goes through `readJson` + a schema). */
 const RAW_BODY: Record<string, string> = {
   "stripe-webhook": "the signature covers the exact bytes; size-limited before and after reading",
   "hooks-tradingview": "TradingView sends free text / JSON without headers; parsed by `parseTvAlert`, size-limited (MAX_BYTES)",
+  "alerts-twilio-status": "Twilio posts a form (not JSON) and signs its fields; the signature check needs the parsed fields, size-limited (MAX_BYTES) before parsing",
 };
 
 /** Public functions: what keeps them from being an open relay. */
@@ -149,6 +151,23 @@ describe("class public / token / webhook / cron", () => {
     const hook = src("hooks-tradingview.mts");
     expect(hook).toMatch(/hashToken\(token\)/);
     for (const f of ["ops-status.mts", "hooks-tradingview.mts", "trades-api.mts"]) expect(src(f), f).not.toMatch(/console\.\w+\([^)]*\btoken\b[^"')]*\)/);
+  });
+
+  it("the Twilio status callback verifies the signature before it changes anything, and bounds the body", () => {
+    const s = src("alerts-twilio-status.mts");
+    expect(s.indexOf("validTwilioSignature(")).toBeGreaterThan(0);
+    expect(s.indexOf("validTwilioSignature(")).toBeLessThan(s.indexOf("advanceByRef("));
+    expect(s).toMatch(/payload_too_large/);
+    expect(s).toMatch(/phone_unavailable/); // no auth token → 503, never "accepted"
+  });
+
+  it("the signal receiver limits first, compares the token by hash, bounds the body and never logs the token", () => {
+    const s = src("signals-receive.mts");
+    expect(s.indexOf("receiveRateLimits(")).toBeLessThan(s.indexOf("resolveSignalOwner("));
+    expect(s.indexOf("resolveSignalOwner(")).toBeLessThan(s.indexOf("readBodyLimited("));
+    expect(s).toMatch(/MAX_SIGNAL_BYTES/);
+    expect(s).not.toMatch(/console\./);
+    expect(readFileSync(join(root, "_lib/signals/receive.ts"), "utf8")).toMatch(/hashToken\(token\)/);
   });
 
   it("the Stripe webhook verifies the signature before processing, and bounds the body", () => {

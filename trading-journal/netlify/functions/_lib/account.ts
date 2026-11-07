@@ -120,6 +120,8 @@ export const EXPORT_TABLES: ExportTable[] = [
   { table: "alert_phones", userColumn: "user_id", columns: "user_id,status,masked,consent_at,consent_version,verified_at,revoked_at,updated_at" },
   { table: "alert_events", userColumn: "user_id", columns: "id,source,market_key,market,event,value,detail,suppressed,occurred_at,created_at" },
   { table: "alert_deliveries", userColumn: "user_id", columns: "id,event_id,kind,channel,status,reason,attempts,not_before,dialed_at,created_at,updated_at" },
+  { table: "consents", userColumn: "user_id", columns: "id,order_id,kind,text_hash,text_version,consent_text,plan,interval,seats,checkout_session_id,given_at" },
+  { table: "contract_requests", userColumn: "user_id", columns: "id,kind,declared_name,contract_hint,status,received_at,executed_at,ends_at" },
 ];
 
 const SECRET_KEY = /secret|password|passphrase|token|api[-_]?key|authorization|cookie|jwt|_enc$/i;

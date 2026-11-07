@@ -70,6 +70,7 @@ const DEFINER_CALLABLE_WITHOUT_AUTH_UID: Record<string, string> = {
 /** R2b – columns whose NAME looks like secret material but that the browser may read, with the reason. */
 const READABLE_SECRET_LOOKING: Record<string, string> = {
   "audit_log.ip_hash": "salted pseudonym of the user's OWN sign-in address, shown in their own security log (not reversible, never another person's)",
+  "consents.text_hash": "SHA-256 of the consent wording the user was shown (public text, src/legal/consentRecord.ts) – the proof of WHAT was ticked, shown in their own export",
   "simulations.data_hash": "public integrity hash of the user's own simulation input (the reproducibility proof the card shows)",
   "simulations.result_hash": "public integrity hash of the user's own simulation result (the reproducibility proof the card shows)",
 };
@@ -83,6 +84,7 @@ const EXPORT_EXCEPTIONS: Record<string, string> = {
   tv_mcp_states: "short-lived (minutes) PKCE state of a running TradingView connection – no lasting data",
   mfa_recovery_codes: "HMAC hashes of the recovery codes (secret material, useless outside the server); the export would only show hashes – the status (how many are left) is in the account view",
   sync_cursor: "internal resume position of the exchange sync (a timestamp per stream) – no personal content",
+  "contract_requests.user_id": "set null on deletion: a cancel / withdraw declaration made without login can name no account, and one that did stays as the operator's proof of what was declared when (how long: docs/RECHT/anwaltsfragen.md). The user's own requests are exported through the contract_requests entry (without the hashes)",
   "group_reviews.reviewed_by": "the mentor who reviewed – the review itself is exported by its author; reviewer id is set null on deletion",
   "referrals.referred_id": "another person's account (the invited one) – never exported, set null on deletion",
 };

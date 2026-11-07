@@ -65,6 +65,9 @@ const PROBES: Probe[] = [
   { table: "alert_phones", owner: "user_id", cols: "user_id", b: 1, a: 1 },
   { table: "alert_events", owner: "user_id", cols: "id", b: 1, a: 1 },
   { table: "alert_deliveries", owner: "user_id", cols: "id, status, channel", b: 1, a: 1 },
+  // 0016: the proof of consents and the contract declarations – own rows, read only
+  { table: "consents", owner: "user_id", cols: "id", b: 1, a: 1 },
+  { table: "contract_requests", owner: "user_id", cols: "id, kind, status", b: 1, a: 1 },
 ];
 
 beforeAll(async () => {
@@ -100,6 +103,8 @@ beforeAll(async () => {
      insert into public.alert_state (user_id) values ('${A}'), ('${B}');
      insert into public.alert_events (user_id, dedup_key, source, market_key, market, event, occurred_at) values ('${A}', 'k1', 'industry', 'm', 'BTC', 'green_warn', now()), ('${B}', 'k1', 'industry', 'm', 'BTC', 'green_warn', now());
      insert into public.alert_deliveries (user_id, kind, channel, status, provider_ref) values ('${A}', 'test', 'phone', 'sent', 'CA_secret_A'), ('${B}', 'test', 'phone', 'sent', 'CA_secret_B');
+     insert into public.consents (user_id, order_id, kind, text_hash, text_version, consent_text) values ('${A}', '${G}', 'terms', '${"c".repeat(64)}', 'v1', 'text A'), ('${B}', '${G}', 'terms', '${"c".repeat(64)}', 'v1', 'text B');
+     insert into public.contract_requests (kind, user_id, email_hash, token_hash) values ('cancel', '${A}', '${"d".repeat(64)}', '${"e".repeat(64)}'), ('cancel', '${B}', '${"f".repeat(64)}', '${"1".repeat(64)}'), ('withdraw', null, '${"2".repeat(64)}', null);
      insert into public.jobs (user_id, kind, job_key) values ('${A}', 'alert.deliver', 'a:phone'), ('${B}', 'alert.deliver', 'b:phone');
      insert into public.mfa_recovery_codes (user_id, codes) values ('${A}', '[{"h":"x","usedAt":null}]'), ('${B}', '[{"h":"y","usedAt":null}]')`,
   );
@@ -150,6 +155,14 @@ describe("two users, every table the browser can reach", () => {
     for (const table of ["billing_customers", "rate_hits", "app_errors", "app_config", "stripe_events", "sync_cursor", "leaderboard_snapshots", "jobs", "tv_mcp_connections", "tv_mcp_states", "alert_phone_secrets", "alert_state", "mfa_recovery_codes"]) {
       for (const who of [jwt(A), jwt(B, "aal2")]) await expect(t.as(who, `select * from public.${table} limit 1`), table).rejects.toThrow(/permission denied/);
     }
+  });
+
+  it("a contract request's hashes (address, link token) and the job lease are not readable by their own user", async () => {
+    await expect(t.as(jwt(B), `select email_hash from public.contract_requests`)).rejects.toThrow(/permission denied/);
+    await expect(t.as(jwt(B), `select token_hash from public.contract_requests`)).rejects.toThrow(/permission denied/);
+    await expect(t.as(jwt(B), `select lease_token from public.jobs`)).rejects.toThrow(/permission denied/);
+    // a request made without login (no user) is nobody's row
+    expect(await t.as(jwt(B), `select id from public.contract_requests where user_id is null`)).toEqual([]);
   });
 
   it("the plan column is not B's to set (privilege-escalation by the browser)", async () => {
