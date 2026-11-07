@@ -58,6 +58,14 @@ export function isLazyPage(page: Page): page is LazyPage {
   return page in LOADERS;
 }
 
+/**
+ * How long a failed download stays remembered (ms). `loadChunk` fails only after its own retry pause; React re-renders at once
+ * after an error (its synchronous recovery pass, `retryableLazy` hands out a fresh lazy) – without this memory that pass would
+ * start a second full download cycle (pause + retry) and the page would hang on its skeleton without ever reaching the error
+ * boundary. The memory is far shorter than a human needs to press „Erneut versuchen“.
+ */
+const FAIL_MEMORY_MS = 600;
+
 /** One promise per page: a preload and the render share the same download. */
 const started = new Map<LazyPage, Promise<{ default: ComponentType }>>();
 function load(page: LazyPage): Promise<{ default: ComponentType }> {
@@ -66,7 +74,7 @@ function load(page: LazyPage): Promise<{ default: ComponentType }> {
     // waits for the network, retried once (`loadChunk`): offline the page stays on its skeleton – with the offline note – until `online`
     p = loadChunk(LOADERS[page]);
     // a failed download (offline, a deploy replaced the chunk) may be tried again – the page's error boundary offers it
-    p.catch(() => started.delete(page));
+    p.catch(() => setTimeout(() => started.delete(page), FAIL_MEMORY_MS));
     started.set(page, p);
   }
   return p;
@@ -84,7 +92,7 @@ function loadTab(tab: DeferredTab): Promise<{ default: ComponentType }> {
   let p = startedTabs.get(tab);
   if (!p) {
     p = loadChunk(STATIC_LOADERS[tab]);
-    p.catch(() => startedTabs.delete(tab));
+    p.catch(() => setTimeout(() => startedTabs.delete(tab), FAIL_MEMORY_MS));
     startedTabs.set(tab, p);
   }
   return p;

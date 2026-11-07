@@ -85,12 +85,18 @@ test.describe("data reliability", () => {
   /**
    * Budget-Schnitt follow-up: the idle preload (editor, detail, tabs …) and every lazy page are chunks. In CI the idle slot
    * is early, so the offline window of the test above hit a chunk that was still on its way ("Unable to preload CSS for
-   * …/facts-….css" as page errors). Here every lazy chunk answers slowly, so the window hits the preload on purpose.
+   * …/facts-….css" as page errors). Here the chunks of the idle chain answer slowly, so the window hits the preload on purpose.
+   * Only those: the chunks the Übersicht itself needs on screen (its candle chart, the feature hosts) come at normal speed –
+   * a module whose request is cut off stays failed for the rest of the document (the browser keeps the failure), so cutting
+   * one of those would be a coin toss between "the page shows its error frame" and "nothing happens", and says nothing about
+   * the chain.
    */
+  /** The chunks of the idle chain (`IDLE_STEPS` in App.tsx) by file name without hash: editor, detail, Trades, Markt, setup editor, Einstellungen, Entscheidungsgrundlagen. */
+  const IDLE_CHAIN_CHUNKS = ["TradeEditor", "TradeDetail", "TradesView", "MarktView", "SetupEditor", "SettingsPage", "SetupsView"];
   const slowChunks = async (page: Page, ms: number): Promise<void> => {
     await page.route(/\/assets\/[^/]+\.(js|css)(\?.*)?$/, async (route) => {
-      // the first-load files (entry, vendor chunks) at normal speed – only what loads later is slow
-      if (/\/assets\/(index|react|motion|recharts|rolldown-runtime)-/.test(route.request().url())) return route.continue();
+      const name = /\/assets\/([A-Za-z]+)-[^/]+\.(js|css)(\?.*)?$/.exec(route.request().url())?.[1] ?? "";
+      if (!IDLE_CHAIN_CHUNKS.includes(name)) return route.continue();
       await new Promise((r) => setTimeout(r, ms));
       await route.continue().catch(() => undefined);
     });
@@ -110,11 +116,17 @@ test.describe("data reliability", () => {
     const errors = collectErrors(page);
     await seed(page);
     await slowChunks(page, 1800);
-    const after: string[] = [];
-    let isOnlineAgain = false;
+    // Every request for a chunk of the idle chain, whenever it was made. How far the chain got before the drop depends on the
+    // runner: on a fast one the idle slots come early and all seven steps may have started before the network goes away, their
+    // downloads are cut off, and the browser never asks again for a module whose request failed. So the test does not count
+    // requests after `online`; it asks the invariant: no step of the chain is lost. A step that had not started when the
+    // network went away is started after `online`; one that had started was requested before.
+    const requested = new Set<string>();
     page.on("request", (r) => {
-      if (isOnlineAgain && /\/assets\//.test(r.url())) after.push(r.url());
+      const m = r.url().match(/\/assets\/([A-Za-z]+)-[^/]+\.js(\?.*)?$/);
+      if (m) requested.add(m[1]!);
     });
+    const missingSteps = (): string[] => IDLE_CHAIN_CHUNKS.filter((c) => !requested.has(c));
     await page.goto("/#overview");
     await expect(page.getByTestId("market-panel")).toBeVisible();
     // the idle chain has started (editor first) and its chunks are still in flight when the network goes away
@@ -122,10 +134,10 @@ test.describe("data reliability", () => {
     await context.setOffline(true);
     await page.waitForTimeout(4500);
     expect(noNetErrors(errors), errors.join("\n")).toEqual([]);
-    isOnlineAgain = true;
+    const unstarted = missingSteps();
     await context.setOffline(false);
-    // the chain goes on by itself with the steps it had not started yet
-    await expect.poll(() => after.length, { timeout: 30_000, message: "chunk requests resume after `online`" }).toBeGreaterThan(0);
+    // the chain goes on by itself with the steps it had not started yet (none left: it had started them all)
+    await expect.poll(missingSteps, { timeout: 30_000, message: `the idle chain resumes after \`online\` (not started at the drop: ${unstarted.join(", ") || "nothing"})` }).toEqual([]);
     expect(noNetErrors(errors), errors.join("\n")).toEqual([]);
     // A module whose request was cut off by the drop stays failed for the rest of the document (the browser keeps the failure),
     // so the editor either opens or the app says so ("Neu laden" is the way out) – never a silent tap.

@@ -23,7 +23,7 @@ export interface SeeAlsoRow {
 
 export const SEE_ALSO = {
   // Handelsplan: find candidates first, then manage the position after the entry
-  "plan.page": { from: "handelsplan-einstieg", links: [{ id: "beste-setups", label: "Beste Setups (Krypto)" }, { id: "aktien-scanner", label: "Aktien-Scanner" }] },
+  "plan.page": { from: "handelsplan-einstieg", links: [{ id: "beste-setups", label: "Beste Setups" }, { id: "aktien-scanner", label: "Aktien-Scanner" }] },
   "plan.exit": { from: "verwaltung-planen", links: [{ id: "positionsverwaltung", label: "Verwaltung testen" }, { id: "verwaltung-vergleich", label: "Verwaltung vergleichen" }] },
   // Aktien: plan the trade, or look at the crypto scanner
   "aktien.page": { from: "aktien-scanner", links: [{ id: "handelsplan-einstieg", label: "Handelsplan" }, { id: "scanner", label: "Chancen-Scanner (Krypto)" }] },
