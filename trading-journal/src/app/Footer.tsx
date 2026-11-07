@@ -18,6 +18,7 @@ import { Marquee } from "@/motion/pulse/Marquee";
 import { isScrolling } from "@/motion/scrollGate";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { useUi } from "@/store/uiStore";
 import { useHoverRect } from "@/primitives/hoverRect";
 
 export const FOOTER_TEXT = "TRADE JOURNAL";
@@ -254,6 +255,8 @@ function useFooterShown(sentinel: React.RefObject<HTMLElement | null>, footer: R
  * attribution (Plan 5.8) and a back-to-top button. Bottom padding keeps every part above the dock.
  */
 export function Footer() {
+  // the cancel link (§ 312k BGB) stands in the footer of every page except the start page and the cockpit, which keep their pixels; the menu carries it everywhere
+  const contract = useUi((s) => s.page !== "overview" && s.page !== "cockpit");
   const reduced = useReducedFx();
   const sentinel = useRef<HTMLDivElement>(null);
   const footer = useRef<HTMLElement>(null);
@@ -279,7 +282,7 @@ export function Footer() {
           <div className="grid gap-2" style={part(shown, reduced, CONFIG.bar)}>
             <ChartAttribution className="touch-hit-links" />
             {/* the shell footer stays at three links (the Übersicht keeps its pixels, five would wrap on a phone); Widerruf and Hinweise are on Konto, Preise and in Einstellungen › Rechtliches */}
-            <LegalLinks roomy extended={false} className="-mx-2.5" />
+            <LegalLinks roomy extended={false} contract={contract} className="-mx-2.5" />
           </div>
           <div style={part(shown, reduced, CONFIG.links)}>
             <button

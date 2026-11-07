@@ -53,6 +53,24 @@ Hinweise:
 - **Migration:** `supabase/migrations/0012_connections.sql` (Empfangsprotokoll des TradingView-Webhooks). Ohne sie nimmt der Webhook Testsignale an, der
   Assistent zeigt aber keinen Empfang und sagt das.
 
+## Kaufstrecke (Paket B4: Tarife, Bestellung, Stripe, Kündigung, Widerruf)
+
+Keine neue Variable: die Kaufstrecke liest die vorhandenen. Hier steht, **was sie tun und was ohne sie passiert** (Name · Zweck · Pflicht? · ohne sie). Alles bleibt „Entwurf – Prüfung durch Anwalt nötig“.
+
+| Name | Zweck für die Kaufstrecke | Pflicht? | Ohne sie |
+|---|---|---|---|
+| `STRIPE_SECRET_KEY` | Stripe-Zugang der Functions (Checkout-Sitzung, Portal, Preise) | Ja, zum Verkaufen | `billing-status` meldet `enabled: false`; die Oberfläche sagt „Zahlungen noch nicht eingerichtet“; `billing-checkout` antwortet 503 – **kein Fake-Kauf** |
+| `STRIPE_WEBHOOK_SECRET` | prüft die Signatur der Stripe-Ereignisse (`/api/v1/stripe/webhook`); **nur der Webhook schaltet einen Tarif frei** | Ja, zum Verkaufen | Webhook antwortet 503; die Ergebnisseite bleibt bei „Wir warten noch auf die Bestätigung von Stripe“ |
+| `STRIPE_PRICE_PRO_MONTHLY` / `_YEARLY`, `STRIPE_PRICE_PREMIUM_MONTHLY` / `_YEARLY`, `STRIPE_PRICE_TEAM_MONTHLY` / `_YEARLY` | Preis-IDs (`price_…`); Team = Preis **pro Sitz** | Mindestens eine | der Tarif ist „Noch nicht buchbar“; ein Intervall ohne Preis-ID wird nicht verkauft |
+| `STRIPE_AUTOMATIC_TAX` | `true` = Stripe Tax im Checkout, Anschrift Pflicht, Steuer-ID abfragbar. Standard aus | Nein (Betreiberentscheidung, Steuerberater) | die Bestellübersicht sagt „Stripe Tax ist beim Betreiber nicht eingeschaltet: Stripe berechnet im nächsten Schritt keine Steuer zusätzlich“; mit `true`: „Steuer wird im nächsten Schritt von Stripe berechnet“. Nie ein erfundener Betrag |
+| `TRIAL_DAYS`, `REFERRAL_TRIAL_DAYS`, `STRIPE_TRIAL_CARDLESS` | Testphase; die Bestellübersicht nennt den **Preis nach** der Testphase und das Datum der ersten Zahlung | Nein | 14 / 30 Tage, mit Karte |
+| `SITE_ORIGIN` | Ursprung der Rücksprung-Adressen; mit gesetzter Variable wird **jeder andere Ursprung abgelehnt** (kein offener Redirect), Links in Bestätigungs-Mails | Empfohlen | der Ursprung der Anfrage |
+| `VITE_LEGAL_IMPRESSUM_URL` **oder** `VITE_LEGAL_OPERATOR` + `VITE_LEGAL_ADDRESS` + `VITE_LEGAL_EMAIL`, dazu `VITE_LEGAL_DATENSCHUTZ_URL`, `VITE_LEGAL_AGB_URL` | **Sperre der Kaufstrecke:** solange eines davon fehlt, ist die Bestellung gesperrt (`config.purchaseOpen: false`, Server: `purchase_closed`). Dieselbe Regel wie `legalComplete()` im Browser; in Netlify für **Builds und Functions** setzen | Ja, zum Verkaufen | „Bestellung noch nicht möglich: Impressum, AGB und Datenschutz des Betreibers fehlen“ – alle Funktionen bleiben freigeschaltet |
+| `RESEND_API_KEY` + `ALERT_FROM` | Bestätigungs-Mails zu Kündigung (§ 312k BGB) und Widerruf (§ 356a BGB) und der Bestätigungslink der Erklärung ohne Login (derselbe Versand wie der E-Mail-Alarm) | Ja, für die Kündigung ohne Login | die Erklärung wird gespeichert, die Seite sagt „E-Mail-Versand nicht eingerichtet“ und verspricht keine Mail; ausgeführt wird dann nur bei angemeldeter Person |
+| `IP_HASH_PEPPER` | gesalzener Hash der E-Mail-Adresse in `contract_requests` (die Adresse selbst wird nicht gespeichert) | Empfohlen | wird aus `SUPABASE_SECRET_KEY` abgeleitet |
+
+Migration: `supabase/migrations/0016_consents.sql` (Zustimmungsnachweis `consents`, Erklärungen `contract_requests`). **Ohne sie bleibt die Kaufstrecke gesperrt**: ohne Nachweis wird nichts bestellt.
+
 ## Weitere Variablen
 
 Siehe `.env.example` (Supabase, Stripe, Resend, Anthropic, SEC …). Ergänzungen der anderen Pakete folgen in diesem Dokument.

@@ -71,8 +71,8 @@ export const UPGRADE = {
   title: "Freischalten",
   inPlan: (plan: string) => `Enthalten in ${plan}`,
   gained: "Das bekommst du dazu",
-  cta: (days: number) => (days > 0 ? `${days} Tage gratis testen` : "Jetzt abonnieren"),
-  ctaSignIn: "Anmelden und testen",
+  /** Not the order button (that one says "Zahlungspflichtig bestellen"): the way to the order summary. */
+  cta: "Weiter zur Bestellung",
   compare: "Alle Tarife vergleichen",
   teaserCta: "Freischalten",
   teaserLine: (plan: string) => `Ab ${plan}`,

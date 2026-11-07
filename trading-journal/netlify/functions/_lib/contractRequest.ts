@@ -193,7 +193,7 @@ export async function executeContract(x: ExecInput, mail: MailConfig | null, ip:
   if (x.id) {
     const { error } = await supabaseAdmin()
       .from("contract_requests")
-      .update({ status, executed_at: confirmedAt.toISOString(), ends_at: endsAt?.toISOString() ?? null, token_hash: null })
+      .update({ status: status === "done" ? "executed" : status, executed_at: confirmedAt.toISOString(), ends_at: endsAt?.toISOString() ?? null, token_hash: null })
       .eq("id", x.id);
     if (error) console.error("[fn] contract_requests update failed", error.code ?? "");
   }

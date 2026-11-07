@@ -9,6 +9,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
+import { consentSetHash, newOrderId } from "../../src/legal/consentRecord";
 import { setSupabaseAdminForTests } from "../../netlify/functions/_lib/supabase";
 import { paymentsConfigured, requireFeature, requireLimit, resetPaymentsReportForTests } from "../../netlify/functions/_lib/plan";
 import { EXPORT_TABLES } from "../../netlify/functions/_lib/account";
@@ -51,6 +52,7 @@ const UNIQUE: Record<string, string[][]> = {
   affiliate_ledger: [["stripe_invoice_id", "kind"]],
   stripe_events: [["id"]],
   team_seats: [["member_id"]],
+  consents: [["user_id", "order_id", "kind"]],
 };
 
 /** Foreign keys to auth.users per table (0002): a write for a deleted user fails with 23503, like Postgres. */
@@ -162,6 +164,7 @@ function fakeDb(): Db {
       team_seats: [],
       audit_log: [],
       app_config: [],
+      consents: [],
     },
     seq: 0,
     rpcHits: 0,
@@ -296,6 +299,7 @@ function fakeStripe(): FakeStripe {
         f.balance.push({ customer, amount: params.amount, key: options?.idempotencyKey });
         return { id: `cbtxn_${++n}` };
       },
+      list: async () => ({ data: [] }),
     },
     checkout: {
       sessions: {
@@ -415,6 +419,12 @@ const ENV: Record<string, string> = {
   STRIPE_PRICE_PREMIUM_MONTHLY: "price_prem_m",
   STRIPE_PRICE_TEAM_MONTHLY: "price_team_m",
   SITE_ORIGIN: "https://journal.example",
+  // B4: the purchase flow is locked until the operator's legal texts are there (the same rule as the browser's legalComplete)
+  VITE_LEGAL_OPERATOR: "Beispiel Trading UG",
+  VITE_LEGAL_ADDRESS: "Beispielweg 1 | 10115 Berlin",
+  VITE_LEGAL_EMAIL: "kontakt@example.com",
+  VITE_LEGAL_DATENSCHUTZ_URL: "https://example.com/datenschutz",
+  VITE_LEGAL_AGB_URL: "/agb.html",
 };
 const OPTIONAL_ENV = [
   "STRIPE_TRIAL_CARDLESS",
@@ -607,7 +617,9 @@ describe("GET /api/v1/billing/status", () => {
 /* ------------------------------------------------------------------ checkout */
 
 describe("POST /api/v1/billing/checkout", () => {
-  const checkout = (body: unknown, user = U1) => call(checkoutFn, req("/api/v1/billing/checkout", { body, user }));
+  // B4: every order carries its id (idempotency key), both ticked consents and the hash of the wording shown
+  const checkout = async (body: Record<string, unknown>, user = U1) =>
+    call(checkoutFn, req("/api/v1/billing/checkout", { body: { orderId: newOrderId(), consents: { terms: true, immediateStart: true }, consentHash: await consentSetHash(), ...body }, user }));
 
   it("needs a login", async () => {
     const res = await call(checkoutFn, req("/api/v1/billing/checkout", { body: { plan: "pro", interval: "month" } }));
@@ -889,7 +901,7 @@ describe("POST /api/v1/stripe/webhook", () => {
 
   it("a credit earned before the referrer had a customer is applied at their first checkout", async () => {
     db.tables.affiliate_ledger!.push({ id: 77, referrer_id: U2, kind: "credit", amount: 1000, currency: "eur", status: "pending", stripe_invoice_id: "in_x" });
-    await call(checkoutFn, req("/api/v1/billing/checkout", { body: { plan: "pro", interval: "month" }, user: U2 }));
+    await call(checkoutFn, req("/api/v1/billing/checkout", { body: { plan: "pro", interval: "month", orderId: newOrderId(), consents: { terms: true, immediateStart: true }, consentHash: await consentSetHash() }, user: U2 }));
     expect(stripe.balance).toEqual([{ customer: "cus_1", amount: -1000, key: "tj-ref-credit-77" }]);
     expect(db.tables.affiliate_ledger![0]).toMatchObject({ status: "applied" });
   });

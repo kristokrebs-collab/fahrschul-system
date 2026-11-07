@@ -35,7 +35,7 @@ import { announcePlanChange } from "./planChange";
 import { formatOrderParam, normalizeDraft, type OrderDraft } from "./purchase/order";
 import { BILLING } from "./strings";
 import { FREE_PLAN, isPlanId, isPlanStatus, type BillingInterval, type Feature, type PlanInfo } from "./types";
-import { clearReferral, currentReturnTo, type BillingReturn } from "./url";
+import { clearReferral, currentReturnTo, storedReferral, type BillingReturn } from "./url";
 
 export type BillingMode = "off" | "closed" | "open";
 

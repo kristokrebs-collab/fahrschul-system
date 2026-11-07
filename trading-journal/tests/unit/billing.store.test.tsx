@@ -15,11 +15,15 @@ import {
   effectivePlanOf,
   loadBilling,
   modeOf,
+  purchaseOpenOf,
+  requestOrder,
   resetBilling,
-  startCheckout,
   useBilling,
   verifyReferral,
 } from "@/billing/store";
+import { consentSetHash } from "@/legal/consentRecord";
+import { readLastOrder, resetOrderForm, setImmediate, setTerms, submitOrder, useOrderForm } from "@/billing/purchase/orderState";
+import { peekReturnTo, clearReturnTo } from "@/store/returnTo";
 import { REF_KEY } from "@/billing/url";
 import { FUNCTIONS_MISSING } from "@/cloud/api";
 import { setCloudEnabledForTests } from "@/cloud/env";
@@ -27,7 +31,7 @@ import { resetCloudSession, useCloudSession } from "@/cloud/session";
 import { useUi } from "@/store/uiStore";
 
 const USER = { id: "11111111-1111-4111-8111-111111111111", email: "t@example.com", aal: "aal1" as const, mfaEnrolled: false };
-const CONFIG: BillingStatus["config"] = { enabled: true, trialDays: 14, referralTrialDays: 30, cardless: false, prices: {}, available: ["pro", "premium", "team"] };
+const CONFIG: BillingStatus["config"] = { enabled: true, trialDays: 14, referralTrialDays: 30, cardless: false, prices: {}, available: ["pro", "premium", "team"], purchaseOpen: true };
 const SUB: SubscriptionSummary = {
   id: "sub_1",
   plan: "pro",
@@ -78,6 +82,7 @@ beforeEach(() => {
   resetCloudSession();
   useCloudSession.setState({ phase: "signedOut" });
   resetBilling();
+  clearReturnTo();
   useUi.setState({ toasts: [] });
   handler = () => ({ body: status() });
   stubFetch();
@@ -88,6 +93,7 @@ afterEach(() => {
   setCloudEnabledForTests(null);
   resetCloudSession();
   resetBilling();
+  clearReturnTo();
   setRedirectForTests(null);
   vi.unstubAllGlobals();
 });
@@ -168,53 +174,117 @@ describe("store flows", () => {
     expect(FUNCTIONS_MISSING).toMatch(/nicht eingerichtet/);
   });
 
-  it("checkout signed out: opens the registration and keeps the intent", async () => {
+  it("an order signed out: noted for returnTo (exactly this choice) and the registration opens; nothing is posted", async () => {
     useBilling.setState({ config: CONFIG });
-    await startCheckout({ plan: "pro", interval: "year" });
-    expect(useBilling.getState().pending).toEqual({ plan: "pro", interval: "year" });
+    requestOrder({ plan: "team", interval: "year", seats: 4 });
+    expect(peekReturnTo()).toMatchObject({ target: { kind: "order", order: "team.year.4" }, wait: { on: "signedIn" } });
     expect(useCloudSession.getState().sheet).toMatchObject({ open: true, view: "signup" });
+    expect(useBilling.getState().order.open).toBe(false);
     expect(calls).toHaveLength(0);
   });
 
-  it("checkout without the AGB consent of this session: the upgrade sheet asks first, nothing is posted (Review F07)", async () => {
+  it("the purchase flow is LOCKED while the server does not say purchaseOpen (legal texts missing, or an older server): honest toast, no sheet", async () => {
     signIn();
-    useBilling.setState({ config: CONFIG, termsAccepted: false });
-    await startCheckout({ plan: "premium", interval: "month" });
-    expect(calls).toHaveLength(0);
-    expect(useBilling.getState().upgrade).toMatchObject({ open: true, plan: "premium" });
-    expect(redirects).toHaveLength(0);
+    for (const config of [{ ...CONFIG, purchaseOpen: false, purchaseBlockedBy: ["legal" as const] }, { ...CONFIG, purchaseOpen: undefined }]) {
+      useBilling.setState({ config, order: { open: false, draft: null, loaded: false } });
+      requestOrder({ plan: "pro", interval: "month" });
+      expect(useBilling.getState().order.open).toBe(false);
+    }
+    expect(useUi.getState().toasts.at(-1)).toMatchObject({ kind: "info", title: "Zahlungen noch nicht eingerichtet" });
+    expect(purchaseOpenOf({ ...CONFIG, purchaseOpen: false, purchaseBlockedBy: ["legal"] }, "open")).toEqual({ open: false, blockedBy: ["legal"] });
+    expect(purchaseOpenOf(CONFIG, "closed")).toEqual({ open: false, blockedBy: ["stripe"] });
+    expect(purchaseOpenOf(CONFIG, "open")).toEqual({ open: true, blockedBy: [] });
   });
 
-  it("checkout signed in: sends code + referral + return path, then leaves for Stripe only", async () => {
+  it("an order signed in opens the order sheet with exactly the choice (Team seats clamped)", () => {
     signIn();
-    useBilling.setState({ config: CONFIG, promo: { valid: true, code: "TRADER20", percentOff: 20 }, termsAccepted: true });
+    useBilling.setState({ config: CONFIG });
+    requestOrder({ plan: "team", interval: "month", seats: 1 });
+    expect(useBilling.getState().order).toMatchObject({ open: true, loaded: true, draft: { plan: "team", interval: "month", seats: 2 } });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("submitOrder: nothing is sent while a box is open; with both: code + referral + return path + order id + consents + hash, then Stripe only", async () => {
+    signIn();
+    useBilling.setState({ config: CONFIG, promo: { valid: true, code: "TRADER20", percentOff: 20 } });
     localStorage.setItem(REF_KEY, JSON.stringify({ code: "FRIEND30", at: Date.now() }));
     window.history.replaceState(null, "", "/#preise");
     handler = () => ({ body: { url: "https://checkout.stripe.com/c/pay/cs_test_1", sessionId: "cs_test_1" } });
-    await startCheckout({ plan: "pro", interval: "month" });
+    const draft = { plan: "pro" as const, interval: "month" as const, seats: 1 };
+    resetOrderForm();
+    setTerms(true);
+    expect(await submitOrder(draft)).toBe("blocked");
+    expect(useOrderForm.getState().tried).toBe(true);
+    expect(calls).toHaveLength(0);
+    setImmediate(true);
+    expect(await submitOrder(draft)).toBe("redirect");
     expect(calls[0]!.url.pathname).toBe("/api/v1/billing/checkout");
-    expect(calls[0]!.body).toEqual({ plan: "pro", interval: "month", code: "TRADER20", ref: "FRIEND30", returnTo: "/#preise" });
+    expect(calls[0]!.body).toEqual({
+      plan: "pro",
+      interval: "month",
+      code: "TRADER20",
+      ref: "FRIEND30",
+      returnTo: "/#preise",
+      orderId: useOrderForm.getState().orderId,
+      consents: { terms: true, immediateStart: true },
+      consentHash: await consentSetHash(),
+    });
     expect(redirects).toEqual(["https://checkout.stripe.com/c/pay/cs_test_1"]);
+    expect(readLastOrder()).toMatchObject({ orderId: useOrderForm.getState().orderId, draft: { plan: "pro", interval: "month" } });
     // a non-Stripe URL is never followed
     useBilling.setState({ busy: null });
+    resetOrderForm();
+    setTerms(true);
+    setImmediate(true);
     handler = () => ({ body: { url: "https://evil.example/pay", sessionId: "x" } });
-    await startCheckout({ plan: "pro", interval: "month" });
+    expect(await submitOrder(draft)).toBe("failed");
     expect(redirects).toHaveLength(1);
-    expect(useUi.getState().toasts.at(-1)).toMatchObject({ kind: "error", title: "Unerwartete Weiterleitung – abgebrochen." });
+    expect(useOrderForm.getState()).toMatchObject({ phase: "idle", error: "Unerwartete Weiterleitung – abgebrochen." });
   });
 
-  it("503 from the checkout closes the shop; 409 reloads the account", async () => {
+  it("a double click sends ONE request (and the id is the server's idempotency key)", async () => {
     signIn();
-    useBilling.setState({ config: CONFIG, termsAccepted: true });
+    useBilling.setState({ config: CONFIG });
+    resetOrderForm();
+    setTerms(true);
+    setImmediate(true);
+    handler = () => ({ body: { url: "https://checkout.stripe.com/c/pay/cs_test_1", sessionId: "cs_test_1" } });
+    const draft = { plan: "pro" as const, interval: "year" as const, seats: 1 };
+    const [a, b] = await Promise.all([submitOrder(draft), submitOrder(draft)]);
+    expect([a, b].sort()).toEqual(["blocked", "redirect"]);
+    expect(calls.filter((c) => c.url.pathname.endsWith("/checkout"))).toHaveLength(1);
+  });
+
+  it("503 purchase_closed / billing_unavailable close the shop in the browser; 409 already_subscribed reloads the account; consent_outdated says so", async () => {
+    signIn();
+    const ready = () => {
+      resetOrderForm();
+      setTerms(true);
+      setImmediate(true);
+    };
+    const draft = { plan: "pro" as const, interval: "month" as const, seats: 1 };
+    useBilling.setState({ config: CONFIG });
+    ready();
+    handler = (u) => (u.pathname.endsWith("/checkout") ? { status: 503, body: { error: { code: "purchase_closed", message: "x" } } } : { body: status() });
+    await submitOrder(draft);
+    expect(useBilling.getState().config).toMatchObject({ enabled: true, purchaseOpen: false, purchaseBlockedBy: ["legal"] });
+    useBilling.setState({ config: CONFIG, busy: null });
+    ready();
     handler = (u) => (u.pathname.endsWith("/checkout") ? { status: 503, body: { error: { code: "billing_unavailable", message: "Zahlungen sind noch nicht eingerichtet." } } } : { body: status() });
-    await startCheckout({ plan: "pro", interval: "month" });
+    await submitOrder(draft);
     expect(useBilling.getState().config?.enabled).toBe(false);
-    useBilling.setState({ config: CONFIG, termsAccepted: true });
+    useBilling.setState({ config: CONFIG, busy: null });
+    ready();
+    handler = (u) => (u.pathname.endsWith("/checkout") ? { status: 409, body: { error: { code: "consent_outdated", message: "x" } } } : { body: status() });
+    await submitOrder(draft);
+    expect(useOrderForm.getState().error).toMatch(/aktualisiert/);
+    useBilling.setState({ config: CONFIG, busy: null });
+    ready();
     handler = (u) =>
       u.pathname.endsWith("/checkout")
         ? { status: 409, body: { error: { code: "already_subscribed", message: "x" } } }
         : { body: status({ plan: { plan: "pro", status: "active", trialEnd: null }, subscription: SUB, hasCustomer: true }) };
-    await startCheckout({ plan: "pro", interval: "month" });
+    await submitOrder(draft);
     await waitFor(() => expect(useBilling.getState().account?.plan.plan).toBe("pro"));
   });
 
