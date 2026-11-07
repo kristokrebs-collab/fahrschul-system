@@ -193,6 +193,7 @@ function AlertsBody({ view, onViewChange, reload }: { view: PrefsView; onViewCha
   const [testResult, setTestResult] = useState<string | null>(null);
   const [protocolKey, setProtocolKey] = useState(0);
   const [phoneOpen, setPhoneOpen] = useState(view.phone.status === "pending");
+  const [codeSent, setCodeSent] = useState(false);
 
   const dirty = !prefsEqual(draft, view.prefs);
   const gates = useMemo(() => Object.fromEntries(ALERT_CHANNELS.map((c) => [c, channelGate(c, view)])) as Record<AlertChannel, ChannelGate>, [view]);
@@ -249,7 +250,7 @@ function AlertsBody({ view, onViewChange, reload }: { view: PrefsView; onViewCha
   }
 
   const phone = view.phone;
-  const slotState = gates.phone.state === "ok" ? "connected" : gates.phone.state === "connect" ? (phone.status === "pending" ? "pending" : "missing") : "unavailable";
+  const slotState = gates.phone.state === "ok" ? "connected" : gates.phone.state === "connect" ? (phone.status === "pending" || codeSent ? "pending" : "missing") : "unavailable";
   const emailSlotState = gates.email.state === "ok" ? "connected" : gates.email.state === "connect" ? "missing" : "unavailable";
 
   return (
@@ -296,14 +297,14 @@ function AlertsBody({ view, onViewChange, reload }: { view: PrefsView; onViewCha
           ))}
           {ALERT_EVENTS.map((e) => (
             <div key={e} className="contents">
-              <span className="grid min-w-0 gap-0.5 py-1.5 pr-2">
+              <span className="grid min-h-11 min-w-0 content-center gap-0.5 py-1 pr-2">
                 <span className="text-[13px] text-fg">{ALERT_EVENT_LABEL.de[e]}</span>
                 <span className="hidden text-[11px] text-faint sm:block">{ALERT_EVENT_HELP[e]}</span>
               </span>
               {ALERT_CHANNELS.map((c) => {
                 const locked = gates[c].state === "locked" || gates[c].state === "setup";
                 return (
-                  <span key={c} className="flex justify-center">
+                  <span key={c} className="flex h-11 items-center justify-center">
                     <Switch
                       size="sm"
                       checked={draft.channels[c][e]}
@@ -350,7 +351,7 @@ function AlertsBody({ view, onViewChange, reload }: { view: PrefsView; onViewCha
           actionLabel={gates.phone.state === "connect" && !phoneOpen ? (phone.status === "pending" ? "Code eingeben" : "Nummer bestätigen") : undefined}
           onAction={() => setPhoneOpen(true)}
         >
-          {gates.phone.state === "ok" || (gates.phone.state === "connect" && (phoneOpen || phone.status === "pending")) ? <PhoneSetup status={phone.status} masked={phone.masked} onChanged={reload} /> : null}
+          {gates.phone.state === "ok" || (gates.phone.state === "connect" && (phoneOpen || phone.status === "pending")) ? <PhoneSetup status={phone.status} masked={phone.masked} onChanged={reload} onStarted={() => setCodeSent(true)} /> : null}
         </AlertConnectSlot>
       </section>
 
@@ -389,7 +390,7 @@ function AlertsBody({ view, onViewChange, reload }: { view: PrefsView; onViewCha
       </section>
 
       <div className="grid gap-2" data-testid="alert-save-row">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-4">
           <Button variant="primary" loading={saving} disabled={!dirty} onClick={() => void save()}>
             {ALERTS_STRINGS.save}
           </Button>
@@ -418,7 +419,7 @@ function AlertsBody({ view, onViewChange, reload }: { view: PrefsView; onViewCha
         <h3 id="alert-test-h" className="label !text-fg">
           Testen
         </h3>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-x-2 gap-y-4">
           {ALERT_CHANNELS.map((c) => {
             const g = gates[c];
             const ok = g.state === "ok";

@@ -20,11 +20,13 @@ export interface PhoneSetupProps {
   masked: string | null;
   /** the account's phone changed on the server: reload the settings */
   onChanged: () => void;
+  /** the code was sent: the number is being checked (the slot says "In Arbeit" before the server state reloads) */
+  onStarted?: () => void;
 }
 
 const msg = (e: unknown): string => (e instanceof ApiError ? e.message : "Der Server hat nicht geantwortet.");
 
-export function PhoneSetup({ status, masked, onChanged }: PhoneSetupProps) {
+export function PhoneSetup({ status, masked, onChanged, onStarted }: PhoneSetupProps) {
   const [number, setNumber] = useState("");
   const [consent, setConsent] = useState(false);
   const [code, setCode] = useState("");
@@ -46,6 +48,7 @@ export function PhoneSetup({ status, masked, onChanged }: PhoneSetupProps) {
       setShownMask(r.masked);
       setStep("code");
       setCode("");
+      onStarted?.();
       pushToast({ kind: "info", title: "Code gesendet", detail: "Du bekommst ihn gleich per SMS." });
     } catch (e) {
       setError(msg(e));
