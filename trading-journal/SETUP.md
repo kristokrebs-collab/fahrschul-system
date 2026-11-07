@@ -59,7 +59,7 @@ Prüfbefehle (dieselben wie in der CI): `npm run typecheck && npm run lint && np
    - **Publishable key** (`sb_publishable_…`) → `VITE_SUPABASE_PUBLISHABLE_KEY` (öffentlich, landet im Bundle)
    - **Secret key** (`sb_secret_…`) → `SUPABASE_SECRET_KEY` (**nur** für die Functions, niemals mit `VITE_`-Präfix)
 
-### 2.1 Migrationen 0001 → 0017
+### 2.1 Migrationen 0001 → 0018
 
 Die Dateien liegen in `trading-journal/supabase/migrations/` und werden **genau einmal, in dieser Reihenfolge**
 ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als neue Datei):
@@ -83,9 +83,10 @@ ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als n
 | `0015_mfa_recovery.sql` | Wiederherstellungscodes der 2FA (B1): eigene Tabelle `mfa_recovery_codes` (nur HMAC-Hashes, je Nutzer eine Zeile, Kaskade auf `auth.users`, RLS an, **kein** Client-Recht), dazu eine Korrektur zu 0014: `jobs` ist für den Browser nicht lesbar (Lease-Token). Bestehende Sätze in `app_config` (`mfa-recovery:<id>`) funktionieren weiter, neue Sätze landen in der Tabelle. Ohne die Migration schreiben die Functions weiter nach `app_config` |
 | `0016_consents.sql` | Kaufstrecke: Zustimmungsnachweis (`consents`: wer, wann, welcher Wortlaut + Hash je Bestellung – geschrieben VOR der Stripe-Sitzung, nur eigene Zeilen lesbar, 2FA-Regel) und Kündigungs-/Widerrufserklärungen ohne Login (`contract_requests`, Adresse nur als gesalzener Hash). **Ohne sie bleibt die Kaufstrecke gesperrt** („Zustimmung kann nicht gespeichert werden“) – nie ein Kauf ohne Nachweis |
 | `0017_contract_grants.sql` | Korrektur zu 0016: der Browser liest von `contract_requests` keine Hash-Spalten (`email_hash`, `token_hash`) mehr; gelesen wird dort ohnehin nur in den Functions. Richtlinien und Schreibwege bleiben, ohne sie läuft alles weiter (nur das Recht wäre weiter als nötig) |
+| `0018_quotas_visibility.sql` | Sicherheitsrunde 11: Kontingente prüft jetzt die Datenbank selbst, nicht nur App und Functions – Journal (höchstens 100 000 Datensätze und 256 MiB je Konto, Zähler in `user_usage`), Simulationen (neue je Tag nach Tarif: Free 20, Pro 200, Premium/Team höchstens 2 000; höchstens 5 000 gespeicherte), Screenshot-Bucket (Summe je Konto nach Tarif: Pro 2 GB, Premium/Team 20 GB; die Datei, die gerade hochgeladen wird, zählt erst danach mit – die Summe kann also um diese eine Datei (höchstens 5 MB) überschritten werden) und Backup-Bucket (höchstens 512 MiB je Datei). Dazu sehen Schüler in Mentor-Gruppen die anderen Schüler weder in `group_members` noch in `social_profiles`, und `cloud_shots_allowed()` beantwortet nur noch die Frage nach dem eigenen Tarif. Die Zahlen ohne Gegenstück im Tarifdokument sind Vorschläge, die du bestätigst (E8, `docs/TARIFE.md`). Ohne die Migration funktioniert alles wie vorher – nur ohne diese Obergrenzen |
 
 **Variante A – SQL-Editor (ohne CLI):** Supabase → **SQL Editor → New query** → Inhalt von `0001_core.sql` einfügen →
-**Run** → „Success“ abwarten. Dann `0002` bis `0017` (die Nummern dazwischen, die es gibt) genauso.
+**Run** → „Success“ abwarten. Dann `0002` bis `0018` (die Nummern dazwischen, die es gibt) genauso.
 
 **Variante B – CLI:**
 
@@ -125,6 +126,30 @@ Börsen-Verbindungen eine 2FA-Sitzung (Regel aus 0001).
 
 **Authentication → Emails → Templates**: Bestätigung, Magic Link, Passwort zurücksetzen und E-Mail-Änderung auf
 Deutsch übersetzen (die App selbst ist komplett deutsch).
+
+#### Einstellungen, die nur du im Supabase-Dashboard treffen kannst (Sicherheitsrunde 11)
+
+Die Datenbank-Kontingente aus 0018 greifen nur, wenn nicht beliebig viele Konten entstehen. Das Repo kann diese Schalter
+nicht setzen und nicht prüfen – bitte einmal selbst kontrollieren und abhaken:
+
+- **Anonyme Anmeldungen aus**: **Authentication → Sign In / Providers → „Allow anonymous sign-ins“** auf **aus**. Die App
+  braucht sie nicht; sind sie an, bekommt jeder Besucher ein gültiges Token (Rolle `authenticated`) und damit Schreibrechte
+  auf die eigenen Zeilen.
+- **E-Mail-Bestätigung an**: **Sign In / Providers → Email → „Confirm email“** an (steht oben schon so; hier die Kontrolle,
+  dass es nach dem Anlegen des Projekts nicht abgeschaltet wurde). Ohne Bestätigung kann ein Skript beliebig viele Konten
+  anlegen.
+- **CAPTCHA (Bot-Schutz)**: **Authentication → Attack Protection → „Enable Captcha protection“** (Cloudflare Turnstile oder
+  hCaptcha). **Achtung, heute noch nicht einschalten:** Die App sendet bisher kein CAPTCHA-Token mit (`captchaToken` fehlt in
+  `src/cloud/client.ts`); mit eingeschaltetem CAPTCHA würden Registrierung, Magic Link und Passwort-Zurücksetzen mit
+  `captcha_failed` scheitern. Einschalten erst, wenn die Anmeldemaske das Token mitschickt (offener Punkt, nicht Teil von 0018).
+- **JWT-Laufzeit kurz halten**: **„JWT expiry limit“** (je nach Dashboard-Version unter **Project Settings → JWT Keys** oder **Authentication → Sessions**) auf höchstens **3600 s (1 h)**,
+  gern 900 s. Die Functions prüfen das Token lokal; ein gestohlenes oder abgemeldetes Token bleibt bis zu diesem Ablauf
+  gültig. Kürzer = kleineres Zeitfenster (Preis: etwas mehr Token-Erneuerungen).
+- **Globale Dateigrößen-Grenze für Storage**: **Project Settings → Storage → „Upload file size limit“** mindestens so hoch wie
+  das Bucket-Limit (Backups bis 512 MiB), sonst gilt die kleinere Zahl (auf dem Free-Tarif von Supabase 50 MB). Größere
+  nächtliche Backups schlagen dann fehl, das Journal selbst ist nicht betroffen.
+- **Auth-Raten-Limits** (**Authentication → Rate Limits**) und ein eigener SMTP-Server (siehe oben) bleiben Pflicht für den
+  Echtbetrieb; sie bremsen Mail-Flut bei Registrierung und Magic Link.
 
 ---
 

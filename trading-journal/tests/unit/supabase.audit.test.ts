@@ -42,6 +42,7 @@ const KNOWN_MIGRATIONS = [
   "0009_proofs_boards",
   "0010_cases",
   "0011_simulations",
+  "0018_quotas_visibility",
 ];
 
 /** R2 – tables every signed-in user may read in full (aggregates, no user rows). */
@@ -62,10 +63,12 @@ const CLIENT_WRITABLE: Record<string, readonly string[]> = {
   profiles: ["update"],
 };
 
-/** R6 – SECURITY DEFINER functions that take the user id as an argument and may be called by `authenticated`. */
-const DEFINER_CALLABLE_WITHOUT_AUTH_UID: Record<string, string> = {
-  cloud_shots_allowed: "plan gate of the storage policy, called with auth.uid(); answers one boolean about a plan",
-};
+/**
+ * R6 – SECURITY DEFINER functions that may be called by `authenticated` although they do not read the caller (`auth.uid()` /
+ * `auth.jwt()`). Empty on purpose: `cloud_shots_allowed(uuid)` used to be listed here (0007 answered about ANY user id), 0018 binds it to
+ * the caller. A new entry needs a reason that says why an argument cannot be abused.
+ */
+const DEFINER_CALLABLE_WITHOUT_AUTH_UID: Record<string, string> = {};
 
 /** R2b – columns whose NAME looks like secret material but that the browser may read, with the reason. */
 const READABLE_SECRET_LOOKING: Record<string, string> = {
@@ -87,6 +90,8 @@ const EXPORT_EXCEPTIONS: Record<string, string> = {
   "contract_requests.user_id": "set null on deletion: a cancel / withdraw declaration made without login can name no account, and one that did stays as the operator's proof of what was declared when (how long: docs/RECHT/anwaltsfragen.md). The user's own requests are exported through the contract_requests entry (without the hashes)",
   "group_reviews.reviewed_by": "the mentor who reviewed – the review itself is exported by its author; reviewer id is set null on deletion",
   "referrals.referred_id": "another person's account (the invited one) – never exported, set null on deletion",
+  user_usage: "internal quota counters (rows / bytes of the journal) derived from journal_docs, which the export lists in full – no content of its own",
+  usage_daily: "internal per-day counters of the quota triggers (new simulations today), kept for three days – no content of its own",
 };
 
 /** Columns that name a user: must be a foreign key to auth.users. */
@@ -304,6 +309,16 @@ describe("R6 – functions", () => {
       if (f.auth_x && !readsCaller && !(f.proname in DEFINER_CALLABLE_WITHOUT_AUTH_UID)) bad.push(`${f.proname}: SECURITY DEFINER callable by authenticated without reading the caller (auth.uid / auth.jwt)`);
     }
     expect(bad).toEqual([]);
+  });
+});
+
+describe("R6b – every function in public pins its search_path", () => {
+  it("no function (definer or not) runs with the caller's search_path, so nobody can shadow a table or operator with their own schema", async () => {
+    const fns = await t.catalog<{ proname: string; proconfig: string[] | null }>(`
+      select p.proname, p.proconfig from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.prokind = 'f'`);
+    expect(fns.length).toBeGreaterThan(30);
+    expect(fns.filter((f) => !(f.proconfig ?? []).some((c) => c.startsWith("search_path="))).map((f) => f.proname)).toEqual([]);
   });
 });
 

@@ -20,6 +20,8 @@ single-file builds) the app never talks to Supabase (`isCloudAvailable()` in `sr
 | `migrations/0010_cases.sql` | F47 | Chartfälle: `group_cases` (pair, interval, anchor, horizon, question, `closes_at` ≤ created + 8 days) and `case_hypotheses` (one row per case and person, direction, confidence 50–90, reason); trigger `case_hypothesis_guard` (a hypothesis is written once – UPDATE → 23001; INSERT after the close → 23514; `created_at := now()`); `can_see_hypothesis()` (own always, others only after the close; mentor group: students see the mentors' and their own); select-only RLS with the restrictive MFA policies, writes only through the function; `feedback` report target `'case'`. Without it the functions answer 503 `cases_not_ready` for new cases and the rest of the community keeps working. |
 | `migrations/0011_simulations.sql` | A3 | Zeitmaschine, gespeicherte Simulationen: `simulations` (PK `user_id, id`; `id` = `sim_` + Hash der Eingaben, `trade_id`, Symbol, Intervall, Seed, `model_version`, `data_hash` (SHA-256 der Kerzen) + Stand, Läufe, Zeitstopp, `plan`, `costs`, `metrics` (Kennzahlen, ≤ 16 KB), `result_hash`); RLS nur eigene Zeilen (select / insert / update / delete), restriktive aal2-Regel, anon nichts, Größenprüfungen in der Datenbank, `created_at` bleibt, `updated_at` = Uhr der Datenbank, Konto löschen = cascade. Der Client synchronisiert nur eingeloggt; die schweren Pfade werden nicht gespeichert (Seed + Kerzen erzeugen sie wieder). Geprüft auf PGlite (`tests/unit/supabase.simulations.test.ts`). |
 
+| `migrations/0018_quotas_visibility.sql` | round 11, package B | Quotas by trigger / policy (`journal_docs` rows + bytes, new `simulations` per day, stored simulations, `screenshots` sum per plan, `backups` object size), counters `user_usage` / `usage_daily`, mentor-aware `group_members` / `social_profiles`, `cloud_shots_allowed()` bound to the caller. Details below. |
+
 Apply with the Supabase CLI (`supabase db push`) or paste each file into the SQL editor. Every migration runs once;
 never edit an applied migration – add a new one.
 
@@ -145,6 +147,20 @@ the 200-item limit, `execute` refused for `authenticated`, and the cascades on c
 co-member visibility vs. strangers, mentor-group visibility, refused client writes on every table, hidden snapshots,
 the token / pseudonym / invite / report checks, `n >= 10`, `shared_payload()` (expired / revoked / views),
 `social_candidates()` (opt-ins only), `execute` refused for `authenticated`, and the cascades on group and user deletion.
+
+## Rules the schema enforces (0018, quotas and visibility)
+
+- **Quotas by the database** (round 11, lens 1 #2 / lens 3 #4): the browser's own writes are limited by triggers, the functions (service
+  role) are counted but never refused. `journal_docs`: 100 000 records and 256 MiB of JSON per user (`user_usage` counters, kept by
+  `journal_docs_quota` / `journal_docs_unquota`; `recount_usage()` rebuilds them). `simulations`: new ones per UTC day by plan (Free 20,
+  Pro 200 – `plans.ts`; Premium / Team capped at 2 000) in `usage_daily`, 5 000 stored per user. `screenshots` bucket: summed object
+  size of the caller's folder by plan (`screenshots_quota_ok()` reads `metadata.size`; the file being uploaded counts only afterwards).
+  `backups` bucket: 512 MiB per object. A refused write is SQLSTATE `P0001`, message `quota_exceeded:<what>`; shrinking updates,
+  tombstones and deletes always pass. The numbers are in `quota_cap()` / `plan_limit()`; `docs/TARIFE.md` marks the proposals (E8).
+- **Mentor groups**: `group_members` and `social_profiles` follow the rule of `can_see_review`: a student reads the mentors and their own
+  row, owners / mentors read everyone, 'group' / 'team' groups are unchanged (`can_see_member()`, `shares_group_with()`).
+- **`cloud_shots_allowed(uuid)`** answers about the signed-in caller's plan whatever id is passed; only the service role names a user.
+- Every function in `public` pins an empty `search_path` (audit rule R6b).
 
 ## External setup (dashboard)
 

@@ -152,7 +152,7 @@ describe("two users, every table the browser can reach", () => {
   });
 
   it("service-only tables are closed to both users, with or without 2FA", async () => {
-    for (const table of ["billing_customers", "rate_hits", "app_errors", "app_config", "stripe_events", "sync_cursor", "leaderboard_snapshots", "jobs", "tv_mcp_connections", "tv_mcp_states", "alert_phone_secrets", "alert_state", "mfa_recovery_codes"]) {
+    for (const table of ["billing_customers", "rate_hits", "app_errors", "app_config", "stripe_events", "sync_cursor", "leaderboard_snapshots", "jobs", "tv_mcp_connections", "tv_mcp_states", "alert_phone_secrets", "alert_state", "mfa_recovery_codes", "user_usage", "usage_daily"]) {
       for (const who of [jwt(A), jwt(B, "aal2")]) await expect(t.as(who, `select * from public.${table} limit 1`), table).rejects.toThrow(/permission denied/);
     }
   });
@@ -213,6 +213,8 @@ describe("sessions, storage, functions", () => {
       `select * from public.shared_payload('${"a".repeat(22)}')`,
       `select public.assign_team_seat('${A}', '${B}', 5)`,
       `select * from public.backup_candidates(now())`,
+      `select public.recount_usage()`,
+      `select public.effective_plan('${A}')`,
     ];
     for (const sql of calls) await expect(t.as(jwt(B), sql), sql).rejects.toThrow(/permission denied/);
   });

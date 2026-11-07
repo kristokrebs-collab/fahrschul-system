@@ -226,6 +226,26 @@ der Browser spiegelt ihn. Solange Zahlungen nicht eingerichtet sind, ist nichts 
 
 <!-- tarife:end -->
 
+## Obergrenzen der Datenbank (Sicherheitsrunde 11, Migration 0018)
+
+Die Datenbank setzt Kontingente jetzt selbst durch (`supabase/migrations/0018_quotas_visibility.sql`), damit sie auch gelten, wenn jemand die
+Datenbank-Schnittstelle ohne die App anspricht. Zahlen, die in `plans.ts` stehen, sind übernommen (ein Test hält beide Tabellen gleich); fehlt in
+`plans.ts` eine Zahl, steht hier eine **großzügige Obergrenze – Vorschlag, Betreiber bestätigt (E8)**. Gebrochen wird nur der Browser (Rolle
+`authenticated`); die Functions schreiben weiter und werden mitgezählt.
+
+| Grenze | Free | Pro | Premium | Team | Herkunft der Zahl |
+|---|---|---|---|---|---|
+| Neue Simulationen pro Tag (UTC-Tag) | 20 | 200 | 2 000 | 2 000 | Free / Pro aus `plans.ts`; Premium / Team sind dort „unbegrenzt“ – **Vorschlag, Betreiber bestätigt (E8)**: Obergrenze 2 000 |
+| Gespeicherte Simulationen je Konto | 5 000 | 5 000 | 5 000 | 5 000 | **Vorschlag, Betreiber bestätigt (E8)** (je Zeile höchstens ca. 22 KB) |
+| Journal-Datensätze je Konto (`journal_docs`) | 100 000 | 100 000 | 100 000 | 100 000 | **Vorschlag, Betreiber bestätigt (E8)** |
+| Journal-Größe je Konto (JSON) | 256 MiB | 256 MiB | 256 MiB | 256 MiB | **Vorschlag, Betreiber bestätigt (E8)** (je Datensatz bleiben es höchstens 1 MiB) |
+| Screenshot-Speicher je Konto | – | 2 GB | 20 GB | 20 GB | aus `plans.ts` (`screenshotStorageMb`); die Datei, die gerade hochgeladen wird, zählt erst danach mit |
+| Screenshot-Dateien je Konto | – | 100 000 | 100 000 | 100 000 | **Vorschlag, Betreiber bestätigt (E8)** (Rückfallebene, falls Größen fehlen) |
+| Backup-Datei (Bucket `backups`) | 512 MiB | 512 MiB | 512 MiB | 512 MiB | **Vorschlag, Betreiber bestätigt (E8)** (doppelt so groß wie die Journal-Grenze) |
+
+Solange Zahlungen nicht gemeldet sind (kein Stripe, siehe oben), gelten für Simulationen und Screenshots die Werte von Premium – wie bei jeder anderen
+Sperre ohne Bezahlschranke. Wer über einer Grenze liegt, kann weiter ändern und löschen, nur nichts Neues hinzufügen.
+
 ## Offene Fragen an den Betreiber
 
 1. **Zahlen freigeben:** stimmen die Vorschläge (Tabelle „Kontingente“, Spalte „Herkunft der Zahl“ = Vorschlag)? Besonders: Telefonie 30 / 60 pro Monat,
