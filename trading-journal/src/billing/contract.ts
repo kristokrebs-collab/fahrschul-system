@@ -75,6 +75,8 @@ export interface SubscriptionSummary {
   /** Cents per period (all seats), null when unknown. */
   amount: number | null;
   currency: string | null;
+  /** ISO time the contract was concluded (the subscription row was created) – the withdrawal period (14 days) counts from it; null when unknown. */
+  startedAt?: string | null;
   /** A payment method is on file (false during a card-less trial). */
   hasPaymentMethod: boolean | null;
 }
@@ -177,7 +179,7 @@ export interface ContractConfirmResponse {
 export const PORTAL_FLOWS = ["manage", "cancel", "update", "payment"] as const;
 export type PortalFlow = (typeof PORTAL_FLOWS)[number];
 
-export const PORTAL_ACTIONS = ["cancel", "resume", "pause"] as const;
+export const PORTAL_ACTIONS = ["cancel", "resume", "pause", "feedback"] as const;
 export type PortalAction = (typeof PORTAL_ACTIONS)[number];
 
 /** Stripe's `cancellation_details.feedback` values. */

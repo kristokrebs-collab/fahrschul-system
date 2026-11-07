@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, type HTMLMotionProps } from "motion/react";
-import { useRef, useState, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { attachMagnet } from "@/motion/buttonMagnet";
 import { tween } from "@/motion/tokens";
@@ -74,6 +74,11 @@ export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children">
   fx?: boolean;
   /** A coloured border run (a `BorderBeam` lap) while the mouse is over the button or the keyboard holds it, `[data-rich]` pages only: sparingly, for ONE highlighted action. */
   run?: boolean;
+  /**
+   * The busy indicator: `ring` (default, the small spinner) or `orbs` (six dots on a ring that breathe in turn – the order
+   * button of the purchase flow; the CSS `.pay-orbs` comes with that chunk). Size and width of the button stay either way.
+   */
+  loader?: "ring" | "orbs";
 }
 
 /** `data-fx` tokens read by `controls.css` (`magnet` by this file). */
@@ -105,6 +110,7 @@ export function Button({
   statusIcon = true,
   fx = true,
   run = false,
+  loader = "ring",
   ripple = true,
   children,
   onPointerDown,
@@ -224,7 +230,15 @@ export function Button({
       {label}
       {busy && (
         <span aria-hidden="true" className={cn("pointer-events-none absolute inset-0 grid place-items-center", spinnerInk[variant])}>
-          <span className="size-3.5 rounded-full border-2 border-current border-t-transparent motion-safe:animate-spin" />
+          {loader === "orbs" ? (
+            <span className="pay-orbs" data-testid="button-orbs">
+              {[0, 1, 2, 3, 4, 5].map((k) => (
+                <i key={k} style={{ "--k": k } as CSSProperties} />
+              ))}
+            </span>
+          ) : (
+            <span className="size-3.5 rounded-full border-2 border-current border-t-transparent motion-safe:animate-spin" />
+          )}
         </span>
       )}
       {checked && (

@@ -14,6 +14,7 @@
  */
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import type { ContractConfirmResponse, ContractDeclaration, ContractKind, ContractReceipt } from "../../../src/billing/contract";
+import { WITHDRAWAL_DAYS } from "../../../src/billing/purchase/manage";
 import { isMissingTable } from "./account";
 import { audit } from "./audit";
 import { mailConfig, sendMail, type MailConfig } from "./alertWatch/mail";
@@ -35,8 +36,8 @@ import {
 import { supabaseAdmin } from "./supabase";
 import type { AuthUser } from "./auth";
 
-/** The withdrawal period (§ 355 Abs. 2 BGB): 14 days from the conclusion of the contract. */
-export const WITHDRAWAL_DAYS = 14;
+/** The withdrawal period (§ 355 Abs. 2 BGB): 14 days from the conclusion of the contract (one definition, `src/billing/purchase/manage.ts`). */
+export { WITHDRAWAL_DAYS };
 /** How long the confirmation link works. */
 export const LINK_TTL_MS = 24 * 3_600_000;
 const OPEN = new Set(["trialing", "active", "past_due", "unpaid", "paused", "incomplete"]);

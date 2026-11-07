@@ -157,12 +157,11 @@ export function assertSameOrigin(origin: string): string {
  * Stripe's success and cancel URLs: `origin` + a path of the whitelist grammar (`safeReturnTo`: no `//`, no scheme, no
  * backslash, ≤ 200 chars) + `?billing=…`. The result is re-parsed: it must lie on the very same origin.
  */
-export function returnUrls(origin: string, returnTo: string | undefined, order?: string): { success: string; cancel: string } {
+export function returnUrls(origin: string, returnTo: string | undefined): { success: string; cancel: string } {
   const base = assertSameOrigin(origin);
   const { path, hash } = safeReturnTo(returnTo);
-  const tag = order ? `&order=${encodeURIComponent(order)}` : "";
-  const success = `${base}${path}?billing=success&session_id={CHECKOUT_SESSION_ID}${tag}${hash}`;
-  const cancel = `${base}${path}?billing=cancel${tag}${hash}`;
+  const success = `${base}${path}?billing=success&session_id={CHECKOUT_SESSION_ID}${hash}`;
+  const cancel = `${base}${path}?billing=cancel${hash}`;
   for (const u of [success, cancel]) {
     if (new URL(u.replace("{CHECKOUT_SESSION_ID}", "cs_x")).origin !== new URL(base).origin) throw new HttpError(422, "invalid_body", "Ungültige Rücksprung-Adresse.");
   }

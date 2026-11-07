@@ -13,11 +13,11 @@ import { ApiError, FUNCTIONS_MISSING } from "@/cloud/api";
 import { cloudEnabled } from "@/cloud/env";
 import { hasStoredSession } from "@/cloud/hint";
 import { openAuthSheet, useCloudSession } from "@/cloud/session";
-import { legalShown } from "@/legal/config";
+import { setReturnTo } from "@/store/returnTo";
 import { hasClaudeRuntime } from "@/store/capability";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 import { pushToast } from "@/store/uiStore";
-import { checkReferral, fetchBillingStatus, fetchReferral, postCheckout, postCode, postPortal, redirectToStripe } from "./api";
+import { checkReferral, fetchBillingStatus, fetchReferral, postCode, postPortal, redirectToStripe } from "./api";
 import type {
   BillingConfig,
   BillingStatus,
@@ -31,9 +31,11 @@ import type {
   TeamSeats,
 } from "./contract";
 import { DEFAULT_REFERRAL_TRIAL_DAYS, DEFAULT_TRIAL_DAYS, type PaidPlanId } from "./plans";
+import { announcePlanChange } from "./planChange";
+import { formatOrderParam, normalizeDraft, type OrderDraft } from "./purchase/order";
 import { BILLING } from "./strings";
 import { FREE_PLAN, isPlanId, isPlanStatus, type BillingInterval, type Feature, type PlanInfo } from "./types";
-import { clearReferral, currentReturnTo, storedReferral, type BillingReturn } from "./url";
+import { clearReferral, currentReturnTo, type BillingReturn } from "./url";
 
 export type BillingMode = "off" | "closed" | "open";
 
@@ -69,19 +71,20 @@ export interface BillingState {
   referralInfo: ReferralInfo | null;
   upgrade: { open: boolean; feature: Feature | null; plan: PaidPlanId | null };
   cancelOpen: boolean;
-  /** A checkout waiting for the login to finish. */
-  pending: CheckoutIntent | null;
+  /** The confirmation mail of the last in-app cancellation (`sent` / `unavailable` = mail not set up), `null` = none yet. */
+  cancelMail: "sent" | "unavailable" | null;
+  /** The order sheet (B4, lazy chunk `purchase/`): open + what is being ordered. `loaded` keeps the chunk mounted for its exit. */
+  order: { open: boolean; draft: OrderDraft | null; loaded: boolean };
+  /** The tariff detail sheet (B4): which plan. */
+  detail: { open: boolean; plan: PaidPlanId | null };
+  /** The management sheet of Konto (B4). */
+  manageOpen: boolean;
   /** The Stripe return of this page load (BillingHost shows it). */
   returned: BillingReturn | null;
   /** Monthly / yearly toggle (pricing page + upgrade sheet share it). */
   interval: BillingInterval;
   /** Team seats picked on the pricing page. */
   seats: number;
-  /**
-   * The buyer accepted the operator's AGB (and took note of the Widerrufsbelehrung) in the upgrade sheet – this
-   * session only. Every checkout passes through it (Review F07); not asked inside claude.ai (nothing is sold there).
-   */
-  termsAccepted: boolean;
 }
 
 export interface BillingCache {
@@ -113,8 +116,10 @@ const INITIAL: BillingState = {
   referralInfo: null,
   upgrade: { open: false, feature: null, plan: null },
   cancelOpen: false,
-  termsAccepted: false,
-  pending: null,
+  cancelMail: null,
+  order:{ open: false, draft: null, loaded: false },
+  detail: { open: false, plan: null },
+  manageOpen: false,
   returned: null,
   interval: "year",
   seats: 3,
@@ -169,7 +174,7 @@ export function useBillingMode(): BillingMode {
 }
 
 /** The signed-in user's id when the session is live (null otherwise). */
-function sessionUserId(): string | null {
+export function sessionUserId(): string | null {
   const s = useCloudSession.getState();
   return s.phase === "signedIn" ? (s.user?.id ?? null) : null;
 }
@@ -195,7 +200,7 @@ export function useTrialDays(): number {
 
 /* ------------------------------------------------------------------ loading */
 
-const CLOSED_CONFIG = (reason: BillingConfig["reason"]): BillingConfig => ({
+export const CLOSED_CONFIG = (reason: BillingConfig["reason"]): BillingConfig => ({
   enabled: false,
   reason,
   trialDays: DEFAULT_TRIAL_DAYS,
@@ -205,14 +210,14 @@ const CLOSED_CONFIG = (reason: BillingConfig["reason"]): BillingConfig => ({
   available: [],
 });
 
-function persist(config: BillingConfig | null, account: BillingAccount | null, userId: string | null): void {
+export function persist(config: BillingConfig | null, account: BillingAccount | null, userId: string | null): void {
   const cache: BillingCache = { userId, plan: account?.plan ?? null, closed: config ? !config.enabled : false, at: Date.now() };
   writeJson(BILLING_CACHE_KEY, cache);
   useBilling.setState({ cached: cache });
 }
 
 /** `ApiError`s that mean "no billing functions on this host" (SPA fallback page / 404 route). */
-function functionsMissing(e: unknown): boolean {
+export function functionsMissing(e: unknown): boolean {
   return e instanceof ApiError && ((e.status === 0 && e.message === FUNCTIONS_MISSING) || e.status === 404 || e.status === 405);
 }
 
@@ -240,8 +245,11 @@ export async function loadBilling(opts: { invoices?: boolean } = {}): Promise<Bi
             team: status.team,
           }
         : null;
+    // a plan the SERVER now reports differently from the last one this browser knew for the same user = a confirmed change
+    const known = prev?.userId === userId ? prev.plan.plan : useBilling.getState().cached?.userId === userId ? (useBilling.getState().cached?.plan?.plan ?? null) : null;
     useBilling.setState({ config: status.config, configState: "ready", account });
     persist(status.config, account, userId);
+    if (account && known && known !== account.plan.plan) announcePlanChange({ from: known, to: account.plan.plan });
     return status;
   } catch (e) {
     if (seq !== loadSeq) return null;
@@ -261,14 +269,14 @@ export function clearAccount(): void {
 
 /* ------------------------------------------------------------------ flows */
 
-function errorText(e: unknown): string {
+export function errorText(e: unknown): string {
   return e instanceof ApiError ? e.message : BILLING.loadFailed;
 }
 
 let busyTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Keeps `busy` while the browser leaves for Stripe; a blocked / cancelled navigation frees it again. */
-function holdBusyForRedirect(): void {
+export function holdBusyForRedirect(): void {
   if (busyTimer) clearTimeout(busyTimer);
   busyTimer = setTimeout(() => useBilling.setState({ busy: null }), 15_000);
 }
@@ -281,53 +289,71 @@ export function releaseBusy(): void {
 }
 
 /**
- * Starts Stripe Checkout. Signed out → the login sheet opens and the checkout continues after the login
- * (`pending`, BillingHost). Closed shop → an honest toast. A valid code / stored referral travel along.
+ * The purchase flow may start (B4): the shop is `open` (Stripe set up) AND the server says the operator's legal texts are
+ * complete (`config.purchaseOpen`; absent = an older server = locked – never an invented "open").
  */
-export async function startCheckout(intent: CheckoutIntent): Promise<void> {
+export function purchaseOpenOf(config: BillingConfig | null, mode: BillingMode): { open: boolean; blockedBy: ("stripe" | "legal")[] } {
+  if (mode === "off") return { open: false, blockedBy: [] };
+  if (mode === "closed" || !config || !config.enabled) return { open: false, blockedBy: ["stripe"] };
+  if (config.purchaseOpen === true) return { open: true, blockedBy: [] };
+  return { open: false, blockedBy: config.purchaseBlockedBy?.length ? config.purchaseBlockedBy : ["legal"] };
+}
+
+export function usePurchaseGate(): { open: boolean; blockedBy: ("stripe" | "legal")[] } {
+  const config = useBilling((s) => s.config);
+  const mode = useBillingMode();
+  return purchaseOpenOf(config, mode);
+}
+
+/** Opens the order sheet for `draft` (the sheet itself lives in the lazy chunk `purchase/`). */
+export function openOrder(draft: OrderDraft): void {
+  useBilling.setState({ order: { open: true, draft: normalizeDraft(draft), loaded: true }, detail: { open: false, plan: useBilling.getState().detail.plan } });
+}
+
+export function closeOrder(): void {
+  useBilling.setState((s) => ({ order: { ...s.order, open: false } }));
+}
+
+export function openDetail(plan: PaidPlanId): void {
+  useBilling.setState({ order: { ...useBilling.getState().order, loaded: true }, detail: { open: true, plan } });
+}
+
+export function closeDetail(): void {
+  useBilling.setState((s) => ({ detail: { ...s.detail, open: false } }));
+}
+
+export function openManage(): void {
+  useBilling.setState({ order: { ...useBilling.getState().order, loaded: true }, manageOpen: true });
+}
+
+export function closeManage(): void {
+  useBilling.setState({ manageOpen: false });
+}
+
+/** Where the login (or the plan wall) sends the person back to: exactly this order, the choice stays (`returnTo` grammar `order:…`). */
+export function noteOrderReturn(draft: OrderDraft): void {
+  setReturnTo({ kind: "order", order: formatOrderParam(draft) }, { on: "signedIn" }, "Bestellung");
+}
+
+/**
+ * The entry of every "buy" button (B4): closed purchase flow → an honest toast and nothing else; signed out → the order is
+ * noted for `returnTo` and the login opens (after it the ReturnHost reopens THIS order); signed in → the order sheet opens
+ * with the summary. The order itself is placed ONLY by the button of that sheet.
+ */
+export function requestOrder(intent: CheckoutIntent): void {
+  const draft = normalizeDraft({ plan: intent.plan, interval: intent.interval, seats: intent.seats ?? useBilling.getState().seats });
   const s = useBilling.getState();
-  if (s.busy) return;
-  if (currentMode() !== "open") {
-    pushToast({ kind: "info", title: BILLING.closedTitle, detail: BILLING.closedText });
+  const gate = purchaseOpenOf(s.config, currentMode());
+  if (!gate.open) {
+    pushToast({ kind: "info", title: BILLING.closedTitle, detail: gate.blockedBy.includes("legal") && !gate.blockedBy.includes("stripe") ? BILLING.legalClosedText : BILLING.closedText });
     return;
   }
   if (!sessionUserId()) {
-    // the sheet first: BillingHost continues the checkout once it is closed again (signed in) or drops it
+    noteOrderReturn(draft);
     openAuthSheet("signup", "card");
-    useBilling.setState({ pending: intent });
     return;
   }
-  if (legalShown() && !s.termsAccepted) {
-    // the consent first: the upgrade sheet asks for it, its button continues the checkout
-    useBilling.setState({ pending: null, upgrade: { open: true, feature: null, plan: intent.plan } });
-    return;
-  }
-  useBilling.setState({ busy: "checkout", pending: null });
-  try {
-    const code = s.promo?.valid ? s.promo.code : undefined;
-    const res = await postCheckout({
-      ...intent,
-      ...(code ? { code } : {}),
-      ...(storedReferral() ? { ref: storedReferral()! } : {}),
-      returnTo: currentReturnTo(),
-    });
-    holdBusyForRedirect();
-    redirectToStripe(res.url);
-  } catch (e) {
-    useBilling.setState({ busy: null });
-    if (e instanceof ApiError && e.code === "already_subscribed") {
-      pushToast({ kind: "info", title: BILLING.alreadySubscribed });
-      await loadBilling();
-      return;
-    }
-    if (e instanceof ApiError && e.status === 503 && e.code === "billing_unavailable") {
-      const config = CLOSED_CONFIG("stripe_missing");
-      useBilling.setState({ config });
-      persist(config, useBilling.getState().account, sessionUserId());
-    }
-    if (e instanceof ApiError && e.code === "invalid_code") useBilling.setState({ promo: null });
-    pushToast({ kind: "error", title: errorText(e) });
-  }
+  openOrder(draft);
 }
 
 /** Opens the Stripe Customer Portal (optionally deep-linked into a flow). */
@@ -357,7 +383,9 @@ export async function changeSubscription(action: PortalAction, opts: { reason?: 
       const next: BillingAccount = { ...account, subscription: res.subscription ?? account.subscription, plan: res.plan ?? account.plan };
       useBilling.setState({ account: next });
       persist(useBilling.getState().config, next, userId);
+      if (next.plan.plan !== account.plan.plan) announcePlanChange({ from: account.plan.plan, to: next.plan.plan });
     }
+    if (action === "cancel") useBilling.setState({ cancelMail: res.mail ?? null });
     return true;
   } catch (e) {
     pushToast({ kind: "error", title: errorText(e) });
@@ -428,11 +456,6 @@ export function openUpgrade(feature: Feature | null = null, plan: PaidPlanId | n
   useBilling.setState({ upgrade: { open: true, feature, plan } });
 }
 
-/** The consent of the upgrade sheet (AGB / Widerruf) for this session. */
-export function acceptTerms(v: boolean): void {
-  useBilling.setState({ termsAccepted: v });
-}
-
 export function closeUpgrade(): void {
   useBilling.setState((s) => ({ upgrade: { ...s.upgrade, open: false } }));
 }
@@ -454,5 +477,6 @@ export function setSeats(seats: number): void {
 }
 
 export function setReturned(r: BillingReturn | null): void {
-  useBilling.setState({ returned: r });
+  // the result page lives in the lazy chunk of the purchase flow: asking for it loads it
+  useBilling.setState((s) => ({ returned: r, order: r ? { ...s.order, loaded: true } : s.order }));
 }

@@ -7,7 +7,8 @@
 import { useEffect } from "react";
 import { pageTargetId } from "@/app/pageTargets";
 import { entitledNow } from "@/billing/entitlements";
-import { useBilling, useEffectivePlan } from "@/billing/store";
+import { parseOrderParam } from "@/billing/purchase/order";
+import { requestOrder, useBilling, useEffectivePlan } from "@/billing/store";
 import { useCloudSession } from "@/cloud/session";
 import { primaryConnection, useExchange } from "@/exchanges/store";
 import { clearReturnTo, peekReturnTo, useReturnTo, type ReturnWait } from "@/store/returnTo";
@@ -28,6 +29,7 @@ export function waitMet(wait: ReturnWait, s: { signedIn: boolean; entitled: (fea
 export function ReturnHost() {
   const pending = useReturnTo((s) => s.pending);
   const signedIn = useCloudSession((s) => s.phase === "signedIn" && !s.needsMfa);
+  const authSheetOpen = useCloudSession((s) => s.sheet.open);
   const connected = useExchange((s) => primaryConnection(s.status) !== null);
   // a plan change (the account arrives from the server, the cache is rewritten) re-renders here; `entitledNow` then reads the new plan
   const plan = useEffectivePlan().plan;
@@ -39,13 +41,21 @@ export function ReturnHost() {
     const now = peekReturnTo();
     if (!now) return;
     if (!waitMet(now.wait, { signedIn, connected, entitled: (f) => entitledNow(f as Feature) })) return;
+    // an order waits until the login sheet (and its welcome step) is closed: two sheets never stack
+    if (now.target.kind === "order" && authSheetOpen) return;
     // once: the note is cleared before the target opens, so nothing can fire it twice
     clearReturnTo();
     const t = now.target;
+    if (t.kind === "order") {
+      // B4: back to exactly this order (plan, interval, seats) – the sheet opens, nothing is ordered by itself
+      const draft = parseOrderParam(t.order);
+      if (draft) requestOrder(draft);
+      return;
+    }
     const id = t.kind === "feature" ? t.id : pageTargetId(t.page);
     // the register is a lazy chunk of its own: it is fetched only when a return actually happens
     void import("@/app/featureOpen").then((m) => m.openFeature(id, { remember: false }));
-  }, [pending, signedIn, connected, plan, account, cached]);
+  }, [pending, signedIn, authSheetOpen, connected, plan, account, cached]);
 
   return null;
 }

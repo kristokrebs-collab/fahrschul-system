@@ -209,6 +209,7 @@ export interface SubscriptionRow {
   ref_code: string | null;
   last_event_at: string | null;
   updated_at?: string;
+  created_at?: string;
 }
 
 /** Our status for a Stripe subscription: collection paused counts as `paused` (no payment → no paid features). */
@@ -287,6 +288,7 @@ export function summaryOf(row: SubscriptionRow): SubscriptionSummary {
     amount: row.amount,
     currency: row.currency,
     hasPaymentMethod: row.has_payment_method,
+    startedAt: row.created_at ?? null,
   };
 }
 
@@ -305,7 +307,7 @@ function dbFail(what: string, error: { code?: string } | null | undefined): neve
 }
 
 const SUB_COLUMNS =
-  "id,user_id,stripe_customer_id,status,plan,price_id,interval,seats,amount,currency,current_period_end,cancel_at_period_end,cancel_at,canceled_at,trial_end,pause_resumes_at,has_payment_method,ref_code,last_event_at,updated_at";
+  "id,user_id,stripe_customer_id,status,plan,price_id,interval,seats,amount,currency,current_period_end,cancel_at_period_end,cancel_at,canceled_at,trial_end,pause_resumes_at,has_payment_method,ref_code,last_event_at,updated_at,created_at";
 
 /** The user's subscription rows, newest first (empty while the table does not exist). */
 export async function subscriptionRows(userId: string): Promise<SubscriptionRow[]> {
@@ -685,7 +687,7 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
   const seats = team ? Math.max(cat.minSeats ?? 2, Math.min(cat.maxSeats ?? 50, Math.round(body.seats ?? cat.minSeats ?? 2))) : 1;
   const consentAt = await storeConsents({ userId: user.id, orderId: body.orderId, plan: body.plan, interval: body.interval, seats });
   const customer = await ensureCustomer(user);
-  const urls = returnUrls(origin, body.returnTo, body.orderId);
+  const urls = returnUrls(origin, body.returnTo);
   const meta: Record<string, string> = {
     supabase_user_id: user.id,
     plan: body.plan,
@@ -774,6 +776,11 @@ export async function changeSubscription(
     params = { cancel_at_period_end: true, cancellation_details: { ...(opts.reason ? { feedback: opts.reason } : {}), ...(comment ? { comment } : {}) } };
   } else if (action === "resume") {
     params = { cancel_at_period_end: false, ...(current.status === "paused" || current.pause_resumes_at ? { pause_collection: "" as const } : {}) };
+  } else if (action === "feedback") {
+    // the optional reason AFTER the cancellation was confirmed (§ 312k: no question stands in front of the confirmation)
+    if (!current.cancel_at_period_end) throw new HttpError(409, "not_canceled", "Es gibt keine Kündigung, zu der du etwas sagen könntest.");
+    const comment = opts.comment?.trim().slice(0, 500);
+    params = { cancellation_details: { ...(opts.reason ? { feedback: opts.reason } : {}), ...(comment ? { comment } : {}) } };
   } else {
     if (current.status !== "active" || current.cancel_at_period_end)
       throw new HttpError(409, "cannot_pause", "Pausieren geht nur bei einem laufenden, bezahlten Abo.");
