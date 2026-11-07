@@ -291,16 +291,3 @@ html[data-safe-fx] .shiny-cta {
     inset 0 0 0 1px var(--shiny-cta-bg-subtle),
     inset 0 -14px 16px -14px rgb(229 32 46 / 0.75);
 }
-
-/* Reserve tier `wide` (see `src/primitives/Reserve.tsx`): from 1360 px the floor of a box that sets `--reserve-wide` is that value.
-   Un-layered on purpose – the floors themselves are Tailwind utilities (`lg:min-h-…`), and an arbitrary `min-[1360px]:` one is
-   sorted before `lg:` and would lose. Only boxes that set the property are touched; the others keep the `lg` floor. */
-@media (min-width: 1360px) {
-  [style*="--reserve-wide"] {
-    min-height: var(--reserve-wide);
-  }
-  [data-defer][style*="--reserve-wide"] {
-    min-height: calc(var(--reserve-wide) + 1.5rem);
-    contain-intrinsic-block-size: auto var(--reserve-wide);
-  }
-}
