@@ -220,11 +220,13 @@ function SidebarPanel() {
   // the sidebar scrolls on a short screen: the page you are on is always in view – also while its group is still unfolding (the box grows on the spring:
   // the resize observer below looks again until `keepInView` is over)
   const keepInView = useRef(0);
+  // with the nested sections showing (pinned, on Einstellungen) the row goes to the top so its sections follow it into view
+  const rowAt: ScrollLogicalPosition = showSettingsEntries(page, expanded) ? "start" : "nearest";
   useLayoutEffect(() => {
     const el = nav.current?.querySelector<HTMLElement>(`[data-nav-page="${page}"]`);
     keepInView.current = performance.now() + 900;
-    if (el && currentOpen) el.scrollIntoView?.({ block: "nearest", behavior: "instant" });
-  }, [page, currentOpen]);
+    if (el && currentOpen) el.scrollIntoView?.({ block: rowAt, behavior: "instant" });
+  }, [page, currentOpen, rowAt]);
 
   // a group folds / unfolds (its rows grow and shrink with the spring) or the font changes the rows: the marker stays on its row
   useEffect(() => {
@@ -233,11 +235,11 @@ function SidebarPanel() {
     const ro = new ResizeObserver(() => {
       const el = box.querySelector<HTMLElement>(`[data-nav-page="${page}"]`);
       if (el) y.jump(el.offsetTop);
-      if (el && performance.now() < keepInView.current) el.scrollIntoView?.({ block: "nearest", behavior: "instant" });
+      if (el && performance.now() < keepInView.current) el.scrollIntoView?.({ block: rowAt, behavior: "instant" });
     });
     for (const child of Array.from(box.children)) if (child !== box.querySelector("[data-sidebar-marker]")) ro.observe(child);
     return () => ro.disconnect();
-  }, [page, y]);
+  }, [page, y, rowAt]);
 
   // a page that lives in a folded group opens it (a link, a key, the search): you never land on a hidden row
   useEffect(() => {
