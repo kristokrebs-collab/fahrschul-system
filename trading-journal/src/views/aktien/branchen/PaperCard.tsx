@@ -21,6 +21,10 @@ import { PAPER } from "./paperStrings";
 
 const TradeSimulationBlock = lazy(() => import("@/views/timemachine/TradeSimulationBlock"));
 
+/** Rows of the candidate list kept free before the data are there (a row is about 106 px on a phone, 58 px wider; four rows = 448 / 256 px). */
+const RESERVED_ROWS = 4;
+const RESERVE_CLASS = "min-h-[448px] sm:min-h-[256px]";
+
 const money = (v: number): string => v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const sign = (v: number): string => `${v > 0 ? "+" : v < 0 ? "−" : ""}${money(Math.abs(v))}`;
 const ageText = (age: number): string => (!Number.isFinite(age) ? "Alter unbekannt" : age < 1 ? "weniger als 1 Tag alt" : `${age.toLocaleString("de-DE", { maximumFractionDigits: 1 })} Tage alt`);
@@ -223,15 +227,23 @@ export function PaperCard() {
           </Mini>
           <p className="text-[12px] text-faint">{PAPER.candidatesLead}</p>
           {!ampel ? (
-            <p className="text-[13px] text-mute" data-testid="paper-no-ampel">
-              {PAPER.noAmpel}
-            </p>
+            <div className="grid gap-2" data-testid="paper-no-ampel-wrap">
+              <p className="text-[13px] text-mute" data-testid="paper-no-ampel">
+                {PAPER.noAmpel}
+              </p>
+              {/* the place of the list is kept while the data come (a few rows high; a longer list grows from here) */}
+              <div aria-hidden="true" className="grid gap-2" data-testid="paper-candidates-reserve">
+                {Array.from({ length: RESERVED_ROWS }, (_, i) => (
+                  <div key={i} className="min-h-[106px] rounded-xl border border-dashed border-line bg-ink-950/20 sm:min-h-[58px]" />
+                ))}
+              </div>
+            </div>
           ) : candidates.length === 0 ? (
-            <p className="text-[13px] text-mute" data-testid="paper-no-candidates">
+            <p className={cn("text-[13px] text-mute", RESERVE_CLASS)} data-testid="paper-no-candidates">
               {PAPER.noCandidates}
             </p>
           ) : (
-            <ul className="grid gap-2" data-testid="paper-candidates">
+            <ul className={cn("grid content-start gap-2", RESERVE_CLASS)} data-testid="paper-candidates">
               {candidates.map(({ row, signal }) => {
                 const run = checks[signal.signalId];
                 const inst = instrumentOf(row.code)!;

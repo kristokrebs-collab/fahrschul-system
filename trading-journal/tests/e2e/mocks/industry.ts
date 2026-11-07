@@ -72,14 +72,17 @@ export interface Industry {
   fail: { status: number; code: string; message: string } | null;
   /** hold every answer back this long (ms) */
   delayMs: number;
+  /** while set, every answer waits for it (the spec decides when the data arrive – no race with a slow machine) */
+  hold: Promise<void> | null;
 }
 
 export async function mockIndustry(page: Page, opts: { endDay?: number } = {}): Promise<Industry> {
-  const state: Industry = { calls: 0, fail: null, delayMs: 0 };
+  const state: Industry = { calls: 0, fail: null, delayMs: 0, hold: null };
   const body = JSON.stringify(payload(Date.now(), opts.endDay));
   await page.route(/\/api\/v1\/industry\/daily/, async (route: Route) => {
     state.calls++;
     if (state.delayMs) await new Promise((r) => setTimeout(r, state.delayMs));
+    if (state.hold) await state.hold;
     if (state.fail) return route.fulfill({ status: state.fail.status, headers: { "content-type": "application/json" }, body: JSON.stringify({ error: { code: state.fail.code, message: state.fail.message } }) });
     return route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body });
   });
