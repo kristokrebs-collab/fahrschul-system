@@ -54,16 +54,18 @@ describe("Positionsrechner · Verwaltung", () => {
     expect(card).toHaveAttribute("data-active", "false");
     fireEvent.click(within(card).getByRole("checkbox", { name: /^Break-even/ }));
     fireEvent.click(within(card).getByRole("checkbox", { name: /^Teilziel/ }));
-    const steps = await within(card).findByTestId("risk-manage-steps", {}, { timeout: 5000 });
-    // the steps are computed after the toggles settle – on a loaded runner later than the default 1 s of `waitFor`
-    await waitFor(() => expect(steps.querySelector("[data-step=breakEven]")?.textContent ?? "").toContain("105,00"), { timeout: 5000 });
-    expect(steps.querySelector("[data-step=breakEven]")!.textContent).toContain("Stop von 95,00 auf 100,00");
+    await within(card).findByTestId("risk-manage-steps", {}, { timeout: 5000 });
+    // the steps are computed after the toggles settle – on a loaded runner later than the default 1 s of `waitFor`; the list may
+    // re-mount while it settles, so every read asks the DOM again instead of holding on to a node that can be detached
+    const step = (k: string): string => within(calc).getByTestId("risk-manage-steps").querySelector(`[data-step=${k}]`)?.textContent ?? "";
+    await waitFor(() => expect(step("breakEven")).toContain("105,00"), { timeout: 5000 });
+    expect(step("breakEven")).toContain("Stop von 95,00 auf 100,00");
     // Teilziel bei +1R = 105,00, die Hälfte der Menge (auf 0,001 abgerundet)
-    expect(steps.querySelector("[data-step=partial]")!.textContent).toMatch(/105,00 erreicht hat \(\+1 R\)/);
-    expect(steps.querySelector("[data-step=partial]")!.textContent).toMatch(/\(50 %\) mit Limit-Order verkaufen/);
+    expect(step("partial")).toMatch(/105,00 erreicht hat \(\+1 R\)/);
+    expect(step("partial")).toMatch(/\(50 %\) mit Limit-Order verkaufen/);
     // der Verlust am Stop in den Beispielen ist der Verlust des Rechners (50 USDT bei 1 % von 5 000), ohne Schönfärberei
-    expect(within(card).getByTestId("risk-manage-pnl-stop")).toHaveTextContent(/−(49|50),\d\d USDT/);
-    expect(card).not.toHaveTextContent("Finanzberatung");
+    expect(within(calc).getByTestId("risk-manage-pnl-stop")).toHaveTextContent(/−(49|50),\d\d USDT/);
+    expect(within(calc).getByTestId("risk-manage")).not.toHaveTextContent("Finanzberatung");
     // die Wahl bleibt auf dem Gerät
     expect(useCalcManage.getState().spec.breakEven.on).toBe(true);
     expect(JSON.parse(localStorage.getItem(CALC_MANAGE_KEY)!).partial.on).toBe(true);
