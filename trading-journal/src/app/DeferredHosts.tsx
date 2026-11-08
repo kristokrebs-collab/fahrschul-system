@@ -10,6 +10,7 @@
  * | `BoxAlertHost` | P02 | candle-close box alerts of the Markt symbol while `settings.boxes.alerts` is on (free, like the box chart); the watchlist-scanner alerts only with gate `boxScanner` (F03) |
  * | `CoachWatcher` | P04 | live coach alerts after a save (revenge, overtrading …) (gate `coach`) |
  * | `ReportReadyHost` | P04 | "Bericht bereit" wipe → Berichte (checks `reports` itself) |
+ * | `ReviewReminderHost` | Paket P | the optional reminder for the weekly review: OFF by default, in-app only, once a week at most, never in the quiet hours (`src/views/berichte/reviewReminder.ts`) |
  * | `RiskGuardHost` | P05 | limit / cooldown toasts after a save (gate `riskLive`) |
  * | `PostTradeReviewHost` | P08 | review prompt for closed trades + the review sheet (gate `growth`) |
  * | `DailyCheckinHost` | F61 | the daily check-in dialog at the first open of the day + the check-in sheet (gate `growth`) |
@@ -64,6 +65,7 @@ import { useBrowserAlertsOn } from "@/views/settings/alerts/browserFlag";
 import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { ReportReadyHost } from "@/views/berichte/ReportReady";
+import { ReviewReminderHost } from "@/views/berichte/ReviewReminderHost";
 import { CoachWatcher } from "@/views/coach/CoachWatcher";
 import { SignalOutcomeHost } from "@/views/coach/SignalOutcomeHost";
 import { RiskGuardHost, useRiskGuardStore } from "@/views/risiko/guard";
@@ -245,6 +247,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Bericht bereit">
         <ReportReadyHost onOpen={() => navigate("berichte")} />
+      </HostSlot>
+      <HostSlot name="Wochenrückblick-Erinnerung">
+        <ReviewReminderHost />
       </HostSlot>
       <HostSlot name="Risiko-Wächter">
         <Entitled feature="riskLive">

@@ -8,6 +8,7 @@
  *   Hero (8) · side (4) report hero (net, figures, curve with strip wipe, highlights) · Export + Archiv
  *   sections (focus)   Performance (7) · Vergleich (5) · Strategie (7) · Risiko (5) · Psychologie (6) · Fehler (6) ·
  *                      Zielerreichung (12) · week report only: Wochenreview (7) · Wochenexperiment (5) (F37) ·
+ *                      finished week report only: Wochenabschluss (12, Paket P: behaviour + a lesson, closes the review)
  *                      month report only: Monatsnutzen (12) (F60)
  *
  * Opening a finished report marks it seen (`settings.coach.reports.seen`, after a short look – flipping through does
@@ -43,6 +44,7 @@ import { useReportPage } from "./hooks";
 import { ReportHero } from "./ReportHero";
 import { MonthBenefitCard } from "./MonthBenefitCard";
 import { ExperimentCard, experimentVisible, WeekReviewCard } from "./WeekReview";
+import { WeekCloseCard, weekCloseVisible } from "./WeekCloseCard";
 import { CompareCard, GoalsCard, MistakesCard, PerformanceCard, PsychCard, ReportRiskCard, StrategyCard } from "./sections";
 
 // F70: das Transaktionsbuch (Hilfsrechnung) – eigener Chunk, geladen mit der Seite
@@ -130,6 +132,8 @@ export function BerichteView({ className }: { className?: string }) {
 
   const show = (s: Exclude<ReportFocus, "all">) => focus === "all" || focus === s;
   const showExperiment = focus === "all" && kind === "week" && experimentVisible(page);
+  // Paket P: the week report ends on behaviour – the closing card (a finished week with trades only)
+  const showClose = focus === "all" && weekCloseVisible(page);
   // the cards on the page right now (they follow the focus and the kind of report), for the "Inhalt" strip
   const nav: SectionNavItem[] = [
     { id: "report-hero", label: "Bericht" },
@@ -147,6 +151,7 @@ export function BerichteView({ className }: { className?: string }) {
           ...(focus === "all" && kind === "week" ? [{ id: "week-review", label: "Wochenreview" }] : []),
         ]),
     ...(showExperiment ? [{ id: "week-experiment", label: "Experiment" }] : []),
+    ...(showClose ? [{ id: "week-close", label: "Abschluss" }] : []),
     ...(focus === "all" && kind === "month" ? [{ id: "benefit-card", label: "Monatsnutzen" }] : []),
     { id: "ledger-card", label: "Transaktionsbuch" },
   ];
@@ -257,6 +262,12 @@ export function BerichteView({ className }: { className?: string }) {
       {showExperiment && (
         <Cell index={1} span="lg:col-span-5">
           <ExperimentCard page={page} />
+        </Cell>
+      )}
+      {/* Paket P: the closing of a finished week – behaviour and a lesson for tomorrow, never a result or an offer */}
+      {showClose && (
+        <Cell index={2} span="lg:col-span-12">
+          <WeekCloseCard page={page} />
         </Cell>
       )}
       {/* F60: the month's look back – also for a month without trades (alerts, check-ins and experiments are recorded too) */}

@@ -31,6 +31,10 @@ export const RISIKO = {
     overridden: (until: string) => `Überschrieben bis ${until}. Bleib klein.`,
     clearOverride: "Pause wieder aktivieren",
     allGood: "Alles im Rahmen. Trade the best, fuck the rest.",
+    /** Paket P: a calm line when a limit is reached – "dein eigenes" only when the trader set limits himself; never an order. */
+    ownLimit: "Du hast dein eigenes Limit erreicht – so hast du es dir gesetzt. Nichts wird blockiert; was du jetzt tust, entscheidest du.",
+    defaultLimit: "Die Standardgrenze ist erreicht. Du kannst sie unter Einstellungen an dich anpassen – nichts wird blockiert.",
+    pauseOptIn: "Eine Pause nach Verlusten ist aus. Du kannst sie unter Einstellungen › Pause einschalten.",
   },
   calc: {
     title: "Rechner",

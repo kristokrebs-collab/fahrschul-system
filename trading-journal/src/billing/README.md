@@ -53,7 +53,7 @@ ships: `tvConnections` B3, `alertChannels` / `phoneCallsPerMonth` C2, `simulatio
 | `UpgradeTeaser` | `<Gate fallback>` | lock pops in on first view (`spring.pop`), feature name gets the `TactileHighlight` marker; "Freischalten" → `UpgradeSheet` |
 | `UpgradeSheet` | via `BillingHost` | `Sheet`; feature wipes in with `TactileHighlight` as the sheet lands, plan + Monat/Jahr `Segmented`, price on `RollingDigits`, gained features tick in (drawn checks) |
 | `CancelSheet` | via `BillingHost` | reason → offer (pause / cheaper plan, only when it fits, always skippable) → confirm "Jetzt kündigen" → done (drawn ✓, "Kündigung zurücknehmen"); steps slide on `spring.enter`; portal cancel flow as alternative |
-| `LimitMeter` | wherever a limit is used (`<LimitMeter limitKey="savedViews" used={n} />`) | rolling count, bar fills on first view (`useFirstInView`), warn + "Mehr mit Pro" at the limit |
+| `LimitMeter` | wherever a limit is used (`<LimitMeter limitKey="savedViews" used={n} />`) | rolling count, bar fills on first view (`useFirstInView`), warn + "Dieses Limit gehört zu Pro" at the limit (Paket P: a fact, no push) |
 
 Rules kept: transform / opacity / filter / clip-path only; timings from `tokens.ts`; reduced motion → static end states;
 in-view effects through `useFirstInView` (guarded, intro-gated); decorative layers `aria-hidden`; no `aria-live` (toasts go

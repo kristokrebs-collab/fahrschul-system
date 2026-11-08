@@ -132,11 +132,29 @@ export function markWizardExisting(): void {
   if (readWizard()?.status === "pending") write({ status: "skipped" });
 }
 
+/**
+ * Real progress (Paket P, docs/PSYCHOLOGIE.md): how many of the four steps the person has been through – counted from where the
+ * stored step stands, never padded ("3 von 4" means three steps are behind them). A finished wizard is all four; a declined or not
+ * yet started one is none. Pure.
+ */
+export function wizardProgress(s: StoredWizard | null): { done: number; total: number } {
+  if (!s) return { done: 0, total: WIZARD_COUNT };
+  if (s.status === "done") return { done: WIZARD_COUNT, total: WIZARD_COUNT };
+  if (s.status === "active") return { done: Math.max(0, Math.min(WIZARD_COUNT - 1, s.step)), total: WIZARD_COUNT };
+  return { done: 0, total: WIZARD_COUNT };
+}
+
 /** The line of the settings card: where the wizard stands. */
 export function wizardStatusText(s: StoredWizard | null): string {
   if (!s) return "Noch nicht gestartet.";
-  if (s.status === "done") return "Abgeschlossen.";
+  if (s.status === "done") return `Alle ${WIZARD_COUNT} Schritte erledigt.`;
   if (s.status === "skipped") return "Übersprungen – du kannst sie jederzeit öffnen.";
-  if (s.status === "active") return `Begonnen – Schritt ${s.step + 1} von ${WIZARD_COUNT}.`;
+  if (s.status === "active") {
+    const { done } = wizardProgress(s);
+    return `Begonnen – ${done} von ${WIZARD_COUNT} Schritten durchgegangen, als Nächstes: ${WIZARD_STEP_LABELS[s.step] ?? ""}.`;
+  }
   return "Bereit – startet nach der Registrierung.";
 }
+
+/** Short names of the four steps (the rail of the sheet and the status line of the settings card). */
+export const WIZARD_STEP_LABELS = ["Konto", "Daten", "Verbindung", "Start"] as const;

@@ -96,6 +96,8 @@ export function growthSeed(now: number, opts: { reached?: boolean; pause?: boole
   const created = new Date(now - 45 * DAY).toISOString();
   const settings = {
     ...(fixture["tj2-settings"] as Record<string, unknown>),
+    // the pause is opt-in (Paket P: `cooldownMin` 0 by default) – the pause test switches it on
+    ...(opts.pause ? { risk: { cooldownMin: 30 } } : {}),
     growth: {
       goals: [
         { id: "gl_rev", title: "Jeden Trade reviewen", kind: "process", metric: "journalRate", target: 0.6, comparator: "atLeast", period: "week", source: { kind: "coach", ref: "journal" }, why: "Ohne Review kein Lernen.", createdAt: created, status: "active", hold: opts.reached ? 2 : 12 },

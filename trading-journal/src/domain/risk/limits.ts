@@ -136,9 +136,13 @@ const money = (x: number, cur: string): string => `${n0(x)} ${cur}`;
 const pctText = (x: number): string => `${(Math.round(x * 1000) / 10).toString().replace(".", ",")} %`;
 const xText = (x: number): string => `${(Math.round(x * 10) / 10).toString().replace(".", ",")}×`;
 
-/** Pause after a breached day (until midnight) or `cooldownLosses` losses in a row (`cooldownMin` after the last). */
+/**
+ * Pause after a breached day (until midnight) or `cooldownLosses` losses in a row (`cooldownMin` after the last). Opt-in (Paket P):
+ * with `cooldownMin` 0 – the default – there is no pause at all; the limits themselves still show their state.
+ */
 export function cooldownOf(input: { closed: readonly EnrichedTrade[]; now: number; limits: RiskLimits; marks?: Readonly<Record<string, number>>; dayBreach: boolean }): Cooldown | null {
   const { now, limits, marks } = input;
+  if (!(limits.cooldownMin > 0)) return null;
   const seq = input.closed
     .filter((t) => t.result !== "open")
     .map((t) => ({ t, at: closeAt(t, marks) }))

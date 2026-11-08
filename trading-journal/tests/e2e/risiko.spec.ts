@@ -16,7 +16,7 @@
  * `/dev/risiko.html` under `npm run dev`). `P05_SHOTS=<dir>` writes review screenshots.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, middayToday, openRoute, pinClock, seed } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, fixture, middayToday, openRoute, pinClock, seed } from "./helpers";
 import { boxFixture } from "./mocks/boxFixture";
 
 const RISIKO_URL = process.env.PW_RISIKO_URL ?? "/#risiko";
@@ -60,6 +60,9 @@ const base = (p: Record<string, unknown>): Record<string, unknown> => ({
 });
 
 /** The seeded journal relative to `now` (live = the box market's live BTC price). */
+/** the pause is opt-in (Paket P, `cooldownMin` 0 by default): the specs about the pause switch it on in the seeded settings */
+const PAUSE_ON = { ...(fixture["tj2-settings"] as Record<string, unknown>), risk: { cooldownMin: 30 } };
+
 export function riskTrades(now: number, live: number, opts: { pause?: boolean } = {}): Record<string, unknown>[] {
   const rand = rng(20261014);
   const out: Record<string, unknown>[] = [];
@@ -179,7 +182,7 @@ test.describe("Risiko", () => {
     const clock = await pinClock(page, middayToday());
     const now = clock.now();
     const live = boxFixture(now).live;
-    await seed(page, { boxes: true, clock: clock.now, extra: { "tj2-trades": riskTrades(now, live) } });
+    await seed(page, { boxes: true, clock: clock.now, extra: { "tj2-trades": riskTrades(now, live), "tj2-settings": PAUSE_ON } });
     const daily: string[] = [];
     await routeDaily(page, daily, clock.now);
     await openRisiko(page);
@@ -279,7 +282,7 @@ test.describe("Risiko", () => {
     const clock = await pinClock(page, middayToday());
     const now = clock.now();
     const live = boxFixture(now).live;
-    await seed(page, { boxes: true, clock: clock.now, extra: { "tj2-trades": riskTrades(now, live) } });
+    await seed(page, { boxes: true, clock: clock.now, extra: { "tj2-trades": riskTrades(now, live), "tj2-settings": PAUSE_ON } });
     await routeDaily(page, [], clock.now);
     await openRisiko(page);
 

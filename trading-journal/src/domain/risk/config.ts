@@ -44,7 +44,11 @@ export interface RiskSettings {
   maxOpenRiskPct: number;
   /** Share of a limit from which it turns "warn" (0.5–0.95). */
   warnAt: number;
-  /** Pause after `cooldownLosses` losses in a row (minutes); 0 = off. */
+  /**
+   * The pause (cooldown): minutes after `cooldownLosses` losses in a row – and the switch of the whole pause, including the one
+   * until midnight after a breached day. 0 = OFF, and OFF is the default: the journal only suggests a pause when the trader asked
+   * for one (Paket P, docs/PSYCHOLOGIE.md – protective friction is a choice, not a nanny).
+   */
   cooldownMin: number;
   /** Losses in a row that start the pause (0 = off). */
   cooldownLosses: number;
@@ -66,7 +70,7 @@ export const DEFAULT_RISK: Readonly<RiskSettings> = Object.freeze({
   maxDrawdownPct: 0.15,
   maxOpenRiskPct: 0.03,
   warnAt: 0.75,
-  cooldownMin: 30,
+  cooldownMin: 0,
   cooldownLosses: 2,
   feePct: 0.0005,
   slippagePct: 0.0005,
@@ -74,6 +78,19 @@ export const DEFAULT_RISK: Readonly<RiskSettings> = Object.freeze({
   guard: true,
   tiers: DEFAULT_TIERS as MaintTier[],
 });
+
+/**
+ * Did the trader set a limit himself? `settings.discipline` and the limit keys of `settings.risk` only exist after a save that
+ * changed them (the settings page writes them only when their part of the draft changed) – the defaults alone leave them out.
+ * The risk page words its hint accordingly ("dein eigenes Limit" vs. "die Standardgrenze"); nothing is ever blocked either way.
+ */
+export function limitsSetByUser(settings: object): boolean {
+  const s = settings as { risk?: unknown; discipline?: unknown };
+  const d = isObj(s.discipline) ? s.discipline : {};
+  const r = isObj(s.risk) ? s.risk : {};
+  const set = (o: Record<string, unknown>, keys: readonly string[]): boolean => keys.some((k) => typeof o[k] === "number" || isObj(o[k]));
+  return set(d, ["maxLossTradePct", "maxLossDayPct", "maxTrades"]) || set(r, ["maxLossWeekPct", "maxDrawdownPct", "maxOpenRiskPct"]);
+}
 
 /** Everything a risk module reads: `settings.risk` + the discipline limits + the edition's leverage rule. */
 export interface RiskLimits extends RiskSettings, DisciplineLimits {

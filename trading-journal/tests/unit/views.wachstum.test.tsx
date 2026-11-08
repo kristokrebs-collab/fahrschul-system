@@ -61,6 +61,8 @@ function seed(now: number, opts: { reached?: boolean; pause?: boolean } = {}): S
   const created = new Date(now - 40 * DAY).toISOString();
   const settings = {
     ...useJournal.getState().settings,
+    // the pause is opt-in (Paket P) – the test about the pause switches it on
+    ...(opts.pause ? { risk: { cooldownMin: 30 } } : {}),
     growth: {
       goals: [
         { id: "g_rev", title: "Jeden Trade reviewen", kind: "process", metric: "journalRate", target: 0.6, comparator: "atLeast", period: "week", source: { kind: "coach" }, createdAt: created, status: "active", hold: opts.reached ? 2 : 12 },

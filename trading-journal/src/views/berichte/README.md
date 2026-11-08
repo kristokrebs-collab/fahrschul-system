@@ -87,3 +87,9 @@ Letzter Abschnitt der Seite (lazy, eigener Chunk, `data-testid="ledger-card"`, C
 ## Etappe 1c (kürzere Seite)
 - Das Transaktionsbuch (`ledger-card`) steht eingeklappt in einer Zeile (`Fold`, `berichte-ledger`); die „Inhalt“-Leiste und der Funktionsfinder öffnen es beim Ansprung. Höhe bei 390 px: 14 156 → 6 425 px.
 
+## Paket P (Wochenabschluss, `docs/PSYCHOLOGIE.md`)
+- `WeekCloseCard.tsx`: für eine **abgeschlossene Woche mit Trades** (Fokus „Alles“) – „Verhalten dieser Woche“ (der Disziplin-Befund des Wochenreviews, kein Ergebnis), **eine eigene Lektion für morgen**,
+  „Rückblick abschließen“ / „Wieder öffnen“. Gespeichert in `settings.coach.reviews` (`{ closed, at, lesson }` je Wochenschlüssel, synchron, nie gelöscht: Wieder-Öffnen setzt `closed: false`), danach
+  die eine ruhige Bestätigung `processDone("weekReview")`. Kein Geld, kein Urteil, kein Angebot im Abschluss.
+- Die **Erinnerung** (`reviewReminder.ts`, `ReviewReminderHost.tsx`, Schalter in derselben Karte): Standard aus, nur in der App, höchstens einmal pro Woche, Ruhezeiten, sachlicher Text. Pro Gerät.
+

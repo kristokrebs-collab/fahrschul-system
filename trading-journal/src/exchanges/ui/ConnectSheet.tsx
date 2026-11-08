@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { cn } from "@/lib/cn";
-import { celebrateFrom } from "@/motion/Celebrate";
+import { processDone } from "@/motion/processFeedback";
 import { ThinkingOrb } from "@/motion/ThinkingOrb";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { Sheet } from "@/motion/Sheet";
@@ -187,7 +187,8 @@ export function ConnectSheet() {
     if (out.ok) {
       setApiKey("");
       setResult(out.result);
-      requestAnimationFrame(() => okRef.current && celebrateFrom(okRef.current, { kind: "streak", tone: "win" }));
+      // a verified (read-only) connection is a process step: the quiet confirmation, not a burst of dots (Paket P)
+      processDone("connection");
     } else {
       setSecret(creds.secret);
       setError(out.error);

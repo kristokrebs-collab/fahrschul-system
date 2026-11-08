@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useMemo, useState } from "react";
 import type { StoreMode } from "@/domain/types";
 import { dateTime, date as fmtDate } from "@/lib/format";
+import { processDone } from "@/motion/processFeedback";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { HoldConfirm, useConfirmFocus } from "@/motion/HoldConfirm";
@@ -70,6 +71,12 @@ export interface DataCardProps {
  * to the browser; the mode badge breathes while synchronised; `Wiederherstellen` is a `HoldConfirm` (a click still
  * asks `Alles ersetzen?`, holding it restores at once).
  */
+/** A backup file really went to the browser: the one quiet process confirmation (Paket P). Passes the result on for the ✓ of the button. */
+const confirmBackup = (started: boolean): boolean => {
+  if (started) processDone("backup");
+  return started;
+};
+
 export function DataCard({ onImport, className }: DataCardProps) {
   const trades = useJournal((s) => s.trades);
   const settings = useJournal((s) => s.settings);
@@ -126,12 +133,12 @@ export function DataCard({ onImport, className }: DataCardProps) {
             <ActionButton icon={<GlyphDownload />} onRun={() => exportCsv()}>
               {DATA_STRINGS.csv}
             </ActionButton>
-            <ActionButton icon={<GlyphDownload />} onRun={() => exportJson()}>
+            <ActionButton icon={<GlyphDownload />} onRun={() => exportJson().then(confirmBackup)}>
               {DATA_STRINGS.json}
             </ActionButton>
             {anyShots && (
               <>
-                <ActionButton icon={<GlyphDownload />} onRun={() => import("@/journal/screenshots/backupZip").then((m) => m.exportBackupZip())} data-testid="data-backup-zip">
+                <ActionButton icon={<GlyphDownload />} onRun={() => import("@/journal/screenshots/backupZip").then((m) => m.exportBackupZip()).then(confirmBackup)} data-testid="data-backup-zip">
                   {DATA_STRINGS.jsonShots}
                 </ActionButton>
                 <ActionButton icon={<GlyphDownload />} onRun={() => import("@/journal/screenshots/hashList").then((m) => m.exportShotHashes())} data-testid="data-shot-hashes">

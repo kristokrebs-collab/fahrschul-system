@@ -7,6 +7,9 @@
  *   coach.plan           the accepted improvement plan: `{ goals: GoalDraft[], acceptedAt }` (pinned on the coach page,
  *                        evaluated in the reports' "Zielerreichung"; also handed to P08 `addGoalFromDraft`).
  *   coach.ai             `{ notes: boolean }` – opt-in to send note excerpts to the optional LLM rephrasing (default off).
+ *   coach.reviews        Paket P: the weekly reviews the trader closed himself, `{ "2026-W45": { closed, at, lesson } }` – closed means
+ *                        "I looked at this week" (never a score); `lesson` is his own sentence for tomorrow (≤ 200 characters). Re-opening
+ *                        sets `closed: false` (a key is never deleted, so the merge of two devices stays lossless); newest 60 kept.
  *
  * Writers return a NEW settings object with every other key untouched (unknown keys inside `coach` too).
  */
@@ -15,6 +18,17 @@ import type { GoalDraft } from "../growth/goals";
 
 export const SEEN_MAX = 400;
 export const PLAN_MAX = 5;
+export const REVIEWS_MAX = 60;
+export const LESSON_MAX = 200;
+
+/** The weekly review of one period as the trader left it (`closed: false` = re-opened). */
+export interface WeekClose {
+  closed: boolean;
+  /** ISO – when it was closed */
+  at: string;
+  /** his own sentence for tomorrow (may be empty) */
+  lesson: string;
+}
 
 export interface CoachPlan {
   goals: GoalDraft[];
@@ -80,4 +94,34 @@ export function withCoachPlan(settings: Settings, goals: readonly GoalDraft[] | 
 /** Opt-in for note excerpts in the LLM rephrasing. */
 export function withAiNotes(settings: Settings, on: boolean): Settings {
   return withCoach(settings, (c) => ({ ...c, ai: { ...obj(c.ai), notes: on } }));
+}
+
+const WEEK_KEY = /^\d{4}-W\d{2}$/;
+
+/** The closed weekly reviews of `settings` (sanitised: week keys only, text clipped). */
+export function weekClosesOf(settings: object): Record<string, WeekClose> {
+  const raw = obj(obj((settings as { coach?: unknown }).coach).reviews);
+  const out: Record<string, WeekClose> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (!WEEK_KEY.test(k)) continue;
+    const o = obj(v);
+    out[k] = { closed: o.closed === true, at: typeof o.at === "string" ? o.at.slice(0, 40) : "", lesson: typeof o.lesson === "string" ? o.lesson.slice(0, LESSON_MAX) : "" };
+  }
+  return out;
+}
+
+/** Did the trader close the review of this week? */
+export const weekClosed = (settings: object, key: string): boolean => weekClosesOf(settings)[key]?.closed === true;
+
+/** Closes (or re-opens) the weekly review of `key`; the same object for an invalid key. Never deletes a key. */
+export function withWeekClosed(settings: Settings, key: string, patch: { closed: boolean; lesson?: string }, now: number): Settings {
+  if (!WEEK_KEY.test(key)) return settings;
+  const all = weekClosesOf(settings);
+  const prev = all[key];
+  const next: WeekClose = { closed: patch.closed, at: patch.closed ? new Date(now).toISOString() : (prev?.at ?? ""), lesson: (patch.lesson ?? prev?.lesson ?? "").trim().slice(0, LESSON_MAX) };
+  const merged = { ...all, [key]: next };
+  const keep = Object.entries(merged)
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .slice(0, REVIEWS_MAX);
+  return withCoach(settings, (c) => ({ ...c, reviews: Object.fromEntries(keep) }));
 }

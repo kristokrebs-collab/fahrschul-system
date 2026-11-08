@@ -6,18 +6,16 @@
  *
  * Motion: the rail fills on `spring.smooth` and the reached dots pop (`spring.pop`); the price marker glides inside the
  * gauge (transform only, the price itself is a MotionValue); the pill turns warn → live at a confirmed breakout and runs
- * its own countdown ring (`RingCycle`, no render per second). A breakout ABOVE the range high of the loaded history
- * celebrates once (`celebrateFrom` kind `record`). Reduced motion: static.
+ * its own countdown ring (`RingCycle`, no render per second). A breakout is shown, never celebrated (Paket P). Reduced motion: static.
  */
 import { motion, useSpring, useTransform } from "motion/react";
-import { memo, useEffect, useRef, useState, type CSSProperties } from "react";
+import { memo, useRef, useState, type CSSProperties } from "react";
 import { BOX_TF_MS, PHASE_LABEL, type BoxPhase, type BoxTf } from "@/domain/boxes";
 import { cn } from "@/lib/cn";
-import { getBoxBars, type BoxesView, type BoxTfView } from "@/market/boxes/store";
+import { type BoxesView, type BoxTfView } from "@/market/boxes/store";
 import { hhmmss } from "@/market/format";
 import { priceMv } from "@/market/motionValues";
 import { useNowMv } from "@/motion/clock";
-import { celebrateFrom } from "@/motion/Celebrate";
 import { StatusPill } from "@/motion/StatusPill";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -188,22 +186,7 @@ export function BoxStateCard({ view }: { view: BoxesView }) {
   const pill = wait ?? pillOf(v);
   const closesAt = v.closesAt;
   const ref = useRef<HTMLDivElement>(null);
-  // a confirmed upward breakout to a new high of the loaded history celebrates once per box
-  const seen = useRef<Map<string, string>>(new Map());
-  useEffect(() => {
-    for (const t of ["4h", "1d", "1w"] as const) {
-      const x = view.tfs[t];
-      const st = x.analysis?.box;
-      if (!st || !x.boxId) continue;
-      const prev = seen.current.get(t);
-      const now = `${x.boxId}:${st.phase}:${st.dir}`;
-      seen.current.set(t, now);
-      if (prev === undefined || prev === now || st.phase !== "breakout" || st.dir <= 0) continue;
-      const bars = getBoxBars(t);
-      const hi = bars.reduce((m, b) => Math.max(m, b.h), -Infinity);
-      if (bars.length && st.price >= hi) celebrateFrom(ref.current, { kind: "record" });
-    }
-  }, [view.tfs]);
+  // Paket P: no burst for a breakout to a new high – a market move is not an achievement of the trader (docs/PSYCHOLOGIE.md)
   return (
     <Card
       title={S.title}

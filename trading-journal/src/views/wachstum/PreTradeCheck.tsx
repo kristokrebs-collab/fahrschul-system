@@ -15,6 +15,7 @@ import { cn } from "@/lib/cn";
 import { useNowMv } from "@/motion/clock";
 import { ConfidenceMeter } from "@/motion/fx";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
+import { processDone } from "@/motion/processFeedback";
 import { StatusPill } from "@/motion/StatusPill";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -54,6 +55,13 @@ export function PreTradeCheck({ checkin, mood, events, todayKey, className }: Pr
   const checklist = useMemo(() => preTradeChecklist(rules), [rules]);
   const ticked = ticksFor(pretrade, todayKey);
   const own = (rules ?? []).some((r) => r.text?.trim());
+  // the last open point ticked = a complete checklist: the one quiet process confirmation (Paket P); un-ticking and re-ticking asks again
+  const tick = (id: string) => {
+    const complete = checklist.length > 0 && checklist.every((x) => (x.id === id ? ticked[id] !== true : ticked[x.id] === true));
+    const wasComplete = checklist.length > 0 && checklist.every((x) => ticked[x.id] === true);
+    toggleTick(todayKey, id);
+    if (complete && !wasComplete) processDone("checklist");
+  };
   const r = useMemo(
     () => readiness({ checkin, mood, checklist, ticked, limits: report.rows.length ? report : null, overrideUntil: override?.until ?? null, events, now: base.now }),
     [checkin, mood, checklist, ticked, report, override, events, base.now],
@@ -104,7 +112,7 @@ export function PreTradeCheck({ checkin, mood, events, todayKey, className }: Pr
           </div>
           <div className="grid gap-1" data-testid="growth-ready-checklist">
             {checklist.map((p) => (
-              <CheckboxRow key={p.id} checked={ticked[p.id] === true} onToggle={() => toggleTick(todayKey, p.id)} strike>
+              <CheckboxRow key={p.id} checked={ticked[p.id] === true} onToggle={() => tick(p.id)} strike>
                 {p.text}
               </CheckboxRow>
             ))}

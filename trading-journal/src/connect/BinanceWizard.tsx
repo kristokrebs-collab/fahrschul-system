@@ -6,7 +6,7 @@ import { connectExchange } from "@/exchanges/api";
 import { disconnectAccount, loadExchangeStatus, runDryRun, startFirstImport, syncNow, useExchange } from "@/exchanges/store";
 import type { ExchangeConnection, JournalAccount } from "@/exchanges/types";
 import { cn } from "@/lib/cn";
-import { celebrateFrom } from "@/motion/Celebrate";
+import { processDone } from "@/motion/processFeedback";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { StaggerItem } from "@/motion/Stagger";
 import { spring, tween } from "@/motion/tokens";
@@ -243,7 +243,8 @@ function Setup({ id, market, onClose }: { id: ServiceId; market: Market; onClose
       setResult({ connection: out.connection, available: out.account.available });
       dispatch({ type: "ok" });
       void loadExchangeStatus();
-      requestAnimationFrame(() => okRef.current && celebrateFrom(okRef.current, { kind: "streak", tone: "win" }));
+      // a verified (read-only) connection is a process step: the quiet confirmation, not a burst of dots (Paket P)
+      processDone("connection");
     } catch (e) {
       if (e instanceof ApiError && e.code === "rights_confirm") {
         const found = issuesOf(e.details);

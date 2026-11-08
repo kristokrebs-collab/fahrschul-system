@@ -11,16 +11,20 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { cloudEnabled } from "@/cloud";
 import { openAuthSheet, useCloudSession } from "@/cloud/session";
+import { DEFAULT_RULES } from "@/domain/defaults";
 import { cn } from "@/lib/cn";
+import { newRuleId } from "@/lib/ids";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
 import { Sheet } from "@/motion/Sheet";
 import { spring, tween } from "@/motion/tokens";
+import { processDone } from "@/motion/processFeedback";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
+import { Input } from "@/primitives/Input";
 import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { useUi, type Page } from "@/store/uiStore";
-import { chooseWizardData, finishWizard, goToWizardStep, pauseWizard, skipWizard, useWizard, WIZARD_COUNT, WIZARD_STEPS, type WizardData } from "./wizardStore";
+import { chooseWizardData, finishWizard, goToWizardStep, pauseWizard, skipWizard, useWizard, WIZARD_COUNT, WIZARD_STEP_LABELS, WIZARD_STEPS, type WizardData } from "./wizardStore";
 
 export const WIZARD = {
   title: "Einrichtung",
@@ -46,6 +50,15 @@ export const WIZARD = {
     own: { title: "Eigene Daten", text: "Du trägst Trades selbst ein oder importierst sie – per CSV oder, später, von deiner Börse." },
     group: "Startart",
     missing: "Wähle eine Startart – oder tippe auf „Überspringen“.",
+    rules: {
+      count: (n: number) => `Deine Regeln: ${n}`,
+      own: (n: number) => (n === 0 ? "Noch keine eigene dabei." : n === 1 ? "Eine davon ist von dir." : `${n} davon sind von dir.`),
+      lead: "Optional: Schreib eine Regel auf, an die du dich halten willst. Sie steht ab dann in jeder Checkliste und lässt sich unter Einstellungen jederzeit ändern.",
+      label: "Eigene Regel",
+      placeholder: "z. B. Kein Trade ohne Stop",
+      add: "Regel hinzufügen",
+      failed: "Nicht gespeichert – bitte noch einmal versuchen.",
+    },
   },
   verbindung: {
     title: "Verbindung optional – zunächst Demo ausprobieren",
@@ -128,6 +141,56 @@ function Choice({ value, current, title, text, onPick, testId }: { value: Exclud
   );
 }
 
+/** The first piece of the person's own work (Paket P): one rule of their own, counted honestly ("Deine Regeln: n"). */
+function OwnRules() {
+  const rules = useJournal((s) => s.settings.rules);
+  const saveSettings = useJournal((s) => s.saveSettings);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const list = rules ?? [];
+  const builtIn = new Set(DEFAULT_RULES.map((r) => r.id));
+  const own = list.filter((r) => !builtIn.has(r.id) && r.text.trim()).length;
+  const R = WIZARD.daten.rules;
+  const add = async () => {
+    const t = text.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    setFailed(false);
+    try {
+      const cur = useJournal.getState().settings;
+      await saveSettings({ ...cur, rules: [...cur.rules, { id: newRuleId(), text: t.slice(0, 160) }] });
+      setText("");
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="grid gap-2 border-t border-line pt-4" data-testid="wizard-rules">
+      <p className="flex flex-wrap items-baseline gap-x-2 text-[13px] text-fg">
+        <span className="font-medium" data-testid="wizard-rules-count">
+          {R.count(list.filter((r) => r.text.trim()).length)}
+        </span>
+        <span className="text-[12px] text-mute">{R.own(own)}</span>
+      </p>
+      <p className="text-[12px] leading-relaxed text-mute">{R.lead}</p>
+      <div className="flex items-center gap-2">
+        <Input aria-label={R.label} placeholder={R.placeholder} value={text} maxLength={160} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void add()} data-testid="wizard-rule-input" className="flex-1" />
+        <Button size="sm" onClick={() => void add()} disabled={busy || !text.trim()} data-testid="wizard-rule-add">
+          {R.add}
+        </Button>
+      </div>
+      {failed && (
+        <p role="alert" className="text-[12px] text-loss">
+          {R.failed}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function StepDaten({ data, invalid }: { data: WizardData; invalid: boolean }) {
   return (
     <div className="grid gap-4">
@@ -141,6 +204,7 @@ function StepDaten({ data, invalid }: { data: WizardData; invalid: boolean }) {
           {WIZARD.daten.missing}
         </p>
       )}
+      <OwnRules />
     </div>
   );
 }
@@ -252,7 +316,15 @@ export function SetupWizard() {
               </Button>
             )}
             {last ? (
-              <Button variant="primary" onClick={finishWizard} data-testid="wizard-finish">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  finishWizard();
+                  // the wizard is the one process step with a real end: a quiet confirmation, no fanfare (Paket P)
+                  processDone("wizard");
+                }}
+                data-testid="wizard-finish"
+              >
                 {WIZARD.finish}
               </Button>
             ) : (
@@ -269,7 +341,7 @@ export function SetupWizard() {
           {WIZARD_STEPS.map((s, i) => (
             <li key={s} aria-current={i === step ? "step" : undefined} data-state={i < step ? "done" : i === step ? "now" : "next"} className="grid gap-1">
               <span aria-hidden="true" className={cn("h-1 rounded-full", i <= step ? "bg-fg" : "bg-white/[0.08]")} />
-              <span className={cn("text-[11px]", i === step ? "text-fg" : "text-faint")}>{["Konto", "Daten", "Verbindung", "Start"][i]}</span>
+              <span className={cn("text-[11px]", i === step ? "text-fg" : "text-faint")}>{WIZARD_STEP_LABELS[i]}</span>
             </li>
           ))}
         </ol>

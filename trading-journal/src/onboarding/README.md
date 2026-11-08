@@ -91,3 +91,7 @@ oben (die bleibt unter Einstellungen › Einführung & Hilfe).
   ist der Leerzustand der Verbindung (auch in der Börsen-Karte unter Konto); die Demo ist die abgegrenzte Beispiel-Sitzung, nicht das Journal.
 - Dateien: `wizardStore.ts` (Zustand + reine Entscheidung, in der Karte und im Anmelde-Blatt geladen), `WizardHost.tsx` (Auslöser), `SetupWizard.tsx` (das Blatt, eigener Chunk). Tests:
   `tests/unit/onboarding.wizard.test.tsx`, `tests/e2e/auth-b.spec.ts`.
+- **Paket P (Verhaltenspsychologie, `docs/PSYCHOLOGIE.md`).** Echter Fortschritt statt Druck: `wizardProgress` zählt die Schritte hinter dir („2 von 4 Schritten durchgegangen“, nie aufgefüllt),
+  `WizardResumeNote.tsx` ist eine ruhige Zeile auf der Konto-Seite, **nur** solange der Assistent begonnen und pausiert ist („Weiter, wo du aufgehört hast“; Übersicht und Cockpit bleiben ohne),
+  der Schritt „Daten“ lässt eine eigene Regel aufschreiben („Deine Regeln: n“), „Fertig“ gibt die eine ruhige Prozess-Bestätigung (`@/motion/processFeedback`). Tests: `tests/unit/psych.reminder.test.ts`,
+  `tests/e2e/psychologie.spec.ts`.

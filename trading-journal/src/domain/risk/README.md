@@ -20,7 +20,9 @@ liquidation.ts  liquidationPrice: one-way linear contract, W + s·Q·(P − E) =
 limits.ts       limitStatus(input) → LimitReport: rows day / week / drawdown / openRisk / trade / trades / leverage with
                 ok · warn (from warnAt) · breach; scope "all" checks every account against its own capital and reports
                 the worst; P&L counts on the CLOSE day (exitDate → the guard's mark → entry time); cooldownOf: a
-                breached day pauses until midnight, `cooldownLosses` losses in a row pause `cooldownMin` minutes
+                breached day pauses until midnight, `cooldownLosses` losses in a row pause `cooldownMin` minutes –
+                **opt-in since Paket P**: `cooldownMin` 0 (the default) = no pause at all (docs/PSYCHOLOGIE.md §4);
+                `limitsSetByUser(settings)` tells whether the trader set a limit himself (the risk page words its hint by it)
 exposure.ts     exposureReport: open journal trades + venue positions (P11 contract) as legs (a trade that IS a venue
                 position counts once), gross / net / hedged per asset and venue, HHI, cross-venue assets, uPnL;
                 a trade with fills counts only what is still held after partial exits (`openPositionOf`: remaining
