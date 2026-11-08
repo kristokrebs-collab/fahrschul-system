@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
-import { fanLayout, RADIAL_ITEM, stepIndex, type RadialFan } from "@/motion/radialLayout";
+import { captionSide, fanLayout, RADIAL_ITEM, stepIndex, type RadialFan } from "@/motion/radialLayout";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { TextRoll } from "@/motion/TextRoll";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -12,6 +12,8 @@ export interface RadialTarget {
   id: string;
   /** Word of the target (German): the accessible name, and what the trigger shows while the target is active. */
   label: string;
+  /** What choosing it does, in a few words (German): the caption under the trigger while the target is active („Kurzfassung kopieren“). Defaults to `label`. */
+  detail?: string;
   icon: ReactNode;
   /** Runs when the target is chosen; the fan closes first. The target reports its own result (a toast, a sheet). */
   onSelect: () => void | Promise<void>;
@@ -24,11 +26,46 @@ export interface RadialShareProps {
   targets: readonly RadialTarget[];
   /** Resting label of the trigger (default „Teilen“). */
   label?: string;
-  /** Symbol of the trigger (the callers pass the share glyph of `@/social/ui`). */
+  /** Symbol of the trigger (the callers pass the share glyph of `@/social/ui`); while the fan is open it turns into the cross. */
   icon?: ReactNode;
+  /** The caption under the trigger while the fan is open and no target is active (default „Kanal wählen“). */
+  prompt?: string;
   size?: ButtonSize;
   className?: string;
   testId?: string;
+}
+
+/** A mouse picks a chip by hovering only once the chips have settled (ms): they fly out from under the pointer that clicked the trigger. */
+const HOVER_GRACE_MS = 360;
+
+type OpenFan = RadialFan & { ox: number; oy: number; hubH: number; vw: number; vh: number };
+
+/**
+ * The caption under the trigger while the fan is open (the „Pick a channel“ of the reference): the prompt, or what the active target does.
+ * A glass pill on the side AWAY from the fan, kept inside the screen; decorative (the trigger's `aria-label` carries the same words) and
+ * never takes a pointer.
+ */
+function Caption({ fan, text, reduced }: { fan: OpenFan; text: string; reduced: boolean }) {
+  const side = captionSide(fan, { y: fan.oy }, { h: fan.vh }, fan.hubH);
+  if (!side) return null;
+  // the pill is centred on the trigger and slides sideways only as far as the screen needs (it is at most 260 px wide)
+  const dx = Math.min(fan.vw - 8 - 130, Math.max(8 + 130, fan.ox)) - fan.ox;
+  const top = side === "below" ? fan.hubH / 2 + 10 : -(fan.hubH / 2 + 10);
+  return (
+    <div aria-hidden="true" data-testid="radial-caption" data-side={side} className="pointer-events-none absolute w-0" style={{ left: dx, top }}>
+      <motion.span
+        className={cn(
+          "absolute left-0 w-max max-w-[260px] -translate-x-1/2 whitespace-nowrap rounded-full border border-[rgb(var(--gl-ink)/0.2)] bg-[color-mix(in_srgb,var(--color-ink-850)_86%,transparent)] px-3 py-1 text-[12px] font-medium leading-4 text-fg shadow-[inset_0_1px_0_rgb(var(--gl-hi)/0.14),0_8px_24px_rgb(0_0_0/0.35)] backdrop-blur-md",
+          side === "above" && "bottom-0",
+        )}
+        initial={reduced ? false : { opacity: 0, y: side === "below" ? -6 : 6, scale: 0.92 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={reduced ? { duration: 0 } : { default: spring.pop, opacity: tween.fade, scale: spring.pop }}
+      >
+        <TextRoll text={text} />
+      </motion.span>
+    </div>
+  );
 }
 
 const viewport = (): { w: number; h: number } => {
@@ -46,18 +83,24 @@ const viewport = (): { w: number; h: number } => {
  * - Keyboard: the trigger opens with Enter / Space / ↑ / ↓; focus moves into the fan; ← ↑ / → ↓ step (wrapping), Home / End jump,
  *   Esc closes and returns the focus to the trigger (without closing the dialog under it), Tab closes. A focus ring glides to the
  *   active target; while one is active the trigger says its word.
- * - Motion: targets leave the trigger centre one after another (`spring.pop`, `stagger.cards`), and return on `tween.exit`;
+ * - Motion: targets leave the trigger centre one after another (`spring.pop`, `stagger.cards`, a short turn), and return on `tween.exit`;
  *   transform / opacity only. Reduced motion: they are simply there.
+ * - Runde 12 (the reference „Share Button Animation“, Instagram, Aufnahme des Nutzers – behaviour only, no source): the targets are glass
+ *   chips, the trigger's symbol turns into the cross while the fan is open, and a caption pill on the side AWAY from the fan says „Kanal wählen“
+ *   – or, once a target is active, what it does (`detail`). Nothing of the closing and scrolling rules changed.
  * - The fan is a fixed layer in `<body>` (a dialog's scroll box cannot clip it); it is exempt from the dialog's inert rule
  *   (`data-radial-share`, `INERT_EXEMPT_SELECTOR`). A pointer press anywhere else, a resize or a scroll that moves the trigger closes it.
  */
-export function RadialShare({ targets, label = "Teilen", icon, size = "sm", className, testId = "share-button" }: RadialShareProps) {
+export function RadialShare({ targets, label = "Teilen", icon, prompt = "Kanal wählen", size = "sm", className, testId = "share-button" }: RadialShareProps) {
   const reduced = useReducedFx();
   const uid = useId();
   const trigger = useRef<HTMLButtonElement>(null);
+  /** the focus that moves into the fan by itself (no pick) and the moment it opened (the chips are still flying – no hover yet) */
+  const movedIn = useRef(false);
+  const openedAt = useRef(0);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  const [fan, setFan] = useState<(RadialFan & { ox: number; oy: number }) | null>(null);
+  const [fan, setFan] = useState<OpenFan | null>(null);
   const disabled = targets.map((t) => !!t.disabled);
   const firstEnabled = disabled.findIndex((d) => !d);
 
@@ -72,16 +115,22 @@ export function RadialShare({ targets, label = "Teilen", icon, size = "sm", clas
     if (!el) return;
     const r = el.getBoundingClientRect();
     const o = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    const f = fanLayout({ n: targets.length, origin: o, viewport: viewport(), hub: { w: r.width, h: r.height } });
-    setFan({ ...f, ox: o.x, oy: o.y });
+    const vp = viewport();
+    const f = fanLayout({ n: targets.length, origin: o, viewport: vp, hub: { w: r.width, h: r.height } });
+    setFan({ ...f, ox: o.x, oy: o.y, hubH: r.height, vw: vp.w, vh: vp.h });
     setActive(-1);
+    openedAt.current = performance.now();
     setOpen(true);
   }, [targets.length]);
 
   // focus moves into the fan once it is mounted; the first enabled target is the roving tab stop
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   useLayoutEffect(() => {
-    if (open && firstEnabled >= 0) itemRefs.current[firstEnabled]?.focus({ preventScroll: true });
+    if (!open || firstEnabled < 0) return;
+    // the focus that lands in the fan by itself is no pick: the caption still asks „Kanal wählen“ until a key or the pointer chooses one
+    movedIn.current = true;
+    itemRefs.current[firstEnabled]?.focus({ preventScroll: true });
+    movedIn.current = false;
   }, [open, firstEnabled]);
 
   // anything that moves the trigger closes the fan (its place was measured once). A scroll counts only when the trigger really
@@ -168,7 +217,17 @@ export function RadialShare({ targets, label = "Teilen", icon, size = "sm", clas
           }
         }}
       >
-        {icon}
+        {/* the symbol turns into the cross while the fan is open (one grid cell: the button never changes its width) */}
+        <span className="inline-grid shrink-0 place-items-center [&>*]:[grid-area:1/1]" data-radial-icon={open ? "close" : "share"}>
+          <motion.span className="grid place-items-center" initial={false} animate={{ rotate: open ? 90 : 0, scale: open ? 0.5 : 1, opacity: open ? 0 : 1 }} transition={reduced ? { duration: 0 } : { default: spring.pop, opacity: tween.fade }}>
+            {icon}
+          </motion.span>
+          <motion.span aria-hidden="true" className="grid size-4 place-items-center" initial={false} animate={{ rotate: open ? 0 : -90, scale: open ? 1 : 0.5, opacity: open ? 1 : 0 }} transition={reduced ? { duration: 0 } : { default: spring.pop, opacity: tween.fade }}>
+            <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+              <path d="M4 4l8 8M12 4l-8 8" />
+            </svg>
+          </motion.span>
+        </span>
         <span className="fx-reserve" data-reserve={widest}>
           <TextRoll text={shown} className="[grid-area:1/1] justify-self-start" />
         </span>
@@ -191,6 +250,7 @@ export function RadialShare({ targets, label = "Teilen", icon, size = "sm", clas
                       transition={reduced ? { duration: 0 } : { default: spring.layout, scale: spring.pop, opacity: tween.fade }}
                     />
                   )}
+                  <Caption fan={fan} text={active >= 0 ? (targets[active]?.detail ?? targets[active]?.label ?? prompt) : prompt} reduced={reduced} />
                   {targets.map((t, i) => {
                     const o = fan.offsets[i]!;
                     const tabStop = (active >= 0 ? active : firstEnabled) === i;
@@ -209,17 +269,19 @@ export function RadialShare({ targets, label = "Teilen", icon, size = "sm", clas
                         data-testid={`radial-${t.id}`}
                         data-active={active === i ? "" : undefined}
                         className={cn(
-                          "pointer-events-auto absolute grid place-items-center rounded-full border border-line-2 bg-ink-800 text-fg shadow-[0_10px_30px_rgb(0_0_0/0.45)] transition-colors",
-                          "hover:bg-ink-700 focus-visible:outline-none focus-visible:border-fg/70 [&>svg]:size-5",
+                          // a glass chip (Runde 12): the ink of the theme at 80 % over a soft blur, light from the top – small and short-lived, so the blur costs nothing
+                          "pointer-events-auto absolute grid place-items-center rounded-full border border-[rgb(var(--gl-ink)/0.2)] bg-[color-mix(in_srgb,var(--color-ink-850)_80%,transparent)] text-fg shadow-[inset_0_1px_0_rgb(var(--gl-hi)/0.16),0_10px_30px_rgb(0_0_0/0.45)] backdrop-blur-md transition-colors",
+                          "hover:bg-[color-mix(in_srgb,var(--color-ink-700)_88%,transparent)] focus-visible:outline-none focus-visible:border-fg/70 [&>svg]:size-5",
                           t.disabled && "cursor-not-allowed opacity-45",
                         )}
                         style={{ width: RADIAL_ITEM, height: RADIAL_ITEM, left: -RADIAL_ITEM / 2, top: -RADIAL_ITEM / 2 }}
-                        initial={reduced ? { x: o.x, y: o.y } : { x: 0, y: 0, scale: 0.3, opacity: 0 }}
-                        animate={{ x: o.x, y: o.y, scale: 1, opacity: 1 }}
-                        exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { x: 0, y: 0, scale: 0.3, opacity: 0, transition: tween.exit }}
+                        initial={reduced ? { x: o.x, y: o.y } : { x: 0, y: 0, scale: 0.3, opacity: 0, rotate: -28 }}
+                        animate={{ x: o.x, y: o.y, scale: 1, opacity: 1, rotate: 0 }}
+                        exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { x: 0, y: 0, scale: 0.3, opacity: 0, rotate: -28, transition: tween.exit }}
                         transition={reduced ? { duration: 0 } : { default: { ...spring.pop, delay: i * stagger.cards }, opacity: { ...tween.fade, delay: i * stagger.cards } }}
-                        onPointerEnter={(e) => e.pointerType === "mouse" && !t.disabled && setActive(i)}
-                        onFocus={() => !t.disabled && setActive(i)}
+                        // the chips fly out from under the pointer that clicked the trigger: that is no hover – a mouse picks only once they have settled
+                        onPointerEnter={(e) => e.pointerType === "mouse" && !t.disabled && performance.now() - openedAt.current > HOVER_GRACE_MS && setActive(i)}
+                        onFocus={() => !t.disabled && !movedIn.current && setActive(i)}
                         onClick={() => choose(t)}
                       >
                         {t.icon}

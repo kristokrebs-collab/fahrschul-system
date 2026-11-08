@@ -1,5 +1,5 @@
 /**
- * Funktionsfinder, mit echten Klicks (Selbstprüfung): fünfzehn typische Ziele, gesucht in den Worten des Traders – einmal im
+ * Funktionsfinder, mit echten Klicks (Selbstprüfung): fünfzehn typische Ziele plus die vier Aufgaben „Trade suchen“, „Screenshot finden“, „Alarm konfigurieren“, „Simulation öffnen“ (Runde 12), gesucht in den Worten des Traders – einmal im
  * Suchfeld der Seite „Funktionen“, einmal im Finder der Befehlsnavigation (Menü). Der erste Treffer ist die erwartete
  * Funktion, ein Klick öffnet ihren Ort, und der Zielabschnitt steht danach wirklich im sichtbaren Bereich (oder, bei
  * Sheets, der Dialog ist offen). Ein Abschnitt, der erst nach einem Lauf entsteht, sagt das ehrlich im Fundort-Hinweis (A4: kein
@@ -53,6 +53,11 @@ const GOALS: readonly Goal[] = [
   { name: "Assistent", query: "Assistent", feature: "assistent", dialog: "Assistent" },
   { name: "Trainings-Modus", query: "Trainings-Modus", feature: "ueben", dialog: "Üben" },
   { name: "Backup", query: "Backup", feature: "backup", page: "settings", testid: "settings-data" },
+  // Runde 12: die vier Aufgaben des Auftrags (Abschnitt 5) – gesucht als Tätigkeit, gelandet am Ziel
+  { name: "Trade suchen", query: "Trade suchen", feature: "trade-filter", page: "trades", testid: "trades-search" },
+  { name: "Screenshot finden", query: "Screenshot finden", feature: "bild-originale", page: "settings", note: /Screenshot/ },
+  { name: "Alarm konfigurieren", query: "Alarm konfigurieren", feature: "alarme", page: "markt", testid: "alerts-card" },
+  { name: "Simulation öffnen", query: "Simulation öffnen", feature: "zeitmaschine", page: "labor", testid: "tm-section" },
 ];
 
 const layer = (page: Page, key: string) => page.locator(`[data-page="${key}"][data-page-role="current"]`);

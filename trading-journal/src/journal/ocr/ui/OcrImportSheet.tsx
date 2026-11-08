@@ -510,7 +510,8 @@ export default function OcrImportSheet() {
           <StaggerItem>
             <div role="status" aria-live="polite" className="grid gap-2.5 rounded-xl border border-line bg-ink-950/40 px-3.5 py-3 text-[13px] text-mute" data-testid="ocr-busy">
               <span className="flex items-center gap-3">
-                <ThinkingOrb variant="calc" size={20} className="text-mute" />
+                {/* the voice ring (Runde 12): the recognition moves visibly; the line and the bar below say how far (real fraction) */}
+                <ThinkingOrb variant="ring" mood="active" size={24} className="text-mute" />
                 {progress.text}
               </span>
               <span aria-hidden="true" className="h-[3px] overflow-hidden rounded-full bg-white/[0.06]">

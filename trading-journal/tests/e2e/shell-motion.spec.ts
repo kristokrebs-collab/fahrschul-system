@@ -2,7 +2,7 @@
  * Runde 10 – the shell's richer motion, the way a reader meets it (mobile 390 + desktop 1440):
  *   - the sidebar's rail peeks: the pointer or the keyboard opens the names OVER the page (nothing the page stands on moves), Escape
  *     and leaving close it, the foot button still pins it (that one does move the page – it is the reader's choice);
- *   - the icons draw themselves once per session and never again (nor under reduced motion);
+ *   - the icons draw themselves once per page load and never again (nor under reduced motion; Runde 12: `sidebar-sequenz.spec.ts`);
  *   - the menu behind „Mehr“ is a bottom sheet on the phone: every entry is there in well under a second and a pull on its head closes it;
  *   - the header's price is an odometer, the local-mode badge pulses softly, the burger turns into the cross;
  *   - no long task and no slow input on the way (`measure`).
@@ -119,24 +119,24 @@ test.describe("Seitenleiste und Menü: Bewegung", () => {
     await expect.poll(async () => Math.abs((await h1.boundingBox())!.x - x0), { timeout: 5000 }).toBeLessThan(1);
   });
 
-  test("Die Symbole zeichnen sich einmal pro Sitzung; danach nie wieder; mit „weniger Bewegung“ gar nicht", async ({ page }, info) => {
+  test("Die Symbole zeichnen sich einmal pro Seitenaufruf; danach nie wieder; mit „weniger Bewegung“ gar nicht", async ({ page }, info) => {
     const errors = collectErrors(page);
     await seed(page);
     await page.goto("/#overview");
     await expect(page.getByText("Netto-P&L").first()).toBeVisible();
     const frame = page.locator(mobile(info.project.name) ? "[data-layer=\"Dock\"]" : ".sb");
     if (!mobile(info.project.name)) {
-      // the draw-in marks the sidebar while it runs, then removes the mark and keeps the flag for the session
+      // the sequence marks the sidebar while it runs, then removes the mark (its timing and order are measured in `sidebar-sequenz.spec.ts`)
       await expect(frame).toHaveAttribute("data-draw", /^(run|wait)$/, { timeout: 8000 }).catch(() => undefined);
       await expect(frame).not.toHaveAttribute("data-draw", /.+/, { timeout: 10_000 });
-      expect(await page.evaluate(() => sessionStorage.getItem("tj2-sb-draw"))).toBe("1");
-      await page.reload();
-      await expect(page.getByText("Netto-P&L").first()).toBeVisible();
-      await page.waitForTimeout(1500);
-      await expect(page.locator(".sb")).not.toHaveAttribute("data-draw", /.+/);
       // every stroke rests in its drawn state: no dash left behind
-      const dashed = await page.evaluate(() => Array.from(document.querySelectorAll('.sb-ico :is(path,circle,rect,line,polyline)')).filter((s) => getComputedStyle(s).strokeDasharray !== "none").length);
+      const dashed = await page.evaluate(() => Array.from(document.querySelectorAll(".sb-ico :is(path,circle,rect,line,polyline)")).filter((s) => getComputedStyle(s).strokeDasharray !== "none").length);
       expect(dashed).toBe(0);
+      // a route change does not start it again
+      await side(page).getByRole("link", { name: "Markt", exact: true }).click();
+      await expect(page).toHaveURL(/#markt$/);
+      await page.waitForTimeout(1200);
+      await expect(page.locator(".sb")).not.toHaveAttribute("data-draw", /.+/);
     }
     expect(errors, errors.join("\n")).toEqual([]);
   });

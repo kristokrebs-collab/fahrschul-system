@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { INERT_EXEMPT_SELECTOR } from "@/motion/a11y";
-import { fanLayout, RADIAL_ITEM, stepIndex } from "@/motion/radialLayout";
+import { captionSide, fanLayout, RADIAL_ITEM, stepIndex } from "@/motion/radialLayout";
 import { RadialShare, type RadialTarget } from "@/motion/RadialShare";
 
 const fx = vi.hoisted(() => ({ reduced: true }));
@@ -14,6 +14,31 @@ afterEach(() => {
 });
 
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+
+describe("caption side (pure, Runde 12)", () => {
+  it("goes on the side away from the fan: below the trigger when the fan opens upwards, above it when the fan turned downwards", () => {
+    expect(captionSide({ centerAngle: -90 }, { y: 400 }, { h: 844 }, 32)).toBe("below");
+    expect(captionSide({ centerAngle: 90 }, { y: 400 }, { h: 844 }, 32)).toBe("above");
+    // a fan that turned sideways still has its caption under it when it leans up
+    expect(captionSide({ centerAngle: -30 }, { y: 400 }, { h: 844 }, 32)).toBe("below");
+  });
+
+  it("is left out when that side has no room (a trigger at the screen's edge) – never squeezed between a target and the trigger", () => {
+    expect(captionSide({ centerAngle: -90 }, { y: 830 }, { h: 844 }, 32)).toBeNull();
+    expect(captionSide({ centerAngle: 90 }, { y: 24 }, { h: 844 }, 32)).toBeNull();
+    // just enough room: the pill (40 px with its gap) fits under a trigger 100 px above the bottom
+    expect(captionSide({ centerAngle: -90 }, { y: 700 }, { h: 844 }, 32)).toBe("below");
+  });
+
+  it("agrees with the fan the layout makes: a trigger mid-screen → caption below, at the bottom edge → none", () => {
+    const hub = { w: 96, h: 32 };
+    const view = { w: 390, h: 844 };
+    const mid = fanLayout({ n: 4, origin: { x: 195, y: 500 }, viewport: view, hub });
+    expect(captionSide(mid, { y: 500 }, view, hub.h)).toBe("below");
+    const low = fanLayout({ n: 4, origin: { x: 195, y: 830 }, viewport: view, hub });
+    expect(captionSide(low, { y: 830 }, view, hub.h)).toBeNull();
+  });
+});
 
 describe("fan geometry (pure)", () => {
   const hub = { w: 96, h: 32 };
@@ -95,7 +120,7 @@ describe("fan geometry (pure)", () => {
 function Harness({ onSelect, extra }: { onSelect: (id: string) => void; extra?: Partial<RadialTarget> }) {
   const [closedDialog, setClosedDialog] = useState(false);
   const targets: RadialTarget[] = [
-    { id: "copy", label: "Kopieren", icon: <i>c</i>, onSelect: () => onSelect("copy") },
+    { id: "copy", label: "Kopieren", detail: "Kurzfassung kopieren", icon: <i>c</i>, onSelect: () => onSelect("copy") },
     { id: "image", label: "Bild", icon: <i>b</i>, onSelect: () => onSelect("image"), ...extra },
     { id: "link", label: "Link", icon: <i>l</i>, onSelect: () => onSelect("link") },
   ];
@@ -245,5 +270,58 @@ describe("RadialShare", () => {
       expect(el.style.width).toBe("48px");
       expect(el.style.height).toBe("48px");
     }
+  });
+
+  it("Runde 12: the symbol turns into the cross while it is open; the caption asks „Kanal wählen“ and then says what the active target does", async () => {
+    render(<Harness onSelect={vi.fn()} />);
+    const trigger = screen.getByTestId("share-button");
+    expect(trigger.querySelector("[data-radial-icon]")).toHaveAttribute("data-radial-icon", "share");
+    expect(screen.queryByTestId("radial-caption")).toBeNull();
+    fireEvent.click(trigger);
+    await screen.findByRole("menu");
+    expect(trigger.querySelector("[data-radial-icon]")).toHaveAttribute("data-radial-icon", "close");
+    const caption = await screen.findByTestId("radial-caption");
+    expect(caption).toHaveTextContent("Kanal wählen");
+    // decorative and never in the way of a pointer
+    expect(caption).toHaveAttribute("aria-hidden", "true");
+    expect(caption.className).toContain("pointer-events-none");
+    // the first target is the roving tab stop but only a real pick (arrow / pointer) makes it „active“ – then the caption says what it does
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+    await waitFor(() => expect(screen.getByTestId("radial-caption")).toHaveTextContent("Link"));
+    fireEvent.keyDown(document.activeElement!, { key: "Home" });
+    await waitFor(() => expect(screen.getByTestId("radial-caption")).toHaveTextContent("Kurzfassung kopieren"));
+    // closing takes the caption away with the fan
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("radial-caption")).toBeNull());
+    expect(trigger.querySelector("[data-radial-icon]")).toHaveAttribute("data-radial-icon", "share");
+  });
+
+  it("Runde 12: the targets are glass chips (a blur, the theme's ink at 80 %) of the same 48 px; the trigger keeps its label and its name", async () => {
+    render(<Harness onSelect={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("share-button"));
+    await screen.findByRole("menu");
+    for (const el of screen.getAllByRole("menuitem")) {
+      expect(el.className).toContain("backdrop-blur-md");
+      expect(el.className).toContain("color-mix");
+      expect(el.style.width).toBe("48px");
+    }
+    expect(screen.getByTestId("share-button")).toHaveTextContent("Teilen");
+    // the focus that moved in by itself is no pick: the trigger still says „Teilen“ until a key or the pointer chooses a target
+    expect(screen.getByTestId("share-button")).not.toHaveAttribute("aria-label");
+  });
+
+  it("Runde 12: a mouse that rests where the chips fly out picks nothing at first (the caption keeps asking); once they settled, hovering picks", async () => {
+    render(<Harness onSelect={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("share-button"));
+    await screen.findByRole("menu");
+    const link = screen.getByRole("menuitem", { name: "Link" });
+    // the chips are still flying: the pointer that clicked the trigger crosses them – no hover
+    fireEvent.pointerEnter(link, { pointerType: "mouse" });
+    expect(screen.getByTestId("radial-caption")).toHaveTextContent("Kanal wählen");
+    expect(screen.getByTestId("share-button")).not.toHaveAttribute("aria-label");
+    await new Promise((r) => setTimeout(r, 420));
+    fireEvent.pointerEnter(link, { pointerType: "mouse" });
+    await waitFor(() => expect(screen.getByTestId("radial-caption")).toHaveTextContent("Link"));
+    expect(screen.getByTestId("share-button")).toHaveAttribute("aria-label", "Teilen: Link");
   });
 });

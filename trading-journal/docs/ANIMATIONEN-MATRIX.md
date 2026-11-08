@@ -1,6 +1,6 @@
 # Animationen-Matrix – alle 177 Inventarpunkte
 
-Stand: 2026-10-31, nach Runde 10 (Zweig `claude/dreamy-dirac-uwi1be`, Commit `7b7d81d`). Der Nutzer hat im Master-Prompt verlangt:
+Stand: 2026-10-31, nach Runde 10 (Zweig `claude/dreamy-dirac-uwi1be`, Commit `7b7d81d`); fortgeschrieben am 2026-11-08 für Runde 12, Paket C (Abschnitt „Runde 12 – Paket C“ unten, die Zeilen 27, 35, 55 und 129 und die Zusatzpunkte Z2, Z7 bis Z9). Der Nutzer hat im Master-Prompt verlangt:
 „Jeder der 177 Inventarpunkte muss einzeln geprüft und dokumentiert werden.“ Diese Datei ist die Antwort: eine Zeile je Nummer, geprüft gegen den Code in
 `trading-journal/` (Pfade unten sind relativ dazu), ohne Beschönigung. Wo etwas nicht belegt werden konnte, steht das in der Zeile und am Ende der Datei.
 
@@ -13,24 +13,24 @@ nichts darüber, ob eine Zeile inhaltlich stimmt; das kann nur der Blick in den 
 |---|---|---|
 | vorhanden | 44 | war schon da, Runde 9 und 10 haben es nicht verändert |
 | wiederhergestellt/verbessert | 23 | existierte, ist durch Runde 9 oder 10 besser (siehe Hinweis zum Wort „wiederhergestellt“ unten) |
-| neu eingebaut | 19 | gab es nicht, ist in Runde 9 oder 10 dazugekommen (teils sinngemäß, die Zeile sagt es) |
+| neu eingebaut | 21 | gab es nicht, ist in Runde 9 bis 12 dazugekommen (teils sinngemäß, die Zeile sagt es) |
 | bewusst nicht | 65 | passt nicht zu einem Trading-Journal, würde Lesbarkeit, Leistung oder die Startseite verletzen, oder braucht Dienste, Videos und WebGL |
 | offen | 3 | sinnvoll, noch nicht gebaut |
-| nicht prüfbar | 23 | Quelle R: die Originaldatei lag nie vor und im Code steht kein Nachbau unter diesem Namen |
+| nicht prüfbar | 21 | Quelle R: die Originaldatei lag nie vor und im Code steht kein Nachbau unter diesem Namen |
 | **zusammen** | **177** | |
 
-In der App sind 86 von 177 Punkten (44 schon vorher, 23 verbessert, 19 neu). 65 sind begründet nicht gebaut,
-3 sind offen, 23 lassen sich ohne die Originale nicht beurteilen.
+In der App sind 88 von 177 Punkten (44 schon vorher, 23 verbessert, 21 neu). 65 sind begründet nicht gebaut,
+3 sind offen, 21 lassen sich ohne die Originale nicht beurteilen. (Runde 12 holt zwei Punkte aus „nicht prüfbar“ in „neu eingebaut“: 27 Radial Share und 129 Thinking Orbs – beide gab es schon seit Runde 11, die Zeilen waren veraltet.)
 
 Nach Quelle (V = Code oder Technik-Anleitung im Skill-Bestand, R = nur referenziert, N = nur Konzept/Titel):
 
 | Quelle | Punkte | vorhanden | wiederhergestellt/verbessert | neu eingebaut | bewusst nicht | offen | nicht prüfbar |
 |---|---|---|---|---|---|---|---|
 | V | 123 | 25 | 19 | 17 | 59 | 3 | 0 |
-| R | 46 | 19 | 4 | 0 | 0 | 0 | 23 |
+| R | 46 | 19 | 4 | 2 | 0 | 0 | 21 |
 | N | 8 | 0 | 0 | 2 | 6 | 0 | 0 |
 
-Zu Quelle R: Im Bestand liegt von der Sammlung `pulse-motion` nur `motion-graphics`, `fintech-glass` und `relay-lime`; die übrigen Vorlagen-Dateien (in
+Zu Quelle R (Zahlen mit dem Stand von Runde 12): Im Bestand liegt von der Sammlung `pulse-motion` nur `motion-graphics`, `fintech-glass` und `relay-lime`; die übrigen Vorlagen-Dateien (in
 `INVENTAR.md` aufgeführt) sind nicht mehr da. Wo die App einen Port aus früheren Runden hat (`src/motion/pulse/*`, README dort), steht der Port als
 Beleg und die Zeile heißt „vorhanden“. Ein Abgleich mit der Vorlage selbst war nicht möglich. Wo es weder Vorlage noch Port gibt, heißt die Zeile „nicht prüfbar“.
 
@@ -78,7 +78,7 @@ Belege für Runde 9 und 10 (Commits im Zweig). Die Zuordnung folgt der Reihenfol
 - **`data-rich`:** `PageHost` setzt das Attribut auf jede Seiten-Ebene außer Übersicht und Cockpit (`isRichPage` in `src/motion/rich.ts`, `RichContext` für Portale). Neue reiche Effekte stehen in
   CSS als `[data-rich] …` oder in Komponenten, die nur dort eingebunden sind (`useRich()` / `useRichFx()`; Bausteine, die auch auf der Übersicht stehen, fragen den DOM erst im Effekt,
   `isRich(el)` in `src/chart/rich.ts`). Sheets und Dialoge liegen außerhalb der Seite und bekommen die reichen Feinheiten nicht. Zeilen mit „nur reiche Seiten“ folgen dieser Regel.
-- **Budgets** (`scripts/bundleBudget.mjs`, KiB gzip): JS-Erstladung 800, CSS-Erstladung 52, ein Lazy-Chunk 120, Haupt-Chunk `index` 575. Für Runde 10 galt je Auftrag höchstens +4 KiB Erstlade-JS und
+- **Budgets** (`scripts/bundleBudget.mjs`, KiB gzip): JS-Erstladung 800, CSS-Erstladung 52 (seit Runde 12, Paket C: 52,5; gemessen 52,1), ein Lazy-Chunk 120, Haupt-Chunk `index` 575. Für Runde 10 galt je Auftrag höchstens +4 KiB Erstlade-JS und
   +1,5 KiB CSS; alles Größere ist ein eigener Lazy-Chunk (`PageAura`, `EmptyArt`, `TraderNetCard`). Ich habe kein neues Build gemessen.
 - **Reduced Motion:** `useReducedFx()` und `MotionRoot` (`reducedMotion="user"`) zeigen den Endzustand sofort; `src/styles/base.css` setzt CSS-Dauern auf nahe null; Schleifen starten nicht
   (`tests/e2e/motion-global.spec.ts`, `tests/e2e/shell-motion.spec.ts`). Mit `html[data-safe-fx]` (Samsung Internet oder `?safefx=1`) entfallen Weichzeichner und `backdrop-filter`.
@@ -91,11 +91,46 @@ Belege für Runde 9 und 10 (Commits im Zweig). Die Zuordnung folgt der Reihenfol
 | Nr. | Punkt | Stand | Belege und Grenzen |
 |---|---|---|---|
 | Z1 | Einklappbare Sidebar | erledigt | Ab 768 px steht die Seitenleiste (`src/app/Sidebar.tsx`): Fuß-Knopf „Seitenleiste einklappen / ausklappen“ (`SIDEBAR_STRINGS`), Wahl `auto`, `open`, `closed` in `uiStore.sidebar` (je Browser gemerkt), Gruppenköpfe falten ihre Zeilen. Runde 10 lässt die schmale Leiste bei Maus, Fokus oder Berührung über die Seite „blicken“ (`src/app/useSidebarPeek.ts`, `src/styles/shell-motion.css`). Tests: `tests/unit/app.sidebar.test.tsx`, `tests/unit/app.shellMotion.test.tsx`, `tests/e2e/shell-motion.spec.ts`. |
-| Z2 | Sequenzielle SVG-Logo-Animation | teilweise | Gezeichnet werden die **Navigationssymbole**: einmal je Sitzung von oben nach unten, Zeile für Zeile 46 ms versetzt, Strich für Strich (`stroke-dashoffset`, `src/app/shellFx.ts`, `sb-draw` in `src/styles/shell-motion.css`, `pathLength="1"`); die untere Leiste zeichnet das Symbol beim Wechsel neu (0,46 s). Das Kopfzeilen-Logo ist das Schriftzeichen ₿ und kein Pfad; dafür entschlüsselt sich die Wortmarke (`AsciiCascade`, Nr. 89) und tanzt bei Hover (Nr. 88). Offen: ein Logo als Pfad (Nr. 83). |
+| Z2 | Sequenzielle SVG-Logo-Animation | teilweise | Gezeichnet werden die **Navigationssymbole** der Seitenleiste (Runde 12 neu gefasst, Messung im Abschnitt „Runde 12 – Paket C“): einmal je **Seitenaufruf** (vorher je Sitzung), erst wenn die Intro-Bühne weg ist (vorher lief sie darunter, unsichtbar), die Zeilen blenden von oben nach unten 52 ms versetzt mit je 300 ms ein, die **Glyphen zeichnen strikt nacheinander** (ein Glyph ist fertig, bevor der nächste startet: 72 ms je Glyph, die Striche eines Glyphs teilen sich den Platz; `sidebarSequence` und `applySidebarSequence` in `src/app/shellFx.ts`, `sb-draw` in `src/styles/shell-motion.css`, `pathLength="1"`). Nicht bei Hover, Seitenwechsel oder erneutem Rendern; mit „weniger Bewegung“ steht alles sofort da. Die untere Leiste zeichnet das Symbol beim Wechsel neu (0,46 s). Das Kopfzeilen-Logo ist das Schriftzeichen ₿ und kein Pfad; dafür zeichnet die Logo-Sequenz (`src/app/logoSeq.ts`) seine Striche nacheinander. Offen: ein Logo als Pfad (Nr. 83). |
 | Z3 | Frühere Animationen wiederherstellen | Befund: nichts ersatzlos entfernt | Siehe Abschnitt „Frühere Animationen“: sechs belegte Abschaltungen oder Vereinfachungen, überwiegend aus Leistungsgründen und meist mit Messwert im Commit; keine gelöschte Animation. |
 | Z4 | 10.000-Pfade-Simulation (Canvas) | teilweise | **Anzeige ja:** `FanChart` in `src/views/aktien/branchen/charts.tsx` (Aktien › Branchen-Trend › „Ergebnis eines Laufs prüfen“) zeigt 10.000 simulierte Pfade aus einer `megatest.json` des Python-Labors als Canvas: Bänder 5, 25, 50, 75, 95 % aus allen Pfaden, nur eine Stichprobe als Linien, Log-Skala, Einzeichnen von links, Fadenkreuz. Die App rechnet die Pfade nicht selbst (die Karte sagt es). **In der App gerechnet:** Analyse › Monte Carlo mit 2.000 Läufen (`MC_RUNS` in `src/domain/analytics/montecarlo.ts`, `src/views/analyse/MonteCarloCard.tsx`, Fächer-Canvas `fanDraw.ts` mit 120 Linien); die Zeile der Karte nennt ehrlich „2000 Läufe“. Offen: 10.000 Läufe in der App. |
 | Z5 | Wal-/Top-Trader-Anzeige | erledigt | Übersicht: Karte `src/views/overview/TopTraderCard.tsx` und die Plakette im Long-Signal (`TraderNetSection.tsx`). Runde 10: große Karte „Top-Trader: Netto Long/Short“ auf Markt › Einordnung (`src/views/markt/TraderNetCard.tsx`, Canvas `TraderNetPlot.tsx`: Fläche um die Nulllinie, Preislinie, Pfeil am letzten Umschlag, Ring, Fadenkreuz, Zeitraum-Umschalter; Tests `tests/unit/views.markt.traderNet.test.tsx`, `tests/e2e/trader-net-markt.spec.ts`). Ehrlich benannt: Es sind die Top-Trader-Konten der Börse Binance (obere 20 % nach Einsatz), **keine On-Chain-Wale**; in der Oberfläche heißt es „Top-Trader (Binance)“, „Wale“ steht nur im Hilfesatz (verneint) und als Suchwort im Funktionsfinder (`src/app/features.ts`). Der Verlauf reicht rund 30 Tage zurück. |
 | Z6 | Quick Reply Pills (im Inventar bei Nr. 95 genannt, ohne eigene Nummer) | vorhanden | Antwort-Pillen im Coach-Chat (`src/views/coach/ChatCard.tsx`, `suggestQuestions`, Folgefragen). |
+| Z7 | Ladezustände im Stil des Voice Ring | erledigt (Komponente und Einbauorte; keine Zahlen erfunden) | Neue Variante `ring` der Komponente `ThinkingOrb` (`src/motion/ringMath.ts` rein, `src/motion/VoiceRingCanvas.tsx` als Lazy-Chunk, Canvas ohne neue Abhängigkeit): ein leuchtender, weich verformter Ring in drei Zuständen **aktiv** (drei Fäden, tiefere Verformung, Halo, ein roter Akzent läuft herum), **denkt nach** (zwei Fäden, flacher, schneller) und **ruhig (mono)** (ein dünner Faden in Textfarbe, bewegt sich einen Moment und ruht dann: keine Dauerschleife im Leerlauf). Die Schleife (`orbLoop`) läuft nur bei sichtbarem Tab und sichtbarem Element; Reduced Motion zeigt den stillen SVG-Ring; die Box ist immer `size × size` (kein Layoutsprung). Eingebaut, wo vorher ein Punktbild oder nur Text stand: Coach-Chat und Assistent („Denke nach …“, `src/motion/fx/CoachStream.tsx`), Zeitmaschine (Status „20.000 Szenarien werden berechnet · Sitzungen simulieren“ mit der echten Pfadzahl des Laufs, `TimeMachineCard.tsx`), Wal-Karte (`TraderNetCard.tsx`), Screenshot-Import (`ExtractSheet.tsx`, `OcrImportSheet.tsx`). **Nicht angefasst:** der Kaufknopf „wird vorbereitet“ (Paket B), die Markt-Karte „Zustand der Box“ (bleibt der Punkt-Lader `DotMatrix`, derselbe wie in „Beste Setups“). Tests: `tests/unit/motion.ring.test.tsx`, `tests/unit/views.timemachine.test.tsx`, `tests/unit/views.markt.traderNetWal.test.tsx`, `tests/e2e/interaktionen.spec.ts` (Orb in der Zeitmaschine). |
+| Z8 | Teilen-Fächer nach „Share Button Animation“ | erledigt | Siehe Zeile 27. Unverändert bleibt das behobene Scroll- und Schließverhalten (der Fächer geht zu, sobald sich der Auslöser um mehr als 1 px bewegt; ein Scroll, der ihn stehen lässt, schließt nicht). Neu in Runde 12: ein Zeiger, der beim Öffnen noch auf dem Auslöser ruht, wählt nichts (die Chips fliegen unter ihm hervor; Hover wählt erst nach 360 ms), und der Fokus, der von selbst in den Fächer springt, zählt nicht als Wahl – die Beschriftung fragt „Kanal wählen“, bis eine Taste oder der Zeiger wählt. Tests: `tests/unit/motion.radialShare.test.tsx` (23), `tests/e2e/interaktionen.spec.ts` „Radial Share“ (6 je Projekt). |
+| Z9 | Suche nach Tätigkeiten | erledigt | Die Suche (Seitenleiste „Seiten suchen“, Menü-Finder, Seite „Funktionen“, globale Suche mit `/`) antwortet auf „Trade suchen“ (→ das Suchfeld der Trade-Liste, der Cursor steht darin), „Screenshot finden“ (→ Bild-Originale und Hashes), „Alarm konfigurieren“ (→ Alarme & Zustellprotokoll), „Simulation öffnen“ (→ Zeitmaschine) – jeweils als erster Treffer. Dafür: Absichten in `src/app/features.ts`, Anker `trades-search` auf dem Suchfeld (`TradeFilters.tsx`), eine zu allgemeine Absicht der Seite „Handelsplan“ entschärft (`pageTargets.ts`). Das Suchfeld ist bereits eine Glas-/Clay-Fläche (`.sf-box`: Blur, innere Lichter und Schatten, 12 px Radius). `/` öffnet die globale Suche mit dem Cursor im Feld, Escape leert und schließt sie (beides gab es schon). Tests: `tests/unit/app.searchTasks.test.ts`, `tests/e2e/funktionsfinder.spec.ts` (GOALS), `tests/e2e/suche-aufgaben.spec.ts`. |
+
+## Runde 12 – Paket C: Seitenleiste, Ladezustände, Teilen, Suche
+
+Stand 2026-11-08. Quelle der Aufträge: Launch-Audit-Auftrag (Abschnitte 4, 5, 7) und die Aufnahmen des Nutzers: „Glassy SideBar V5“ (Instagram), „Share Button Animation“ (Instagram), „Voice Ring“ (libraries.dev, Chrome). Von den Aufnahmen ist nur das **Verhalten** übernommen, kein Quelltext (Näheres in `docs/KOMPONENTEN-QUELLEN.md`).
+
+**Warum der Nutzer die Einblend-Folge der Seitenleiste nicht gesehen hat** (gemessen mit Playwright/Chromium 1440 × 900, jedes Bild der Seitenleiste mitgeschrieben; die Maschine rendert ohne GPU, daher nur etwa 20 Bilder je Sekunde, die Zeiten selbst sind die der Animationen):
+
+| Zeit nach dem Laden | vorher (Stand `13bbb7d`) | nachher |
+|---|---|---|
+| 0,65 s | Seitenleiste da, `data-draw="run"`, Intro-Bühne deckt die App (`data-intro-covered`) | Seitenleiste da, `data-draw="wait"`, Zeilen unsichtbar, keine Animation läuft |
+| 0,7 s bis 2,2 s | Welle und Zeichnen laufen **unter der Bühne** | wartet |
+| 3,1 s | `data-draw` weg, Sitzungs-Flag `tj2-sb-draw` gesetzt – in dieser Sitzung nie wieder | wartet noch |
+| 5,2 s | Bühne hebt sich: die Seitenleiste steht fertig da, nichts war zu sehen | Bühne hebt sich, `data-draw="run"` startet im selben Augenblick |
+| 5,3 s bis 6,6 s | – | Zeilen blenden von oben nach unten ein, Glyph für Glyph gezeichnet |
+| 7,4 s | – | `data-draw` weg, alles ruht gezeichnet |
+
+Ursache: Die Seitenleiste las die Phase des Intros einmal beim Aufbau (`useState`-Start). Beim ersten Rendern steht die Phase noch auf „off“ – `IntroHost`, der letzte Knoten der Hülle, setzt „stage“ erst in seinem Layout-Effekt –, also startete die Folge sofort und war unter der Bühne unsichtbar und verbraucht. Behoben durch `introCoversApp` / `introPendingAtBoot` (`src/intro/introBoot.ts`): die Folge wartet, solange die Bühne die App deckt **oder gleich decken wird** (einmal entschieden, bevor das Intro sein Sitzungs-Flag schreibt), und solange der Tab verborgen ist. Zweite Ursache: Die Symbole zeichneten nicht nacheinander (640 ms je Strich, 46 ms Versatz: etwa 14 Symbole gleichzeitig). Jetzt hat jedes Glyph seinen eigenen Platz (`sidebarSequence`, rein und getestet). Dritte Ursache: „einmal je Sitzung“ – ein Neuladen im selben Tab zeigte nichts mehr; jetzt **einmal je Seitenaufruf** (Modulzustand: kein Neustart bei Hover, Seitenwechsel, erneutem Rendern oder Größenwechsel über 768 px). Ausfallsicher: nach 20 s Wartezeit zeigt die Leiste ihre Zeilen einfach, mit „weniger Bewegung“ steht alles sofort da.
+
+Messung der Folge (nachher, Reihenfolge und Takt): Zeilen 52 ms versetzt, je 300 ms; 19 Glyphs, 72 ms je Glyph, Glyph n + 1 beginnt erst, wenn Glyph n fertig ist (deklarierte Zeiten der laufenden Animationen und die Bilder des Browsers, `tests/e2e/sidebar-sequenz.spec.ts`). Die Feder des Aktiv-Indikators (`spring.layout`) ist unverändert. Die untere Glas-Leiste am Handy bleibt; ihre Symbole kommen weiterhin von links nach rechts (30 ms Versatz, `stagger.cards`), einmal je Sitzung – jetzt mit einem Test.
+
+Was sich geändert hat (Datei | früher | geändert | Funktion | visuell | mobile | Tastatur | Test):
+
+| Datei | früher | geändert | Funktion | visuell | mobile | Tastatur | Test |
+|---|---|---|---|---|---|---|---|
+| `src/app/Sidebar.tsx`, `src/app/shellFx.ts`, `src/intro/introBoot.ts`, `src/styles/shell-motion.css` | Folge startete bei Mount, unter der Bühne; Flag je Sitzung; Symbole überlappten | wartet auf die sichtbare App, einmal je Seitenaufruf, strikte Glyph-Folge aus reiner Zeitleiste | Reihenfolge, Einmaligkeit, Warten auf die Bühne und auf den Tab | Zeilen 52 ms / 300 ms, Glyphs 72 ms, Glanz am Ende jedes Glyphs | nur ab 768 px (Handy: untere Leiste unverändert) | – | `tests/unit/app.sidebarSequence.test.tsx`, `tests/e2e/sidebar-sequenz.spec.ts` |
+| `src/app/Sidebar.tsx`, `src/app/SidebarParts.tsx` | `aria-label` auf Zeilen, kein Tooltip | `title` an Zeilen und Fußknöpfen, solange die Namen nicht offen sind | Tooltip und Name für Icon-only-Zustände | nativer Tooltip | Langdruck öffnet die Namen wie zuvor | Fokus öffnet die Namen wie zuvor | `tests/unit/app.sidebarSequence.test.tsx` |
+| `src/motion/ringMath.ts`, `VoiceRingCanvas.tsx`, `ThinkingOrb.tsx` | drei Punktbilder | Variante `ring` mit drei Zuständen, stiller SVG-Ring, Ruhe im Leerlauf | Ladezustand ohne Dauerschleife, ohne Layoutsprung | leuchtender Ring, ein roter Akzent, Mono ohne Glühen | gleich | – | `tests/unit/motion.ring.test.tsx`, Bilder in `docs/belege/runde12-paket-c/` |
+| `src/motion/fx/CoachStream.tsx`, `TimeMachineCard.tsx`, `TraderNetCard.tsx`, `ExtractSheet.tsx`, `OcrImportSheet.tsx` | `TextShimmer` allein / Punktbild | Ring neben dem ehrlichen Text; Zeitmaschine nennt die echte Pfadzahl | siehe Z7 | siehe Z7 | gleich | – | die genannten Unit- und E2E-Tests |
+| `src/motion/RadialShare.tsx`, `radialLayout.ts` (`captionSide`), `RadialShareButton.tsx`, `ExportCard.tsx` | dunkle Chips, Wort im Auslöser | Glas-Chips, Kreuz im Auslöser, Beschriftung mit `detail` je Ziel, Zeiger-Schonfrist | siehe Z8 | Chip-Drehung beim Auffächern (Feder `spring.pop`) | Touch und Klemmung am Rand unverändert | Pfeile, Home, End, Esc, Tab unverändert | `tests/unit/motion.radialShare.test.tsx`, `tests/e2e/interaktionen.spec.ts` |
+| `src/app/features.ts`, `pageTargets.ts`, `TradeFilters.tsx` | „Trade suchen“ führte zur Seite Handelsplan, „Simulation öffnen“ zu „Branchen-Papier“ | Absichten ergänzt, Feldanker | siehe Z9 | – | Menü-Finder am Handy | `/`, Esc | `tests/unit/app.searchTasks.test.ts`, `tests/e2e/suche-aufgaben.spec.ts` |
+
+Nicht geändert und nicht angefasst (Auftrag): Anmelde-Sheet, Bezahlfenster und Kaufstrecke (Paket B), Aufbau von Startseite und Cockpit, „Trade eintragen“. Offen: keine Messung auf einem echten Gerät (nur Chromium ohne GPU); die Wirkung des Ringes im Dauerbetrieb auf einem Handy ist nicht gemessen.
 
 ## Frühere Animationen: Befund aus `git log`
 
@@ -162,7 +197,7 @@ Spalten: Nr · Name · Quelle · Status · Stelle im Code · Entscheidung · Beg
 
 | Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
 |---|---|---|---|---|---|---|
-| 27 | Radial Share | R | nicht prüfbar | – | Original anfordern | Original nie vorgelegen und kein Radialmenü im Code; Teilen läuft über ein Fenster (`src/social/ui/ShareSheet.tsx`). |
+| 27 | Radial Share | R | neu eingebaut | `src/motion/RadialShare.tsx`, `src/motion/radialLayout.ts` (Trade-Detail `src/social/ui/RadialShareButton.tsx`, Berichte `src/views/berichte/ExportCard.tsx`) | bleibt | Der frühere Eintrag („kein Radialmenü im Code“) war seit Runde 11 veraltet: der Fächer steht, mit Tastatur, Touch und Klemmung am Bildrand. Runde 12 überarbeitet ihn nach der Aufnahme „Share Button Animation“ (Instagram, Aufnahme des Nutzers – Verhalten, kein Quelltext): Glas-Chips, das Symbol des Auslösers wird zum Kreuz, eine Beschriftung („Kanal wählen“, danach was das aktive Ziel tut). Die Vorlage der Quelle R lag nie vor; das Video ist die einzige Referenz. Das Fenster `ShareSheet.tsx` bleibt der Weg für „Link“. |
 | 28 | Copy-to-Clipboard | V | wiederhergestellt/verbessert | `src/primitives/CopyButton.tsx` (u. a. `src/views/community/SharesCard.tsx`, `src/views/labor/PineCard.tsx`) | bleibt | Kopieren gab es als Einzellösungen, Runde 10 bündelt es: Symbol wird zum Häkchen, das Wort rollt, die Breite bleibt, ein Fehlschlag schüttelt. |
 | 29 | Animated Contact Card | V | bewusst nicht | – | nicht bauen | Die App hat keine Kontaktkarte; ein Kartenzauber ohne Inhalt wäre bloße Zierde. |
 | 30 | Overlapping Avatar Cluster | V | bewusst nicht | – | nicht bauen | Die Community zeigt Pseudonyme als Punktmuster (`src/social/ui/Monogram.tsx`) und keine Gesichter; ein Avatar-Haufen suggerierte Mitgliederzahlen. |
@@ -175,7 +210,7 @@ Spalten: Nr · Name · Quelle · Status · Stelle im Code · Entscheidung · Beg
 | Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
 |---|---|---|---|---|---|---|
 | 34 | Floating Pill Navigation | V | vorhanden | `src/app/Dock.tsx` | bleibt | Am Handy schwebt die Kapsel unten (mit Lupe am Mauszeiger); die Kopfzeile oben bleibt eine durchgehende Leiste. |
-| 35 | Expanding Glass Capsule | V | neu eingebaut | `src/app/Sidebar.tsx`, `src/app/useSidebarPeek.ts`, `src/styles/shell-motion.css` | bleibt | Sinngemäß: die schmale Leiste öffnet sich bei Absicht über die Seite auf 256 px, ohne Glas und ohne die Seite zu verschieben. |
+| 35 | Expanding Glass Capsule | V | neu eingebaut | `src/app/Sidebar.tsx`, `src/app/useSidebarPeek.ts`, `src/styles/shell-motion.css` | bleibt | Sinngemäß: die schmale Leiste öffnet sich bei Absicht über die Seite auf 256 px, ohne die Seite zu verschieben (Glas, solange sie offen über der Seite liegt). Runde 12: die Einblend-Folge beim Öffnen der Website (Zusatzpunkt Z2) läuft jetzt sichtbar und strikt nacheinander. |
 | 36 | Burger Morph | V | neu eingebaut | `src/app/Burger.tsx`, `src/styles/shell-motion.css` | bleibt | Drei Balken werden zum Kreuz, solange das Menü offen ist (reines CSS auf `translate`/`rotate`). |
 | 37 | Staggered Menu Overlay | V | wiederhergestellt/verbessert | `src/app/CommandNav.tsx` (`CONFIG.delays`) | bleibt | Die gestaffelte Einblendung gab es nach der Vorlage; Runde 10 strafft sie, die letzte Zeile startet nach 0,6 s statt 1,8 s. |
 | 38 | Animated Navigation Drawer | V | vorhanden | `src/app/CommandNav.tsx` (Wisch von links ab 768 px, `wipeMs` 800) | bleibt | Das Menü fährt ab 768 px als Fläche von links herein, mit Fokusfalle und Escape. |
@@ -200,7 +235,7 @@ Spalten: Nr · Name · Quelle · Status · Stelle im Code · Entscheidung · Beg
 | 52 | Glass Numbered Panel | V | bewusst nicht | – | nicht bauen | Nummerierte Schritte gibt es im Handelsplan als einfache Leiste, ein Glaspanel brächte keinen Gewinn. |
 | 53 | Glass Contact Card | V | bewusst nicht | – | nicht bauen | Keine Kontaktkarte in der App (siehe Nr. 29). |
 | 54 | Media Card Hover | V | vorhanden | `src/journal/screenshots/ShotThumb.tsx`, `src/views/setups/SetupCard.tsx` | bleibt | Screenshots und Setup-Karten reagieren beim Überfahren (grau zu Farbe, Notch-Scheibe, leichte Neigung); Icon-Pille und Bildzoom der Vorlage fehlen (Nr. 55, 56). |
-| 55 | Icon-to-Label Pill | V | vorhanden | `src/app/Dock.tsx` (`DOCK_CONFIG`, Beschriftung steigt auf), `src/app/Sidebar.tsx` (Namen beim Blick) | bleibt | Symbole zeigen ihren Namen erst bei Absicht, im Dock als aufsteigende Beschriftung, in der Seitenleiste mit dem Öffnen. |
+| 55 | Icon-to-Label Pill | V | vorhanden | `src/app/Dock.tsx` (`DOCK_CONFIG`, Beschriftung steigt auf), `src/app/Sidebar.tsx` (Namen beim Blick) | bleibt | Symbole zeigen ihren Namen erst bei Absicht, im Dock als aufsteigende Beschriftung, in der Seitenleiste mit dem Öffnen. Runde 12: in der schmalen Leiste tragen Zeilen und Fußknöpfe zusätzlich `aria-label` und Tooltip (`title`), der Tooltip nur, solange die Namen nicht offen sind (offen sagen es die Wörter selbst). |
 | 56 | Image Zoom Card | V | offen | – | später bauen | Ein leichter Zoom im Rahmen der Screenshot-Kachel wäre eine natürliche Ergänzung zur Farbe beim Überfahren, ist aber nirgends gebaut. |
 | 57 | Frosted Hover Veil | V | neu eingebaut | `src/primitives/Card.tsx` (Frost-Schleier, Zeile um 290) | bleibt (nur reiche Seiten) | Ein weicher Schleier und eine Lichtkante oben legen sich beim Überfahren mit der Maus auf die Karte (nur Deckkraft). |
 | 58 | Sticky Stacking Cards | V | bewusst nicht | – | nicht bauen | Gestapelte, kleiner werdende Karten würden Zahlen verdecken, die man vergleichen will. |
@@ -289,7 +324,7 @@ Spalten: Nr · Name · Quelle · Status · Stelle im Code · Entscheidung · Beg
 | 126 | Fluted Glass Shader | V | bewusst nicht | – | nicht bauen | Braucht einen Shader auf Bitmaps (schwer) und es gibt kein Bild, das er brechen könnte. |
 | 127 | Cinematic Orbit Hero | R | vorhanden | `src/motion/pulse/OrbitSpread.tsx` (`src/views/coach/ProfileCard.tsx`), Intro | bleibt | Das Coach-Profil fächert sich zu einem Ring, den man mit ←/→ dreht. |
 | 128 | Light and Depth | R | nicht prüfbar | – | Original anfordern | Original nie vorgelegen und kein Port mit diesem Namen im Code; was daran erinnert (Seitenlicht, Kartenkante), ist ohne Vorlage nicht zuordenbar. |
-| 129 | Thinking Orbs | R | nicht prüfbar | – | Original anfordern | Original nie vorgelegen, kein Port im Code; der Coach zeigt „denkt …“ mit `TextShimmer`, nicht mit Kugeln. |
+| 129 | Thinking Orbs | R | neu eingebaut | `src/motion/ThinkingOrb.tsx` (`ThinkingOrbCanvas.tsx`, `orbMath.ts`, `orbLoop.ts`; Variante `ring`: `ringMath.ts`, `VoiceRingCanvas.tsx`) | bleibt | Der frühere Eintrag („kein Port im Code“) war seit Runde 11 veraltet: drei Punktbilder (Kugel, Wolke, Kreisbahn) als Ladezeichen, Referenz die Aufnahme „Thinking Orbs“ (libraries.dev, kein Quelltext). Runde 12 ergänzt den Voice Ring (Zusatzpunkt Z7) und setzt ihn an Coach und Assistent („Denke nach …“), Zeitmaschine, Wal-Karte und Screenshot-Import ein. |
 | 130 | Agent Trace | R | vorhanden | `src/motion/pulse/ScrubTimeline.tsx`, `src/chart/replay.ts`, `src/chart/EquityChart.tsx` | bleibt | Ziehbare Wiedergabe mit Spuren steht bei Kurve, Trades, Labor und Monte-Carlo-Läufen. |
 | 131 | Glass Tilt | N | neu eingebaut | `src/primitives/Card.tsx` (`tilt`), `src/primitives/hoverTilt.ts` | bleibt (nur reiche Seiten) | Nur der Titel ist bekannt; sinngemäß neigt sich eine Karte um bis zu 3° zum Zeiger mit mitlaufendem Glanz (Glas gibt es nicht). |
 | 132 | Globe Arcs | N | bewusst nicht | – | nicht bauen | Nur der Titel ist bekannt (Code nie gesehen), und die App hat keine Orts- oder Verbindungsdaten, die Bögen zeigen könnten. |

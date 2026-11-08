@@ -22,9 +22,10 @@
  *
  * Marker: one plate behind the active row glides from row to row (`spring.layout`, a transform written by `animate`, no layout
  * projection) and stretches a little while it travels; the red dot rides on it; Premium and Team plans get one border-beam lap on it whenever the
- * panel opens. First load: the rows wave in from the top, row by row (45–60 ms apart, 300 ms each, 10 px, opacity) while the icons draw
- * themselves (`stroke-dashoffset`, once per session, `shellFx.ts`); reduced motion: all at once. Keys: ↑ ↓ Home End move between rows, Esc closes the
- * peek. Each row preloads its page chunk on intent. Rows are 44 px tall and never overlap.
+ * panel opens. First load (Runde 12): the rows wave in from the top, row by row (52 ms apart, 300 ms each, 10 px, opacity) and the icons
+ * draw themselves STRICTLY one after the other (`stroke-dashoffset`, `sidebarSequence` in `shellFx.ts`) – once per page load, only once the
+ * intro's stage has lifted (it used to run under the stage, unseen), never on hover, a route change or a re-render; reduced motion: all at once.
+ * Keys: ↑ ↓ Home End move between rows, Esc closes the peek. Each row preloads its page chunk on intent. Rows are 44 px tall and never overlap.
  */
 import { animate, motion, useMotionValue, useTransform, useVelocity } from "motion/react";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
@@ -32,9 +33,10 @@ import { NEW_PAGES, readVisitedPages } from "@/app/CommandNav";
 import { groupOfPage, NAV_GROUPS, NAV_GROUP_ICON, PAGE_HINT, PAGE_ICON, PAGE_LABELS, WIDE_QUERY } from "@/app/navGroups";
 import { NEW_TRADE_LABEL, NewTradeButton } from "@/app/NewTradeButton";
 import { preloadPage } from "@/app/pages";
-import { DRAW_MS, drawSeen, markDrawSeen, prepareStrokes, SB_VARS } from "@/app/shellFx";
+import { applySidebarSequence, markSequenceSeen, prepareStrokes, SB_VARS, SEQ_WAIT_MAX_MS, sequenceSeen, useTabVisible } from "@/app/shellFx";
 import { FootButton, NightRow, ROW_TAIL, SettingsEntries, showSettingsEntries, SidebarSearch, SIDEBAR_PART_STRINGS, UserCard } from "@/app/SidebarParts";
 import { useSidebarPeek } from "@/app/useSidebarPeek";
+import { introCoversApp } from "@/intro/introBoot";
 import { useIntroPhase } from "@/intro/introStore";
 import { LEGAL_LABEL, legalConfig, legalShown, type LegalDoc } from "@/legal/config";
 import { LegalLinks } from "@/legal/LegalLinks";
@@ -77,15 +79,17 @@ interface RowBadge {
   fresh?: boolean;
 }
 
-function Row({ page, current, expanded, badge, onGo }: { page: Page; current: boolean; expanded: boolean; badge: RowBadge; onGo: (p: Page, e: MouseEvent<HTMLAnchorElement>) => void }) {
+function Row({ page, current, expanded, open, badge, onGo }: { page: Page; current: boolean; expanded: boolean; open: boolean; badge: RowBadge; onGo: (p: Page, e: MouseEvent<HTMLAnchorElement>) => void }) {
   const label = PAGE_LABELS[page];
   return (
     <a
       href={`#${page}`}
       data-nav-page={page}
       aria-current={current ? "page" : undefined}
-      // the rail has no room for words: the name is the accessible name (the words are there, clipped, for the peek)
+      // the rail has no room for words: the name is the accessible name (the words are there, clipped, for the peek) and, as long as the
+      // names are not open, the tooltip (a dismissed peek, a pointer that never opened it) – open, the words say it and a tooltip would double them
       aria-label={expanded ? undefined : label}
+      title={open ? undefined : label}
       aria-description={badge.fresh ? SIDEBAR_PART_STRINGS.fresh : badge.count !== undefined ? `${badge.count} Einträge` : undefined}
       onClick={(e) => onGo(page, e)}
       onPointerEnter={() => preloadPage(page)}
@@ -116,7 +120,7 @@ function Row({ page, current, expanded, badge, onGo }: { page: Page; current: bo
   );
 }
 
-function LegalRow({ expanded, index }: { expanded: boolean; index: number }) {
+function LegalRow({ expanded, open, index }: { expanded: boolean; open: boolean; index: number }) {
   if (!legalShown()) return null;
   const docs: LegalDoc[] = ["impressum", "datenschutz", "agb"];
   if (legalConfig().urls.widerruf) docs.push("widerruf");
@@ -124,6 +128,7 @@ function LegalRow({ expanded, index }: { expanded: boolean; index: number }) {
     return (
       <FootButton
         index={index}
+        open={open}
         word={SIDEBAR_STRINGS.legal}
         icon={
           <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center [&>svg]:size-[18px]">
@@ -174,20 +179,33 @@ function SidebarPanel() {
   const peek = useSidebarPeek(!expanded, canHover, page);
   const open = expanded || peek.open;
 
-  // first load: the icons draw themselves once per session (after the intro's stage, never under reduced motion)
+  // first load (Runde 12): the rows wave in from the top and the glyphs draw one after the other – once per page load, never under reduced
+  // motion, and not before anyone can see it: while the intro's stage covers the app (or is about to – the first render comes before the stage
+  // starts) and while the tab is hidden it waits. It used to start at mount, played under the stage and was used up.
   const phase = useIntroPhase();
-  const [drawState, setDraw] = useState<"wait" | "run" | null>(() => (reduced || drawSeen() ? null : phase === "stage" ? "wait" : "run"));
-  // waiting for the intro's stage to lift is derived, not stored: the draw runs from the moment the stage is gone
-  const draw = drawState === "wait" && phase !== "stage" ? "run" : drawState;
+  const visible = useTabVisible();
+  const covered = introCoversApp(phase);
+  const [drawState, setDraw] = useState<"wait" | "run" | null>(() => (reduced || sequenceSeen() ? null : "wait"));
+  // waiting is derived, not stored: it runs from the moment the app is in view
+  const draw = drawState === "wait" && !covered && visible ? "run" : drawState;
+  const seqMs = useRef(0);
   useLayoutEffect(() => {
-    if (draw) prepareStrokes(frame.current);
+    if (!draw) return;
+    prepareStrokes(frame.current);
+    if (draw === "run") seqMs.current = applySidebarSequence(frame.current);
   }, [draw]);
   useEffect(() => {
     if (draw !== "run") return;
-    markDrawSeen();
-    const t = setTimeout(() => setDraw(null), DRAW_MS);
+    markSequenceSeen();
+    const t = setTimeout(() => setDraw(null), seqMs.current + 150);
     return () => clearTimeout(t);
   }, [draw]);
+  // nothing stays invisible: should the wait never end although the tab is seen (a stage that does not lift), the rows simply show
+  useEffect(() => {
+    if (draw !== "wait" || !visible) return;
+    const t = setTimeout(() => setDraw(null), SEQ_WAIT_MAX_MS);
+    return () => clearTimeout(t);
+  }, [draw, visible]);
 
   // the page column leaves room for the sidebar: the footer (outside the flex row) reads it
   useLayoutEffect(() => {
@@ -374,7 +392,7 @@ function SidebarPanel() {
                     <ul className="sb-rows grid min-h-0 gap-0.5 overflow-hidden">
                       {groupRows.map(({ p, index }, j) => (
                         <li key={p} style={{ "--i": index, "--j": j } as CSSProperties}>
-                          <Row page={p} current={page === p} expanded={expanded} badge={{ fresh: fresh.has(p) || undefined, count: p === "trades" && tradeCount > 0 ? tradeCount : undefined }} onGo={onGo} />
+                          <Row page={p} current={page === p} expanded={expanded} open={open} badge={{ fresh: fresh.has(p) || undefined, count: p === "trades" && tradeCount > 0 ? tradeCount : undefined }} onGo={onGo} />
                           {p === "settings" && <SettingsEntries visible={showSettingsEntries(page, expanded)} />}
                         </li>
                       ))}
@@ -385,11 +403,12 @@ function SidebarPanel() {
             })}
           </nav>
           <div className="shrink-0 border-t border-line px-2 py-2">
-            <LegalRow expanded={expanded} index={rows} />
-            <NightRow index={rows + 1} />
-            <UserCard index={rows + 2} current={page === "konto"} />
+            <LegalRow expanded={expanded} open={open} index={rows} />
+            <NightRow index={rows + 1} open={open} />
+            <UserCard index={rows + 2} current={page === "konto"} open={open} />
             <FootButton
               index={rows + 3}
+              open={open}
               word={expanded ? SIDEBAR_STRINGS.unpinWord : SIDEBAR_STRINGS.pinWord}
               icon={
                 <span aria-hidden="true" className={cn("grid size-7 shrink-0 place-items-center transition-[rotate,opacity] duration-300 ease-out [&>svg]:size-[18px]", expanded ? "rotate-0 text-fg" : "-rotate-45")}>

@@ -73,7 +73,7 @@ html[data-motion-tier="team"] {
   }
   [data-draw="run"] .sb-rows > li {
     animation: sb-wave 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
-    animation-delay: calc(var(--i, 0) * 52ms);
+    animation-delay: var(--sq-d, 0ms);
   }
   /* The floating bar (phones): one glass pill, a plate with a soft glow under the active tab, and a step down while the keyboard is up */
   .dock-glass {
@@ -273,24 +273,17 @@ html[data-motion-tier="team"] {
   stroke-dashoffset: 1;
   opacity: 0;
 }
+/* the first-load sequence draws STRICTLY one glyph after the other (a stroke after a stroke inside it): `--gd` / `--gm` are the slot of the
+   stroke, `--ge` the end of its glyph (the glint) – all written by `applySidebarSequence` from the pure timeline `sidebarSequence` */
 [data-draw="run"] .sb-ico :is(path, circle, rect, line, polyline, ellipse),
 .sb-ico[data-redraw] :is(path, circle, rect, line, polyline, ellipse) {
-  animation: sb-draw 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--i, 0) * 46ms + 120ms);
+  animation: sb-draw var(--gm, 640ms) cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--gd, 120ms);
 }
 [data-draw="run"] .sb-ico svg,
 .sb-ico[data-redraw] svg {
-  animation: sb-glint 900ms ease-out both;
-  animation-delay: calc(var(--i, 0) * 46ms + 120ms);
-}
-[data-draw="run"] .sb-ico :is(path, circle, rect, line, polyline, ellipse):nth-child(2) {
-  animation-delay: calc(var(--i, 0) * 46ms + 210ms);
-}
-[data-draw="run"] .sb-ico :is(path, circle, rect, line, polyline, ellipse):nth-child(3) {
-  animation-delay: calc(var(--i, 0) * 46ms + 300ms);
-}
-[data-draw="run"] .sb-ico :is(path, circle, rect, line, polyline, ellipse):nth-child(n + 4) {
-  animation-delay: calc(var(--i, 0) * 46ms + 390ms);
+  animation: sb-glint 700ms ease-out both;
+  animation-delay: var(--ge, 120ms);
 }
 /* a redraw (the bottom bar's icon on a tab switch) is quick and has no row delay */
 .sb-ico[data-redraw] {

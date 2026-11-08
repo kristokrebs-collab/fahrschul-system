@@ -40,17 +40,18 @@ export function ExportCard({ report, focus, className }: { report: Report; focus
       {
         id: "copy",
         label: "Kopieren",
+        detail: "Bericht als Markdown kopieren",
         icon: <Glyph name="copy" className="size-5" />,
         onSelect: async () => {
           pushToast((await copyToClipboard(text())) ? { kind: "success", title: "Bericht kopiert", detail: "Als Markdown." } : { kind: "error", title: "Kopieren ging nicht." });
         },
       },
-      { id: "file", label: "Datei", icon: <Glyph name="image" className="size-5" />, onSelect: () => save("md") },
+      { id: "file", label: "Datei", detail: "Markdown-Datei speichern", icon: <Glyph name="image" className="size-5" />, onSelect: () => save("md") },
       pdf
-        ? { id: "pdf", label: "PDF", icon: <Glyph name="link" className="size-5" />, onSelect: () => setPrinting(true), disabled: printing }
-        : { id: "pdf", label: "PDF · Premium", icon: <Glyph name="lock" className="size-5" />, onSelect: () => openUpgrade("reportsPdf") },
+        ? { id: "pdf", label: "PDF", detail: "Drucken oder als PDF sichern", icon: <Glyph name="link" className="size-5" />, onSelect: () => setPrinting(true), disabled: printing }
+        : { id: "pdf", label: "PDF · Premium", detail: "PDF gibt es im Premium-Plan", icon: <Glyph name="lock" className="size-5" />, onSelect: () => openUpgrade("reportsPdf") },
     ];
-    if (native) list.push({ id: "native", label: "Weitergeben", icon: <Glyph name="send" className="size-5" />, onSelect: async () => void (await nativeShareText(report.title, text())) });
+    if (native) list.push({ id: "native", label: "Weitergeben", detail: "Mit einer App teilen", icon: <Glyph name="send" className="size-5" />, onSelect: async () => void (await nativeShareText(report.title, text())) });
     return list.map((t) => (empty && t.id !== "pdf" ? { ...t, disabled: true, hint: "Keine Trades in diesem Zeitraum" } : t));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `save` only reads `report` / `focus`, both listed
   }, [report, focus, pdf, printing, native, empty]);

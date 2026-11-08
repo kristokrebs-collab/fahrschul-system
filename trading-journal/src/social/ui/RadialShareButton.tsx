@@ -32,6 +32,7 @@ export function RadialShareButton({ trade, className }: { trade: EnrichedTrade; 
       {
         id: "copy",
         label: SHARE.copy,
+        detail: "Kurzfassung ohne Geldbeträge kopieren",
         icon: <Glyph name="copy" className="size-5" />,
         onSelect: async () => {
           pushToast((await copyText(text())) ? { kind: "success", title: "Kurzfassung kopiert", detail: text() } : { kind: "error", title: "Kopieren ging nicht – bitte die Zeile selbst markieren." });
@@ -40,6 +41,7 @@ export function RadialShareButton({ trade, className }: { trade: EnrichedTrade; 
       {
         id: "image",
         label: "Bild",
+        detail: "Teilen-Bild speichern (nur R und %)",
         icon: <Glyph name="image" className="size-5" />,
         onSelect: async () => {
           const ok = await downloadShareCard(trade, { privacy: "percent", currency, setups: [] });
@@ -49,6 +51,7 @@ export function RadialShareButton({ trade, className }: { trade: EnrichedTrade; 
       {
         id: "link",
         label: "Link",
+        detail: "Teilen-Blatt mit Link öffnen",
         icon: <Glyph name="link" className="size-5" />,
         // the share sheet decides what is possible (cloud, login) and says so – a link is never promised here
         onSelect: () => import("../store").then((m) => m.openShare({ kind: "trade", tradeId: trade.id })),
@@ -58,6 +61,7 @@ export function RadialShareButton({ trade, className }: { trade: EnrichedTrade; 
       list.push({
         id: "native",
         label: "Weitergeben",
+        detail: "Mit einer App teilen",
         icon: <Glyph name="send" className="size-5" />,
         onSelect: async () => void (await nativeShareText(text(), text())),
       });

@@ -36,10 +36,13 @@ export const SIDEBAR_PART_STRINGS = {
   nested: "Abschnitte der Einstellungen",
 } as const;
 
-/** A foot button of the rail (Rechtliches, Nachtmodus, Anheften): the icon stays where the rail's icons are, the word comes with the peek. */
-export function FootButton({ index, icon, word, trail, ...props }: { index: number; icon: ReactNode; word: string; trail?: ReactNode } & ButtonHTMLAttributes<HTMLButtonElement>) {
+/**
+ * A foot button of the rail (Rechtliches, Nachtmodus, Anheften): the icon stays where the rail's icons are, the word comes with the peek.
+ * `open` (the names are open: the peek, or pinned): the tooltip (`title`, the accessible name) is only there while they are not – open, the words say it.
+ */
+export function FootButton({ index, icon, word, trail, open = false, ...props }: { index: number; icon: ReactNode; word: string; trail?: ReactNode; open?: boolean } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button type="button" {...props} className={cn("sb-row flex h-11 items-center gap-3 rounded-xl px-2.5 text-mute hover:text-fg", ROW_TAIL, props.className)}>
+    <button type="button" title={open ? undefined : props["aria-label"]} {...props} className={cn("sb-row flex h-11 items-center gap-3 rounded-xl px-2.5 text-mute hover:text-fg", ROW_TAIL, props.className)}>
       {icon}
       <span aria-hidden="true" className="sb-lbl min-w-0 flex-1 truncate text-left text-[12.5px] font-medium" style={{ "--i": index } as CSSProperties}>
         {word}
@@ -100,7 +103,7 @@ export function SidebarSearch() {
 /* ------------------------------------------------------------------ night mode */
 
 /** The night-mode switch: `role="switch"`, the circular reveal of the theme change starts at the button. */
-export function NightRow({ index }: { index: number }) {
+export function NightRow({ index, open }: { index: number; open: boolean }) {
   const dark = useTheme((s) => s.resolved) === "dark";
   const onClick = (e: MouseEvent<HTMLButtonElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -109,6 +112,7 @@ export function NightRow({ index }: { index: number }) {
   return (
     <FootButton
       index={index}
+      open={open}
       word={SIDEBAR_PART_STRINGS.night}
       role="switch"
       aria-checked={dark}
@@ -136,7 +140,7 @@ export function NightRow({ index }: { index: number }) {
  * plans get a ring around the avatar and a small „Team“ chip that rises in when the plan changes (`[data-motion-tier="team"]`). Honest: no
  * account → „Nur auf diesem Gerät“; the plan is the server-confirmed one (`useEffectivePlan`).
  */
-export function UserCard({ index, current }: { index: number; current: boolean }) {
+export function UserCard({ index, current, open }: { index: number; current: boolean; open: boolean }) {
   const phase = useCloudSession((s) => s.phase);
   const email = useCloudSession((s) => s.user?.email ?? null);
   const plan = useEffectivePlan().plan;
@@ -145,11 +149,13 @@ export function UserCard({ index, current }: { index: number; current: boolean }
   const name = signedIn && email ? (email.split("@")[0] ?? email) : SIDEBAR_PART_STRINGS.device;
   const sub = signedIn ? PLAN_CATALOG[plan].name : SIDEBAR_PART_STRINGS.local;
   const initial = signedIn && email ? email.slice(0, 1).toUpperCase() : "";
+  const label = `${SIDEBAR_PART_STRINGS.account}: ${name}, ${sub}`;
   return (
     <button
       type="button"
       onClick={() => navigate("konto")}
-      aria-label={`${SIDEBAR_PART_STRINGS.account}: ${name}, ${sub}`}
+      aria-label={label}
+      title={open ? undefined : label}
       aria-current={current ? "page" : undefined}
       data-testid="sidebar-user"
       className={cn("sb-row flex h-12 items-center gap-3 rounded-xl px-2.5 text-left text-fg", ROW_TAIL)}

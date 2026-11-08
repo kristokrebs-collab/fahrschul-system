@@ -81,3 +81,27 @@ export function markIntroSeen(): void {
     /* storage blocked */
   }
 }
+
+let pendingAtBoot: boolean | null = null;
+
+/**
+ * Whether the first-visit intro is about to cover the app although its phase still reads "off" – the window between the first render
+ * (the sidebar already mounts) and `IntroHost`'s layout effect that sets "stage". Decided ONCE, at the first look, before the intro
+ * writes its session flag. Whatever starts its own first-view motion at mount (the sidebar's sequence) waits while this is true or the
+ * phase is "stage": it used to start in that window, played under the stage – unseen – and used up its one run (Runde 12).
+ */
+export function introPendingAtBoot(): boolean {
+  pendingAtBoot ??= canAutoplay(readIntroEnv());
+  return pendingAtBoot;
+}
+
+/** Test hook: forget the once-per-load decision. */
+export function resetIntroPendingForTests(): void {
+  pendingAtBoot = null;
+}
+
+/** Pure: does the intro cover the app (or is it about to) at this phase? "off" + pending = the first render before the stage starts. */
+export function introCoversApp(phase: "off" | "stage" | "build" | "done", pending?: boolean): boolean {
+  if (phase === "stage") return true;
+  return phase === "off" && (pending ?? introPendingAtBoot());
+}

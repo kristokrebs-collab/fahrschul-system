@@ -155,7 +155,7 @@ export function TradeFilters({ filter, onChange, setups, count, closed, suggesti
             <Icon name="search" />
           </motion.span>
         </motion.span>
-        <Autocomplete type="search" inputClassName="pl-9" placeholder="Notizen, Begründung …" value={q} onChange={setQ} suggestions={items} onSelect={choose} emptyText="Keine Vorschläge" aria-label="Trades durchsuchen" />
+        <Autocomplete type="search" inputClassName="pl-9" placeholder="Notizen, Begründung …" value={q} onChange={setQ} suggestions={items} onSelect={choose} emptyText="Keine Vorschläge" aria-label="Trades durchsuchen" data-testid="trades-search" />
         <AnimatePresence>
           {pending && !reduced && (
             <motion.span

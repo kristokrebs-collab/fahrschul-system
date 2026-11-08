@@ -481,7 +481,7 @@ test.describe("Wal-Karte (C3): Top-Trader netto on the Markt page", () => {
     });
     await expect(card).toHaveAttribute("data-state", "loading", { timeout: 20_000 });
     const box = card.getByTestId("trader-net-empty");
-    await expect(box.locator("[data-thinking-orb='search']")).toBeVisible();
+    await expect(box.locator("[data-thinking-orb='ring']")).toBeVisible();
     await expect(box).toContainText("Top-Trader-Daten werden geladen");
     await expect(card.getByTestId("trader-net-kpi-net-value")).toHaveText("–");
     release();
