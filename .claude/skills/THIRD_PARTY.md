@@ -75,3 +75,8 @@ Nach ausdrücklicher Freigabe des Nutzers (2026-11-08) als reine Skill-Ordner ko
 | `playwright-cli` | https://github.com/microsoft/playwright-cli | 4bc00fb | Apache-2.0 | Zeile `allowed-tools` (vorab erteilte Bash-Rechte) entfernt; das npm-Paket `@playwright/cli` ist **nicht** installiert |
 | `extract-design` | https://github.com/Manavarya09/design-extract | 6050fdb | MIT | keine; das npm-Paket `designlang` ist **nicht** installiert, Aufruf per `npx` nur nach Freigabe je Lauf, Rechte an fremden Websites beachten |
 | `silent-ugc` | https://github.com/jasonlee-breadcrumb/silent-ugc | b9278da | MIT | keine; **braucht Arcads-MCP (Konto, Credits), yt-dlp, ffmpeg, nicht verbunden**. Nur mit eigener Darstellerin/Einwilligung, Kennzeichnung als KI/Werbung, Medienrechten; kein Download fremder Videos gegen Plattformregeln. Der eigene Skill `silent-ugc-workflow` bleibt getrennt |
+
+### Fish Audio (2026-11-08, auf Wunsch des Nutzers)
+| Skill-Ordner | Quelle | Commit | Lizenz | Hinweis |
+|---|---|---|---|---|
+| `fish-audio`, `fish-audio-sdk`, `fish-audio-api` | https://github.com/fishaudio/fish-audio-plugin (`plugins/fish-audio/skills`) | 6e18251 | MIT | nur Dokumentations-Skills kopiert, keine Skripte. **Nicht** übernommen: `.mcp.json` (Verbindung zu `https://api.fish.audio/mcp`); die Anmeldung per OAuth macht der Nutzer selbst. Fish Audio ist Sprachsynthese/-erkennung, **keine** Telefonanlage |
