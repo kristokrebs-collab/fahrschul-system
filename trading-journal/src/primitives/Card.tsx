@@ -279,7 +279,7 @@ export function Card({
         style={tiltDeg > 0 ? { borderRadius: radius.card, rotateX: srx, rotateY: sry, transformPerspective: persp } : { borderRadius: radius.card }}
         className={cn(
           // `p-px` instead of a CSS border: overflow clips at the padding box, so the ring layers below can light the edge
-          "group relative isolate h-full overflow-hidden rounded-2xl bg-background p-px duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5",
+          "group relative isolate h-full overflow-clip rounded-2xl bg-background p-px duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5",
           // a tilting card must not let a CSS transition smear the transform that Motion writes every frame
           tiltDeg > 0 ? "transition-[translate]" : "transition-transform",
           className,

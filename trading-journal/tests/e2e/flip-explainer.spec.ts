@@ -280,6 +280,25 @@ test.describe("Was ist ein Flip? – on the Top-Trader card", () => {
     await expectNoHorizontalScroll(page);
   });
 
+  test("the card cannot be pushed sideways: its glow is clipped, not scrollable (a taller card has a wider glow – scrolling it under the edge hid buttons and made clicks miss in CI)", async ({ page }) => {
+    const { card, box } = await openMarkt(page);
+    await expect(box).toHaveAttribute("data-kind", "flip", { timeout: 25_000 });
+    const after = await card.evaluate((el) => {
+      el.scrollLeft = 600;
+      el.scrollIntoView({ block: "center", inline: "center" });
+      return { left: el.scrollLeft, overflow: getComputedStyle(el).overflowX };
+    });
+    expect(after).toEqual({ left: 0, overflow: "clip" });
+    // the buttons of the archive row stay where a click finds them after Playwright's own scroll-into-view
+    const no = card.getByTestId("trader-net-archive-delete");
+    await no.scrollIntoViewIfNeeded();
+    expect(await card.evaluate((el) => el.scrollLeft)).toBe(0);
+    const b = (await no.boundingBox())!;
+    const c = (await card.boundingBox())!;
+    expect(b.x).toBeGreaterThanOrEqual(c.x);
+    expect(b.x + b.width).toBeLessThanOrEqual(c.x + c.width + 1);
+  });
+
   test("the alert link opens Einstellungen › Alarme and switches nothing on (this build has no account: the card and the note say so)", async ({ page }) => {
     const { box } = await openMarkt(page);
     const btn = box.getByRole("button", { name: "Bei Flip benachrichtigen" });
