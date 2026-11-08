@@ -76,3 +76,18 @@ Kosten nur, wo belegbar: **für keinen der Anbieter wurden Preise geprüft**; Ar
 - `opportunity-monitor` (tägliche Auftragssuche), `content-operating-system` (Trendbeobachtung), `social-carousel-publishing` (Veröffentlichungsplan): brauchen einen Planer (Cron/Server) und autorisierte Zugänge; Veröffentlichen nur nach Freigabe.
 - `whatsapp-client-agent`, `voice-reception`: brauchen dauerhaft erreichbaren Webhook-Server und Provider-Konten (nicht in dieser Sitzung leistbar).
 - Reihenfolge nach Nutzen und Sicherheit: 1) Skills nutzen (jetzt), 2) gsap-skills kopieren, 3) Konten klären (CRM, WhatsApp), 4) erst dann Outbound/Voice testen.
+
+## (h) Konten und Verbindung: WhatsApp, Kapso, ElevenLabs (Stand 2026-11-08)
+
+Der Nutzer hat WhatsApp-Business, ein Kapso-Konto und ein ElevenLabs-Konto. Neu im Repo (auf Wunsch): 12 Skills `elevenlabs-*` (offizielles Paket, MIT) und 4 Skills `kapso-*` (**Lizenz im Original fehlt**, bewusst trotzdem kopiert, nicht öffentlich weitergeben). Die Fish-Audio-Skills bleiben, sind aber nicht nötig, wenn ElevenLabs die Stimme liefert.
+
+| Dienst | Was du tust (nur du, im Anbieter-Dialog) | Wohin damit | Status |
+|---|---|---|---|
+| Kapso/WhatsApp | API-Key in der Kapso-Web-App (app.kapso.ai) erzeugen; alternativ in der Kapso-CLI `kapso login` | Umgebungsvariablen `KAPSO_API_KEY` und `KAPSO_API_BASE_URL=https://api.kapso.ai` (laut Kapso-README) | nicht verbunden, nicht getestet |
+| ElevenLabs | API-Key auf der API-Keys-Seite von elevenlabs.io erzeugen | Umgebungsvariable `ELEVENLABS_API_KEY` (laut offizieller README) | nicht verbunden, nicht getestet |
+| ElevenLabs-MCP (optional) | nichts, solange du nur die Skills willst | offizielles Paket `elevenlabs-mcp` (MIT), Start laut README mit `uvx elevenlabs-mcp` und dem Schlüssel in `ELEVENLABS_API_KEY`; **nicht installiert**, nur auf deine Freigabe | nicht installiert |
+| Telefon | Nummer/SIP-Trunk bei einem Telefonie-Anbieter besorgen; ElevenLabs Agents unterstützt laut offizieller Doku SIP-Trunking (Eingang und Ausgang). Twilio-Einzelheiten nicht geprüft | Anbieter-Dialog, dann in ElevenLabs Nummer importieren | Anbieter noch offen |
+
+Schlüssel gehören **nie in den Chat**. Zwei sichere Wege: (1) lokal in deinem Terminal oder deiner `.env` (nicht ins Repo), (2) für diese Cloud-Sitzung gibt es ein sicheres Formular: ich frage den Schlüssel dann gezielt an, du fügst ihn nur dort ein, ich sehe den Wert nie. Das mache ich erst, wenn ein echter Test nötig ist und du zustimmst.
+
+Reihenfolge zum Testen (ohne Risiko): 1) ElevenLabs-Key setzen, `elevenlabs-text-to-speech` mit einem kurzen Testsatz; 2) Kapso-Key setzen, Verbindung nur lesend prüfen; 3) Testnachricht nur an deine eigene Nummer; 4) erst danach echte Kunden, mit Einwilligung und Freigabe. Telefonaufzeichnung und KI-Hinweis vorher juristisch prüfen.
