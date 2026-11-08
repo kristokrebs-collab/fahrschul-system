@@ -128,6 +128,8 @@ async function openMarkt(page: Page, opts: OpenOpts = {}): Promise<Opened> {
   }
   const card = page.getByTestId(CARD);
   await card.scrollIntoViewIfNeeded();
+  // the card starts with the "Was ist ein Flip?" panel (Paket W): the plot sits below it and draws in when it is on screen
+  await card.getByRole("radiogroup", { name: "Reihe" }).scrollIntoViewIfNeeded();
   return { card, now: at, newest: Math.floor(at / HOUR) * HOUR };
 }
 
@@ -364,6 +366,7 @@ test.describe("Wal-Karte (C3): Top-Trader netto on the Markt page", () => {
     await expect(again.getByTestId("trader-net-line")).toHaveText("Binance liefert gerade nichts – gezeigt wird der Verlauf, den dieses Gerät gespeichert hat.");
     await expect(again.getByTestId("trader-net-prov-source")).toHaveText("Gespeicherter Verlauf auf diesem Gerät – Binance liefert gerade nichts");
     const plot = again.getByTestId("trader-net-plot");
+    await again.getByRole("radiogroup", { name: "Reihe" }).scrollIntoViewIfNeeded();
     await expect(plot).toHaveAttribute("data-drawn", "true", { timeout: 10_000 });
     expect(Number(await plot.getAttribute("data-points"))).toBeGreaterThanOrEqual(490);
     await expect(again.getByTestId("trader-net-kpi-net-value")).toHaveText(/^−\d+,\d Pkt\.$/);

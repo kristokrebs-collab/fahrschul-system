@@ -55,6 +55,8 @@ async function openMarkt(page: Page, opts: { light?: boolean; afterSeed?: () => 
   await expect(page.locator('[data-page="markt"][data-page-role="current"] h1').first()).toBeAttached({ timeout: 30_000 });
   const card = page.getByTestId(CARD);
   await card.scrollIntoViewIfNeeded();
+  // the card starts with the "Was ist ein Flip?" panel (Paket W): the plot sits below it and draws in when it is on screen
+  await card.getByRole("radiogroup", { name: "Reihe" }).scrollIntoViewIfNeeded();
   return { card, now: at, anchor };
 }
 

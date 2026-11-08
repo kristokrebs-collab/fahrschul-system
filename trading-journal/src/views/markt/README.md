@@ -201,6 +201,16 @@ Die große Karte oben kann jetzt mehr (`TraderNetCard.tsx`, Modell `traderNetWal
 
 Tests: `tests/unit/signals.netSeries.test.ts`, `alerts.replay.test.ts`, `market.netArchive.test.ts`, `views.markt.traderNetWal.test.tsx`, `tests/e2e/trader-net-wal.spec.ts` (mobil + Desktop; Fixture `slide-account` in `tests/e2e/mocks/synth.ts`; gegen Mocks, nicht gegen echte Binance-Werte – fapi antwortet aus dem Sandbox-Netz mit 451).
 
+## „Was ist ein Flip?“ (Runde 12, Paket W)
+Ganz oben in der Top-Trader-Karte (`FlipExplainer.tsx`, eigener Lazy-Chunk aus `TraderNetCard.tsx`, Platz bis dahin `flipExplainerReserve.ts`; `data-testid="flip-explainer"`, `data-kind` flip / flip-before / no-flip / balanced / loading / empty):
+- **Echte Daten** der Karte (die Reihe, die gerade gewählt ist): letzte 14 Tage als SVG – grüne Fläche über der Nulllinie (+), rote **schraffierte** darunter (−), Preislinie auf eigener Skala, Lücken als Band (nichts überbrückt), der letzte Flip mit Pfeil, Ring und Marke „Flip 05.11. · netto Short“ – nur wenn sein Kreuzungspunkt im Fenster liegt; sonst sagt der Satz darunter „Kein Flip …“ (Modell `flipExplainerModel.ts`, `flipModel`). Ohne Daten steht der Grund in demselben Kasten.
+- **Schema, keine Daten:** drei erfundene Bilder (netto long → kippt → netto short), so gekennzeichnet.
+- Wortlaut (`flipExplainerStrings.ts`): immer „Top-Trader (oberste 20 % nach Einsatz, Binance)“, nie das Wort für On-Chain-Wale und nie ein Datenanbieter; die Einordnung ist ein Hinweis, keine Prognose und keine Anlageempfehlung; „Wie lese ich das?“ erklärt Netto, Nulllinie, Flip und Grenzen.
+- **Alarm-Link:** „Bei Flip benachrichtigen“ öffnet nur Einstellungen › Alarme (`openFeature("vier-alarme")`); daneben steht, was Build und Tarif wirklich haben (`alarmNote`: kein Konto / Anmeldung nötig / Kanäle und Anrufe aus `PLAN_LIMITS`), nichts wird von hier aus eingeschaltet.
+- Bewegung: einmal beim ersten Sichtbarwerden (Linie zeichnet, Flächen füllen, Ring pulst einmal), reduziert = fertiges Bild.
+- Platz: die `PendingCard` der Karte in `MarktView.tsx` reserviert Karte + Feld (2702 / 1991 / 1669 px bei 390 / 820 / 1440).
+Tests: `tests/unit/views.markt.flipExplainer.test.tsx`, `tests/e2e/flip-explainer.spec.ts` (mobil + Desktop; Cloud-Ausgabe gegen Mocks mit `PW_CLOUD_BASE_URL`). Gegen Mocks geprüft, nicht gegen echte Binance-Werte.
+
 ## Etappe 1c (kürzere Seite)
 - Sechs Karten stehen eingeklappt in einer Zeile (`Fold`, „Mehr anzeigen“): Squeeze, Preis- & RSI-Struktur, Ähnliche Situationen, Alarme & Zustellprotokoll, Ereignisphasen (in `TermineSection`), Box-Einstellungen. Die `data-testid` der Karten bleiben im DOM; der Funktionsfinder öffnet die Karte beim Ansprung. Höhe bei 390 px: 21 273 → 11 200 px.
 
