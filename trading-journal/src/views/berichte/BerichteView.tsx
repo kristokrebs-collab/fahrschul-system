@@ -27,7 +27,7 @@ import { Reveal } from "@/motion/Reveal";
 import { Card } from "@/primitives/Card";
 import { FeatureLinks } from "@/app/FeatureLinks";
 import { Later } from "@/primitives/Later";
-import { RESERVE_CLASS, RESERVE_CLASS_DEFER, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
+import { CardSkeleton, RESERVE_CLASS, RESERVE_CLASS_DEFER, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
 import { Skeleton } from "@/primitives/Skeleton";
@@ -45,10 +45,14 @@ import { ReportHero } from "./ReportHero";
 import { MonthBenefitCard } from "./MonthBenefitCard";
 import { ExperimentCard, experimentVisible, WeekReviewCard } from "./WeekReview";
 import { WeekCloseCard, weekCloseVisible } from "./WeekCloseCard";
+import { DayCloseCard, dayCloseVisible } from "./DayCloseCard";
+import { JournalCard } from "./JournalCard";
 import { CompareCard, GoalsCard, MistakesCard, PerformanceCard, PsychCard, ReportRiskCard, StrategyCard } from "./sections";
 
 // F70: das Transaktionsbuch (Hilfsrechnung) – eigener Chunk, geladen mit der Seite
 const LedgerSection = lazy(() => import("./ledger/LedgerSection"));
+// Paket F2: "Frag dein Journal" (question parser, answer engine, result cards) – its own chunk, loaded with the page
+const AskJournalCard = lazy(() => import("./AskJournalCard").then((m) => ({ default: m.AskJournalCard })));
 
 export const BERICHTE_LEAD_FILL = { storageKey: storageKey("fill-berichte"), highlight: BERICHTE_HIGHLIGHT } as const;
 /** A finished report counts as opened after this long on screen. */
@@ -80,6 +84,8 @@ const SIZE = {
   mistakes: { base: 185, sm: 169, lg: 276 },
   goals: { base: 410, sm: 237, lg: 237 },
   review: { base: 907, sm: 774, lg: 754 },
+  journal: { base: 590, sm: 600 },
+  ask: { base: 560, sm: 400 },
 } as const satisfies Record<string, ReserveHeight>;
 
 function Arrow({ dir, onClick, disabled, label }: { dir: "prev" | "next"; onClick: () => void; disabled?: boolean; label: string }) {
@@ -134,6 +140,9 @@ export function BerichteView({ className }: { className?: string }) {
   const showExperiment = focus === "all" && kind === "week" && experimentVisible(page);
   // Paket P: the week report ends on behaviour – the closing card (a finished week with trades only)
   const showClose = focus === "all" && weekCloseVisible(page);
+  // Paket F2: "Heute abschließen" in the report of the running day / week; the entries of the period, one at a time
+  const showDay = focus === "all" && dayCloseVisible(page);
+  const showEntries = focus === "all" && !report.empty;
   // the cards on the page right now (they follow the focus and the kind of report), for the "Inhalt" strip
   const nav: SectionNavItem[] = [
     { id: "report-hero", label: "Bericht" },
@@ -151,8 +160,11 @@ export function BerichteView({ className }: { className?: string }) {
           ...(focus === "all" && kind === "week" ? [{ id: "week-review", label: "Wochenreview" }] : []),
         ]),
     ...(showExperiment ? [{ id: "week-experiment", label: "Experiment" }] : []),
+    ...(showEntries ? [{ id: "journal-cards", label: "Einträge" }] : []),
+    ...(showDay ? [{ id: "day-close", label: "Heute abschließen" }] : []),
     ...(showClose ? [{ id: "week-close", label: "Abschluss" }] : []),
     ...(focus === "all" && kind === "month" ? [{ id: "benefit-card", label: "Monatsnutzen" }] : []),
+    ...(focus === "all" ? [{ id: "ask-journal", label: "Frag dein Journal" }] : []),
     { id: "ledger-card", label: "Transaktionsbuch" },
   ];
   return (
@@ -264,6 +276,18 @@ export function BerichteView({ className }: { className?: string }) {
           <ExperimentCard page={page} />
         </Cell>
       )}
+      {/* Paket F2: the closed trades of the period, one at a time (Eintrag 06 von 12) in a frosted card before the word REVIEW */}
+      {showEntries && (
+        <Cell index={2} span="lg:col-span-12" size={SIZE.journal}>
+          <JournalCard key={period.key} trades={report.trades} settings={settings} />
+        </Cell>
+      )}
+      {/* Paket F2: "Heute abschließen" – the same ritual as the weekly closing, for the running day */}
+      {showDay && (
+        <Cell index={2} span="lg:col-span-12">
+          <DayCloseCard page={page} />
+        </Cell>
+      )}
       {/* Paket P: the closing of a finished week – behaviour and a lesson for tomorrow, never a result or an offer */}
       {showClose && (
         <Cell index={2} span="lg:col-span-12">
@@ -274,6 +298,14 @@ export function BerichteView({ className }: { className?: string }) {
       {focus === "all" && kind === "month" && (
         <Cell index={0} span="lg:col-span-12">
           <MonthBenefitCard page={page} />
+        </Cell>
+      )}
+      {/* Paket F2: a question to the whole journal, answered on the device (lazy chunk, reserved size) */}
+      {focus === "all" && (
+        <Cell index={1} span="lg:col-span-12" size={SIZE.ask}>
+          <Suspense fallback={<CardSkeleton rows={3} />}>
+            <AskJournalCard page={page} />
+          </Suspense>
         </Cell>
       )}
       {/* F70: independent of the period and the focus – the whole journal as a ledger */}

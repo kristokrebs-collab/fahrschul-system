@@ -6,7 +6,8 @@
  *  3. LDW (loss disguised as a win): a loss, an open or flat trade never earns a burst, no fanfare / confetti / near-miss words exist
  *     in the product's strings;
  *  4. no urgency words ("nur noch", "letzte Chance", countdown, scarcity, invented popularity) in the buy and tariff path;
- *  5. every opt-in is OFF by default (feedback channels, review reminder, the pause after losses).
+ *  5. every opt-in is OFF by default (feedback channels, review reminder, the pause after losses);
+ *  6. Frost (Paket F2): "Heute abschließen" rewards only done process, the journal card dresses no loss up, the question bar stays local.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -42,6 +43,7 @@ describe("1 · process feedback only after a process step", () => {
       "src/connect/BinanceWizard.tsx",
       "src/exchanges/ui/ConnectSheet.tsx",
       "src/onboarding/wizard/SetupWizard.tsx",
+      "src/views/berichte/DayCloseCard.tsx",
       "src/views/berichte/WeekCloseCard.tsx",
       "src/views/settings/DataCard.tsx",
       "src/views/wachstum/PreTradeCheck.tsx",
@@ -60,7 +62,7 @@ describe("1 · process feedback only after a process step", () => {
     for (const f of files) {
       for (const m of code(f).matchAll(/\bprocessDone\(\s*"([^"]+)"/g)) expect(PROCESS_EVENT_IDS, `${rel(f)}: ${m[1]}`).toContain(m[1]);
     }
-    expect([...PROCESS_EVENT_IDS].sort()).toEqual(["backup", "checklist", "connection", "weekReview", "wizard"]);
+    expect([...PROCESS_EVENT_IDS].sort()).toEqual(["backup", "checklist", "connection", "dayClose", "weekReview", "wizard"]);
   });
 });
 
@@ -274,5 +276,60 @@ describe("process feedback itself", () => {
     vibrate.mockRestore();
     tone.mockRestore();
     pf.useFeedbackPref.setState({ sound: false, haptic: false });
+  });
+});
+
+describe("6 · Frost (Paket F2): Heute abschließen, Journal-Karte, Frag dein Journal", () => {
+  it("the day's closing calls the confirmation exactly once, with the one event, and only in the branch of the closing that was `earned`", () => {
+    const src = code(join(SRC, "views/berichte/DayCloseCard.tsx"));
+    expect([...src.matchAll(/\bprocessDone\(/g)]).toHaveLength(1);
+    expect(src).toMatch(/if \(earned\) processDone\("dayClose"\)/);
+    // `earned` is the readiness of the PROCESS items at the moment of the tap – nothing else feeds it
+    expect(src).toMatch(/const earned = ready;/);
+    expect(src).toMatch(/const ready = dayCloseReady\(items\);/);
+    // the week's ritual and the day's ritual are the same component (no second system)
+    expect(code(join(SRC, "views/berichte/WeekCloseCard.tsx"))).toMatch(/<CloseRitual/);
+    expect(src).toMatch(/<CloseRitual/);
+  });
+
+  it("what decides a day's closing knows no profit, no loss, no trade count and no order", () => {
+    for (const f of ["src/domain/growth/dayClose.ts", "src/views/berichte/DayCloseCard.tsx", "src/views/berichte/CloseRitual.tsx"]) {
+      const src = code(join(ROOT, f));
+      expect(src, f).not.toMatch(/\b(pnl|net|winRate|profit|gain|avgR|sumR|equity|order|placeOrder)\b/i);
+      expect(src, f).not.toMatch(/\.r\b/);
+    }
+  });
+
+  it("the week of dots never says missed, risk or streak – and a closed day adds no dot by itself", () => {
+    const src = code(join(ROOT, "src/domain/growth/dayClose.ts"));
+    expect(src.replace(/^import .*$/gm, "")).not.toMatch(/verpass|Serie|streak|Gefahr|Lücke/i);
+    expect(src).toMatch(/journalDayOk\(p, key\)/); // the SAME predicate as the streaks
+    expect(src).not.toMatch(/dayClosesOf|\.closed\b/); // the closing flag is not read for the dots
+  });
+
+  it("the closing is recorded without the confirmation when something is open (the info toast carries no `milestone`)", () => {
+    const src = code(join(SRC, "views/berichte/DayCloseCard.tsx"));
+    expect(src).toMatch(/else pushToast\(\{ kind: "info"/);
+    expect(src).not.toMatch(/milestone/);
+  });
+
+  it("the journal card dresses nothing up: one tone function by sign, the same markup for each entry, no celebration in the card", () => {
+    const entries = code(join(ROOT, "src/domain/reports/entries.ts"));
+    expect(entries).toMatch(/tone: net == null \|\| net === 0 \? "mute" : net > 0 \? "win" : "loss"/);
+    const card = code(join(SRC, "views/berichte/JournalCard.tsx"));
+    expect(card).not.toMatch(/\b(celebrate\w*|processDone|confetti|Celebrate)\b/i);
+    expect(card).toMatch(/TONE_CLASS = \{ win: "text-win", loss: "text-loss", mute: "text-mute" \}/);
+  });
+
+  it("the question bar is local: no fetch, no API client, no model SDK in the parser, the answer engine, the word guard or the card", () => {
+    const parts = ["src/domain/ask/index.ts", "src/domain/ask/words.ts", "src/domain/coach/nlq/audit.ts", "src/domain/coach/nlq/parse.ts", "src/domain/coach/nlq/answer.ts", "src/views/berichte/AskJournalCard.tsx"];
+    for (const f of parts) expect(code(join(ROOT, f)), f).not.toMatch(/\bfetch\(|apiFetch|@anthropic-ai|XMLHttpRequest|WebSocket|navigator\.sendBeacon|rephraseAnswer|Math\.random/);
+  });
+
+  it("no pressure or festive word in the three new cards' strings", () => {
+    const bad = /nur noch|letzte chance|verpass|countdown|in gefahr|jetzt sofort|Glückwunsch|Rekord|Serie|knapp|fast gewonnen/i;
+    for (const f of ["views/berichte/JournalCard.tsx", "views/berichte/DayCloseCard.tsx", "views/berichte/CloseRitual.tsx", "views/berichte/AskJournalCard.tsx", "domain/ask/index.ts", "domain/growth/dayClose.ts"]) {
+      expect(code(join(SRC, f)), f).not.toMatch(bad);
+    }
   });
 });

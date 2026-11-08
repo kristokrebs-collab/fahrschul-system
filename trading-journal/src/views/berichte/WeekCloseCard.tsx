@@ -5,6 +5,9 @@
  *   Eine Lektion für morgen  the trader's own sentence (optional, ≤ 200 characters, kept with the week; the IKEA effect, honestly)
  *   Rückblick abschließen    marks the review as done in `settings.coach.reviews` (synced); a quiet process confirmation follows
  *                            (`processDone("weekReview")`: toast + optional vibration / tone). "Wieder öffnen" takes it back at any time.
+ *                            Paket F2: the round check button, the week's seven dots ("4 von 7 Tagen mit Rückblick"; a day without trades or
+ *                            text is neutral, nothing is ever "missed") and the two channels are the shared `CloseRitual` – the same one
+ *                            "Heute abschließen" (`DayCloseCard`) uses.
  *   Erinnerung               the opt-in reminder (`reviewReminder.ts`): OFF, in-app, once a week at most, quiet hours.
  *
  * Only for a finished week with trades. Nothing here asks for an upgrade, counts down or compares with other people.
@@ -20,6 +23,8 @@ import { Card } from "@/primitives/Card";
 import { inputClass, Input } from "@/primitives/Input";
 import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
+import { CloseRitual } from "./CloseRitual";
+import { usePrepared, useWeekDots } from "./closeData";
 import type { ReportPage } from "./hooks";
 import { REMINDER_DAYS, REMINDER_STRINGS, useReminderPref } from "./reviewReminder";
 
@@ -33,6 +38,8 @@ export const WEEK_CLOSE = {
   lessonHint: "Optional – ein Satz in deinen Worten.",
   placeholder: "z. B. Erst den Stop setzen, dann auf Kaufen tippen.",
   close: "Rückblick abschließen",
+  closeHint: "Ein Tipp – du ordnest die Woche ein.",
+  closedShort: "Rückblick abgeschlossen",
   reopen: "Wieder öffnen",
   reopened: "Der Rückblick ist wieder offen.",
   failed: "Nicht gespeichert",
@@ -136,6 +143,8 @@ export function WeekCloseCard({ page, className }: { page: ReportPage; className
     setDraft(stored?.lesson ?? "");
   }
   const [busy, setBusy] = useState(false);
+  const prepared = usePrepared(page);
+  const week = useWeekDots(prepared, period.from, !report.complete);
 
   const run = async (fn: () => Promise<void>, after?: () => void) => {
     if (busy) return;
@@ -194,14 +203,22 @@ export function WeekCloseCard({ page, className }: { page: ReportPage; className
         <span className="text-[11.5px] text-faint">{WEEK_CLOSE.lessonHint}</span>
       </div>
 
+      <CloseRitual
+        testid="week-close"
+        items={null}
+        dots={week.dots}
+        dotsText={week.text}
+        closed={closed}
+        ring
+        busy={busy}
+        action={{ label: WEEK_CLOSE.close, hint: WEEK_CLOSE.closeHint, done: WEEK_CLOSE.closedShort }}
+        onClose={close}
+      />
+
       <div className="flex flex-wrap items-center gap-2.5">
-        {closed ? (
+        {closed && (
           <Button variant="secondary" disabled={busy} onClick={reopen} data-testid="week-close-reopen">
             {WEEK_CLOSE.reopen}
-          </Button>
-        ) : (
-          <Button variant="primary" disabled={busy} onClick={close} data-testid="week-close-done">
-            {WEEK_CLOSE.close}
           </Button>
         )}
         {closedCount > 0 && (

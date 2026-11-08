@@ -9,6 +9,7 @@ export * from "./model";
 export * from "./context";
 export * from "./habits";
 export * from "./streaks";
+export * from "./dayClose";
 export * from "./progress";
 export * from "./challenges";
 export * from "./bests";

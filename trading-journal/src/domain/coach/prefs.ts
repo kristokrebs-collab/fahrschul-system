@@ -11,6 +11,9 @@
  *                        "I looked at this week" (never a score); `lesson` is his own sentence for tomorrow (≤ 200 characters). Re-opening
  *                        sets `closed: false` (a key is never deleted, so the merge of two devices stays lossless); newest 60 kept.
  *
+ *   coach.dayCloses      Paket F2 "Heute abschließen": the days the trader closed himself, `{ "2026-11-08": { closed, at, ready } }` – `ready`: the
+ *                        process items (checklist, review) were all done when he closed it; re-opening sets `closed: false`; newest 120 kept.
+ *
  * Writers return a NEW settings object with every other key untouched (unknown keys inside `coach` too).
  */
 import type { Settings } from "../types";
@@ -124,4 +127,41 @@ export function withWeekClosed(settings: Settings, key: string, patch: { closed:
     .sort((a, b) => (a[0] < b[0] ? 1 : -1))
     .slice(0, REVIEWS_MAX);
   return withCoach(settings, (c) => ({ ...c, reviews: Object.fromEntries(keep) }));
+}
+
+/* ------------------------------------------------------------------ Heute abschließen (Paket F2) */
+
+export const DAY_CLOSES_MAX = 120;
+const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The closing of one day as the trader left it (`closed: false` = re-opened). `ready`: the process items were all done when he closed it. */
+export interface DayClose {
+  closed: boolean;
+  /** ISO – when it was closed */
+  at: string;
+  ready: boolean;
+}
+
+/** The closed days of `settings` (`coach.dayCloses`, sanitised: day keys only). */
+export function dayClosesOf(settings: object): Record<string, DayClose> {
+  const raw = obj(obj((settings as { coach?: unknown }).coach).dayCloses);
+  const out: Record<string, DayClose> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (!DAY_KEY.test(k)) continue;
+    const o = obj(v);
+    out[k] = { closed: o.closed === true, at: typeof o.at === "string" ? o.at.slice(0, 40) : "", ready: o.ready === true };
+  }
+  return out;
+}
+
+/** Closes (or re-opens) the day `key`; the same object for an invalid key. Never deletes a key (the merge of two devices stays lossless); newest 120 kept. */
+export function withDayClosed(settings: Settings, key: string, patch: { closed: boolean; ready?: boolean }, now: number): Settings {
+  if (!DAY_KEY.test(key)) return settings;
+  const all = dayClosesOf(settings);
+  const prev = all[key];
+  const next: DayClose = { closed: patch.closed, at: patch.closed ? new Date(now).toISOString() : (prev?.at ?? ""), ready: patch.closed ? patch.ready === true : (prev?.ready ?? false) };
+  const keep = Object.entries({ ...all, [key]: next })
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .slice(0, DAY_CLOSES_MAX);
+  return withCoach(settings, (c) => ({ ...c, dayCloses: Object.fromEntries(keep) }));
 }

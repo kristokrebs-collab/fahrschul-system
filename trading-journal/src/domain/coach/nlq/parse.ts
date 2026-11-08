@@ -7,6 +7,7 @@
 import type { Setup } from "../../types";
 import type { BehaviorKey } from "../events";
 import { BEHAVIOR_LABEL } from "../events";
+import { AUDIT_LABEL, detectAudit, type AuditKind } from "./audit";
 import {
   ACCOUNT_VALUES,
   ASSET_ALIASES,
@@ -64,7 +65,7 @@ export interface Period {
   at: number;
 }
 
-export type IntentType = "metric" | "group" | "compare" | "list" | "behavior" | "summary" | "unknown";
+export type IntentType = "metric" | "group" | "compare" | "list" | "behavior" | "summary" | "audit" | "unknown";
 
 export interface Intent {
   raw: string;
@@ -81,6 +82,8 @@ export interface Intent {
   /** the two sides of a comparison (filters of the same dimension) */
   compare: [Filter, Filter] | null;
   behavior: BehaviorKey | null;
+  /** audit question (Paket F2): trades without stop / checklist skipped / without review / the losing trades */
+  audit: AuditKind | null;
   /** chips: how the question was read */
   understood: string[];
 }
@@ -426,8 +429,15 @@ export function parseQuestion(text: string, ctx: ParseContext): Intent {
   const isList = LIST_WORDS.some((w) => findPhrase(norm, w) >= 0);
   const isSummary = SUMMARY_WORDS.some((w) => findPhrase(norm, w) >= 0);
 
+  // audit questions (Paket F2). Two questions in one ("… ohne Stopp, Long gegen Short") are NOT answered by dropping one: unknown
+  let audit = detectAudit(norm);
+  if (audit === "outcomes" && (compare || period2 || groupBy || behavior || (metricHit && !["net", "count"].includes(metricHit.metric)))) audit = null;
+  const auditClash = audit !== null && audit !== "outcomes" && !!(compare || period2 || groupBy || behavior);
+
   let type: IntentType;
-  if (compare || period2) type = "compare";
+  if (auditClash) type = "unknown";
+  else if (audit) type = "audit";
+  else if (compare || period2) type = "compare";
   else if (behavior && !groupBy) type = "behavior";
   else if (groupBy) type = "group";
   else if (isList && !metricHit) type = "list";
@@ -439,8 +449,9 @@ export function parseQuestion(text: string, ctx: ParseContext): Intent {
   // "wie oft gewinne ich" is a win rate; "wie oft Revenge" is a count of events (handled by type behavior)
   if (metricHit?.metric === "count" && /gewinn/.test(norm)) metric = "winRate";
 
-  if (metricHit) understood.push(METRIC_LABEL[metric]);
-  if (behavior) understood.push(BEHAVIOR_LABEL[behavior]);
+  if (audit && !auditClash) understood.push(AUDIT_LABEL[audit]);
+  else if (metricHit) understood.push(METRIC_LABEL[metric]);
+  if (behavior && !audit) understood.push(BEHAVIOR_LABEL[behavior]);
   for (const f of plainFilters) understood.push(f.label);
   if (compare) understood.push(`${compare[0].label} vs. ${compare[1].label}`);
   if (period) understood.push(period.label);
@@ -448,7 +459,7 @@ export function parseQuestion(text: string, ctx: ParseContext): Intent {
   if (groupBy) understood.push(`pro ${DIM_LABEL[groupBy]}`);
   if (sort && type === "group") understood.push(sort === "best" ? "beste zuerst" : "schwächste zuerst");
 
-  return { raw: text, norm, type, metric, metricExplicit: !!metricHit, filters: plainFilters, period, period2, groupBy, sort, compare, behavior, understood };
+  return { raw: text, norm, type, metric, metricExplicit: !!metricHit, filters: plainFilters, period, period2, groupBy, sort, compare, behavior, audit, understood: auditClash ? [] : understood };
 }
 
 export const DIM_LABEL: Readonly<Record<GroupDim, string>> = {

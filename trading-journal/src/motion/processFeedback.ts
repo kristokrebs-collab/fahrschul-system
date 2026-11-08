@@ -4,7 +4,7 @@
  * (second channel; both default OFF, Einstellungen › Darstellung › Bewegung).
  *
  * It rewards PROCESS and nothing else. The event list below is closed on purpose: a finished weekly review, a complete checklist,
- * a backup that was written, a verified connection, a finished setup wizard. There is no event for a profit, a saved or closed trade
+ * a closed day whose checklist and review were done (Paket F2), a backup that was written, a verified connection, a finished setup wizard. There is no event for a profit, a saved or closed trade
  * or a loss – and a guard test (`tests/unit/psych.guard.test.ts`) fails when this file is called from anywhere near them.
  * `processDone` ignores anything outside the list (a typed call cannot name another one; an untyped one is dropped).
  *
@@ -19,6 +19,8 @@ import { pushToast } from "@/store/uiStore";
 export const PROCESS_EVENTS = {
   weekReview: { title: "Wochenrückblick abgeschlossen", detail: "Du hast die Woche eingeordnet." },
   checklist: { title: "Checkliste vollständig", detail: "Alle Punkte für heute sind abgehakt." },
+  // Paket F2 "Heute abschließen": only when the day's process items were all done at the moment of closing (`dayCloseReady`)
+  dayClose: { title: "Tag abgeschlossen", detail: "Checkliste und Review für heute sind erledigt." },
   backup: { title: "Backup erstellt", detail: "Deine Daten liegen als Datei bei dir." },
   connection: { title: "Verbindung geprüft", detail: "Nur lesend – du kannst sie jederzeit trennen." },
   wizard: { title: "Einrichtung abgeschlossen", detail: "Alle Schritte sind erledigt." },

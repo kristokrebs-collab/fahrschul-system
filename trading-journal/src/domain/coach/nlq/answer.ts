@@ -20,6 +20,7 @@ import { BEHAVIOR_LABEL, type BehaviorEvent } from "../events";
 import { BEHAVIOR_ADVICE, FALLBACK_HELP } from "../copy";
 import { behaviorReport, behaviorTrend, triggerOf } from "../behaviors";
 import { accountOf, fin, median } from "../shared";
+import { auditAnswer } from "./audit";
 import { METRIC_LABEL, type MetricKey } from "./lexicon";
 import { DIM_LABEL, assetBase, type Filter, type Intent, type Period } from "./parse";
 
@@ -58,6 +59,8 @@ export interface Answer {
   facts: AnswerFact[];
   /** evidence trade ids (≤ 6) */
   trades: string[];
+  /** audit questions only (Paket F2): EVERY trade the answer is about, newest first (`trades` = its first six) */
+  matched?: string[];
   chart: ChartSpec | null;
   confidence: AnswerConfidence;
   followUps: string[];
@@ -268,7 +271,10 @@ function metricAnswer(intent: Intent, data: AnswerData): Answer {
   if (m.ci && intent.metric === "winRate") text += ` Ehrliche Spanne: ${pct0(m.ci.lo)} bis ${pct0(m.ci.hi)}.`;
   else if (m.ci && intent.metric === "avgR") text += ` Spanne (80 %): ${fmtR(m.ci.lo)} bis ${fmtR(m.ci.hi)}.`;
   else if (m.ci && intent.metric === "expectancy") text += ` Spanne (80 %): ${money(m.ci.lo, data.currency)} bis ${money(m.ci.hi, data.currency)}.`;
-  if (m.trade) text = `${label} (${scope}): ${m.text} am ${tradeTime(m.trade).toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" })}${m.trade.pair ? ` · ${m.trade.pair}` : ""}.`;
+  // "größter Verlust" with no losing trade (or "bester Trade" with no winner) is not answered with the other sign
+  const noSuch = (intent.metric === "worst" && m.trade && (m.trade.pnl ?? 0) >= 0) || (intent.metric === "best" && m.trade && (m.trade.pnl ?? 0) <= 0);
+  if (noSuch && m.trade) text = `${intent.metric === "worst" ? "Kein Verlusttrade" : "Kein Gewinntrade"} (${scope}): der ${intent.metric === "worst" ? "schwächste" : "stärkste"} von ${g.n} Trade${g.n === 1 ? "" : "s"} liegt bei ${m.text}.`;
+  else if (m.trade) text = `${label} (${scope}): ${m.text} am ${tradeTime(m.trade).toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" })}${m.trade.pair ? ` · ${m.trade.pair}` : ""}.`;
   const facts: AnswerFact[] = [{ label, value: m.text, raw: m.value, tone: m.tone }, ...baseFacts(g, data.currency).filter((f) => f.label !== label && !(intent.metric === "net" && f.label === "Netto") && !(intent.metric === "count" && f.label === "Trades"))];
   const conf = sampleConfidence(g.n);
   const chart: ChartSpec | null = ts.length >= 3 && ["net", "expectancy", "sumR", "maxDD", "count"].includes(intent.metric) ? { type: "line", label: "Kumuliertes P&L", values: equityLine(ts) } : null;
@@ -523,6 +529,8 @@ export function answerIntent(intent: Intent, data: AnswerData): Answer {
       return behaviorAnswer(intent, data);
     case "list":
       return listAnswer(intent, data);
+    case "audit":
+      return auditAnswer(intent, data);
     case "summary":
       return summaryAnswer(intent, data);
     default:

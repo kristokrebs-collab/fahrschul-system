@@ -13,6 +13,7 @@ import { assetBase, parseQuestion, type Intent, type ParseContext } from "./pars
 export * from "./lexicon";
 export * from "./parse";
 export * from "./answer";
+export * from "./audit";
 
 /** The chip question of each behaviour (all understood by the parser). */
 export const BEHAVIOR_QUESTION: Readonly<Record<BehaviorKey, string>> = {
