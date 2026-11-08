@@ -1,8 +1,8 @@
 /**
- * Paket B – the order window after the Rücknahme R2 (it looks as before Paket B again: one column, the summary, the button with its
- * orbs – no plan card, no path band, no stage), the VIS-05/06/07 sums, the hand-over and the way back after a failed order, and the
- * result page's glow that belongs to the SERVER-confirmed state only (the result page keeps its plan card). Mocked fetch: this proves
- * the browser flow, not a Stripe account.
+ * The order window – since Paket V the payment window of the reference recording (step band, card left, form right) – in its hand-over
+ * mode (no publishable key here, Stripe Tax on): the VIS-05/06/07 sums, the hand-over to Stripe Checkout with the button's orbs and the way
+ * back after a failed order, and the result page's glow that belongs to the SERVER-confirmed state only. Mocked fetch: this proves the
+ * browser flow, not a Stripe account. The order paid in the app has its own file (`billing.payWindow.test.tsx`).
  */
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -74,10 +74,16 @@ const tick = () => {
   fireEvent.click(within(screen.getByTestId("order-immediate")).getByRole("checkbox"));
 };
 
-describe("Rücknahme R2: the order window of before Paket B", () => {
-  it("one column, no plan card, no path band, no footer total – the summary with price, renewal and cancellation, the button with its fixed words", async () => {
+describe("Paket V: the payment window in its hand-over mode", () => {
+  it("step band, card left, summary with price, renewal and cancellation, the button with its fixed words – the card fields are Stripe's own page", async () => {
     await openTheOrder({ plan: "premium", interval: "year", seats: 1 });
-    for (const id of ["plan-card-art", "order-steps", "order-flip", "order-card-note", "order-footer-total"]) expect(screen.queryByTestId(id), id).toBeNull();
+    expect(screen.getByTestId("order-sheet")).toHaveAttribute("data-source", "redirect");
+    expect(screen.getByTestId("order-steps")).toHaveTextContent(/Auswahl.*Konto.*3.*Zahlung/);
+    expect(screen.getByTestId("pay-card")).toBeInTheDocument();
+    expect(screen.getByTestId("order-handover")).toHaveTextContent("im nächsten Schritt bei Stripe");
+    expect(screen.queryByTestId("pay-number")).toBeNull();
+    // the result page's plan card is another component: the window's card never claims a confirmed state
+    expect(screen.queryByTestId("plan-card-art")).toBeNull();
     expect(screen.getByTestId("order-total")).toHaveTextContent("240 €");
     expect(screen.getByTestId("order-renewal")).toHaveTextContent("verlängert sich automatisch");
     expect(screen.getByTestId("order-cancel")).toBeInTheDocument();
@@ -109,7 +115,7 @@ describe("VIS-05/06/07: the summary names what follows the trial – and the Tea
   });
 });
 
-describe("the hand-over: the button of before Paket B", () => {
+describe("the hand-over to Stripe Checkout", () => {
   it("click → the button shows its orbs, a second click sends nothing more; nothing is claimed", async () => {
     checkout = "hang";
     const sheet = await openTheOrder();

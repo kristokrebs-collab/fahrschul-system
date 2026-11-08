@@ -5,6 +5,9 @@
  *
  * - `handle()` answers `/api/v1/billing/status|checkout|portal|contract|code|referral` from `MockBilling.state` (the plan of the signed-in
  *   mock user is never taken from the client – a checkout only becomes a plan when the fake Stripe page "pays");
+ * - Paket V, the order paid in the app: `/billing/subscribe` (start → a `setup` / `payment` intent; with `setupIntent` → the trial subscription)
+ *   and `/billing/demo-confirm` (what Stripe.js would do in the browser – here only a VERDICT of the demo card fields arrives, never a
+ *   number: `ok` · `declined` · `funds` · `unpaid` = the payment fails after the check). The subscription lands like the webhook would;
  * - `completeCheckout()` is the fake Stripe page's "Jetzt abonnieren" (as the webhook would: the subscription lands according to `outcome`),
  *   `cancelCheckout()` its "Zurück"; both return the URL the real Stripe would redirect to (`success_url` / `cancel_url`);
  * - `portalUrl` helpers give the fake Customer Portal its "Zurück zum Journal".
@@ -66,6 +69,18 @@ export interface MockBilling {
   contracts: ContractDeclaration[];
   confirmed: string[];
   calls: string[];
+}
+
+/** Paket V: an order paid in the app (one per order id). */
+interface EmbeddedOrder {
+  req: CheckoutRequest;
+  key: string;
+  kind: "setup" | "payment";
+  secret: string;
+  n: number;
+  confirmed: boolean;
+  landed: string | null;
+  verdict: string | null;
 }
 
 export interface BillingSnapshot {
@@ -172,6 +187,27 @@ export function createBillingCore(opts: MockBillingOptions = {}): BillingCore {
     opts.onChange?.();
   };
   const sessions = new Map<string, string>(snap?.sessions ?? []);
+  const embedded = new Map<string, EmbeddedOrder>();
+  const cents = (r: Pick<CheckoutRequest, "plan" | "interval" | "seats">): number => {
+    const base = r.plan === "premium" ? 2400 : r.plan === "team" ? 1900 : 1200;
+    return (r.interval === "year" ? base * 10 : base) * (r.plan === "team" ? (r.seats ?? 2) : 1);
+  };
+  /** What the webhook would write once Stripe has the card (trial) or the first payment (no trial): per `outcome` / the demo verdict. */
+  const landEmbedded = (o: EmbeddedOrder): string => {
+    if (o.landed) return o.landed;
+    const id = `sub_demo_${o.n}`;
+    o.landed = id;
+    const outcome = o.verdict === "unpaid" ? "unpaid" : (opts.outcome ?? "trialing");
+    const status = outcome === "never" ? null : outcome === "unpaid" ? "unpaid" : o.kind === "setup" ? "trialing" : outcome === "trialing" ? "active" : outcome;
+    if (!status) return id;
+    const sub = mockSubscription({ id, plan: o.req.plan, interval: o.req.interval, seats: o.req.seats ?? 1, amount: cents(o.req), status, ...(status === "trialing" ? {} : { trialEnd: null }) });
+    const planState: PlanInfo = status === "incomplete" || status === "unpaid" ? { plan: "free", status, trialEnd: null } : { plan: o.req.plan, status, trialEnd: sub.trialEnd };
+    if ((opts.webhookAfterStatusCalls ?? 0) > 0) {
+      statusCalls = 0;
+      held = { key: o.key, plan: planState, subscription: sub };
+    } else write(o.key, { ...read(o.key), plan: planState, subscription: sub, hasCustomer: true, trialUsed: true });
+    return id;
+  };
   let statusCalls = 0;
   let held: { key: string; plan: PlanInfo; subscription: SubscriptionSummary } | null = null;
   let pending: { req: CheckoutRequest; origin: string; key: string } | null = snap?.pending ?? null;
@@ -231,6 +267,49 @@ export function createBillingCore(opts: MockBillingOptions = {}): BillingCore {
         sessions.set(r.orderId, sid);
         opts.onChange?.();
         return send(200, { url: `https://checkout.stripe.com/c/pay/${sid}`, sessionId: sid });
+      }
+      case "/api/v1/billing/subscribe": {
+        if (!authed) return err(401, "unauthenticated", "Bitte melde dich an.");
+        if (!cfg.enabled) return err(503, "billing_unavailable", "Zahlungen sind noch nicht eingerichtet.");
+        if (!cfg.purchaseOpen) return err(503, "purchase_closed", "Die Bestellung ist noch nicht freigeschaltet.");
+        // like the real function: Stripe Tax needs the address only Stripe Checkout asks → the app hands over
+        if (cfg.automaticTax) return err(409, "embedded_unavailable", "Mit Steuerberechnung geht die Bestellung über die Bezahlseite von Stripe.");
+        const r = body as unknown as CheckoutRequest & { setupIntent?: string };
+        if (!r.consents?.terms || !r.consents?.immediateStart) return err(422, "consent_required", "Bitte bestätige beide Kästchen vor der Bestellung.");
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(r.orderId ?? ""))) return err(422, "invalid_body", "Ungültige Bestellung.");
+        const known = embedded.get(r.orderId);
+        if (r.setupIntent) {
+          if (!known || known.kind !== "setup" || !known.confirmed || r.setupIntent !== `seti_demo_${known.n}`) return err(409, "card_unconfirmed", "Die Karte ist noch nicht bestätigt.");
+          const id = landEmbedded(known);
+          opts.onChange?.();
+          return send(200, { kind: "created", subscriptionId: id, trialDays: opts.trialDays ?? 14, card: { brand: "visa", last4: "4242" } });
+        }
+        const st = read(key);
+        if (st.subscription && ["active", "trialing", "past_due", "paused"].includes(st.subscription.status)) return err(409, "already_subscribed", "Du hast schon ein Abo. Tarif wechseln oder kündigen kannst du im Kundenportal.");
+        if (r.code && !opts.codes?.[String(r.code).toUpperCase()]) return err(422, "invalid_code", "Dieser Code ist ungültig oder abgelaufen.");
+        let o = known;
+        if (!o) {
+          mock.checkouts.push(r);
+          const n = mock.checkouts.length;
+          const trial = !st.trialUsed && (opts.trialDays ?? 14) > 0;
+          o = { req: r, key, kind: trial ? "setup" : "payment", secret: `demo_${trial ? "seti" : "pi"}_${n}_secret_x`, n, confirmed: false, landed: null, verdict: null };
+          embedded.set(r.orderId, o);
+          opts.onChange?.();
+        }
+        return send(200, { kind: o.kind, clientSecret: o.secret, subscriptionId: o.kind === "payment" ? `sub_demo_${o.n}` : null, trialDays: o.kind === "setup" ? (opts.trialDays ?? 14) : 0 });
+      }
+      case "/api/v1/billing/demo-confirm": {
+        if (!authed) return err(401, "unauthenticated", "Bitte melde dich an.");
+        const o = [...embedded.values()].find((x) => x.secret === String(body.clientSecret ?? ""));
+        if (!o) return err(404, "not_found", "Diese Bestellung gibt es nicht.");
+        const verdict = String(body.verdict ?? "");
+        if (verdict === "declined") return err(402, "card_declined", "Die Karte wurde abgelehnt. Es wurde nichts berechnet.");
+        if (verdict === "funds") return err(402, "insufficient_funds", "Die Karte ist nicht ausreichend gedeckt. Es wurde nichts berechnet.");
+        o.confirmed = true;
+        o.verdict = verdict;
+        if (o.kind === "payment") landEmbedded(o);
+        opts.onChange?.();
+        return send(200, { intentId: o.kind === "setup" ? `seti_demo_${o.n}` : `pi_demo_${o.n}` });
       }
       case "/api/v1/billing/portal": {
         if (!authed) return err(401, "unauthenticated", "Bitte melde dich an.");

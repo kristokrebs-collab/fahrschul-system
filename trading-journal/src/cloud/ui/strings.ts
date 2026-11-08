@@ -85,6 +85,28 @@ export const AUTH = {
   signedOutDetail: "Dein Journal bleibt in diesem Browser.",
   signedIn: "Angemeldet",
   unavailable: "Cloud nicht eingerichtet",
+  /** Paket V: the landscape card (form half + the dark band with the brand half). */
+  card: {
+    close: "Schließen",
+    brand: {
+      a: { eyebrow: "TRADE JOURNAL", line1: "Willkommen", line2: "zurück.", text: "Deine Trades, Notizen und Einstellungen – genau da, wo du sie gelassen hast." },
+      b: { eyebrow: "TRADE JOURNAL", line1: "Dein Journal.", line2: "Dein Start.", text: "Ein Konto für alle Geräte. Deine Daten liegen verschlüsselt in der EU." },
+    },
+    name: "Name",
+    nameHint: "Freiwillig – steht später als Karteninhaber im Bezahlfenster.",
+    remember: "Angemeldet bleiben",
+    rememberHint: "Aus: Nach 30 Minuten ohne Aktivität wirst du auf diesem Gerät abgemeldet (Konto → Sicherheit).",
+    newHere: "Neu hier?",
+    create: "Konto erstellen",
+    haveAccount: "Schon ein Konto?",
+    signin: "Anmelden",
+    magicAsk: "Lieber ohne Passwort?",
+    magicLink: "Link per E-Mail",
+    passwordAsk: "Lieber mit Passwort?",
+    passwordLink: "Mit Passwort anmelden",
+    magicLead: "Wir schicken dir einen Link. Ein Klick, und du bist drin.",
+    pwRule: "Mindestens 10 Zeichen.",
+  },
 } as const;
 
 export const KONTO = {

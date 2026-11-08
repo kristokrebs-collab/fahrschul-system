@@ -16,10 +16,19 @@ export const SIGN_IN_EMAIL = "trader@example.com";
 export const SIGN_IN_PASSWORD = "richtig-geheim-42";
 
 /**
+ * Waits until the login window's band run is over (Paket V, `AuthWindow.tsx`): during the 900 ms run the leaving half is still in
+ * the DOM (covered by the band, `aria-hidden`, inert from the swap on), so a label locator would find its field too.
+ */
+export async function bandSettled(page: Page, timeout = 20_000): Promise<void> {
+  await expect(page.locator(".aw-col[data-leaving]")).toHaveCount(0, { timeout });
+}
+
+/**
  * Waits until the control and none of its ancestors is `inert` (the sheet body is inert until its morph has settled, and the
  * morphing login keeps other, hidden views inert for good – so "no inert element anywhere in the dialog" is the wrong test).
  */
 export async function expectNotInert(control: Locator, timeout = 20_000): Promise<void> {
+  await bandSettled(control.page(), timeout);
   await expect.poll(() => control.evaluate((el) => el.closest("[inert]") === null), { timeout }).toBe(true);
 }
 

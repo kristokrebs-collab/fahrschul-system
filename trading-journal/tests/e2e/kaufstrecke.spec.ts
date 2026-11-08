@@ -1,6 +1,7 @@
 /**
- * Kaufstrecke (B4) end to end against the Supabase mock and the billing / (FAKE) Stripe mock: choice → login → order summary
- * (exact button text, both boxes) → fake Stripe Checkout → return → result page in all five states; the locked flow; cancel
+ * Kaufstrecke (B4) end to end against the Supabase mock and the billing / (FAKE) Stripe mock: choice → login → the payment window of Paket V
+ * (this build has no publishable key, so it hands over to Checkout; exact button text, both boxes) → fake Stripe Checkout → return → result
+ * page in all five states; the locked flow; cancel
  * and withdraw WITHOUT a login; hit boxes, layout shift of the order button, accessibility (axe, dark + light).
  *
  * Everything runs on the cloud edition against mocks: it proves the browser flow, NOT a real Stripe account, a real webhook
@@ -39,9 +40,13 @@ async function ready(sheet: Locator): Promise<void> {
 async function signInViaSheet(page: Page): Promise<void> {
   const sheet = page.getByRole("dialog", { name: /Anmelden|Konto erstellen|Registrieren/ }).first();
   await ready(sheet);
-  // the card opens the registration: switch to the login of the existing account
-  const mode = sheet.getByRole("radio", { name: "Passwort", exact: true });
-  if (await mode.count()) await mode.click();
+  // the card opens the registration: switch to the login of the existing account (the footer link; the band runs back)
+  const toLogin = sheet.getByTestId("auth-to-signin");
+  if (await toLogin.count()) {
+    await toLogin.click();
+    await expect(page.getByRole("dialog", { name: "Anmelden" })).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.aw-col[data-side="b"]')).toHaveCount(0, { timeout: 3_000 });
+  }
   await sheet.getByLabel("E-Mail").fill(EMAIL);
   await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
   await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
@@ -119,17 +124,24 @@ test.describe("Kaufstrecke", () => {
     expect(errors).toEqual([]);
   });
 
-  test("Bestellfenster wie vor Paket B (Rücknahme R2): eine Spalte, keine Kartengrafik, kein Ablaufband, keine Summe am Knopf", async ({ page }) => {
+  test("Bezahlfenster (Paket V) ohne Publishable Key: Aufbau wie im Vorbild (Schrittband, Karte links, Formular rechts), bestellt wird über Stripe Checkout", async ({ page }) => {
     await setup(page);
     await openRoute(page, PREISE, "Preise", { timeout: 30_000 });
     await signInHeader(page);
     await page.getByTestId("cta-premium").click();
     const sheet = page.getByTestId("order-sheet");
     await expect(sheet).toBeVisible({ timeout: 20_000 });
-    for (const id of ["plan-card-art", "order-steps", "order-flip", "order-card-note", "order-footer-total"]) await expect(page.getByTestId(id), id).toHaveCount(0);
+    // this build has no VITE_STRIPE_PUBLISHABLE_KEY: the same window, the card fields are Stripe's own page (the hand-over)
+    await expect(sheet).toHaveAttribute("data-source", "redirect");
+    await expect(page.getByTestId("order-steps")).toContainText("Auswahl");
+    await expect(page.getByTestId("order-steps")).toContainText("Zahlung");
+    await expect(page.getByTestId("pay-card")).toBeVisible();
+    await expect(page.getByTestId("order-handover")).toContainText("im nächsten Schritt bei Stripe");
     await expect(sheet.getByTestId("order-total")).toContainText("240 €");
     await page.getByRole("radio", { name: "Monatlich" }).click();
     await expect(sheet.getByTestId("order-total")).toContainText("24 €");
+    // without the key nothing of Stripe.js is loaded
+    expect(await page.evaluate(() => Array.from(document.querySelectorAll("script")).some((s) => s.src.includes("js.stripe.com")))).toBe(false);
     await expectNoHorizontalScroll(page);
   });
 
@@ -341,7 +353,7 @@ test.describe("Kaufstrecke", () => {
     expect(during!.width).toBeCloseTo(before!.width, 0);
     expect(during!.height).toBeCloseTo(before!.height, 0);
     await expect(pay.getByTestId("button-orbs")).toBeAttached();
-    // the window keeps its size while the button works (no stage covers it any more – Rücknahme R2)
+    // the window keeps its size while the button works (the hand-over: the card stays where it is, nothing flies)
     await expect(page.getByTestId("pay-stage")).toHaveCount(0);
     const panelDuring = await panel.boundingBox();
     expect(Math.abs(panelDuring!.height - panelBefore!.height), "the order window does not change its height while the order is sent").toBeLessThanOrEqual(2);

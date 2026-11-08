@@ -7,9 +7,11 @@
  * sandbox gets 451 / 403), so this file asserts the card and its texts, never market numbers.
  *
  * Covered: the fixed banner (no control, the footer's legal links stay clear of it), the panel (closed until its pill is clicked) and a working jump for every
- * entry (sign-in, registration → simulated mail link → wizard, order window Premium yearly → the demo card page with its choreography → "Tarif aktiv", Markt ›
+ * entry (sign-in, registration → simulated mail link → wizard, the payment window Premium yearly with the DEMO card fields of Paket V (the card fills, turns at the
+ * security code, flies to the middle, "Testphase läuft" only after the mock server says so) → plan active, Markt ›
  * Top-Trader-Karte with "Was ist ein Flip?", the coach's "Mit KI formulieren", the weekly close, the wizard, the share fan, the motion settings), the declined
- * demo card, the payment error case, sign-in with the demo access, password reset by the simulated link, axe (dark, panel + payment page), reduced motion,
+ * demo card (the card flies back, the message at the field), the payment that fails after the check, sign-in with the demo access, password reset by the simulated
+ * link, axe (dark, panel + payment window), reduced motion,
  * nothing wider than the screen.
  */
 import AxeBuilder from "@axe-core/playwright";
@@ -244,96 +246,103 @@ test.describe("Showroom", () => {
     expect(appOnly(errors), errors.join("\n")).toEqual([]);
   });
 
-  test("Bezahlen: Premium jährlich → Bestellung → Demo-Karte (live, Flip beim CVC) → Prüfung → Bezahlt (Demo) → Tarif aktiv", async ({ page }) => {
+  test("Bezahlen (Paket V): Premium jährlich → Bezahlfenster mit Demo-Feldern → Karte füllt sich, wendet bei der Prüfziffer → fliegt in die Mitte → „Testphase läuft“ erst nach dem Server → Tarif aktiv", async ({ page }) => {
     const errors = collectErrors(page);
     const foreign = foreignRequests(page);
     await open(page);
     await waitSignedIn(page);
     await jump(page, "order");
-    const sheet = page.getByTestId("order-sheet");
-    await expect(sheet).toBeVisible({ timeout: 40_000 });
-    // the order window of before Paket B (Rücknahme R2): no path band, no stage
-    await expect(page.getByTestId("order-steps")).toHaveCount(0);
-    for (const box of await sheet.getByRole("checkbox").all()) await box.check();
-    await page.getByTestId("order-pay").click();
-
-    // the simulated hosted page: labelled as a demo, in the real purchase the card goes to Stripe
-    const pay = page.getByTestId("demo-checkout");
-    await expect(pay).toBeVisible({ timeout: 30_000 });
-    await expect(pay).toContainText("Demo-Karte – nichts wird gespeichert oder gesendet");
-    await expect(pay).toContainText("Im echten Kauf gibst du die Karte bei Stripe ein");
-    // typing fills the card graphic live
-    await page.getByTestId("demo-holder").fill("Ada Beispiel");
-    await page.getByTestId("demo-number").fill("4242424242424242");
-    await page.getByTestId("demo-expiry").fill("1234");
-    await expect(page.getByTestId("demo-card-holder")).toHaveText("Ada Beispiel");
-    await expect(page.getByTestId("demo-card-number")).toHaveText("4242 4242 4242 4242");
-    await expect(page.getByTestId("demo-card-expiry")).toHaveText("12/34");
-    // the CVC field turns the card over, leaving it turns it back
-    await expect(page.getByTestId("demo-card")).toHaveAttribute("data-flipped", "0");
+    const win = page.getByTestId("order-sheet");
+    await expect(win).toBeVisible({ timeout: 40_000 });
+    // the window of the recording: step band, card left, form right – here with the DEMO fields (no Stripe in the Showroom), said so
+    await expect(win).toHaveAttribute("data-source", "demo");
+    await expect(page.getByTestId("order-steps")).toContainText("Zahlung");
+    await expect(page.getByTestId("pay-demo-badge")).toHaveText("DEMO");
+    await page.getByTestId("pay-holder").fill("Ada Beispiel");
+    await expect(page.getByTestId("pay-card-holder")).toHaveText("ADA BEISPIEL");
+    await page.getByTestId("demo-number").pressSequentially("4242424242424242");
+    // the card shows only what Stripe would tell: the groups are full, the brand – never the digits
+    await expect(page.getByTestId("pay-card-number")).toHaveAttribute("data-groups", "4");
+    await expect(page.getByTestId("pay-card-number")).not.toContainText("4242");
+    await expect(page.getByTestId("pay-card-brand")).toHaveText("VISA");
+    await page.getByTestId("demo-expiry").pressSequentially("1234");
+    const flipper = page.getByTestId("pay-card-flipper");
+    await expect(flipper).toHaveAttribute("data-flipped", "0");
     await page.getByTestId("demo-cvc").focus();
-    await expect(page.getByTestId("demo-card")).toHaveAttribute("data-flipped", "1");
-    await page.getByTestId("demo-cvc").fill("123");
-    await expect(page.getByTestId("demo-card-cvc")).toHaveText("123");
-    await page.getByTestId("demo-holder").focus();
-    await expect(page.getByTestId("demo-card")).toHaveAttribute("data-flipped", "0");
+    await expect(flipper).toHaveAttribute("data-flipped", "1");
+    await page.getByTestId("demo-cvc").pressSequentially("123");
+    await expect(page.getByTestId("pay-card-cvc")).toHaveText("•••");
+    await page.getByTestId("pay-holder").focus();
+    await expect(flipper).toHaveAttribute("data-flipped", "0");
     await expectNoHorizontalScroll(page);
-    await page.getByTestId("demo-pay").click();
-    await expect(page.getByTestId("demo-auth")).toHaveAttribute("data-phase", "authorising");
-    await expect(page.getByText("Die Bank wird gefragt …")).toBeVisible();
-    await expect(page.getByTestId("demo-auth")).toHaveAttribute("data-phase", "done", { timeout: 20_000 });
-    await expect(page.getByTestId("demo-result")).toContainText("Bezahlt (Demo)");
-    await page.getByTestId("demo-continue").click();
-    // back in the journal: the result page asks the mock server, the note says Demo
-    await expect(page.getByText("Dein Abo ist aktiv").first()).toBeVisible({ timeout: 40_000 });
-    await expect(page.getByText("Demo: Tarif aktiv (simuliert)").first()).toBeVisible({ timeout: 20_000 });
+    for (const box of await win.getByRole("checkbox").all()) await box.check();
+    await page.getByTestId("order-pay").click();
+    // the card lifts (the Animations API sees the 300 ms flight on the measured curve), the status shows in place
+    const lift = await page.evaluate(() => document.getAnimations().filter((a) => a.id === "pay:card-lift" || a.id === "pay:card-fade").map((a) => (a.effect as KeyframeEffect).getTiming().duration));
+    expect(lift.length).toBe(1);
+    await expect(win).toHaveAttribute("data-pay-phase", "confirmed", { timeout: 30_000 });
+    await expect(page.getByTestId("pay-status-title")).toHaveText(/Testphase läuft|Bezahlt/);
+    await page.getByTestId("pay-done").click();
+    await expect(win).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("tj2-billing") ?? "")).toContain('"plan":"premium"');
     expect(foreign, foreign.join("\n")).toEqual([]);
     expect(appOnly(errors), errors.join("\n")).toEqual([]);
   });
 
-  test("Bezahlen: die abgelehnte Demo-Karte (4000 0000 0000 0002) und der Fehlerfall nach der Prüfung", async ({ page }) => {
+  test("Bezahlen: die abgelehnte Demo-Karte (4000 0000 0000 0002) fliegt zurück, die Meldung steht am Feld; die Zahlung, die nach der Prüfung scheitert, auch", async ({ page }) => {
     await open(page);
     await waitSignedIn(page);
     await jump(page, "order");
-    const sheet = page.getByTestId("order-sheet");
-    await expect(sheet).toBeVisible({ timeout: 40_000 });
-    for (const box of await sheet.getByRole("checkbox").all()) await box.check();
+    const win = page.getByTestId("order-sheet");
+    await expect(win).toBeVisible({ timeout: 40_000 });
+    for (const box of await win.getByRole("checkbox").all()) await box.check();
+    // an empty form: nothing goes out, the fields say what is missing
     await page.getByTestId("order-pay").click();
-    await expect(page.getByTestId("demo-checkout")).toBeVisible({ timeout: 40_000 });
-    await page.getByTestId("demo-pay").click(); // empty form: nothing happens but the hint
-    await expect(page.getByTestId("demo-error")).toContainText("Bitte fülle alle Felder");
-    await page.getByTestId("demo-fill-decline").click();
-    await page.getByTestId("demo-pay").click();
-    await expect(page.getByTestId("demo-error")).toContainText("abgelehnt", { timeout: 20_000 });
-    await expect(page.getByTestId("demo-checkout")).toHaveAttribute("data-phase", "form");
-    // the error case "payment fails after the check": the result page says so, nothing is activated
-    await page.getByTestId("demo-fill-ok").click();
-    await page.getByTestId("demo-outcome").selectOption("unpaid");
-    await page.getByTestId("demo-pay").click();
-    await expect(page.getByTestId("demo-result")).toContainText("gescheitert", { timeout: 20_000 });
-    await page.getByTestId("demo-continue").click();
-    await expect(page.getByText("Demo: Zahlung fehlgeschlagen (simuliert)").first()).toBeVisible({ timeout: 40_000 });
+    await expect(win).toHaveAttribute("data-pay-phase", "idle");
+    await expect(page.getByTestId("pay-number-error")).toContainText("Kartennummer");
+    await page.getByTestId("pay-holder").fill("Ada Beispiel");
+    await page.getByTestId("demo-number").pressSequentially("4000000000000002");
+    await page.getByTestId("demo-expiry").pressSequentially("1234");
+    await page.getByTestId("demo-cvc").pressSequentially("123");
+    await page.getByTestId("order-pay").click();
+    await expect(win).toHaveAttribute("data-pay-phase", "failed", { timeout: 20_000 });
+    await expect(page.getByTestId("pay-number-error")).toContainText("abgelehnt");
+    await expect(page.getByTestId("pay-status-title")).not.toHaveText(/Bezahlt|Testphase läuft/);
+    // the card is back at its place (the form usable again)
+    await expect(page.getByTestId("pay-holder")).toBeEditable({ timeout: 5_000 });
+    // another card that passes the check but whose payment fails afterwards: nothing is shown as paid
+    await page.getByTestId("demo-number").fill("");
+    await page.getByTestId("demo-number").pressSequentially("4000000000000341");
+    await page.getByTestId("order-pay").click();
+    // the phase was already "failed" from the first card: wait for the new verdict itself (the mock's webhook reports `unpaid`)
+    await expect(page.getByTestId("pay-number-error")).toContainText("nicht geklappt", { timeout: 30_000 });
+    await expect(win).toHaveAttribute("data-pay-phase", "failed");
   });
 
-  test("a11y: Hauptseite mit Panel und die Demo-Zahlungsseite (axe, dunkel); Reduced Motion: keine Drehung, das Ergebnis steht", async ({ page }) => {
+  test("a11y: Hauptseite mit Panel und das Bezahlfenster (axe, dunkel); Reduced Motion: keine Drehung, kein Flug, das Ergebnis steht", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await open(page);
     await waitSignedIn(page);
     const main = await new AxeBuilder({ page }).withTags(TAGS).analyze();
     expect(main.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);
     await jump(page, "order");
-    const sheet = page.getByTestId("order-sheet");
-    await expect(sheet).toBeVisible({ timeout: 40_000 });
-    for (const box of await sheet.getByRole("checkbox").all()) await box.check();
-    await page.getByTestId("order-pay").click();
-    await expect(page.getByTestId("demo-checkout")).toBeVisible({ timeout: 40_000 });
-    const checkout = await new AxeBuilder({ page }).withTags(TAGS).analyze();
+    const win = page.getByTestId("order-sheet");
+    await expect(win).toBeVisible({ timeout: 40_000 });
+    await page.waitForTimeout(600);
+    const checkout = await new AxeBuilder({ page }).include('[data-testid="order-sheet"]').withTags(TAGS).analyze();
     expect(checkout.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);
-    expect(await page.getByTestId("demo-card").evaluate((el) => Number.parseFloat(getComputedStyle(el).transitionDuration))).toBeLessThan(0.001);
-    await page.getByTestId("demo-fill-ok").click();
-    await page.getByTestId("demo-pay").click();
-    await expect(page.getByTestId("demo-result")).toContainText("Bezahlt (Demo)", { timeout: 15_000 });
-    expect(await page.getByTestId("demo-auth").evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a.playState === "running").length)).toBe(0);
+    expect(await page.getByTestId("pay-card-flipper").evaluate((el) => Number.parseFloat(getComputedStyle(el).transitionDuration))).toBeLessThan(0.001);
+    await page.getByTestId("pay-holder").fill("Ada Beispiel");
+    await page.getByTestId("demo-number").pressSequentially("4242424242424242");
+    await page.getByTestId("demo-expiry").pressSequentially("1234");
+    await page.getByTestId("demo-cvc").pressSequentially("123");
+    for (const box of await win.getByRole("checkbox").all()) await box.check();
+    await page.getByTestId("order-pay").click();
+    await expect(win).toHaveAttribute("data-pay-phase", "confirmed", { timeout: 15_000 });
+    // reduced motion: no flight (a cross-fade), no loop is left running
+    expect(await page.evaluate(() => document.getAnimations().filter((a) => a.id === "pay:card-lift").length)).toBe(0);
+    await page.waitForTimeout(400);
+    expect(await win.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a.playState === "running").length)).toBe(0);
     await expectNoHorizontalScroll(page);
   });
 });

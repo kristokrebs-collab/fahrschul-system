@@ -44,6 +44,7 @@ Hängt daran: Kaufstrecke, Kundenportal, Webhook, Tarif-Freischaltung.
 | Name | Zweck | Pflicht? | Scope | Ohne sie → Verhalten |
 | --- | --- | --- | --- | --- |
 | `STRIPE_SECRET_KEY` | Stripe-Schlüssel (sk_… / rk_…): Checkout-Sitzung, Portal, Preise | Pflicht für den Bereich · geheim | Funktionen (Netlify, Scope Functions) | „Zahlungen sind noch nicht eingerichtet“: `billing-status` meldet `enabled: false`, `billing-checkout` antwortet 503 – kein Fake-Kauf; alle Funktionen sind frei zugänglich (Betreiber-Entscheidung, siehe Konto-Seite). |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Veröffentlichbarer Stripe-Schlüssel (pk_test_… / pk_live_…) für das Bezahlfenster (Paket V): Kartenfelder von Stripe (Elements) in der App, die Nummer geht vom Browser direkt zu Stripe | Optional | Browser-Build (Scope Builds, öffentlich) | Das Bezahlfenster gibt die Bestellung wie bisher an Stripe Checkout weiter (Weiterleitung); Stripe.js wird nie geladen. |
 | `STRIPE_WEBHOOK_SECRET` | Signatur-Geheimnis des Stripe-Webhooks (whsec_…); NUR der Webhook schaltet einen Tarif frei | Pflicht für den Bereich · geheim | Funktionen (Netlify, Scope Functions) | Der Webhook antwortet 503 und lehnt jede Meldung ab: bezahlte Tarife werden nie freigeschaltet; die Ergebnisseite bleibt bei „Wir warten noch auf die Bestätigung von Stripe“. |
 | `STRIPE_PRICE_PRO_MONTHLY` | Preis-ID Pro, monatlich | Pflicht für den Bereich | Funktionen (Netlify, Scope Functions) | Dieser Tarif/Intervall ist nicht kaufbar. |
 | `STRIPE_PRICE_PRO_YEARLY` | Preis-ID Pro, jährlich | Pflicht für den Bereich | Funktionen (Netlify, Scope Functions) | Dieser Tarif/Intervall ist nicht kaufbar. |
@@ -201,6 +202,7 @@ Aus `FUNCTION_ENV` in `envSpec.ts`; `/api/v1/ops/status` zeigt dasselbe live (�
 | `billing-reconcile` | (täglich) | Konto & Cloud (Supabase), Abos (Stripe) | – |
 | `billing-status` | /api/v1/billing/status | Konto & Cloud (Supabase) | – |
 | `billing-checkout` | /api/v1/billing/checkout | Konto & Cloud (Supabase), Abos (Stripe), Adresse der Seite | `KILL_CHECKOUT` |
+| `billing-subscribe` | /api/v1/billing/subscribe | Konto & Cloud (Supabase), Abos (Stripe) | `KILL_CHECKOUT` |
 | `billing-portal` | /api/v1/billing/portal | Konto & Cloud (Supabase), Abos (Stripe) | – |
 | `billing-code` | /api/v1/billing/code | Konto & Cloud (Supabase), Abos (Stripe) | – |
 | `billing-referral` | /api/v1/billing/referral | Konto & Cloud (Supabase), Abos (Stripe) | – |

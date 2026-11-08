@@ -39,10 +39,13 @@ describe("netlify.toml", () => {
     expect(share).toBeLessThan(spa);
   });
 
-  it("CSP: same origin, the public market feeds and Supabase (https + wss, storage images); nothing inline, no frames", () => {
+  it("CSP: same origin, the public market feeds and Supabase (https + wss, storage images); nothing inline; frames only Stripe's card fields", () => {
     expect(directive("default-src")).toEqual(["'self'"]);
-    // the local screenshot reader (tesseract.js) compiles WebAssembly: that, and only that, is allowed beyond 'self'
-    expect(directive("script-src")).toEqual(["'self'", "'wasm-unsafe-eval'"]);
+    // the local screenshot reader (tesseract.js) compiles WebAssembly; Paket V: Stripe.js for the payment window's card fields (loaded only when it
+    // opens with a publishable key) – nothing else beyond 'self'
+    expect(directive("script-src")).toEqual(["'self'", "'wasm-unsafe-eval'", "https://js.stripe.com"]);
+    expect(directive("frame-src")).toEqual(["https://js.stripe.com", "https://hooks.stripe.com"]);
+    expect(directive("connect-src")).toContain("https://api.stripe.com");
     expect(directive("connect-src")).toEqual(expect.arrayContaining(["'self'", "https://fapi.binance.com", "wss://fstream.binance.com", "https://*.supabase.co", "wss://*.supabase.co"]));
     // the Labor's last-resort SPOT candles (labelled "Spot, nicht Futures"): exactly this one extra market-data host
     expect(directive("connect-src")).toContain("https://data-api.binance.vision");
@@ -50,12 +53,14 @@ describe("netlify.toml", () => {
     expect(directive("worker-src")).toEqual(["'self'", "blob:"]);
     expect(directive("frame-ancestors")).toEqual(["'none'"]);
     expect(directive("object-src")).toEqual(["'none'"]);
-    // Stripe / Bitunix / Anthropic are server-side only
-    expect(csp).not.toMatch(/stripe|bitunix|anthropic/i);
+    // Bitunix / Anthropic are server-side only; of Stripe exactly the three hosts of Stripe.js (no wildcard)
+    expect(csp).not.toMatch(/bitunix|anthropic|\*\.stripe/i);
+    expect([...csp.matchAll(/https:\/\/[a-z.]*stripe\.com/g)].map((m) => m[0]).sort()).toEqual(["https://api.stripe.com", "https://hooks.stripe.com", "https://js.stripe.com", "https://js.stripe.com"]);
     expect(toml).toMatch(/Strict-Transport-Security = "max-age=63072000; includeSubDomains"/);
     // the microphone is allowed for the app itself only: the assistant's voice input (F74) and the voice note (F31) need it, and
     // `microphone=()` would switch it off for the whole page (Launch-Audit D1); camera and location stay off
-    expect(toml).toMatch(/Permissions-Policy = "camera=\(\), microphone=\(self\), geolocation=\(\)"/);
+    // Paket V: `payment` for the app and Stripe's frames only
+    expect(toml).toMatch(/Permissions-Policy = "camera=\(\), microphone=\(self\), geolocation=\(\), payment=\(self \\"https:\/\/js\.stripe\.com\\"\)"/);
   });
 
   it("the self-hosted OCR files are cached for good (their version is in the path) and never come from a third party", () => {

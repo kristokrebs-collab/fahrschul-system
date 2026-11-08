@@ -1,5 +1,8 @@
 # Paket B – Vorbild-Videos für Anmeldung/Registrierung und Bezahlfenster
 
+> **Paket V (Runde 13, 08.11.2026):** Beide Fenster sind jetzt 1:1 nach den Aufnahmen nachgebaut (`AuthWindow.tsx`, `PayWindow.tsx`); die Messung steht in
+> `docs/audit/V-VORBILD.md`. Dieses Dokument und die Rücknahme-Notiz darunter sind Historie.
+
 > **Rücknahme R1/R2 (Runde 12, 08.11.2026):** Der Nutzer hat Anmeldung und Bestellfenster in der Vorschau eingekreist („wieder ins Original“). Anmelde-Sheet und
 > Bestellfenster sehen wieder aus und bewegen sich wie vor Paket B (`4df73667`): Klinge, Markenstreifen, Bestellkarte in der Anmeldung, Plan-Karte, Ablaufband,
 > Zahlungsbühne und Summe am Knopf sind entfernt (`AuthBlade.tsx`, `OrderContext.tsx`, `PayStage.tsx` gelöscht; `PlanCardArt.tsx` nur noch auf der Ergebnisseite).

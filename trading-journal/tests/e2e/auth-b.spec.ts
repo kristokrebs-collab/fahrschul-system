@@ -1,15 +1,15 @@
 /**
- * Paket B end to end (cloud edition against the Supabase mock and the billing / (FAKE) Stripe mock), as it stands after the Rücknahme R1
- * (the sheet looks and moves as before Paket B: no brand strip, no blade, no order card): Premium · jährlich chosen signed out → the
- * "mail sent" step is neutral → the confirmation link opens a NEW tab (empty sessionStorage) and the sign-in there lands on exactly this
- * order; "Kostenlos starten" drops an earlier choice; Anmelden ↔ Registrieren switch at once; offline said before anything is sent; the
- * setup wizard once after a registration.
+ * Paket B end to end (cloud edition against the Supabase mock and the billing / (FAKE) Stripe mock), with the login window of Paket V (the
+ * landscape card after the reference recording: the dark band crosses the card once when Anmelden ↔ Registrieren switch, no tabs, no order
+ * card in it): Premium · jährlich chosen signed out → the "mail sent" step is neutral → the confirmation link opens a NEW tab (empty
+ * sessionStorage) and the sign-in there lands on exactly this order; "Kostenlos starten" drops an earlier choice; the band run (≈ 900 ms,
+ * the card keeps its height, field 1 has the focus); offline said before anything is sent; the setup wizard once after a registration.
  *
  * It proves the browser flow, NOT a delivered mail, a real Stripe account or a webhook (docs/BETREIBER-AUFGABEN.md: what the
  * operator must supply). `PW_PREISE_URL` overrides the cloud URL like in `preise.spec.ts`.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { blockExternalNetwork, expectNotInert, signInViaSheet } from "./cloudSignIn";
+import { bandSettled, blockExternalNetwork, expectNotInert, signInViaSheet } from "./cloudSignIn";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, seed } from "./helpers";
 import { mockBilling } from "./mocks/billing";
 import { mockSupabase, type MockSupabaseOptions } from "./mocks/supabase";
@@ -104,8 +104,8 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
     await page.getByTestId("cta-team").click();
     const sheet = page.getByRole("dialog", { name: "Konto erstellen" });
     await expectNotInert(sheet.getByLabel("E-Mail"));
-    // an existing account: the mode switch leads over to the login, the choice stays noted
-    await sheet.getByRole("radio", { name: "Passwort", exact: true }).click();
+    // an existing account: the footer link leads over to the login (the band runs back), the choice stays noted
+    await sheet.getByTestId("auth-to-signin").click();
     await expect(page.getByRole("dialog", { name: "Anmelden" })).toBeVisible({ timeout: 10_000 });
     expect(await page.evaluate(() => localStorage.getItem("tj2-return-to-order"))).toContain("team.year.2");
     await signInViaSheet(page, { fromPill: false, email: EMAIL, password: PASSWORD, expectNext: true, synced: true });
@@ -164,22 +164,39 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
     expect(await page.evaluate(() => localStorage.getItem("tj2-return-to-order"))).toBeNull();
   });
 
-  test("Anmelden ↔ Registrieren wie vor Paket B: kein Markenstreifen, kein Band, der Wechsel ist sofort da, nichts bleibt unsichtbar", async ({ page }) => {
+  test("Anmelden ↔ Registrieren (Paket V): das Band läuft einmal über die Karte, die Seiten tauschen, die Karte behält ihre Höhe, Feld 1 hat den Fokus", async ({ page }, info) => {
     await setup(page);
     await openRoute(page, KONTO, "Konto", { timeout: 30_000 });
     await page.locator('[data-cloud-pill="signin"]').click();
-    const sheet = page.getByRole("dialog", { name: "Anmelden" });
-    await expectNotInert(sheet.getByLabel("E-Mail"));
-    await expect(page.getByTestId("auth-brand")).toHaveCount(0);
-    await expect(sheet.getByRole("button", { name: "Neu hier? Jetzt registrieren" })).toHaveCount(0);
-    await page.waitForTimeout(500);
-    await sheet.getByRole("radio", { name: "Neu hier" }).click();
-    await expect(page.getByRole("dialog", { name: "Konto erstellen" })).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByTestId("auth-blade")).toHaveCount(0);
-    await expect(page.getByRole("dialog").getByLabel("Passwort", { exact: true })).toBeVisible();
+    const card = page.getByTestId("auth-card");
+    await expectNotInert(page.getByRole("dialog", { name: "Anmelden" }).getByLabel("E-Mail"));
+    await expect(page.getByRole("dialog").getByRole("radio")).toHaveCount(0);
+    await expect(card).toHaveAttribute("data-side", "a");
+    const before = await card.boundingBox();
+    if (info.project.name === "desktop") expect(Math.abs(before!.width / before!.height - 1030 / 621)).toBeLessThan(0.01);
+    await page.getByTestId("auth-to-signup").click();
+    // the band runs once: one 900 ms run on the measured curve (the Animations API says so), the old form is gone, the new one is there
+    const run = await page.evaluate(() =>
+      document
+        .getAnimations()
+        .filter((a) => a.id === "auth:band")
+        .map((a) => ({ d: a.effect?.getComputedTiming().duration, e: (a.effect as KeyframeEffect).getTiming().easing })),
+    );
+    expect(run).toEqual([{ d: 900, e: "cubic-bezier(0.5, 0.14, 0.3, 1)" }]);
+    const dialog = page.getByRole("dialog", { name: "Konto erstellen" });
+    await expect(dialog).toBeVisible({ timeout: 5_000 });
+    await expect(card).toHaveAttribute("data-side", "b");
+    await expect(page.locator('.aw-col[data-side="a"]')).toHaveCount(0, { timeout: 3_000 });
+    // field 1 (Name) has the focus; the card kept its height
+    await expect(dialog.getByLabel("Name")).toBeFocused();
+    const after = await card.boundingBox();
+    expect(Math.abs(after!.height - before!.height)).toBeLessThan(1);
+    await expect(dialog.getByLabel("Passwort", { exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page);
-    await page.getByRole("dialog").getByRole("radio", { name: "Passwort", exact: true }).click();
+    await dialog.getByTestId("auth-to-signin").click();
     await expect(page.getByRole("dialog", { name: "Anmelden" })).toBeVisible({ timeout: 5_000 });
+    await bandSettled(page, 3_000);
+    await expect(page.getByRole("dialog", { name: "Anmelden" }).getByLabel("E-Mail")).toBeFocused({ timeout: 3_000 });
   });
 
   test("offline: gesagt, bevor etwas gesendet wird – die Eingabe bleibt", async ({ page, context }) => {
@@ -206,7 +223,7 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
     const sheet = page.getByRole("dialog", { name: "Anmelden" });
     await expectNotInert(sheet.getByLabel("E-Mail"));
     await page.waitForTimeout(500);
-    await sheet.getByRole("radio", { name: "Neu hier" }).click();
+    await sheet.getByTestId("auth-to-signup").click();
     await register(page);
     // registration without a confirmation round: signed in, welcome → "Los geht's" → the wizard (and not before)
     await expect(page.locator('[data-auth-view="welcome"]')).toBeVisible({ timeout: 30_000 });

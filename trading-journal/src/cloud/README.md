@@ -158,23 +158,28 @@ tombstones, three-way edits, settings rev race, offline queue, account switch, s
 e2e: `tests/e2e/cloud.spec.ts` with the full Supabase / functions mock `tests/e2e/mocks/supabase.ts` (GoTrue, PostgREST,
 Realtime over `routeWebSocket`, `/api/v1/*`); dev harness `dev/konto.html` until the page is routed.
 
-## Login/Signup-Morph (R11, `ui/AuthMorph.tsx`)
+## Anmeldefenster (Paket V, `ui/AuthWindow.tsx`, `ui/authBand.ts`)
 
-`AuthSheet` sagt, WAS es zeigt; `AuthMorph` sagt, WIE es sich bewegt (damit spätere Änderungen am Inhalt, z. B. die Rückführung der Kaufstrecke, die Bewegung nicht berühren).
-Passwort · Magic Link · Neu hier sind EIN Schritt (`stepOf` = `entry`): das Formular bleibt eingehängt (E-Mail-Feld, Wert, Fokus und die Sicht des Passwort-Managers bleiben).
-Blöcke, die nur eine Art hat (Passwort-Stärke, Zustimmung, Hinweise), gleiten als `MorphItem` ein und aus, die übrigen Blöcke gleiten per `layout="position"`. Die anderen Schritte
-(2FA, gesendet, Reset, neues Passwort …) überblenden in derselben Karte (`popLayout`), deren Höhe federt (`MorphHeight` hält die alte Höhe schon im Layout-Effekt des Wechsels fest,
-bevor das Panel selbst misst – sonst liefe seine eigene FLIP-Animation obendrauf, gemessen: Höhe sprang erst zurück und dann vor). Felder: `name` und `autocomplete`
-(`username` bzw. `email`, `current-password` / `new-password`); ein abgelehntes Feld zeigt die Meldung am Feld und bekommt den Fokus; ein Fokus im verschwindenden Passwortfeld geht
-auf die E-Mail. Reduziert: sofortiger Wechsel.
+1:1-Nachbau der Referenzaufnahme (Maße und Zeiten: `docs/audit/V-VORBILD.md`, Tokens `src/motion/vorbild.ts`). Eine Querkarte 1030 : 621 (Papier-Insel `.tj-paper`
+in beiden Themes), links die Anmeldung (Seite A), rechts die Registrierung (Seite B); ein dunkles Band (`.tj-ink`, 1,42 W breit, 13° schräge Kante) deckt jeweils die andere Hälfte
+und trägt den Markentext. Der Wechsel ist EIN Lauf des Bands über die Karte (900 ms, `cubic-bezier(0.5,0.14,0.3,1)`), die innere Ebene läuft gegenläufig (der Text bleibt stehen);
+im voll gedeckten Fenster (36,7 … 43,9 %) wird hart getauscht (342 ms nach B, 387 ms nach A), Feld 1 bekommt den Fokus AM Tausch, erst dann wird die alte Hälfte `inert`.
+Danach steigt der Markentext +20/+80/+140 ms um 14/12/10 px, die Zeilen 45 ms versetzt, die Fokuslinie +250, der Knopf +270, die Fußzeile +390. Alles läuft über die
+Web Animations API (`motion/waapi.ts`, ids `auth:*`), damit Tests und Belege anhalten und spulen können. Schmale Bildschirme (< 640 px): Hochkarte, das Band liegt quer und läuft
+oben → unten (eigene Ableitung, gleiche Zeiten). Reduziert: eine Überblendung von 150 ms, Fokus sofort.
 
-**Paket B (Runde 12) – Anmeldung / Registrierung, nach der Rücknahme R1:** Das Blatt sieht wieder aus und bewegt sich wie vor Paket B (kein Markenstreifen, keine Klinge, keine Bestellkarte,
-keine Zusatzlinks; `AuthBlade.tsx` und `OrderContext.tsx` sind entfernt). Geblieben sind die unsichtbaren Fixes: **Keine Konto-Abfrage** (AUTH-03): `signUp` antwortet für eine neue und eine
+Anmelden und „Link per E-Mail“ sind eine Form auf Seite A (`stepOf` = `a`), das E-Mail-Feld bleibt eingehängt (DOM, Wert, Fokus, Passwort-Manager). Die übrigen Schritte
+(2FA, gesendet, Reset, neues Passwort, Konto, Willkommen) stehen als Fluss-Layout auf der Seite, auf der die Karte gerade steht. Felder: Unterstrich-Felder mit Symbol rechts,
+`name` / `autocomplete` (`username` bzw. `email`, `current-password` / `new-password`); ein abgelehntes Feld zeigt die Meldung am Feld (`<id>-error`) und bekommt den Fokus.
+„Angemeldet bleiben“ ist die Leerlauf-Abmeldung (abgehakt: nie, sonst 30 Minuten). Der optionale Name der Registrierung liegt in `user_metadata.name` und füllt später den
+Karteninhaber vor. Zustimmung zu AGB und Datenschutz bleibt eine Pflichtzeile der Registrierung. Altes Formular „Neues Passwort“: `ui/NewPasswordForm.tsx`.
+
+**Paket B (Runde 12) – Anmeldung / Registrierung, Fixes, die durch Rücknahme R1 und Paket V blieben** (`AuthBlade.tsx`, `OrderContext.tsx`, `AuthMorph.tsx` sind entfernt): **Keine Konto-Abfrage** (AUTH-03): `signUp` antwortet für eine neue und eine
 vorhandene Adresse gleich (`confirm: true`), der Mail-Schritt sagt beides in einem Satz (`AUTH_NEUTRAL`, kein Text der Fehlertabelle sagt „gibt es“ / „gibt es nicht“). **Vorauswahl im Mail-Link**
 (AUTH-06): nur `plan.intervall.sitze`, nie ein Preis, hängt als `?order=` am Link (`redirectUrl(order)` für Registrierung, Wiedersenden, Magic Link, Zurücksetzen), wird beim Öffnen
 (`captureOrderQuery`, `BillingHost`) erneut gegen die Whitelist geprüft und verlässt sofort die Adresse; die Notiz (`returnTo`, Ziel `order:`) liegt zusätzlich 60 Minuten in `localStorage` (der
 Link öffnet einen neuen Tab). **Mail-Schritt:** „Erneut senden“ wartet eine Minute (Voreinstellung des Servers); ein abgelehntes Senden (Limit) sagt es als Toast und verlängert die Wartezeit (nie
-eine Wiederholschleife); offline wird vor dem Senden gesagt; „E-Mail nicht bestätigt“ beim Login führt mit sofort verfügbarem „Erneut senden“ in den Mail-Schritt. `MorphHeight` hält die
-Border-Box-Höhe (sonst lief das Blatt bei jedem Wechsel eine eigene kleine Skalierung).
+eine Wiederholschleife); offline wird vor dem Senden gesagt; „E-Mail nicht bestätigt“ beim Login führt mit sofort verfügbarem „Erneut senden“ in den Mail-Schritt. Die Karte hat eine feste Höhe
+(Verhältnis 1030 : 621), kein Höhen-Morph.
 
 `privacy.ts`: `setPrivacy` liefert jetzt `Promise<boolean>` (Gerät hat gespeichert UND das Konto hat geantwortet); `resyncPrivacy()` sendet die Konto-Schlüssel erneut („Erneut versuchen“ der Karte Datenschutz).

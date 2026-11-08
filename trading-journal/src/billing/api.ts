@@ -4,7 +4,7 @@
  * the URL the server returned, and only to an https `*.stripe.com` host.
  */
 import { ApiError, apiFetch } from "@/cloud/api";
-import type { BillingStatus, CheckoutRequest, CheckoutResponse, CodeLookup, ContractConfirmResponse, ContractDeclaration, ContractReceipt, PortalRequest, PortalResponse, ReferralCheck, ReferralInfo } from "./contract";
+import type { BillingStatus, CheckoutRequest, CheckoutResponse, CodeLookup, ContractConfirmResponse, ContractDeclaration, ContractReceipt, PortalRequest, PortalResponse, ReferralCheck, ReferralInfo, SubscribeRequest, SubscribeResponse } from "./contract";
 
 export function fetchBillingStatus(opts: { invoices?: boolean; signal?: AbortSignal } = {}): Promise<BillingStatus> {
   return apiFetch<BillingStatus>("/billing/status", { query: opts.invoices ? { invoices: 1 } : undefined, signal: opts.signal });
@@ -12,6 +12,11 @@ export function fetchBillingStatus(opts: { invoices?: boolean; signal?: AbortSig
 
 export function postCheckout(body: CheckoutRequest): Promise<CheckoutResponse> {
   return apiFetch<CheckoutResponse>("/billing/checkout", { method: "POST", body });
+}
+
+/** Paket V: the order paid in the app (Stripe Elements) – start, or (with `setupIntent`) the second step of the trial path. */
+export function postSubscribe(body: SubscribeRequest): Promise<SubscribeResponse> {
+  return apiFetch<SubscribeResponse>("/billing/subscribe", { method: "POST", body });
 }
 
 /** § 312k / § 356a BGB: cancel or withdraw WITHOUT a login (public route); `auth` only when signed in, so a login of that address runs it at once. */

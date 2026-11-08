@@ -158,7 +158,7 @@ export interface AccountExport {
   format: "trade-journal-account-export";
   version: 1;
   exportedAt: string;
-  account: { id: string; email: string | null; createdAt: string | null; lastSignInAt: string | null; factors: { type: string; friendlyName: string | null; status: string; createdAt: string | null }[] };
+  account: { id: string; email: string | null; name: string | null; createdAt: string | null; lastSignInAt: string | null; factors: { type: string; friendlyName: string | null; status: string; createdAt: string | null }[] };
   /** The journal in the app's backup format – `Backup importieren` reads this object directly. */
   journal: BackupShape & { counts: Record<string, number> };
   tables: Record<string, unknown[]>;
@@ -217,6 +217,8 @@ export async function collectExport(userId: string, now: Date = new Date(), sb: 
     account: {
       id: userId,
       email: user?.email ?? null,
+      // Paket V: the optional name of the registration (user_metadata.name) is stored data, so the export names it
+      name: typeof user?.user_metadata?.name === "string" ? user.user_metadata.name : null,
       createdAt: user?.created_at ?? null,
       lastSignInAt: user?.last_sign_in_at ?? null,
       factors: (user?.factors ?? []).map((f) => ({ type: f.factor_type, friendlyName: f.friendly_name ?? null, status: f.status, createdAt: f.created_at ?? null })),

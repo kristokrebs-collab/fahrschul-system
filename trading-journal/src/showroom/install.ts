@@ -8,6 +8,7 @@
  * The visitor starts signed in as the Premium demo account (so every gated page is open); the panel switches to a signed-out / Free / new account.
  */
 import { setRedirectHandler } from "@/billing/api";
+import { registerDemoFields } from "@/billing/purchase/pay/fields";
 import { closeManage, closeOrder, releaseBusy } from "@/billing/store";
 import { mountBanner } from "./banner";
 import { createBackend, DEMO_ACCOUNT, type Backend } from "./mock/backend";
@@ -139,7 +140,9 @@ export async function installShowroom(): Promise<void> {
   window.addEventListener("pagehide", save);
   patchFetch(backend);
   installSockets(backend);
-  // the order's hand-over to "Stripe": the simulated hosted page opens inside the app
+  // Paket V: the payment window takes the card in the app – here with the DEMO fields (no Stripe in the Showroom; only a verdict reaches the mock)
+  registerDemoFields(() => import("@/billing/purchase/pay/demoFields").then((m) => m.createDemoFields()));
+  // the order's hand-over to "Stripe" (portal, and the checkout fallback): the simulated hosted page opens inside the app
   setRedirectHandler((url) => {
     // the order sheet (and its focus trap) steps away: the hosted page is the whole screen now, as Stripe's page would be
     closeOrder();

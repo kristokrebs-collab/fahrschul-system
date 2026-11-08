@@ -656,7 +656,7 @@ CSS says `[data-idle] … { animation-play-state: paused }`.
 ## A5 „Interaktionen“ (Runde 11)
 
 Fünf Bausteine für Stellen mit echter Wirkung (Teilen, Entfernen, Speichern, Anmelden, Warten). Quellen/Lizenz: `docs/KOMPONENTEN-QUELLEN.md`. Alles
-`transform`/`opacity`, `useReducedFx` = sofort fertig. Ausnahme: die Höhe EINER Karte in `cloud/ui/AuthMorph.tsx` (`MorphHeight`, nur um einen Ansichtswechsel).
+`transform`/`opacity`, `useReducedFx` = sofort fertig. (`AuthMorph.tsx` mit seiner Höhen-Ausnahme ist seit Paket V entfernt; das Anmeldefenster `cloud/ui/AuthWindow.tsx` hat eine feste Höhe und läuft über `motion/waapi.ts` mit den gemessenen Werten aus `motion/vorbild.ts`.)
 
 | Datei | Zweck |
 |---|---|

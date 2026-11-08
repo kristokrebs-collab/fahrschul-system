@@ -13,7 +13,7 @@ import { Skeleton } from "@/primitives/Skeleton";
 import { pushToast } from "@/store/uiStore";
 import { ensureCloud } from "../runtime";
 import { openAuthSheet, useCloudSession } from "../session";
-import { NewPasswordForm } from "./AuthSheet";
+import { NewPasswordForm } from "./NewPasswordForm";
 import { AUTH, AUTH_CARD } from "./strings";
 
 const BENEFIT_ICONS: Record<string, string> = {

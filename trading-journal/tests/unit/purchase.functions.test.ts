@@ -23,6 +23,7 @@ import statusFn from "../../netlify/functions/billing-status.mts";
 import portalFn from "../../netlify/functions/billing-portal.mts";
 import contractFn from "../../netlify/functions/billing-contract.mts";
 import webhookFn from "../../netlify/functions/stripe-webhook.mts";
+import subscribeFn from "../../netlify/functions/billing-subscribe.mts";
 import Stripe_ from "stripe";
 
 const ctx = { ip: "203.0.113.9" } as Parameters<typeof checkoutFn>[1];
@@ -797,3 +798,149 @@ describe("Paket B: a preselection that came with a link is only a SUGGESTION –
     expect(stripe.sessions).toHaveLength(before);
   });
 });
+
+/* ------------------------------------------------------------------ Paket V: the order paid inside the app (Stripe Elements) */
+
+interface Embedded {
+  intents: Map<string, Stripe.SetupIntent>;
+  created: { params: Stripe.SubscriptionCreateParams; key?: string; id: string }[];
+}
+
+/** Adds what the embedded order needs to the fake: SetupIntents and `subscriptions.create` (idempotent per key, like Stripe). */
+function embedded(): Embedded {
+  const e: Embedded = { intents: new Map(), created: [] };
+  const byKey = new Map<string, Stripe.Subscription>();
+  let n = 0;
+  stripe.api.setupIntents = {
+    create: async (params, options) => {
+      const id = `seti_test${String(++n).padStart(4, "0")}`;
+      const si = { id, object: "setup_intent", client_secret: `${id}_secret_abc`, status: "requires_payment_method", customer: params.customer, payment_method: null, metadata: params.metadata, usage: params.usage } as unknown as Stripe.SetupIntent;
+      e.intents.set(id, si);
+      void options;
+      return si;
+    },
+    retrieve: async (id) => {
+      const si = e.intents.get(id);
+      if (!si) throw Object.assign(new Error("missing"), { code: "resource_missing", statusCode: 404 });
+      return si;
+    },
+  };
+  stripe.api.subscriptions.create = async (params, options) => {
+    const key = options?.idempotencyKey;
+    if (key && byKey.has(key)) return byKey.get(key)!;
+    const id = `sub_emb_${++n}`;
+    const trial = !!params.trial_period_days;
+    const sub = {
+      ...stripeSub(id, { customer: String(params.customer), status: trial ? "trialing" : "incomplete", user: (params.metadata as Record<string, string>).supabase_user_id }),
+      metadata: params.metadata,
+      latest_invoice: trial ? null : { id: `in_${n}`, object: "invoice", confirmation_secret: { client_secret: `pi_${n}_secret_xyz`, type: "payment_intent" } },
+    } as unknown as Stripe.Subscription;
+    e.created.push({ params, key, id });
+    stripe.subs.set(id, sub);
+    if (key) byKey.set(key, sub);
+    return sub;
+  };
+  return e;
+}
+
+const subscribeCall = (body: unknown, user = U1) => call(subscribeFn, req("/api/v1/billing/subscribe", { body, user }));
+/** What Stripe.js does in the browser between the two calls: the card is confirmed on the intent (we never see it). */
+function confirmCard(e: Embedded, secret: string): string {
+  const id = secret.split("_secret_")[0]!;
+  const si = e.intents.get(id)!;
+  e.intents.set(id, { ...si, status: "succeeded", payment_method: { id: "pm_card_visa", object: "payment_method", card: { brand: "visa", last4: "4242" } } } as unknown as Stripe.SetupIntent);
+  return id;
+}
+
+describe("Paket V: billing-subscribe (the card goes from the browser to Stripe, never through us)", () => {
+  it("trial: a SetupIntent first – NO subscription before the card is confirmed; the evidence is stored the same way as for Checkout", async () => {
+    const e = embedded();
+    const body = order();
+    const res = await subscribeCall(body);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ kind: "setup", trialDays: 14, subscriptionId: null });
+    expect(String(res.body.clientSecret)).toMatch(/^seti_\w+_secret_/);
+    const si = [...e.intents.values()][0]!;
+    expect(si.metadata).toMatchObject({ tj_kind: "tj_subscription", price: "price_pro_m", seats: "1", trial_days: "14", order_id: body.orderId, supabase_user_id: U1, consent_hash: HASH });
+    expect(e.created).toHaveLength(0);
+    expect(db.tables.consents!.map((r) => r.kind).sort()).toEqual(["immediate_start", "terms"]);
+    expect(stripe.sessions).toHaveLength(0);
+    // nothing is unlocked by it
+    expect(db.tables.profiles!.find((p) => p.id === U1)).toMatchObject({ plan: "free", plan_status: "none" });
+  });
+
+  it("trial, second step: only a SUCCEEDED intent of THIS user and order makes the subscription (trial, the card as default) – once", async () => {
+    const e = embedded();
+    const body = order();
+    const first = await subscribeCall(body);
+    const id = String(first.body.clientSecret).split("_secret_")[0]!;
+    const early = await subscribeCall({ ...body, setupIntent: id });
+    expect(early.status).toBe(409);
+    expect((early.body.error as { code: string }).code).toBe("card_unconfirmed");
+    confirmCard(e, String(first.body.clientSecret));
+    expect((await subscribeCall({ ...body, setupIntent: id }, U2)).status).toBe(404); // another account
+    expect((await subscribeCall({ ...body, orderId: newOrderId(), setupIntent: id })).status).toBe(404); // another order
+    const done = await subscribeCall({ ...body, setupIntent: id });
+    expect(done.status).toBe(200);
+    expect(done.body).toMatchObject({ kind: "created", trialDays: 14, card: { brand: "visa", last4: "4242" } });
+    expect(e.created).toHaveLength(1);
+    expect(e.created[0]!.params).toMatchObject({ default_payment_method: "pm_card_visa", trial_period_days: 14, items: [{ price: "price_pro_m", quantity: 1 }] });
+    expect(e.created[0]!.key).toBe(`tj-sub-${U1}-${body.orderId}`);
+    // a lost answer: the same call again gives the same subscription
+    const again = await subscribeCall({ ...body, setupIntent: id });
+    expect(again.body.subscriptionId).toBe(done.body.subscriptionId);
+  });
+
+  it("the webhook (setup_intent.succeeded) makes the same subscription if the app's second step never arrives", async () => {
+    const e = embedded();
+    const body = order();
+    const first = await subscribeCall(body);
+    const id = confirmCard(e, String(first.body.clientSecret));
+    const payload = JSON.stringify({ id: "evt_seti", object: "event", type: "setup_intent.succeeded", created: NOW_S, data: { object: { ...e.intents.get(id)!, payment_method: "pm_card_visa" } }, livemode: false, api_version: "x", pending_webhooks: 1, request: null });
+    const res = await call(webhookFn, new Request("https://journal.example/api/v1/stripe/webhook", { method: "POST", body: payload, headers: { "stripe-signature": sdk.webhooks.generateTestHeaderString({ payload, secret: WHSEC }) } }));
+    expect(res.status).toBe(200);
+    expect(e.created).toHaveLength(1);
+    expect(e.created[0]!.key).toBe(`tj-sub-${U1}-${body.orderId}`);
+    // and the app's late second step gets that one back, not a second subscription
+    await subscribeCall({ ...body, setupIntent: id });
+    expect(new Set(e.created.map((c) => c.id)).size).toBe(1);
+  });
+
+  it("no trial: the subscription waits for its first payment (default_incomplete) and hands back only the invoice's client secret", async () => {
+    process.env.TRIAL_DAYS = "0";
+    const e = embedded();
+    const body = order({ interval: "year" });
+    const res = await subscribeCall(body);
+    delete process.env.TRIAL_DAYS;
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ kind: "payment", trialDays: 0 });
+    expect(String(res.body.clientSecret)).toMatch(/^pi_\w+_secret_/);
+    expect(e.created[0]!.params).toMatchObject({ payment_behavior: "default_incomplete", items: [{ price: "price_pro_y", quantity: 1 }] });
+    expect(e.created[0]!.params.expand).toEqual(["latest_invoice.confirmation_secret"]);
+    expect(e.intents.size).toBe(0);
+    // `incomplete` grants nothing: the plan stays free until the webhook says otherwise
+    expect(db.tables.profiles!.find((p) => p.id === U1)).toMatchObject({ plan: "free" });
+  });
+
+  it("same guards as Checkout: both boxes, the current wording, a UUID order id; Stripe Tax on → 409 embedded_unavailable before anything is stored", async () => {
+    embedded();
+    expect((await subscribeCall(order({ consents: { terms: true, immediateStart: false } }))).status).toBe(422);
+    expect((await subscribeCall(order({ consentHash: "0".repeat(64) }))).status).toBe(409);
+    expect((await subscribeCall(order({ orderId: "abc" }))).status).toBe(422);
+    process.env.STRIPE_AUTOMATIC_TAX = "true";
+    const taxed = await subscribeCall(order());
+    delete process.env.STRIPE_AUTOMATIC_TAX;
+    expect(taxed.status).toBe(409);
+    expect((taxed.body.error as { code: string }).code).toBe("embedded_unavailable");
+    expect(db.tables.consents).toHaveLength(0);
+  });
+
+  it("the request schema has no field for card data: an order body with a card number is the same order, the number is dropped", async () => {
+    const e = embedded();
+    const res = await subscribeCall({ ...order(), number: "4242424242424242", card: { number: "4242424242424242", cvc: "123" } });
+    expect(res.status).toBe(200);
+    const stored = JSON.stringify({ consents: db.tables.consents, intents: [...e.intents.values()], audit: db.tables.audit_log });
+    expect(stored).not.toContain("4242424242424242");
+  });
+});
+

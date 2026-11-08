@@ -29,7 +29,7 @@
 # a path-routed function wins over the SPA fallbacks below. Server secrets (SUPABASE_SECRET_KEY, STRIPE_*, EXCHANGE_ENC_KEY_V1,
 # ANTHROPIC_API_KEY …) live in the site's environment variables (scope "Functions", marked secret) – see SETUP.md.
 #   /api/v1/account/{backups,delete,export}  /api/v1/audit  /api/v1/log                    (P09)
-#   /api/v1/billing/{status,checkout,portal,code,referral}  /api/v1/stripe/webhook          (P10, the webhook needs the raw body)
+#   /api/v1/billing/{status,checkout,subscribe,portal,code,referral}  /api/v1/stripe/webhook (P10, the webhook needs the raw body; Paket V: subscribe = the order paid in the app)
 #   /api/v1/exchange/{connect,disconnect,sync,positions,backfill}  /api/v1/hooks/tradingview/:token
 #   /api/v1/signals/:token  /api/v1/connections/tradingview[/mcp[/*]]                       (B3: signal receiver signal/1 + branchen-trend/1; optional OAuth/MCP connection, operator setup TV_MCP_CLIENT_ID)
 #   /api/v1/trades[/*]                                                                     (P11)
@@ -149,20 +149,25 @@
 #   script-src   'wasm-unsafe-eval' – ONLY WebAssembly may compile (the local screenshot OCR, tesseract.js core); no eval() of
 #                strings, no foreign script host. The worker script, core and language data come from /ocr/<version>/ of this
 #                site (self-hosted: nothing about a screenshot leaves the device, nothing is fetched from a CDN).
-# Stripe Checkout / Customer Portal are full-page redirects (no Stripe.js), Bitunix / Stripe / Anthropic are reached by
-# the functions only – none of them needs a client entry. The CSP applies on Netlify only (check a deploy preview).
+#   Stripe (Paket V, the payment window): with VITE_STRIPE_PUBLISHABLE_KEY the window loads Stripe.js lazily (script-src
+#                https://js.stripe.com), its card fields are Stripe iframes (frame-src js.stripe.com, 3-D Secure in hooks.stripe.com),
+#                Stripe.js talks to api.stripe.com (connect-src). The card number never reaches this site. Without the key nothing of it
+#                loads (the order hands over to Stripe Checkout, a full-page redirect).
+# The Customer Portal is a full-page redirect; Bitunix / Anthropic are reached by the functions only. The CSP applies on Netlify only
+# (check a deploy preview).
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://fapi.binance.com https://data-api.binance.vision wss://fstream.binance.com https://api.bybit.com wss://stream.bybit.com https://www.okx.com https://*.supabase.co wss://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; manifest-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://js.stripe.com; connect-src 'self' https://api.stripe.com https://fapi.binance.com https://data-api.binance.vision wss://fstream.binance.com https://api.bybit.com wss://stream.bybit.com https://www.okx.com https://*.supabase.co wss://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; manifest-src 'self'; worker-src 'self' blob:; frame-src https://js.stripe.com https://hooks.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=63072000; includeSubDomains"
     # microphone=(self): the assistant's „Per Sprache fragen“ (F74) and the voice note under a note field (F31) use the browser's speech
     # recognition. With `microphone=()` the policy switches the microphone off for the whole page, those buttons could never work on a
     # deploy (Launch-Audit D1: `document.permissionsPolicy.allowsFeature("microphone")` was false on the preview). `self` keeps every foreign
-    # frame out (there is none: frame-src 'none') and the browser still asks the person before the first use. Camera and location stay off.
-    Permissions-Policy = "camera=(), microphone=(self), geolocation=()"
+    # frame out (the only frames are Stripe's card fields) and the browser still asks the person before the first use. Camera and location stay
+    # off. Paket V: `payment` for the app and Stripe's frames only (the card fields / 3-D Secure of the payment window).
+    Permissions-Policy = "camera=(), microphone=(self), geolocation=(), payment=(self \"https://js.stripe.com\")"
     X-Frame-Options = "DENY"
 
 # Hashed build assets never change: cache them for a year (index.html stays revalidated, so a deploy is picked up at once).

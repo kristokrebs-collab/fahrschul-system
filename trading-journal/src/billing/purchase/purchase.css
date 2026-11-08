@@ -40,7 +40,7 @@ html[data-safe-fx] .pay-glass {
   background: linear-gradient(155deg, rgb(var(--pg-hi) / 0.08), transparent 55%), var(--color-ink-850);
 }
 
-/* The plan "card" of the order window (PlanCardArt): the glass surface WITHOUT backdrop-filter (a blurred layer and
+/* The plan "card" of the result page (PlanCardArt): the glass surface WITHOUT backdrop-filter (a blurred layer and
    `backface-visibility` do not mix in every browser), a fine dot grid (the dot-matrix language) and a lit edge. Both faces. */
 .pay-card {
   --pg-hi: 255 255 255;

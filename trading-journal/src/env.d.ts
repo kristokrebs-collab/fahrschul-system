@@ -3,8 +3,12 @@
  * `VITE_` prefix ends up in the bundle – server secrets never get that prefix (see `.env.example`).
  */
 interface ImportMetaEnv {
+  /** Vite: true in the dev server, false in every build (the demo card fields of the payment window live only behind it). */
+  readonly DEV: boolean;
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string;
+  /** Paket V: Stripe's PUBLISHABLE key (`pk_test_…` / `pk_live_…`) – the payment window shows Stripe Elements. Without it the order hands over to Stripe Checkout. The secret key stays server-side (`STRIPE_SECRET_KEY`). */
+  readonly VITE_STRIPE_PUBLISHABLE_KEY?: string;
   /** Legal data of the operator (`src/legal/config.ts`, SETUP.md „Rechtliches“) – all optional, public. */
   readonly VITE_LEGAL_OPERATOR?: string;
   readonly VITE_LEGAL_ADDRESS?: string;

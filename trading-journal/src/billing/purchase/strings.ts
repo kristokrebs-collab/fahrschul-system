@@ -62,6 +62,53 @@ export const ORDER = {
   changed: "Diese Bestellung wurde schon mit anderen Angaben gestartet. Bitte öffne sie neu.",
 } as const;
 
+/** Paket V: the payment window (the order paid in the app; legally relevant sentences stay in `ORDER` / `consentTexts.ts`). */
+export const PAY = {
+  kasse: "KASSE",
+  stepsLabel: "Bestellschritte",
+  steps: ["Auswahl", "Konto", "Zahlung"] as const,
+  title: "Zahlungsdaten",
+  sub: "Die Karte geht direkt an Stripe – wir sehen sie nie.",
+  subDemo: "Demo ohne Zahlung · Testkarte 4242 4242 4242 4242",
+  holder: "KARTENINHABER",
+  holderPh: "Vor- und Nachname",
+  number: "KARTENNUMMER",
+  expiry: "GÜLTIG BIS",
+  cvc: "PRÜFZIFFER",
+  cvcBack: "Rückseite",
+  missing: { holder: "Bitte gib den Namen auf der Karte an.", number: "Bitte gib die Kartennummer vollständig ein.", expiry: "Bitte gib das Ablaufdatum ein.", cvc: "Bitte gib die Prüfziffer ein." },
+  fieldsFailed: "Die Kartenfelder von Stripe ließen sich nicht laden. Prüfe die Verbindung und öffne das Fenster neu.",
+  handover: "Die Kartendaten gibst du im nächsten Schritt bei Stripe ein. Bestellt ist erst mit dem Button unten.",
+  yourOrder: "DEINE BESTELLUNG",
+  legalLinks: "Rechtstexte lesen",
+  summaryLabel: "Deine Bestellung",
+  trialRow: (days: number) => `${days} Tage Testphase`,
+  firstRow: "Erste Zahlung",
+  included: "inklusive",
+  anytime: "jederzeit",
+  taxIncl: "inkl. USt.",
+  /** Paid in the app (Stripe Tax off – with it on the order hands over to Checkout): the price IS the amount. */
+  taxHere: "Preise in Euro inkl. gesetzlicher Umsatzsteuer – Stripe berechnet nichts zusätzlich.",
+  /** `ORDER.cancel` compact (the same facts: any time, no notice period, end of the paid period, the in-app button, no login needed). */
+  cancelShort: "Du kannst jederzeit kündigen – keine Kündigungsfrist, Ende zum Schluss des bezahlten Zeitraums; in der App über „Verträge hier kündigen“, auch ohne Anmeldung.",
+  taxStripe: "rechnet Stripe",
+  dueToday: "Heute fällig",
+  today: "heute",
+  /** No trial, paid in the app: the first payment is this order. */
+  noTrialHere: (amount: string, per: string) => `Heute: ${amount} ${per} – du zahlst jetzt mit deiner Karte.`,
+  trustStripe: "Zahlung über Stripe (PCI-DSS)",
+  trustTls: "TLS-verschlüsselt",
+  cardWord: "Karte",
+  authorising: "Autorisierung bei deiner Bank",
+  paid: (amount: string) => `Bezahlt ${amount}`,
+  paidSub: (card: string) => `${card} · der Beleg ist unterwegs`,
+  trialActive: "Testphase läuft",
+  trialSub: (card: string, date: string, amount: string, per: string) => `${card} · ab ${date} ${amount} ${per} · Beleg per E-Mail`,
+  slowTitle: "Wir warten noch auf die Bestätigung",
+  slowSub: "Stripe hat die Karte angenommen, die Bestätigung an uns fehlt noch. Dein Tarif erscheint unter Konto, sobald sie da ist.",
+  done: "Fertig",
+} as const;
+
 export const DETAIL = {
   title: "Tarif im Detail",
   benefit: "Das bringt dir der Tarif",
