@@ -295,7 +295,7 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 23 Funktionen
 
 ### Aus Fehlern lernen
 
-_Warum du verlierst, was du verpasst, was du ändern kannst._ · 17 Funktionen
+_Warum du verlierst, was du verpasst, was du ändern kannst._ · 18 Funktionen
 
 **Fehler & Muster**
 
@@ -313,6 +313,7 @@ _Warum du verlierst, was du verpasst, was du ändern kannst._ · 17 Funktionen
 |---|---|---|---|
 | Deine teuersten Muster und die Lektion der Woche sehen | Coach | Coach › Coach | fertig |
 | Dem Coach Fragen zu deinen Trades stellen | Frag deinen Coach | Coach › Frag deinen Coach | fertig |
+| Eine Frage zu deinen Trades tippen und drei Antworten sehen | Frag dein Journal | Berichte › Frag dein Journal | fertig |
 | Die drei wichtigsten nächsten Schritte sehen | Verbesserungsplan | Coach › Verbesserungsplan | fertig |
 | Dein Handelsprofil in Eigenschaften sehen | Dein Handelsprofil | Coach › Dein Profil | fertig |
 
@@ -336,7 +337,7 @@ _Warum du verlierst, was du verpasst, was du ändern kannst._ · 17 Funktionen
 
 ### Auswerten & Berichte
 
-_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 29 Funktionen
+_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 30 Funktionen
 
 **Berichte**
 
@@ -344,6 +345,7 @@ _Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 29 Funktionen
 |---|---|---|---|
 | Einen Bericht für Woche, Monat oder Jahr lesen | Wochen- & Monatsberichte | Berichte | fertig |
 | Die Woche mit Befunden und Belegen durchgehen | Wochenreview | Berichte › Wochenreview | fertig |
+| Die Trades eines Zeitraums nacheinander durchblättern | Einträge durchgehen | Berichte › Einträge durchgehen | fertig |
 | Sehen, was dir das Journal im Monat gebracht hat | Persönlicher Monatsnutzen | Berichte › Persönlicher Monatsnutzen | fertig |
 | Einen kurzen Rückblick auf Woche oder Monat lesen | Rückblick | Übersicht › Rückblick | fertig |
 | Käufe, Verkäufe, Gebühren und Funding als Buch prüfen | Transaktionsbuch | Berichte › Transaktionsbuch | teilweise |
@@ -394,7 +396,7 @@ _Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 29 Funktionen
 
 ### Üben & Wachsen
 
-_Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
+_Training, Ziele, Gewohnheiten und Fortschritt._ · 14 Funktionen
 
 **Üben**
 
@@ -410,6 +412,7 @@ _Training, Ziele, Gewohnheiten und Fortschritt._ · 13 Funktionen
 | Prozessziele setzen und verfolgen | Ziele, Challenges & Gewohnheiten | Wachstum › Aktive Ziele | fertig |
 | Eine Challenge starten | Challenges | Wachstum › Challenges | fertig |
 | Tägliche Gewohnheiten abhaken | Gewohnheiten | Wachstum › Gewohnheiten | fertig |
+| Den Tag oder die Woche mit einem Tipp ruhig abschließen | Heute abschließen | Berichte › Heute abschließen | fertig |
 | Sehen, wie lange du bei deinen Gewohnheiten dranbleibst | Gewohnheits-Serien | Wachstum › Laufende Serien | fertig |
 
 **Psyche**

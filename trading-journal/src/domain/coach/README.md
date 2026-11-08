@@ -31,6 +31,7 @@ only rephrases an `Answer` that was computed here.
 - `answer.ts`: `answerIntent(intent, data)` over the P03 breakdowns → `Answer {text, facts, trades (evidence ids), chart
   (bars / line), confidence {score, label, n, note}, followUps}`. A sample under the minimum says so; an empty selection
   says so; an unknown question gets `FALLBACK_HELP` – never a guess.
+- `audit.ts` (Paket F2): die Fragen nach dem WIE eines Trades – „Trades ohne Stopp“ (`noStop`), „Checkliste ausgelassen“ (`checklist`), „Trades ohne Review“ (`noReview`) und „Verluste“ im Plural (`outcomes`, die verlierenden Trades einer Auswahl). `detectAudit` im Parser (`Intent.audit`, Typ `audit`; zwei Fragen in einer = `unknown`), `auditAnswer` im Antwort-Motor (`Answer.matched` = alle betroffenen Trades). Dieselbe Maschine hinter „Frag dein Journal“ (`@/domain/ask`, Berichte), siehe `docs/FRAG-DEIN-JOURNAL.md`.
 - `index.ts`: `askJournal(question, data)`, `suggestQuestions(data, 6)` (chips from the journal), `BEHAVIOR_QUESTION`.
 
 ## Tests
