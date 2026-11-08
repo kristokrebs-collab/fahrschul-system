@@ -20,9 +20,14 @@ export const PREISE = {
   yearly: "Jährlich",
   perMonth: "pro Monat",
   perSeatMonth: "pro Sitz und Monat",
-  yearlyNote: (amount: string, months: number) =>
-    months > 0 ? `${amount} jährlich · ${months} ${months === 1 ? "Monat" : "Monate"} gratis` : `${amount} jährlich`,
+  perYear: "pro Jahr",
+  perSeatYear: "pro Sitz und Jahr",
+  /** The big number of a yearly card is the amount DUE per year; the monthly value is only a comparison, never the price. */
+  perMonthEquiv: (amount: string) => `entspricht ${amount} pro Monat`,
+  yearlyNote: (months: number) => (months > 0 ? `${months} ${months === 1 ? "Monat" : "Monate"} gratis gegenüber monatlicher Zahlung` : ""),
   monthlyNote: "monatlich abgerechnet",
+  /** Team: seats × price = the amount really due, shown on the card (`2 Sitze: 380 € pro Jahr`). */
+  seatsTotal: (n: number, amount: string, per: string) => `${n} Sitze: ${amount} ${per}`,
   free: "0 €",
   freeNote: "für immer",
   recommended: "Beliebt",

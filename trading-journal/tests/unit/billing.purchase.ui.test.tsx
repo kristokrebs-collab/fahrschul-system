@@ -102,7 +102,7 @@ describe("order summary (§ 312j Abs. 2 BGB: everything in front of the order)",
     expect(within(sheet).getByTestId("order-plan")).toHaveTextContent("Trade Journal Pro");
     expect(within(sheet).getByTestId("order-total")).toHaveTextContent("120 €"); // the rolling digits carry the amount as sr-only text
     expect(within(sheet).getByTestId("order-total")).toHaveTextContent("pro Jahr");
-    expect(within(sheet).getByTestId("order-first")).toHaveTextContent(/14 Tage kostenlos testen – heute zahlst du nichts\. Am \d\d\.\d\d\.\d{4} beginnt die Zahlung: 120 € pro Jahr\./);
+    expect(within(sheet).getByTestId("order-first")).toHaveTextContent(/Heute 0 € \(14 Tage kostenlos testen\), danach 120 € pro Jahr – die erste Zahlung ist am \d\d\.\d\d\.\d{4}\./);
     expect(within(sheet).getByTestId("order-renewal")).toHaveTextContent(/verlängert sich automatisch am \d\d\.\d\d\.\d{4} und danach jedes Jahr um 120 €, bis du kündigst/);
     expect(within(sheet).getByTestId("order-cancel")).toHaveTextContent(/jederzeit kündigen.*keine Kündigungsfrist/);
     expect(within(sheet).getByTestId("order-cancel")).toHaveTextContent("Verträge hier kündigen");

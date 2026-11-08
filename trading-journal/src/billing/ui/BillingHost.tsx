@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
 import { useCloudSession } from "@/cloud/session";
+import { captureOrderQuery } from "@/store/returnTo";
 import { pushToast } from "@/store/uiStore";
 import { billingActive, clearAccount, loadBilling, releaseBusy, setReturned, useBilling, verifyReferral } from "../store";
 import { BILLING } from "../strings";
@@ -38,6 +39,8 @@ export function BillingHost({ onNavigate }: BillingHostProps) {
   useEffect(() => {
     if (!active) return;
     captureReferral();
+    // the pre-selection of a confirmation / magic link (`?order=premium.year.1`): validated, noted for the ReturnHost, out of the address
+    captureOrderQuery();
     void verifyReferral();
     const r = takeReturn();
     if (!r) return;

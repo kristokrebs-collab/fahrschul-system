@@ -253,6 +253,13 @@ function Hero({ status }: { status: ExchangeStatus }) {
           </div>
         )}
         <p className="text-[11.5px] text-faint">{EX.otherVenues}</p>
+        {/* the empty start state of a connection (Launch-Auftrag Abschnitt 2): optional – the demo first is fine */}
+        <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-mute" data-testid="exchange-optional">
+          {EX.optionalLine}
+          <Button variant="ghost" size="sm" onClick={() => void import("@/views/demo/demoStore").then((m) => m.openDemo())} data-testid="exchange-demo">
+            {EX.demo}
+          </Button>
+        </p>
       </div>
       <FactList facts={manual ? EX.facts.map((f) => (f.k === "auto" ? EX.manualFact : f)) : EX.facts} vertical />
     </div>

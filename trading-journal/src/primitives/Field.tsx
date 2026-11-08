@@ -85,7 +85,11 @@ export function Field({ label, htmlFor, children, help, error, suffix, required,
           {error}
         </motion.span>
       ) : (
-        help && <span className="text-[11px] text-faint">{help}</span>
+        help && (
+          <span id={htmlFor ? `${htmlFor}-help` : undefined} className="text-[11px] text-faint">
+            {help}
+          </span>
+        )
       )}
     </div>
   );

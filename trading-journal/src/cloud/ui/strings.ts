@@ -41,12 +41,45 @@ export const AUTH = {
   euNote: "Deine Daten liegen verschlüsselt in der EU (Frankfurt). Export und Löschung jederzeit unter Konto.",
   sent: {
     magic: (email: string) => `Wir haben einen Anmelde-Link an ${email} geschickt.`,
-    reset: (email: string) => `Wir haben einen Link zum Zurücksetzen an ${email} geschickt.`,
-    confirm: (email: string) => `Bestätige deine E-Mail ${email} mit dem Link, den wir dir geschickt haben. Danach bist du angemeldet.`,
-    sameBrowser: "Öffne den Link am besten in diesem Browser.",
+    // NO ACCOUNT ENUMERATION: the same words for an address with and without an account
+    reset: (email: string) => `Wenn zu ${email} ein Konto gehört, haben wir einen Link zum Zurücksetzen geschickt.`,
+    confirm: (email: string) => `Wenn die Adresse frei ist, schicken wir dir eine Bestätigung an ${email} – darin bestätigst du dein Konto, danach bist du angemeldet. Hast du schon ein Konto, melde dich an oder setze dein Passwort zurück.`,
+    sameBrowser: "Öffne den Link am besten in diesem Browser. Er ist nur begrenzt gültig.",
     resend: "Erneut senden",
     resendIn: (s: number) => `Erneut senden in ${s} s`,
     resent: "Neue E-Mail ist unterwegs.",
+    /** What the page tells about the send limit, always visible (the server allows one mail per address and minute). */
+    limitHint: "Aus Sicherheitsgründen geht eine neue E-Mail erst nach einer Minute – und nur wenige pro Stunde.",
+    /** The server refused a resend because of the limit: say so, wait longer, never retry in a loop. */
+    limit: "Zu viele E-Mails in kurzer Zeit. Warte bitte etwas, dann kannst du es noch einmal versuchen.",
+    spam: "Nichts angekommen? Schau auch im Spam-Ordner nach.",
+    toSignin: "Zur Anmeldung",
+    otherMail: "Andere E-Mail-Adresse",
+    notConfirmed: "Deine E-Mail ist noch nicht bestätigt. Wir können dir den Link erneut senden.",
+  },
+  /** The brand strip of the card (AuthBlade): our name and one line per step – no foreign brand, no promise of profit. */
+  brand: {
+    name: "TRADE JOURNAL",
+    signin: "Willkommen zurück.",
+    magic: "Ein Klick, und du bist drin.",
+    signup: "Dein Journal. Dein Start.",
+    reset: "Kein Problem – wir helfen dir.",
+    sent: "Fast geschafft.",
+    mfa: "Noch ein Schritt.",
+    newPassword: "Ein neues Passwort, ein frischer Start.",
+    account: "Dein Konto.",
+    welcome: "Alles bereit.",
+  } as Record<string, string>,
+  /** The switch inside the card (the other way next to the mode switch); full sentences, so the names stay unique. */
+  switchLink: { toSignup: "Neu hier? Jetzt registrieren", toSignin: "Schon registriert? Zur Anmeldung" },
+  passwordHelp: "Mindestens 10 Zeichen – ein langer Satz ist besser als ein kurzes Rätsel.",
+  offline: "Du bist offline. Verbinde dich mit dem Internet und versuche es noch einmal.",
+  order: {
+    title: "Deine Auswahl bleibt erhalten",
+    line: (plan: string, interval: string, seats: number | null, total: string) => `${plan} · ${interval}${seats ? ` · ${seats} Sitze` : ""} · ${total}`,
+    after: "Nach der Anmeldung geht es genau mit dieser Bestellung weiter. Bestellt ist erst, wenn du dort ausdrücklich bestellst.",
+    skip: "Ohne Kauf weiter",
+    skipped: "Kein Kauf – das Journal bleibt kostenlos nutzbar.",
   },
   mfaSignOut: "Abbrechen und abmelden",
   welcome: {

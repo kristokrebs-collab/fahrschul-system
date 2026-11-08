@@ -1,11 +1,16 @@
 /**
- * The order button as a Button → Pay morph (B4): "Zahlungspflichtig bestellen" → small breathing orbs while the order goes
- * to the server → "Weiter zu Stripe …" while the browser leaves. The width never changes: both labels sit in the same grid
- * cell (the longer one decides), the orbs lie over them. The label of the order step is ALWAYS `BUTTON_LABELS.order` (§ 312j
- * Abs. 3 BGB) – never "N Tage gratis testen", never "Jetzt abonnieren". A second click while it works is ignored here
- * (`phase`) AND on the server (the order id is the idempotency key).
+ * The order button as a Button → Pay morph (B4, Paket B): "Zahlungspflichtig bestellen" → small breathing orbs and "Wird
+ * vorbereitet …" while the order goes to the server → orbs and "Weiter zu Stripe …" while the browser leaves. The width never
+ * changes: the three labels sit in the same grid cell (the longest decides), the orbs are part of the busy labels' own line.
+ * The label of the order step is ALWAYS `BUTTON_LABELS.order` while nothing was sent (§ 312j Abs. 3 BGB) – never "N Tage gratis
+ * testen", never "Jetzt abonnieren"; the other two texts appear only AFTER the click. A second click while it works is
+ * ignored here (`phase`) AND on the server (the order id is the idempotency key). Failed → the button is free again with its old
+ * label (the hint in the sheet says so).
+ *
+ * The button does not use `Button`'s own `loading` (it would make the label transparent): the busy label stays readable, the
+ * button reports `aria-busy` + `aria-disabled` and ignores clicks itself.
  */
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Button } from "@/primitives/Button";
 import { cn } from "@/lib/cn";
 import type { OrderPhase } from "./orderState";
@@ -21,27 +26,47 @@ export interface PayButtonProps {
   className?: string;
 }
 
+/** Six dots on a ring that breathe in turn – inside the label's own line, 18 px (`.pay-orbs`). */
+function MiniOrbs() {
+  return (
+    <span aria-hidden="true" className="relative inline-block size-[18px] shrink-0" data-testid="button-orbs">
+      <span className="pay-orbs">
+        {[0, 1, 2, 3, 4, 5].map((k) => (
+          <i key={k} style={{ "--k": k } as CSSProperties} />
+        ))}
+      </span>
+    </span>
+  );
+}
+
 export function PayButton({ phase, disabled, onPay, idleLabel, className }: PayButtonProps) {
   const busy = phase !== "idle";
+  const cells: [OrderPhase, ReactNode][] = [
+    ["idle", idleLabel ?? BUTTON_LABELS.order],
+    ["confirming", ORDER.preparing],
+    ["redirecting", ORDER.redirecting],
+  ];
   return (
     <Button
       variant="primary"
       fx={false}
-      loading={busy}
-      loader="orbs"
       disabled={disabled}
-      onClick={onPay}
-      className={cn("min-w-[15.5rem] justify-center", className)}
+      aria-busy={busy || undefined}
+      aria-disabled={busy || undefined}
+      onClick={() => {
+        if (!busy) onPay();
+      }}
+      className={cn("min-w-[15.5rem] justify-center", busy && "cursor-progress", className)}
       data-testid="order-pay"
       data-phase={phase}
     >
       <span className="pay-swap">
-        <span data-on={phase !== "redirecting"} aria-hidden={phase === "redirecting" || undefined}>
-          {idleLabel ?? BUTTON_LABELS.order}
-        </span>
-        <span data-on={phase === "redirecting"} aria-hidden={phase !== "redirecting" || undefined}>
-          {ORDER.redirecting}
-        </span>
+        {cells.map(([p, label]) => (
+          <span key={p} data-on={phase === p} aria-hidden={phase !== p || undefined} className="inline-flex items-center justify-center gap-2">
+            {p !== "idle" && phase === p && <MiniOrbs />}
+            {label}
+          </span>
+        ))}
       </span>
     </Button>
   );

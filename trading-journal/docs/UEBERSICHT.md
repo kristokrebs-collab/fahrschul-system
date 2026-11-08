@@ -505,7 +505,7 @@ _Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 28 Funktionen
 |---|---|---|---|
 | Anmelden, synchronisieren und das Konto verwalten | Konto & Cloud-Sync | Konto | fertig |
 | Tarif wählen, Abo verwalten oder kündigen | Abo & Tarife | Preise | fertig |
-| Einen Tarif wählen und kaufen | Tarif wählen und kaufen | Preise › Pro wählen | fertig |
+| Einen Tarif wählen und kaufen | Tarif wählen und kaufen | Preise › Pro auswählen · Weiter zur Zahlung | fertig |
 | Ein Abo kündigen, auch ohne dich anzumelden | Verträge hier kündigen (ohne Anmeldung) | Preise › Verträge hier kündigen | fertig |
 | Sehen, welcher Tarif welche Funktion enthält | Tarife im Vergleich | Preise › Alle Funktionen im Vergleich | fertig |
 | Freunde einladen und Gutschrift erhalten | Freunde einladen (Empfehlungscode) | Konto | teilweise |

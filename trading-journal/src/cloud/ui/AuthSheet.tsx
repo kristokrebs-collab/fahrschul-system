@@ -4,6 +4,7 @@ import { LegalLink } from "@/legal/LegalLinks";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { armWizard } from "@/onboarding/wizard/wizardStore";
 import { celebrateFrom } from "@/motion/Celebrate";
 import { DotMatrix } from "@/motion/DotMatrix";
 import { HoldConfirm } from "@/motion/HoldConfirm";
@@ -20,15 +21,18 @@ import { Button } from "@/primitives/Button";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
+import { pendingOrderParam } from "@/store/returnTo";
 import { pushToast } from "@/store/uiStore";
-import { emailProblem, passwordProblem, passwordStrength, type AuthField } from "../authErrors";
+import { emailProblem, isSendLimit, passwordProblem, passwordStrength, type AuthField } from "../authErrors";
 import { oauthProviders, type OAuthProvider } from "../env";
 import { ensureCloud } from "../runtime";
 import { closeAuthSheet, setAuthEmail, setAuthView, useCloudSession } from "../session";
 import { useSyncStatus } from "../sync/status";
 import type { AuthView } from "../types";
+import { AuthBrand, BladeStage, useBlade } from "./AuthBlade";
 import { AuthMorph, MorphItem, slideDir } from "./AuthMorph";
 import { CODE_LENGTH, CodeSlots } from "./CodeSlots";
+import { OrderContext } from "./OrderContext";
 import { AUTH_LAYOUT_ID, syncPill } from "./pill";
 import { AUTH } from "./strings";
 
@@ -51,6 +55,9 @@ export interface AuthSheetProps {
  * wordmark decodes, a `DotMatrix` wave runs while the first sync uploads (progress on `RollingDigits`), a drawn ✓ and a
  * confetti burst (`celebrateFrom`) when it is live. Reduced motion: static end states.
  */
+/** The views in which a pending order is shown above the card (the way to the order is still open). */
+const ORDER_VIEWS: readonly AuthView[] = ["signin", "magic", "signup", "reset", "sent"];
+
 export function AuthSheet({ onOpenAccount }: AuthSheetProps) {
   const sheet = useCloudSession((s) => s.sheet);
   const dir = slideDir(sheet.view, sheet.prev);
@@ -70,13 +77,24 @@ export function AuthSheet({ onOpenAccount }: AuthSheetProps) {
       <div className="grid gap-4" data-auth-view={sheet.view}>
         {sheet.notice && (
           <StaggerItem>
-            <p className="rounded-xl border border-line bg-ink-950/50 px-3 py-2 text-[12.5px] text-mute">{sheet.notice}</p>
+            <p className="rounded-xl border border-line bg-ink-950/50 px-3 py-2 text-[12.5px] text-mute" data-testid="auth-notice" role="status">
+              {sheet.notice}
+            </p>
           </StaggerItem>
         )}
-        {/* R11: one card that morphs – the modes of the entry step keep their form (AuthMorph), the other steps cross over in one height-following box */}
-        <AuthMorph view={sheet.view} dir={dir}>
-          <ViewBody view={sheet.view} onOpenAccount={onOpenAccount} />
-        </AuthMorph>
+        {ORDER_VIEWS.includes(sheet.view) && (
+          <StaggerItem>
+            <OrderContext />
+          </StaggerItem>
+        )}
+        {/* R11: one card that morphs – the modes of the entry step keep their form (AuthMorph), the other steps cross over in one height-following box.
+            Paket B: our brand strip on top and the blade that sweeps once across the card when Anmelden ↔ Registrieren switches (AuthBlade) */}
+        <BladeStage>
+          {/* the strip is the `lead` of the morph: its claim may take one line or two, and that height change belongs to the card's own spring */}
+          <AuthMorph view={sheet.view} dir={dir} lead={<AuthBrand view={sheet.view} />}>
+            <ViewBody view={sheet.view} onOpenAccount={onOpenAccount} />
+          </AuthMorph>
+        </BladeStage>
       </div>
     </Sheet>
   );
@@ -229,6 +247,7 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
   const emailId = `${ids}-email`;
   const pwId = `${ids}-pw`;
   const form = useRef<HTMLFormElement>(null);
+  const blade = useBlade();
 
   /** Shows the error at its field AND moves the focus there (the field that needs the next keystroke), then the screen reader hears it by the field's `aria-describedby`. */
   const fail = (e: FieldError) => {
@@ -263,6 +282,8 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
       setConsentMissing(true);
       return setErr(errorOf(null, AUTH_LEGAL.missing));
     }
+    // offline: say so before anything is sent (the typed values stay)
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return setErr(errorOf(null, AUTH.offline));
     setErr(null);
     setBusy(true);
     const m = await cloudOrError();
@@ -273,17 +294,25 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
     if (mode === "signin") {
       const r = await m.signInPassword(email, password);
       setBusy(false);
-      if (!r.ok) return fail(errorOf(r.field, r.message));
+      if (!r.ok) {
+        // right password, address not confirmed yet (the server says so only to someone who knows the password): the way on is a new link
+        if (r.code === "email_not_confirmed") return setAuthView("sent", { sent: "confirm", resendNow: true, notice: AUTH.sent.notConfirmed });
+        return fail(errorOf(r.field, r.message));
+      }
       setAuthView(r.value.mfa ? "mfa" : "welcome");
     } else if (mode === "magic") {
-      const r = await m.sendMagicLink(email);
+      const order = pendingOrderParam();
+      const r = order ? await m.sendMagicLink(email, order) : await m.sendMagicLink(email);
       setBusy(false);
       if (!r.ok) return fail(errorOf(r.field, r.message));
       setAuthView("sent", { notice: null, sent: "magic" });
     } else {
-      const r = await m.signUp(email, password);
+      const order = pendingOrderParam();
+      const r = order ? await m.signUp(email, password, order) : await m.signUp(email, password);
       setBusy(false);
       if (!r.ok) return fail(errorOf(r.field, r.message));
+      // a registration arms the setup wizard (once; it opens after the sign-in, when nothing else owns the screen)
+      armWizard();
       setAuthView(r.value.confirm ? "sent" : "welcome", { sent: "confirm" });
     }
   }
@@ -306,7 +335,8 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
     // `relative`: a block that leaves (`MorphItem`, popLayout) is taken out of the flow at once, the others glide up (`layout="position"`)
     <form ref={form} className="relative grid gap-4" noValidate method="post" onSubmit={(e) => void submit(e)} data-auth-mode={mode}>
       <StaggerItem layout="position">
-        <Segmented options={MODE_OPTIONS} value={mode} onChange={(v) => setAuthView(v)} aria-label="Anmeldeart" className="w-full" />
+        {/* the blade carries the switch (AuthBlade): the mode shows at once, the content follows behind the band */}
+        <Segmented options={MODE_OPTIONS} value={blade.pending ?? mode} onChange={(v) => blade.switchTo(v)} aria-label="Anmeldeart" className="w-full" />
       </StaggerItem>
       <MorphItem itemKey={`lead-${mode}`}>
         <p className="text-[13px] leading-relaxed text-mute">{AUTH.lead[mode]}</p>
@@ -340,19 +370,32 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
             value={email}
             invalid={err?.field === "email"}
             aria-describedby={err?.field === "email" ? `${emailId}-error` : undefined}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              // a shown e-mail error goes the moment the address is valid (no waiting for the next submit)
+              if (err?.field === "email" && !emailProblem(e.target.value)) setErr(null);
+            }}
           />
         </Field>
       </StaggerItem>
       <MorphItem show={mode !== "magic"} itemKey="password" className="relative grid gap-2">
-        <Field label={AUTH.password} htmlFor={pwId} error={err?.field === "password" ? err.message : undefined} invalidKey={err?.field === "password" ? err.key : null}>
+        <Field
+          label={AUTH.password}
+          htmlFor={pwId}
+          help={mode === "signup" && err?.field !== "password" ? AUTH.passwordHelp : undefined}
+          error={err?.field === "password" ? err.message : undefined}
+          invalidKey={err?.field === "password" ? err.key : null}
+        >
           <PasswordInput
             id={pwId}
             value={password}
-            onChange={setPassword}
+            onChange={(v) => {
+              setPassword(v);
+              if (err?.field === "password" && mode === "signup" && !passwordProblem(v)) setErr(null);
+            }}
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
             invalid={err?.field === "password"}
-            describedBy={err?.field === "password" ? `${pwId}-error` : undefined}
+            describedBy={err?.field === "password" ? `${pwId}-error` : mode === "signup" ? `${pwId}-help` : undefined}
           />
         </Field>
         <MorphItem show={mode === "signup"} itemKey="strength">
@@ -393,6 +436,13 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
         </span>
         <SubmitButton busy={busy} idle={AUTH.submit[mode]} busyLabel={AUTH.busy[mode]} />
       </StaggerItem>
+      {/* the way over to the other face, as in the reference ("New to …? Create account" ↔ "Already have an account? Sign in"):
+          the same blade, and the focus lands in the first field of the new face */}
+      <MorphItem show={mode !== "magic"} itemKey="switch">
+        <p className="text-center">
+          <LinkButton onClick={() => blade.switchTo(mode === "signup" ? "signin" : "signup", { focus: true })}>{mode === "signup" ? AUTH.switchLink.toSignin : AUTH.switchLink.toSignup}</LinkButton>
+        </p>
+      </MorphItem>
       <MorphItem show={mode === "signup"} itemKey="eu">
         <p className="text-[11.5px] leading-relaxed text-faint">{AUTH.euNote}</p>
       </MorphItem>
@@ -426,9 +476,11 @@ function ResetView() {
     const ep = emailProblem(email);
     if (ep) return setErr(errorOf("email", ep));
     setAuthEmail(email.trim());
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return setErr(errorOf(null, AUTH.offline));
     setBusy(true);
     const m = await cloudOrError();
-    const r = m ? await m.sendPasswordReset(email) : null;
+    const order = pendingOrderParam();
+    const r = m ? await m.sendPasswordReset(email, order) : null;
     setBusy(false);
     if (!r) return setErr(errorOf(null, AUTH.unavailable));
     if (!r.ok) return setErr(errorOf(r.field === "email" ? "email" : null, r.message));
@@ -457,15 +509,27 @@ function ResetView() {
   );
 }
 
-const RESEND_S = 30;
+/** One mail per address and minute is the server's default; the button waits as long (a shorter wait would only run into the limit). */
+export const RESEND_S = 60;
+/** After the server refused for the send limit: wait longer, the hint says why. */
+export const RESEND_LIMIT_S = 120;
 
-/** Envelope drawn line by line, then a resend with a rolling 30-s countdown. */
+/** What a resend said: the line under the buttons (`role="status"` / `role="alert"`), never only a toast that is gone before it is read. */
+interface ResendNote {
+  kind: "ok" | "limit" | "error";
+  text: string;
+  key: number;
+}
+
+/** Envelope drawn line by line, then a resend with a rolling countdown, an honest limit hint and the way back / to another address. */
 function SentView() {
   const email = useCloudSession((s) => s.sheet.email);
   const sentKind = useCloudSession((s) => s.sheet.sent);
+  const resendNow = useCloudSession((s) => s.sheet.resendNow);
   const reduced = useReducedFx();
-  const [left, setLeft] = useState(RESEND_S);
+  const [left, setLeft] = useState(resendNow ? 0 : RESEND_S);
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<ResendNote | null>(null);
   useEffect(() => {
     if (left <= 0) return;
     const t = setTimeout(() => setLeft((n) => n - 1), 1000);
@@ -473,14 +537,20 @@ function SentView() {
   }, [left]);
   const text = sentKind === "reset" ? AUTH.sent.reset(email) : sentKind === "confirm" ? AUTH.sent.confirm(email) : AUTH.sent.magic(email);
   async function resend() {
+    if (busy || left > 0) return; // the button is disabled; a keyboard repeat or a second tap cannot send twice
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return setNote({ kind: "error", text: AUTH.offline, key: ++errorSeq });
     setBusy(true);
     const m = await cloudOrError();
-    const r = !m ? null : sentKind === "reset" ? await m.sendPasswordReset(email) : sentKind === "confirm" ? await m.resendConfirmation(email) : await m.sendMagicLink(email);
+    const order = pendingOrderParam();
+    const r = !m ? null : sentKind === "reset" ? await m.sendPasswordReset(email, order) : sentKind === "confirm" ? await m.resendConfirmation(email, order) : await m.sendMagicLink(email, order);
     setBusy(false);
     if (r?.ok) {
-      pushToast({ kind: "success", title: AUTH.sent.resent });
+      setNote({ kind: "ok", text: AUTH.sent.resent, key: ++errorSeq });
       setLeft(RESEND_S);
-    } else pushToast({ kind: "error", title: r && !r.ok ? r.message : AUTH.unavailable });
+    } else if (r && isSendLimit(r.code)) {
+      setNote({ kind: "limit", text: AUTH.sent.limit, key: ++errorSeq });
+      setLeft(RESEND_LIMIT_S);
+    } else setNote({ kind: "error", text: r && !r.ok ? r.message : AUTH.unavailable, key: ++errorSeq });
   }
   const draw = (i: number) => (reduced ? { duration: 0 } : { ...tween.draw, delay: i * stagger.lead });
   return (
@@ -493,11 +563,13 @@ function SentView() {
         </svg>
       </StaggerItem>
       <StaggerItem>
-        <p className="max-w-[26rem] text-[13.5px] leading-relaxed text-fg">{text}</p>
+        <p className="max-w-[26rem] text-[13.5px] leading-relaxed text-fg" data-testid="auth-sent-text">
+          {text}
+        </p>
         <p className="mt-1.5 text-[12px] text-faint">{AUTH.sent.sameBrowser}</p>
       </StaggerItem>
       <StaggerItem className="flex flex-wrap items-center justify-center gap-3">
-        <Button onClick={() => void resend()} disabled={left > 0 || busy} aria-busy={busy || undefined}>
+        <Button onClick={() => void resend()} disabled={left > 0 || busy} aria-busy={busy || undefined} data-testid="auth-resend">
           {left > 0 ? (
             <span className="inline-flex items-center gap-1">
               {AUTH.sent.resend} · <RollingDigits value={left} className="tabular-nums" aria-label={`${left} Sekunden`} /> s
@@ -506,7 +578,21 @@ function SentView() {
             AUTH.sent.resend
           )}
         </Button>
-        <LinkButton onClick={() => setAuthView("signin")}>{AUTH.back}</LinkButton>
+        <LinkButton onClick={() => setAuthView("signin")}>{sentKind === "confirm" ? AUTH.sent.toSignin : AUTH.back}</LinkButton>
+        {sentKind !== "magic" && <LinkButton onClick={() => setAuthView(sentKind === "reset" ? "reset" : "signup")}>{AUTH.sent.otherMail}</LinkButton>}
+        {/* the registration text names both cases ("frei" / "schon ein Konto"): the way to the reset is as close as the way to the login */}
+        {sentKind === "confirm" && <LinkButton onClick={() => setAuthView("reset")}>{AUTH.forgot}</LinkButton>}
+      </StaggerItem>
+      <StaggerItem className="grid max-w-[26rem] gap-1">
+        {/* below the buttons: a result never moves them */}
+        {note ? (
+          <p key={note.key} role={note.kind === "ok" ? "status" : "alert"} data-testid="auth-resend-note" data-kind={note.kind} className={cn("text-[12.5px]", note.kind === "ok" ? "text-win" : "text-loss")}>
+            {note.text}
+          </p>
+        ) : null}
+        <p className="text-[11.5px] leading-snug text-faint" data-testid="auth-limit-hint">
+          {AUTH.sent.limitHint} {AUTH.sent.spam}
+        </p>
       </StaggerItem>
     </div>
   );
