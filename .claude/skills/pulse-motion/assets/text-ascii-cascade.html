@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text ASCII Cascade</title>
+<style>
+/* =====================================================================
+   CONFIG  (alles hier "hochdrehen"; Referenz-Viewport 1234x673)
+   ===================================================================== */
+:root{
+  /* Look */
+  --stage-bg:   #1f1f1f;   /* Buehnenfarbe (gemessen 1F1F1F) */
+  --text-color: #fafafa;   /* Endzustand / oberer Punkt (gemessen FAFAFA) */
+  --scr-color:  #94b0d6;   /* Blau-Schiefer-Ton der Scramble-Zeichen im tiefen Punkt */
+  --font: "Geist Mono", ui-monospace, "SFMono-Regular", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  --font-size: 46px;       /* Kappenhoehe ~36px (Video) */
+  --tracking:  0.08em;     /* Buchstabenabstand */
+  --min-dim-opacity: 0.58; /* Gesamt-Deckkraft im tiefsten Punkt (1 - 0.42) */
+  --blue-gain: 1.6;        /* wie schnell die Farbe zu Weiss zurueckkehrt (haengt an der Absenkung) */
+}
+/* Motion-Tokens stehen im JS (CONFIG) - Zeiten in ms:
+   startDelay 400 | fall 550 cubic-out | hold 670 | rise 600 cubic-out | resolve nach 1870 | tick 70 */
+</style>
+<style>
+html,body{margin:0;height:100%}
+body{background:var(--stage-bg);display:grid;place-items:center;overflow:hidden;
+  font-family:var(--font);-webkit-font-smoothing:antialiased}
+
+/* COMPONENT CSS */
+.tac{position:relative;display:inline-block;font-family:var(--font);font-size:var(--font-size);
+  letter-spacing:var(--tracking);line-height:1.4;color:var(--scr-color);
+  contain:layout paint;padding:.9em 1.2em;outline:none;cursor:default;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none}
+.tac:focus-visible{outline:1px dashed rgba(250,250,250,.4);outline-offset:4px}
+.tac__row{position:relative;display:block;white-space:nowrap;transform:translate3d(0,0,0)}
+.tac__layer{display:block}
+.tac__layer--hi{position:absolute;inset:0;color:var(--text-color);opacity:1}
+.tac__layer--lo{color:var(--scr-color)}
+.tac__ch{display:inline-block;width:calc(1ch + var(--tracking));text-align:center;
+  /* kein Layout-Shift bei breiten Block-Zeichen */}
+.tac--static .tac__layer--lo{visibility:hidden}
+/* /COMPONENT CSS */
+</style>
+</head>
+<body>
+
+<!-- COMPONENT:START -->
+<div class="tac" id="demo" role="img" aria-label="CASCADE" tabindex="0" data-text="CASCADE">
+  <span class="tac__row" aria-hidden="true">
+    <span class="tac__layer tac__layer--lo"></span>
+    <span class="tac__layer tac__layer--hi"></span>
+  </span>
+</div>
+<!-- COMPONENT:END -->
+
+<script>
+/* ===================== CONFIG (Motion) ===================== */
+const TAC_CONFIG = {
+  startDelay: 400,      // ms bis zum ersten Scramble nach dem Laden (Video: ~0.40 s)
+  drop: 47,             // px Absenkung (Video: 47 px bei 48 px Schrift)
+  fall: 550,            // ms Fall, cubic ease-out
+  hold: 670,            // ms unten halten
+  rise: 600,            // ms Rueckweg, cubic ease-out
+  resolveAt: 1870,      // ms nach Scramble-Start: alles springt auf Klartext
+  tick: 70,             // ms Takt, in dem Zeichen neu gewuerfelt werden
+  changeProb: 0.7,      // Wahrscheinlichkeit pro Zeichen und Takt
+  onsetJitter: 60,      // ms zufaelliger Einsatz je Buchstabe (Stagger)
+  chars: ".:-=+*#%@&░▒▓█", // Scramble-Zeichensatz
+  loopMs: 0,            // >0: automatisch alle N ms wiederholen
+  hoverReplay: true,    // Hover/Tap/Enter startet erneut
+  autoPlay: true
+};
+
+/* COMPONENT JS */
+function initTextAsciiCascade(root, opts){
+  const C = Object.assign({}, TAC_CONFIG, opts||{});
+  const text = root.dataset.text || root.getAttribute('aria-label') || 'CASCADE';
+  const row = root.querySelector('.tac__row');
+  const lo = root.querySelector('.tac__layer--lo');
+  const hi = root.querySelector('.tac__layer--hi');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cs = getComputedStyle(root);
+  const minOp = parseFloat(cs.getPropertyValue('--min-dim-opacity')) || .58;
+  const gain  = parseFloat(cs.getPropertyValue('--blue-gain')) || 1.6;
+  const n = text.length, pool = Array.from(C.chars);
+  // Spans einmal erzeugen
+  const loS = [], hiS = [];
+  for (let i=0;i<n;i++){
+    const a = document.createElement('span'); a.className='tac__ch'; a.textContent=text[i]; lo.appendChild(a); loS.push(a);
+    const b = a.cloneNode(true); hi.appendChild(b); hiS.push(b);
+  }
+  const cur = text.split('');
+  let raf=0, t0=-1, running=false, loopTimer=0, delayTimer=0, onset=[], lastTick=-1, lastY=-1, lastW=-1;
+  const easeOut = p => 1 - Math.pow(1-p, 3);
+
+  function setChar(i,ch){ if(cur[i]===ch) return; cur[i]=ch; loS[i].textContent=ch; hiS[i].textContent=ch; }
+  function apply(y){ // y in px (0..drop)
+    if (y===lastY) return; lastY=y;
+    const d = y / C.drop;
+    row.style.transform = 'translate3d(0,'+y.toFixed(2)+'px,0)';
+    row.style.opacity = (1 - (1-minOp)*d).toFixed(3);
+    const w = Math.max(0, 1 - d*gain);                 // Weiss-Anteil (Ebene "hi")
+    if (w!==lastW){ lastW=w; hi.style.opacity = w.toFixed(3); }
+  }
+  function frame(t){
+    if (t0<0){ t0=t; }
+    const e = t - t0;                                   // zeitbasiert -> frameratenunabhaengig
+    if (e >= C.resolveAt){ finish(); return; }
+    // vertikale Kurve
+    let y;
+    if (e < C.fall) y = C.drop * easeOut(e/C.fall);
+    else if (e < C.fall + C.hold) y = C.drop;
+    else y = C.drop * (1 - easeOut(Math.min(1,(e - C.fall - C.hold)/C.rise)));
+    apply(y);
+    // Scramble im festen Takt
+    const k = Math.floor(e / C.tick);
+    if (k !== lastTick){
+      lastTick = k;
+      for (let i=0;i<n;i++){
+        if (e < onset[i]) continue;
+        if (text[i]===' ') continue;
+        if (cur[i]===text[i] || Math.random() < C.changeProb)
+          setChar(i, pool[(Math.random()*pool.length)|0]);
+      }
+    }
+    raf = requestAnimationFrame(frame);
+  }
+  function finish(){
+    running=false; cancelAnimationFrame(raf);
+    for (let i=0;i<n;i++) setChar(i,text[i]);
+    row.style.transform='translate3d(0,0,0)'; row.style.opacity='1'; hi.style.opacity='1';
+    row.style.willChange=''; lastY=lastW=-1;
+    root.dispatchEvent(new CustomEvent('tac:end'));
+    schedule();
+  }
+  function play(){
+    if (reduce || running) return;
+    clearTimeout(delayTimer); clearTimeout(loopTimer);
+    running=true; t0=-1; lastTick=-1; lastY=lastW=-1;
+    onset = Array.from({length:n}, () => Math.random()*C.onsetJitter);
+    row.style.willChange='transform, opacity';
+    raf = requestAnimationFrame(frame);
+  }
+  function schedule(){ if (C.loopMs>0 && !reduce){ clearTimeout(loopTimer); loopTimer=setTimeout(play, C.loopMs); } }
+  // Eingabe
+  if (C.hoverReplay){
+    root.addEventListener('pointerenter', play, {passive:true});
+    root.addEventListener('pointerdown',  play, {passive:true});
+    root.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); play(); } });
+  }
+  if (reduce) root.classList.add('tac--static');
+  else if (C.autoPlay) delayTimer = setTimeout(play, C.startDelay); // einmaliger Start-Timer, kein Animationstakt
+  return { play, destroy(){ cancelAnimationFrame(raf); clearTimeout(loopTimer); clearTimeout(delayTimer); } };
+}
+/* /COMPONENT JS */
+
+/* ===================== DEMO (exakt der Video-Inhalt) ===================== */
+initTextAsciiCascade(document.getElementById('demo'), { loopMs: 4200 });
+</script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Magic Primitives</title>
+<style>
+/* Vanilla-Nachbau von 8 Magic-UI-Effekten (github.com/magicuidesign/magicui, MIT, (c) Magic UI).
+   Keyframes/Zahlen stammen aus deren globals.css; Struktur ist neu in HTML/CSS/JS. Ohne Abhängigkeiten. */
+:root { --stage:#0b0b0d; --card:#16161a; --ink:#ececf1; --muted:#8b8b97; --line:#26262d; }
+body[data-theme="light"] { --stage:#f1f1f4; --card:#fff; --ink:#18181b; --muted:#6b6b76; --line:#dcdce2; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--stage); color:var(--ink); font:14px/1.5 Inter,ui-sans-serif,system-ui,sans-serif; padding:32px 16px 64px; }
+.wrap { max-width:960px; margin:0 auto; display:grid; gap:20px; }
+h1 { font-size:20px; margin:0 0 4px; } p.sub { margin:0 0 8px; color:var(--muted); }
+.card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; position:relative; overflow:hidden; }
+.card h2 { margin:0 0 12px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+.row { display:flex; flex-wrap:wrap; gap:16px; align-items:center; }
+.toggle { position:fixed; right:12px; top:12px; z-index:9; background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:999px; padding:6px 12px; cursor:pointer; font:inherit; }
+
+/* ============ COMPONENT CSS ============ */
+
+/* 1) Shimmer Button  (Funke läuft um den Rand; Variablen: --shimmer-color --speed --radius --cut --bg) */
+.mg-shimmer { --spread:90deg; --shimmer-color:#fff; --radius:100px; --speed:3s; --cut:.05em; --bg:#000;
+  position:relative; z-index:0; display:inline-flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer;
+  border:1px solid rgba(255,255,255,.1); border-radius:var(--radius); padding:12px 24px; white-space:nowrap; color:#fff; font:500 14px/1 inherit; background:var(--bg);
+  transform:translateZ(0); transition:transform .3s ease-in-out; }
+.mg-shimmer:active { transform:translateY(1px); }
+.mg-shimmer__spark { position:absolute; inset:0; z-index:-30; overflow:visible; filter:blur(2px); container-type:size; }
+.mg-shimmer__slide { position:absolute; inset:0; aspect-ratio:1; height:100cqh; animation:mg-shimmer-slide var(--speed) ease-in-out infinite alternate; }
+.mg-shimmer__slide::before { content:""; position:absolute; inset:-100%; translate:0 0; rotate:0deg;
+  background:conic-gradient(from calc(270deg - (var(--spread) * .5)), transparent 0, var(--shimmer-color) var(--spread), transparent var(--spread));
+  animation:mg-spin-around calc(var(--speed) * 2) infinite linear; }
+.mg-shimmer__hl { position:absolute; inset:0; border-radius:16px; box-shadow:inset 0 -8px 10px #ffffff1f; transition:box-shadow .3s ease-in-out; }
+.mg-shimmer:hover .mg-shimmer__hl { box-shadow:inset 0 -6px 10px #ffffff3f; }
+.mg-shimmer:active .mg-shimmer__hl { box-shadow:inset 0 -10px 10px #ffffff3f; }
+.mg-shimmer__bd { position:absolute; inset:var(--cut); z-index:-20; border-radius:var(--radius); background:var(--bg); }
+@keyframes mg-shimmer-slide { to { transform:translate(calc(100cqw - 100%), 0); } }
+@keyframes mg-spin-around { 0% { transform:translateZ(0) rotate(0); } 15%,35% { transform:translateZ(0) rotate(90deg); } 65%,85% { transform:translateZ(0) rotate(270deg); } 100% { transform:translateZ(0) rotate(360deg); } }
+
+/* 2) Meteors  (JS setzt pro Meteor --angle, left, delay, duration) */
+.mg-meteors { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+.mg-meteor { position:absolute; top:-5%; width:2px; height:2px; border-radius:50%; background:#71717a; box-shadow:0 0 0 1px #ffffff10; rotate:var(--angle);
+  animation:mg-meteor 5s linear infinite; will-change:transform,opacity; }
+.mg-meteor::after { content:""; position:absolute; top:50%; z-index:-10; width:50px; height:1px; transform:translateY(-50%); background:linear-gradient(to right,#71717a,transparent); }
+@keyframes mg-meteor { 0% { transform:rotate(var(--angle)) translateX(0); opacity:1; } 70% { opacity:1; } 100% { transform:rotate(var(--angle)) translateX(-500px); opacity:0; } }
+
+/* 3) Marquee  (--duration --gap; .is-reverse, .is-vertical, .is-pause) */
+.mg-marquee { --duration:40s; --gap:1rem; display:flex; gap:var(--gap); overflow:hidden; padding:8px; }
+.mg-marquee__track { display:flex; flex-shrink:0; justify-content:space-around; gap:var(--gap); animation:mg-marquee var(--duration) linear infinite; }
+.mg-marquee.is-reverse .mg-marquee__track { animation-direction:reverse; }
+.mg-marquee.is-pause:hover .mg-marquee__track { animation-play-state:paused; }
+.mg-marquee.is-vertical { flex-direction:column; } .mg-marquee.is-vertical .mg-marquee__track { flex-direction:column; animation-name:mg-marquee-v; }
+@keyframes mg-marquee { from { transform:translateX(0); } to { transform:translateX(calc(-100% - var(--gap))); } }
+@keyframes mg-marquee-v { from { transform:translateY(0); } to { transform:translateY(calc(-100% - var(--gap))); } }
+.mg-chip { padding:10px 16px; border-radius:12px; border:1px solid var(--line); background:var(--stage); white-space:nowrap; }
+
+/* 4) Shine Border  (Rand mit wanderndem Verlauf; --border-width --duration --shine) */
+.mg-shine { --border-width:1px; --duration:14s; --shine:#7928ca,#ff0080,#38bdf8; position:relative; border-radius:16px; }
+.mg-shine::before { content:""; position:absolute; inset:0; border-radius:inherit; padding:var(--border-width); pointer-events:none;
+  background-image:radial-gradient(transparent,transparent,var(--shine),transparent,transparent); background-size:300% 300%;
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#fff 0 0) content-box exclude,linear-gradient(#fff 0 0);
+  animation:mg-shine var(--duration) linear infinite; will-change:background-position; }
+@keyframes mg-shine { 0% { background-position:0% 0%; } 50% { background-position:100% 100%; } to { background-position:0% 0%; } }
+
+/* 5) Ripple  (konzentrische Ringe; JS erzeugt die Kreise) */
+.mg-ripple { position:absolute; inset:0; pointer-events:none; user-select:none; -webkit-mask-image:linear-gradient(to bottom,#fff,transparent); mask-image:linear-gradient(to bottom,#fff,transparent); }
+.mg-ripple i { position:absolute; left:50%; top:50%; border:1px solid var(--ink); border-radius:50%; background:color-mix(in srgb,var(--ink) 25%,transparent);
+  box-shadow:0 20px 25px -5px rgba(0,0,0,.2); transform:translate(-50%,-50%) scale(1); animation:mg-ripple 2s ease calc(var(--i) * .2s) infinite; }
+@keyframes mg-ripple { 0%,100% { transform:translate(-50%,-50%) scale(1); } 50% { transform:translate(-50%,-50%) scale(.9); } }
+
+/* 6) Animated Gradient Text  (--color-from --color-to --bg-size) */
+.mg-gradient-text { --color-from:#ffaa40; --color-to:#9c40ff; --bg-size:300%; display:inline; font-weight:700;
+  background-image:linear-gradient(to right,var(--color-from),var(--color-to),var(--color-from)); background-size:var(--bg-size) 100%;
+  -webkit-background-clip:text; background-clip:text; color:transparent; animation:mg-gradient 8s linear infinite; }
+@keyframes mg-gradient { to { background-position:var(--bg-size) 0; } }
+
+/* 7) Animated Shiny Text  (Glanz läuft über den Text; --shiny-width) */
+.mg-shiny { --shiny-width:100px; display:inline-block; color:color-mix(in srgb,var(--ink) 55%,transparent);
+  background-image:linear-gradient(to right,transparent,var(--ink) 50%,transparent); background-size:var(--shiny-width) 100%; background-repeat:no-repeat; background-position:0 0;
+  -webkit-background-clip:text; background-clip:text; animation:mg-shiny 8s infinite; }
+@keyframes mg-shiny { 0%,90%,100% { background-position:calc(-100% - var(--shiny-width)) 0; } 30%,60% { background-position:calc(100% + var(--shiny-width)) 0; } }
+
+/* 8) Aurora Text  (Farbverlauf wogt; --aurora-speed) */
+.mg-aurora { --aurora-speed:10s; position:relative; display:inline-block; font-weight:800; }
+.mg-aurora > span[aria-hidden] { display:inline-block; background-image:linear-gradient(135deg,#ff0080,#7928ca,#0070f3,#38bdf8,#ff0080); background-size:200% auto;
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation:mg-aurora var(--aurora-speed) ease-in-out infinite; }
+.mg-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+@keyframes mg-aurora { 0% { background-position:0% 50%; transform:rotate(-5deg) scale(.9); } 25% { background-position:50% 100%; transform:rotate(5deg) scale(1.1); }
+  50% { background-position:100% 50%; transform:rotate(-3deg) scale(.95); } 75% { background-position:50% 0%; transform:rotate(3deg) scale(1.05); } 100% { background-position:0% 50%; transform:rotate(-5deg) scale(.9); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mg-shimmer__slide, .mg-shimmer__slide::before, .mg-meteor, .mg-marquee__track, .mg-shine::before, .mg-ripple i, .mg-gradient-text, .mg-shiny, .mg-aurora > span[aria-hidden] { animation:none !important; }
+  .mg-meteor { display:none; }
+}
+</style>
+</head>
+<body data-theme="dark">
+<button class="toggle" id="theme" type="button">hell / dunkel</button>
+<div class="wrap">
+  <div><h1>Magic Primitives</h1><p class="sub">8 Effekte, Vanilla. Quelle: Magic UI (MIT). Kopiere nur den benötigten Block aus „COMPONENT CSS“ (+ JS bei Meteors/Ripple).</p></div>
+
+  <section class="card"><h2>Shimmer Button</h2><div class="row">
+    <button class="mg-shimmer" type="button"><span class="mg-shimmer__spark"><span class="mg-shimmer__slide"></span></span>Jetzt starten<span class="mg-shimmer__hl"></span><span class="mg-shimmer__bd"></span></button>
+    <button class="mg-shimmer" type="button" style="--shimmer-color:#ffb86b;--bg:#1a0f05;--radius:12px;--speed:2s"><span class="mg-shimmer__spark"><span class="mg-shimmer__slide"></span></span>Premium<span class="mg-shimmer__hl"></span><span class="mg-shimmer__bd"></span></button>
+  </div></section>
+
+  <section class="card" style="min-height:200px"><h2>Meteors</h2><div class="mg-meteors" id="meteors" aria-hidden="true"></div><p style="position:relative">Sternschnuppen im Hintergrund (20 Stück).</p></section>
+
+  <section class="card"><h2>Marquee</h2>
+    <div class="mg-marquee is-pause" id="marq1"></div>
+    <div class="mg-marquee is-reverse" id="marq2" style="--duration:30s"></div>
+  </section>
+
+  <section class="card"><h2>Shine Border</h2><div class="row">
+    <div class="mg-shine" style="padding:24px 32px;--border-width:2px"><b>Karte mit wanderndem Rand</b><br><span style="color:var(--muted)">Verlauf läuft 14 s im Kreis</span></div>
+    <div class="mg-shine" style="padding:24px 32px;--shine:#ffaa40,#ff4d4d;--duration:6s;--border-width:1px"><b>Schneller, warm</b></div>
+  </div></section>
+
+  <section class="card" style="min-height:260px"><h2>Ripple</h2><div class="mg-ripple" id="ripple" aria-hidden="true"></div></section>
+
+  <section class="card"><h2>Text-Effekte</h2><div class="row" style="font-size:28px">
+    <span class="mg-gradient-text">Animierter Verlauf</span>
+    <span class="mg-shiny" style="font-size:20px">Glanz läuft darüber</span>
+    <span class="mg-aurora"><span class="mg-sr">Aurora</span><span aria-hidden="true">Aurora</span></span>
+  </div></section>
+</div>
+
+<script>
+/* ============ COMPONENT JS ============ */
+/* Meteors: initMeteors(container, { number, minDelay, maxDelay, minDuration, maxDuration, angle }) */
+function initMeteors(el, o) {
+  o = Object.assign({ number: 20, minDelay: .2, maxDelay: 1.2, minDuration: 2, maxDuration: 10, angle: 215 }, o || {});
+  var w = el.clientWidth || window.innerWidth, frag = document.createDocumentFragment();
+  for (var i = 0; i < o.number; i++) {
+    var m = document.createElement('span'); m.className = 'mg-meteor';
+    m.style.setProperty('--angle', -o.angle + 'deg');
+    m.style.left = Math.floor(Math.random() * w) + 'px';
+    m.style.animationDelay = (Math.random() * (o.maxDelay - o.minDelay) + o.minDelay) + 's';
+    m.style.animationDuration = Math.floor(Math.random() * (o.maxDuration - o.minDuration) + o.minDuration) + 's';
+    frag.appendChild(m);
+  }
+  el.appendChild(frag);
+}
+/* Ripple: initRipple(container, { mainCircleSize, mainCircleOpacity, numCircles }) */
+function initRipple(el, o) {
+  o = Object.assign({ mainCircleSize: 210, mainCircleOpacity: .24, numCircles: 8 }, o || {});
+  for (var i = 0; i < o.numCircles; i++) {
+    var c = document.createElement('i'), s = o.mainCircleSize + i * 70;
+    c.style.cssText = 'width:' + s + 'px;height:' + s + 'px;opacity:' + (o.mainCircleOpacity - i * .03) + ';animation-delay:' + (i * .06) + 's;--i:' + i;
+    el.appendChild(c);
+  }
+}
+/* Marquee: Inhalt 4x wiederholen, damit die Schleife lückenlos ist */
+function initMarquee(el, items, repeat) {
+  for (var r = 0; r < (repeat || 4); r++) {
+    var t = document.createElement('div'); t.className = 'mg-marquee__track';
+    items.forEach(function (x) { var c = document.createElement('div'); c.className = 'mg-chip'; c.textContent = x; t.appendChild(c); });
+    el.appendChild(t);
+  }
+}
+/* ============ DEMO ============ */
+initMeteors(document.getElementById('meteors'));
+initRipple(document.getElementById('ripple'));
+initMarquee(document.getElementById('marq1'), ['Theorie', 'Praxis', 'Klasse B', 'Klasse A', 'BKF', 'Auffrischung', 'Prüfungsvorbereitung']);
+initMarquee(document.getElementById('marq2'), ['Schaltwagen', 'Automatik', 'Intensivkurs', 'Ferienkurs', 'Begleitetes Fahren', 'Sehtest-Service']);
+document.getElementById('theme').onclick = function () { var b = document.body; b.dataset.theme = b.dataset.theme === 'dark' ? 'light' : 'dark'; };
+</script>
+</body>
+</html>

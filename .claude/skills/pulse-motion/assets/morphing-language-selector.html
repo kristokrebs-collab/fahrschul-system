@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Morphing Language Selector</title>
+<style>
+/* =====================================================================
+   CONFIG - alle Look- und Motion-Werte (zum "Hochdrehen" hier aendern)
+   Die Spring-Werte stehen zusaetzlich im JS-CONFIG-Block (SPRING_*).
+   ===================================================================== */
+:root {
+  /* Buehne */
+  --stage-bg: #131313;               /* gemessene Buehnenfarbe */
+
+  /* Panel (geoeffnete Liste) */
+  --panel-w: 230px;                  /* Breite des geoeffneten Panels */
+  --panel-h: 275px;                  /* Hoehe des geoeffneten Panels */
+  --panel-bg: #1e1e1e;               /* Glas-/Flaechenfarbe */
+  --panel-border: #303030;           /* 1px Rahmen */
+  --panel-radius: 24px;              /* Radius im geoeffneten Zustand */
+  --panel-shadow: 0 14px 40px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.30);
+
+  /* Trigger-Pille (geschlossen) */
+  --btn-h: 38px;                     /* Pillenhoehe */
+  --btn-bg: #1d1d1d;
+  --btn-border: #2b2b2b;
+  --btn-shadow: 0 5px 16px rgba(0,0,0,.40);
+  --btn-text: #e3e4f3;
+  --btn-chevron: #999aaa;
+
+  /* Liste */
+  --row-h: 40px;                     /* Zeilenhoehe */
+  --row-gap: 3px;                    /* Abstand -> Raster 43 px */
+  --row-radius: 12px;
+  --row-text: #d0d2e4;
+  --row-hover: #1a1a1a;              /* leichter Touch/Hover-Ton */
+  --accent: #60a5fa;                 /* aktive Sprache: Text + Haken */
+  --accent-bg: #151d27;              /* aktive Zeile: Hintergrund */
+  --head-text: #8e8e9c;              /* "SELECT LANGUAGE" */
+  --divider: #323232;
+  --thumb: #5a5a5a;                  /* Scroll-Daumen */
+
+  /* Typo */
+  --font: Inter, Geist, Roboto, "Helvetica Neue", Arial, "Liberation Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+
+  /* Motion-Dauern (ms) - die Federn selbst: siehe JS CONFIG */
+  --dur-radius-open: 140ms;          /* Radius laeuft beim Oeffnen von Pille zu 24 px */
+  --dur-content-in: 90ms;            /* Panel-Inhalt blendet beim Oeffnen ein */
+  --dur-hover: 120ms;                /* Zeilen-Hover */
+  --dur-thumb-fade: 300ms;           /* Scroll-Daumen blendet aus */
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--stage-bg);
+  font-family: var(--font);
+  color: var(--row-text);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ----- COMPONENT CSS ------------------------------------------------- */
+.lm {
+  position: relative;
+  width: calc(var(--panel-w) + 160px);   /* Platz fuer Schatten */
+  height: calc(var(--panel-h) + 160px);
+  contain: layout paint;
+  pointer-events: none;
+  font-family: var(--font);
+}
+.lm button { font: inherit; color: inherit; }
+
+/* Trigger: ruhende Pille; waehrend des Morphs nur noch "Gesicht" (Label) */
+.lm-trigger {
+  position: absolute; left: 50%; top: 50%; z-index: 2;
+  height: var(--btn-h);
+  margin: calc(var(--btn-h) / -2) 0 0 0;
+  transform: translate3d(-50%, 0, 0);
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 0 16px; white-space: nowrap;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: 999px;
+  box-shadow: var(--btn-shadow);
+  color: var(--btn-text);
+  font-size: 13.5px; font-weight: 500; line-height: 1; letter-spacing: -.005em;
+  cursor: pointer; pointer-events: auto;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+}
+.lm-trigger .lm-flag { font-family: var(--font-emoji); font-size: 14px; }
+.lm-trigger .lm-chev { width: 14px; height: 14px; color: var(--btn-chevron); margin-left: 3px; flex: none; }
+.lm-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.lm.is-morph .lm-trigger { background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
+.lm.is-open .lm-trigger { opacity: 0; pointer-events: none; }
+
+/* Box: Panel-Flaeche; wird per scale(sx, sy) von Pille zu Panel gemorpht */
+.lm-box {
+  position: absolute; left: 50%; top: 50%;
+  width: var(--panel-w); height: var(--panel-h);
+  margin: calc(var(--panel-h) / -2) 0 0 calc(var(--panel-w) / -2);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  overflow: hidden;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transform-origin: 50% 50%;
+  transform: scale(.57, .14);
+}
+.lm.is-morph .lm-box, .lm.is-open .lm-box { opacity: 1; visibility: visible; }
+.lm.is-open .lm-box { pointer-events: auto; }
+
+.lm-content { position: absolute; inset: 0; opacity: 0; }
+.lm-scroller {
+  position: absolute; inset: 0 0 10px 0;   /* 10 px Abstand unten: Zeilen werden dort abgeschnitten */
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.lm-scroller::-webkit-scrollbar { display: none; }
+
+.lm-head {
+  position: relative; height: 36px; margin: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px 0 20px;
+}
+.lm-head::after { content: ""; position: absolute; left: 7px; right: 7px; bottom: 0; height: 1px; background: var(--divider); }
+.lm-title { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--head-text); }
+.lm-close {
+  width: 28px; height: 28px; display: grid; place-items: center; padding: 0; margin: 0;
+  background: none; border: 0; border-radius: 8px; color: var(--head-text); cursor: pointer;
+}
+.lm-close svg { width: 12px; height: 12px; }
+.lm-close:focus-visible { outline: 2px solid var(--accent); }
+
+.lm-list { list-style: none; margin: 0; padding: 7px 8px 6px; display: flex; flex-direction: column; gap: var(--row-gap); }
+.lm-opt {
+  height: var(--row-h); display: flex; align-items: center; gap: 11px;
+  padding: 0 15px 0 12px; border-radius: var(--row-radius);
+  font-size: 14px; font-weight: 450; color: var(--row-text);
+  cursor: pointer; user-select: none; -webkit-user-select: none; outline: none;
+  transition: background-color var(--dur-hover) ease-out;
+}
+.lm-opt .lm-flag { font-family: var(--font-emoji); font-size: 16px; width: 20px; text-align: center; flex: none; }
+.lm-opt .lm-name { flex: 1; white-space: nowrap; }
+.lm-opt .lm-check { width: 14px; height: 14px; color: var(--accent); opacity: 0; flex: none; }
+.lm-opt[aria-selected="true"] { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+.lm-opt[aria-selected="true"] .lm-check { opacity: 1; }
+@media (hover: hover) { .lm-opt:not([aria-selected="true"]):hover { background: var(--row-hover); } }
+.lm-opt:not([aria-selected="true"]):active, .lm-opt:focus-visible:not([aria-selected="true"]) { background: var(--row-hover); }
+.lm-opt:focus-visible { box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+.lm-thumb {
+  position: absolute; right: 7px; top: 0; width: 4px; border-radius: 2px;
+  background: var(--thumb); opacity: 0; pointer-events: none;
+  transition: opacity var(--dur-thumb-fade) ease-out;
+}
+.lm-thumb.is-on { opacity: 1; transition-duration: 60ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lm-opt { transition: none; }
+  .lm-thumb { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- COMPONENT:START -->
+<div class="lm" id="lang" data-lm>
+  <button class="lm-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Sprache waehlen">
+    <span class="lm-flag" aria-hidden="true"></span>
+    <span class="lm-label"></span>
+    <svg class="lm-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 6l4.5 4.5L12.5 6"/></svg>
+  </button>
+  <div class="lm-box">
+    <div class="lm-content">
+      <div class="lm-scroller">
+        <div class="lm-head">
+          <span class="lm-title" id="lang-title">Select Language</span>
+          <button class="lm-close" type="button" aria-label="Schliessen"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9"/></svg></button>
+        </div>
+        <ul class="lm-list" role="listbox" aria-labelledby="lang-title"></ul>
+      </div>
+      <div class="lm-thumb"></div>
+    </div>
+  </div>
+</div>
+<!-- COMPONENT:END -->
+
+<script>
+/* =====================================================================
+   CONFIG - Motion-Tokens (Federn: masse=1, stiffness k, damping c)
+   ===================================================================== */
+const MLS_CONFIG = {
+  SPRING_OPEN:  { stiffness: 660, damping: 40 },  // Pille -> Panel, ca. 1.8 % Overshoot (zeta ~0.78)
+  SPRING_CLOSE: { stiffness: 560, damping: 47 },  // Panel -> Pille, kein Overshoot (zeta ~1)
+  CLOSE_DELAY: 40,                                // ms zwischen Tap und Start des Zusammenziehens
+  BTN_H: 38,                                      // muss zu --btn-h passen
+  PANEL_W: 230, PANEL_H: 275,                     // muss zu --panel-w/h passen
+  RADIUS_OPEN: 24,                                // muss zu --panel-radius passen
+  RADIUS_OPEN_MS: 140,
+  CONTENT_IN_MS: 90,
+  THUMB_IDLE_MS: 1400,
+  SUBSTEP: 1 / 240                                // Feder-Substep in Sekunden
+};
+
+/* ----- COMPONENT JS --------------------------------------------------- */
+function initMorphingLanguageSelector(root, opts) {
+  opts = opts || {};
+  const C = Object.assign({}, MLS_CONFIG, opts.config || {});
+  const langs = opts.languages || [];
+  let value = opts.value || (langs[0] && langs[0].code);
+  const onChange = opts.onChange || function () {};
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)');
+
+  const trigger = root.querySelector('.lm-trigger');
+  const box = root.querySelector('.lm-box');
+  const content = root.querySelector('.lm-content');
+  const scroller = root.querySelector('.lm-scroller');
+  const list = root.querySelector('.lm-list');
+  const thumb = root.querySelector('.lm-thumb');
+  const closeBtn = root.querySelector('.lm-close');
+  const flagEl = trigger.querySelector('.lm-flag');
+  const labelEl = trigger.querySelector('.lm-label');
+
+  const CHECK = '<svg class="lm-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8"/></svg>';
+  const opts_ = [];
+  langs.forEach(function (l) {
+    const li = document.createElement('li');
+    li.className = 'lm-opt'; li.setAttribute('role', 'option'); li.tabIndex = -1; li.dataset.code = l.code;
+    li.innerHTML = '<span class="lm-flag" aria-hidden="true"></span><span class="lm-name"></span>' + CHECK;
+    li.children[0].textContent = l.flag; li.children[1].textContent = l.label;
+    list.appendChild(li); opts_.push(li);
+  });
+
+  // Zustand
+  let state = 'closed';            // closed | opening | open | closing
+  let p = 0, v = 0, target = 0;    // Feder: 0 = Pille, 1 = Panel
+  let sx0 = 0.57, sy0 = C.BTN_H / C.PANEL_H, btnW = 128;
+  let k = C.SPRING_OPEN.stiffness, c = C.SPRING_OPEN.damping;
+  let acc = 0, last = 0, rafId = 0, t0 = 0, startAt = 0, radT = 1, radStart = 0;
+  let sH = 0, cH = 0, lastScroll = -1e9, thumbOn = false, scrollDirty = false;
+
+  function current() { return langs.find(function (l) { return l.code === value; }) || langs[0]; }
+  function paintTrigger() {
+    const l = current(); if (!l) return;
+    flagEl.textContent = l.flag; labelEl.textContent = l.label;
+  }
+  function measureBtn() {                       // nur bei Zustandswechsel (kein Layout-Lesen pro Frame)
+    btnW = trigger.offsetWidth;
+    sx0 = btnW / C.PANEL_W; sy0 = C.BTN_H / C.PANEL_H;
+  }
+  function markSelected() {
+    opts_.forEach(function (li) { li.setAttribute('aria-selected', li.dataset.code === value ? 'true' : 'false'); });
+  }
+
+  // Radius: pre-scale-Radius so, dass die sichtbare Rundung zur Pille passt (R/sx / R/sy)
+  function setRadius(u) {                       // u: 0 = Pille, 1 = Panel
+    const R0 = C.BTN_H / 2, rxc = R0 / sx0, ryc = R0 / sy0;
+    const rx = rxc + (C.RADIUS_OPEN - rxc) * u, ry = ryc + (C.RADIUS_OPEN - ryc) * u;
+    box.style.borderRadius = rx.toFixed(1) + 'px / ' + ry.toFixed(1) + 'px';
+  }
+  function render(pp, t) {
+    const sx = sx0 + (1 - sx0) * pp, sy = sy0 + (1 - sy0) * pp;
+    box.style.transform = 'scale(' + sx.toFixed(4) + ',' + sy.toFixed(4) + ')';
+    if (state === 'closing' || state === 'closed') {
+      // Label klebt oben-links an der schrumpfenden Box
+      const tx = -(C.PANEL_W * sx) / 2 + btnW / 2;
+      const ty = -(C.PANEL_H * sy) / 2 + C.BTN_H / 2;
+      trigger.style.transform = 'translate3d(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px,0) translateX(-50%)';
+    }
+    if (t !== undefined) {
+      if (state === 'opening' || state === 'open') {
+        const a = Math.min(1, (t - t0) / C.CONTENT_IN_MS);
+        content.style.opacity = a;
+        if (radT < 1) { radT = Math.min(1, (t - radStart) / C.RADIUS_OPEN_MS); setRadius(1 - Math.pow(1 - radT, 3)); }
+      }
+    }
+  }
+
+  function loop(t) {
+    rafId = 0;
+    const dt = last ? Math.min(t - last, 50) : 0; last = t;
+    if (t >= startAt) {
+      acc += dt / 1000;
+      const h = C.SUBSTEP;
+      while (acc >= h) {                         // semi-impliziter Euler, fester Substep
+        v += (-k * (p - target) - c * v) * h;
+        p += v * h; acc -= h;
+      }
+    }
+    const pr = p + v * acc;                      // Rest-Zeit interpolieren -> glatt bei 120/144/240 Hz
+    render(pr, t);
+    updateThumb(t);
+    const settled = t >= startAt && Math.abs(p - target) < 0.0004 && Math.abs(v) < 0.02;
+    if (settled) { p = target; v = 0; render(p, t); finish(); }
+    if (!settled || thumbOn) rafId = requestAnimationFrame(loop);
+    else last = 0;
+  }
+  function kick() { if (!rafId) { last = 0; acc = 0; rafId = requestAnimationFrame(loop); } }
+
+  function finish() {
+    if (state === 'opening') {
+      state = 'open'; box.style.willChange = ''; content.style.opacity = 1; setRadius(1);
+    } else if (state === 'closing') {
+      state = 'closed';
+      root.classList.remove('is-morph', 'is-open');
+      trigger.style.transform = ''; trigger.style.willChange = ''; box.style.willChange = '';
+      box.style.transform = 'scale(' + sx0 + ',' + sy0 + ')';
+    }
+  }
+
+  // Scroll-Daumen (Metriken einmal beim Oeffnen messen)
+  function measureScroll() { sH = scroller.scrollHeight; cH = scroller.clientHeight; thumb.style.height = Math.max(24, cH * cH / sH - 8) + 'px'; }
+  function updateThumb(t) {
+    if (scrollDirty) {
+      scrollDirty = false;
+      const th = Math.max(24, cH * cH / sH - 8), travel = cH - th - 16;
+      const y = 8 + travel * (scroller.scrollTop / Math.max(1, sH - cH));
+      thumb.style.transform = 'translate3d(0,' + y.toFixed(1) + 'px,0)';
+      if (!thumbOn) { thumbOn = true; thumb.classList.add('is-on'); }
+    }
+    if (thumbOn && t - lastScroll > C.THUMB_IDLE_MS) { thumbOn = false; thumb.classList.remove('is-on'); }
+  }
+  scroller.addEventListener('scroll', function () {
+    lastScroll = performance.now(); scrollDirty = true;
+    if (!rafId) kick();
+    lastScroll = performance.now();
+  }, { passive: true });
+
+  function open() {
+    if (state === 'open' || state === 'opening') return;
+    measureBtn();
+    state = 'opening';
+    root.classList.add('is-open'); root.classList.remove('is-morph');
+    trigger.setAttribute('aria-expanded', 'true');
+    markSelected();
+    k = C.SPRING_OPEN.stiffness; c = C.SPRING_OPEN.damping; target = 1;
+    const sel = opts_.find(function (li) { return li.dataset.code === value; });
+    if (reduce && reduce.matches) {
+      p = 1; v = 0; box.style.transform = 'none'; setRadius(1); content.style.opacity = 1; state = 'open';
+    } else {
+      box.style.willChange = 'transform'; trigger.style.willChange = 'transform';
+      trigger.style.transform = '';
+      t0 = performance.now(); startAt = 0; radT = 0; radStart = t0; setRadius(0);
+      content.style.opacity = 0; render(p);
+      kick();
+    }
+    scroller.scrollTop = 0;
+    measureScroll();
+    if (sel && sel.offsetTop + C.ROW > cH) scroller.scrollTop = sel.offsetTop - cH / 2;
+    if (sel) sel.focus({ preventScroll: true });
+  }
+  function close(code) {
+    if (state === 'closed' || state === 'closing') return;
+    if (code && code !== value) { value = code; paintTrigger(); markSelected(); onChange(current()); }
+    trigger.setAttribute('aria-expanded', 'false');
+    measureBtn();
+    state = 'closing';
+    root.classList.add('is-morph'); root.classList.remove('is-open');
+    content.style.opacity = 0;                      // Panel-Inhalt sofort weg, Label der Pille uebernimmt
+    setRadius(0);
+    k = C.SPRING_CLOSE.stiffness; c = C.SPRING_CLOSE.damping; target = 0;
+    if (reduce && reduce.matches) { p = 0; v = 0; render(0); finish(); trigger.focus(); return; }
+    box.style.willChange = 'transform'; trigger.style.willChange = 'transform';
+    startAt = performance.now() + C.CLOSE_DELAY;
+    render(p); kick();
+    trigger.focus({ preventScroll: true });
+  }
+  C.ROW = 43;
+
+  // Eingaben
+  trigger.addEventListener('click', function () { open(); });
+  closeBtn.addEventListener('click', function () { close(); });
+  list.addEventListener('click', function (e) {
+    const li = e.target.closest('.lm-opt'); if (li) close(li.dataset.code);
+  });
+  document.addEventListener('pointerdown', function (e) {
+    if (state === 'open' && !box.contains(e.target)) close();
+  }, { passive: true });
+  root.addEventListener('keydown', function (e) {
+    if (state === 'closed') { if (e.key === 'ArrowDown') { e.preventDefault(); open(); } return; }
+    const i = opts_.indexOf(document.activeElement);
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); opts_[Math.min(opts_.length - 1, i + 1)].focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); opts_[Math.max(0, i - 1)].focus(); }
+    else if (e.key === 'Home') { e.preventDefault(); opts_[0].focus(); }
+    else if (e.key === 'End') { e.preventDefault(); opts_[opts_.length - 1].focus(); }
+    else if ((e.key === 'Enter' || e.key === ' ') && i >= 0) { e.preventDefault(); close(opts_[i].dataset.code); }
+  });
+
+  paintTrigger(); markSelected(); measureBtn(); setRadius(0);
+  box.style.transform = 'scale(' + sx0 + ',' + sy0 + ')';
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measureBtn);
+
+  return {
+    open: open, close: close,
+    setValue: function (code) { value = code; paintTrigger(); markSelected(); measureBtn(); },
+    getValue: function () { return value; },
+    state: function () { return state; }
+  };
+}
+
+/* ----- DEMO: exakt der Video-Inhalt ------------------------------------ */
+const LANGUAGES = [
+  { code: 'en', label: 'English',        flag: '\u{1F1FA}\u{1F1F8}' },
+  { code: 'zh-CN', label: '简体中文', flag: '\u{1F1E8}\u{1F1F3}' },
+  { code: 'zh-TW', label: '繁體中文', flag: '\u{1F1E8}\u{1F1F3}' },
+  { code: 'ja', label: '日本語', flag: '\u{1F1EF}\u{1F1F5}' },
+  { code: 'es', label: 'Español',    flag: '\u{1F1EA}\u{1F1F8}' },
+  { code: 'fr', label: 'Français',   flag: '\u{1F1EB}\u{1F1F7}' },
+  { code: 'pt-BR', label: 'Português (BR)', flag: '\u{1F1E7}\u{1F1F7}' },
+  { code: 'ko', label: '한국어', flag: '\u{1F1F0}\u{1F1F7}' },
+  { code: 'ru', label: 'Русский', flag: '\u{1F1F7}\u{1F1FA}' },
+  { code: 'tr', label: 'Türkçe', flag: '\u{1F1F9}\u{1F1F7}' },
+  { code: 'id', label: 'Bahasa Indonesia', flag: '\u{1F1EE}\u{1F1E9}' },
+  { code: 'de', label: 'Deutsch',         flag: '\u{1F1E9}\u{1F1EA}' },
+  { code: 'fa', label: 'فارسی', flag: '\u{1F1EE}\u{1F1F7}' }
+];
+window.lang = initMorphingLanguageSelector(document.getElementById('lang'), { languages: LANGUAGES, value: 'en' });
+</script>
+</body>
+</html>

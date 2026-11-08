@@ -1,0 +1,21 @@
+/* Factory — „Terminal-War-Room um Mitternacht“ (dark). Einsatz: <section data-style="factory"> (+ _base.css) */
+[data-style="factory"] {
+  /* Marke */
+  --fa-obsidian: #101010; --fa-carbon: #1d1a18; --fa-ash: #3d3a39; --fa-graphite: #4d4947; --fa-granite: #8a8380; --fa-stone: #b8b3b0;
+  --fa-bone: #eeeeee; --fa-chalk: #fafafa; --fa-orange: #ee6018; --fa-green: #a0ca92; --fa-button: #1f1d1c; --fa-panel: #0d0d0d;
+  /* Semantik-Schicht */
+  --s-bg: var(--fa-obsidian); --s-surface: var(--fa-bone); --s-fg: var(--fa-bone); --s-fg-muted: var(--fa-granite);
+  --s-border: var(--fa-ash); --s-border-strong: var(--fa-ash); --s-accent: var(--fa-orange); --s-link: var(--fa-bone);
+  --s-action-bg: var(--fa-button); --s-action-fg: var(--fa-bone);                  /* neutral gefüllt, NIE farbig */
+  --s-radius-card: 10px; --s-radius-btn: 3px; --s-card-pad: 24px; --s-card-border: 0;
+  --s-btn-pad: 10px 14px; --s-btn-weight: 400;
+  --s-font-ui: 'Geist', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-display: var(--s-font-ui); --s-font-mono: 'Geist Mono', 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s-display-weight: 400; --s-display-leading: 1; --s-display-tracking: -0.04em; --s-body-weight: 400;
+  --s-ease: cubic-bezier(.4,0,.2,1); --s-dur: .15s;
+  /* Extras: helle Karte (#eee) auf Schwarz = Lichtkegel; Orange/Grün nur als Status/Daten */
+  --s-card-fg: var(--fa-obsidian); --s-card-muted: #6a6562;   /* Text auf der hellen Karte dunkel */
+  --fa-live: var(--fa-orange); --fa-positive: var(--fa-green); --fa-hairline: var(--fa-carbon);
+}
+[data-style="factory"] .s-eyebrow { font-family: var(--s-font-mono); text-transform: uppercase; letter-spacing: -0.02em; }
+[data-style="factory"] .s-pulse::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--fa-live); margin-right: 8px; }

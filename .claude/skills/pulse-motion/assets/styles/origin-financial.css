@@ -1,0 +1,23 @@
+/* Origin Financial — „Mitternachts-Galerie“ (dark). Einsatz: <section data-style="origin-financial"> (+ _base.css) */
+[data-style="origin-financial"] {
+  /* Marke */
+  --ori-iris: #847dff; --ori-cyan: #00b3dd; --ori-pale-iris: #d1c9ff; --ori-deep-iris: #4b49aa; --ori-orchid: #dd90d8; --ori-periwinkle: #90b8f0;
+  --ori-obsidian: #0f1011; --ori-abyss: #090a0b; --ori-graphite: #2e2e2e; --ori-steel: #3f4041; --ori-silver: #cacaca;
+  --ori-fog: #6a6b6b; --ori-ash: #9f9fa0; --ori-cloud: #f5f5f7; --ori-pure: #ffffff; --ori-void: #000000;
+  /* Semantik-Schicht */
+  --s-bg: var(--ori-obsidian); --s-surface: var(--ori-graphite); --s-fg: var(--ori-pure); --s-fg-muted: var(--ori-ash);
+  --s-border: rgba(255,255,255,.1); --s-border-strong: var(--ori-pure); --s-accent: var(--ori-iris); --s-link: var(--ori-cloud);
+  --s-action-bg: var(--ori-pure); --s-action-fg: var(--ori-void);
+  --s-radius-card: 16px; --s-radius-btn: 8px; --s-card-pad: 32px; --s-card-border: 0;
+  --s-btn-pad: 12px 18px; --s-btn-weight: 400;
+  --s-font-ui: 'Suisse Int\'l', 'Inter', 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-display: 'Lyon Display', 'Playfair Display', 'DM Serif Display', Georgia, 'Times New Roman', serif;
+  --s-font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s-display-weight: 300; --s-display-leading: 0.9; --s-display-tracking: normal; --s-body-weight: 300;
+  --s-ease: ease; --s-dur: .2s;
+  /* Extras: Farbe lebt nur in Feature-Kacheln (30px) + Daten-Linien; sonst flach, Stufen statt Schatten */
+  --ori-tile-radius: 30px; --ori-glass: rgba(255,255,255,.1); --ori-glass-blur: blur(24px);
+  --ori-chrome: linear-gradient(135deg, rgb(43,43,44), rgb(19,19,19));
+  --ori-sky: linear-gradient(rgb(15,16,17), rgb(19,29,39) 18%, rgb(26,71,136) 37%, rgb(64,138,193) 69%, rgb(64,138,193) 102%);
+  --ori-reveal: 2.5s cubic-bezier(.455,.03,.515,.955);
+}

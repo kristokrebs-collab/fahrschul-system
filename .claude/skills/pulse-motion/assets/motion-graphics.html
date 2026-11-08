@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Motion Graphics Set</title>
+<style>
+/* ===== CONFIG (hier hochdrehen) ===== */
+:root{
+  --bg:#f3f4f9; --card:#ffffff; --line:#e3e5ef; --ink:#15171f; --muted:#6a7084; --accent:#6a5cff; --accent2:#ff7a45; --good:#14b87f;
+  --font:Inter,Geist,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease-out:cubic-bezier(.16,1,.3,1); --ease-in:cubic-bezier(.55,.08,.4,.95); --spring:cubic-bezier(.34,1.56,.64,1);
+  --draw-ms:1600; --roll-ms:1300; --roll-stagger-ms:90; --form-k:5.5; --burst-count:90;
+}
+:root[data-theme=dark]{--bg:#0a0b10;--card:#12141c;--line:#242736;--ink:#f1f3fa;--muted:#8f95aa;--accent:#8b7dff;--accent2:#ff8a5a;--good:#3be0a8}
+</style>
+<style>
+/* COMPONENT CSS */
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);padding:clamp(16px,3vw,36px)}
+h1{margin:0 0 4px;font-size:clamp(22px,4vw,34px);letter-spacing:-.02em} .sub{color:var(--muted);margin:0 0 20px;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;max-width:1100px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:12px;display:grid;gap:8px;opacity:0;transform:translate3d(0,14px,0);animation:tin .55s var(--ease-out) forwards;animation-delay:calc(var(--n)*60ms)}
+@keyframes tin{to{opacity:1;transform:none}}
+.stage{position:relative;height:170px;border-radius:14px;overflow:hidden;display:grid;place-items:center;background:var(--bg)}
+.stage.dark{background:linear-gradient(135deg,#14183a,#241a4a)}
+.cap{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted)}
+.cap b{color:var(--ink);font-weight:600} .cap button{font:12px var(--font);border:1px solid var(--line);background:none;color:var(--ink);border-radius:999px;padding:3px 10px;cursor:pointer;transition:transform .2s var(--spring)}
+.cap button:active{transform:scale(.92)} .cap button:focus-visible,.pay:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+canvas{display:block;width:100%;height:100%}
+/* Gradient -> flow */
+.flow{position:absolute;inset:-30%;background:conic-gradient(from 0deg,#ff7a45,#ffd23f,#ff4fa3,#6a5cff,#ff7a45);filter:blur(34px);animation:spin 14s var(--ease-in) infinite alternate;will-change:transform}
+@keyframes spin{from{transform:rotate(0) scale(1)}to{transform:rotate(140deg) scale(1.25)}}
+.flow.is-off{animation-play-state:paused}
+.flow-label{position:relative;font:600 13px var(--mono);color:#fff;letter-spacing:.06em;mix-blend-mode:overlay}
+/* Number -> roll */
+.odo{display:flex;font:700 30px/1 var(--mono);letter-spacing:-.02em;height:1em;overflow:hidden;font-variant-numeric:tabular-nums}
+.odo .col{display:block;height:1em;overflow:hidden} .odo .reel{display:block;transform:translate3d(0,0,0)}
+.odo .reel i{display:block;height:1em;font-style:normal}
+.odo-wrap{text-align:center} .odo-wrap small{display:block;color:var(--muted);font:11px var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+.odo-wrap .delta{display:inline-block;margin-top:8px;font:700 11px var(--mono);color:var(--good);background:color-mix(in srgb,var(--good) 14%,transparent);border-radius:999px;padding:3px 8px}
+/* Line -> draw */
+.chart{width:100%;height:100%} .chart .area{opacity:0} .chart .badge{opacity:0;transform-origin:center}
+.chart text{font:600 11px var(--mono);fill:#fff}
+/* Rings -> orbit */
+.rings{width:100%;height:100%} .rings ellipse{fill:none;stroke:rgba(255,255,255,.28);stroke-width:1}
+/* Button -> pay */
+.pay{position:relative;border:0;background:none;padding:0;cursor:pointer;width:190px;height:46px;color:#fff;font:600 14px var(--font);filter:drop-shadow(0 8px 12px rgba(74,91,255,.35))}
+.pay .bg{position:absolute;inset:0;background:linear-gradient(135deg,#4a5bff,#6a5cff);clip-path:inset(0 0 round 23px);transition:clip-path .5s var(--ease-out),background-color .3s var(--ease-out)}
+.pay .lbl{position:relative;transition:opacity .2s var(--ease-in),transform .2s var(--ease-in)}
+.pay .spin,.pay .ok{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;opacity:0}
+.pay .spin{border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%}
+.pay.is-load .bg{clip-path:inset(0 72px round 23px)} .pay.is-load .lbl{opacity:0;transform:scale(.8)} .pay.is-load .spin{opacity:1;animation:rot .8s var(--ease-in) infinite}
+.pay.is-done .bg{clip-path:inset(0 72px round 23px);background:var(--good)} .pay.is-done .lbl{opacity:0} .pay.is-done .ok{opacity:1}
+.pay .ok path{stroke:#fff;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1}
+.pay.is-done .ok path{animation:tick .45s var(--ease-out) forwards}
+@keyframes rot{to{transform:rotate(360deg)}} @keyframes tick{to{stroke-dashoffset:0}}
+/* Words -> kinetic */
+.words{font:800 34px/1 var(--font);letter-spacing:-.03em;text-align:left;text-transform:uppercase}
+.words span{display:block;overflow:hidden} .words span i{display:block;font-style:normal;transform:translate3d(0,105%,0)}
+.words .o{color:var(--accent2)}
+.theme{position:fixed;top:12px;right:12px;font:500 12px var(--font);color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.tile{animation:none;opacity:1;transform:none}.flow{animation:none}.pay .bg,.pay .lbl{transition:none}.pay.is-load .spin{animation:none}}
+</style>
+</head>
+<body>
+<button class="theme" id="theme" type="button">Hell / Dunkel</button>
+<h1>Motion Graphics Set</h1>
+<p class="sub">Sieben kleine Bausteine, alle zeitbasiert, nur transform/opacity (oder Canvas). Eintritt ease-out, Austritt ease-in, Feder mit leichtem Overshoot, nichts linear.</p>
+<!-- COMPONENT:START -->
+<div class="grid" id="mg">
+  <article class="tile" style="--n:0"><div class="stage dark"><canvas id="cParticles" aria-label="Partikel formen eine Raute"></canvas></div><div class="cap"><span><b>01</b> Particles → Form</span><button type="button" data-replay="particles">Neu</button></div></article>
+  <article class="tile" style="--n:1"><div class="stage"><div class="flow" aria-hidden="true"></div><span class="flow-label">GRADIENT → FLOW</span></div><div class="cap"><span><b>02</b> Gradient → Flow</span><span>Schleife</span></div></article>
+  <article class="tile" style="--n:2"><div class="stage dark"><svg class="chart" viewBox="0 0 250 170" id="svgLine" role="img" aria-label="Liniendiagramm zeichnet sich"><defs><linearGradient id="lg1" x1="0" x2="1"><stop offset="0" stop-color="#7a6cff"/><stop offset="1" stop-color="#ff7ad0"/></linearGradient><linearGradient id="lg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7ad0" stop-opacity=".35"/><stop offset="1" stop-color="#ff7ad0" stop-opacity="0"/></linearGradient></defs><path class="area" d="M14 140 C50 120 70 135 100 100 S150 90 175 62 S215 40 232 28 L232 160 L14 160Z" fill="url(#lg2)"/><path class="ln" pathLength="1" d="M14 140 C50 120 70 135 100 100 S150 90 175 62 S215 40 232 28" fill="none" stroke="url(#lg1)" stroke-width="3" stroke-linecap="round" stroke-dasharray="1" stroke-dashoffset="1"/><circle class="dot" cx="232" cy="28" r="5" fill="#fff" opacity="0"/><g class="badge"><rect x="170" y="6" width="56" height="20" rx="10" fill="#1d1f3a"/><text x="198" y="20" text-anchor="middle" class="bt">+0%</text></g></svg></div><div class="cap"><span><b>03</b> Line → Draw</span><button type="button" data-replay="line">Neu</button></div></article>
+  <article class="tile" style="--n:3"><div class="stage"><div class="odo-wrap"><small>Umsatz dieses Jahr</small><div class="odo" id="odo" aria-label="1.285.012 Euro"></div><span class="delta">+24 % zum Vorjahr</span></div></div><div class="cap"><span><b>04</b> Number → Roll</span><button type="button" data-replay="roll">Neu</button></div></article>
+  <article class="tile" style="--n:4"><div class="stage dark"><svg class="rings" viewBox="0 0 250 170" id="svgRings" role="img" aria-label="Ringe mit kreisenden Planeten"><ellipse cx="125" cy="85" rx="100" ry="34" transform="rotate(-18 125 85)"/><ellipse cx="125" cy="85" rx="72" ry="24" transform="rotate(-18 125 85)"/><ellipse cx="125" cy="85" rx="46" ry="15" transform="rotate(-18 125 85)"/><circle cx="125" cy="85" r="15" fill="#c45bff"/><circle class="pl" cx="0" cy="0" r="4.5" fill="#ff9a62"/><circle class="pl" cx="0" cy="0" r="3.5" fill="#6ae0ff"/><circle class="pl" cx="0" cy="0" r="3" fill="#fff"/></svg></div><div class="cap"><span><b>05</b> Rings → Orbit</span><span>Schleife</span></div></article>
+  <article class="tile" style="--n:5"><div class="stage"><button class="pay" id="pay" type="button"><span class="bg"></span><span class="lbl">Bezahle 48,00 €</span><span class="spin"></span><svg class="ok" viewBox="0 0 24 24" aria-hidden="true"><path pathLength="1" d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div><div class="cap"><span><b>06</b> Button → Pay</span><span>Klick</span></div></article>
+  <article class="tile" style="--n:6"><div class="stage"><canvas id="cConf" aria-label="Konfetti"></canvas><button class="pay" id="burst" type="button" style="position:absolute;width:130px;height:40px;filter:drop-shadow(0 8px 12px rgba(255,100,100,.4))"><span class="bg" style="background:linear-gradient(135deg,#ff7a45,#ff4fa3);clip-path:inset(0 0 round 20px)"></span><span class="lbl">Feiern</span></button></div><div class="cap"><span><b>07</b> Confetti → Burst</span><span>Klick</span></div></article>
+  <article class="tile" style="--n:7"><div class="stage"><div class="words" id="words" aria-label="Make it move."><span><i>Make</i></span><span><i>it</i></span><span><i class="o">move.</i></span></div></div><div class="cap"><span><b>08</b> Words → Kinetic</span><button type="button" data-replay="words">Neu</button></div></article>
+</div>
+<!-- COMPONENT:END -->
+<script>
+/* Alle Bausteine: zeitbasiert (rAF-Zeitstempel), Leerlauf = keine Arbeit. init in initMotionGraphics(root).
+   Idee der Liste: Instagram-Karussell "Claude Motion Graphics" (16 Titel, nur Titel gesehen); Umsetzung hier eigener Code. */
+(function () {
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var easeOut = function (t) { t = Math.min(1, Math.max(0, t)); return 1 - Math.pow(1 - t, 4); };
+  var easeIn = function (t) { t = Math.min(1, Math.max(0, t)); return t * t * t; };
+  function spring(t, k, z) { var w0 = Math.sqrt(k), zz = z, wd = w0 * Math.sqrt(1 - zz * zz); return 1 - Math.exp(-zz * w0 * t) * (Math.cos(wd * t) + zz * w0 / wd * Math.sin(wd * t)); }
+  function css(n, d) { var v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)); return isNaN(v) ? d : v; }
+  function sizeC(c) { var r = c.getBoundingClientRect(), k = Math.min(devicePixelRatio || 1, 2); c.width = Math.round(r.width * k); c.height = Math.round(r.height * k); var x = c.getContext('2d'); x.setTransform(k, 0, 0, k, 0, 0); return { w: r.width, h: r.height, x: x }; }
+  var jobs = {};
+
+  // ---- 01 Particles -> Form (Raute), exponentielle Annäherung, bildratenunabhängig
+  var pc = document.getElementById('cParticles'), P = [], pRaf = 0, pLast = 0, pT0 = 0;
+  function initParticles() {
+    var s = sizeC(pc); P = [];
+    var n = 360, R = Math.min(s.w, s.h) * 0.34, cx = s.w / 2, cy = s.h / 2;
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * 6.283, rr = Math.sqrt(Math.random()); var tx = cx + Math.cos(a) * rr * R, ty = cy + Math.sin(a) * rr * R;
+      var m = Math.abs(tx - cx) + Math.abs(ty - cy); if (m > R) { var f = R / m; tx = cx + (tx - cx) * f; ty = cy + (ty - cy) * f; }  // Raute: L1-Kugel
+      P.push({ x: Math.random() * s.w, y: Math.random() * s.h, tx: tx, ty: ty, d: Math.random() * 0.5, h: i / n });
+    }
+    pT0 = 0; pLast = 0; cancelAnimationFrame(pRaf);
+    if (reduce) { P.forEach(function (p) { p.x = p.tx; p.y = p.ty; }); drawP(s, 99); return; }
+    pRaf = requestAnimationFrame(function step(t) {
+      if (!pT0) pT0 = t; var dt = Math.min(t - (pLast || t), 50) / 1000; pLast = t; var e = (t - pT0) / 1000, k = css('--form-k', 5.5);
+      P.forEach(function (p) { if (e > p.d) { var a = 1 - Math.exp(-k * 0.5 * dt * (1 + e * .3)); p.x += (p.tx - p.x) * a; p.y += (p.ty - p.y) * a; } });
+      var far = 0; P.forEach(function (p) { if (Math.abs(p.tx - p.x) + Math.abs(p.ty - p.y) > 0.3) far++; });
+      drawP(s, 99);
+      if (far || e < 0.8) pRaf = requestAnimationFrame(step);   // angekommen: Schleife endet, Leerlauf = keine Arbeit
+    });
+  }
+  function drawP(s, e) {
+    var x = s.x; x.clearRect(0, 0, s.w, s.h);
+    P.forEach(function (p) { var br = 0; x.fillStyle = 'hsl(' + (20 + p.h * 260) + ' 95% 66%)'; x.beginPath(); x.arc(p.x, p.y, 2 + br * .5, 0, 6.3); x.fill(); });
+  }
+  jobs.particles = initParticles;
+
+  // ---- 03 Line -> Draw
+  function runLine() {
+    var svg = document.getElementById('svgLine'), ln = svg.querySelector('.ln'), area = svg.querySelector('.area'), dot = svg.querySelector('.dot'), badge = svg.querySelector('.badge'), bt = svg.querySelector('.bt');
+    var D = css('--draw-ms', 1600), t0 = 0; cancelAnimationFrame(jobs._l);
+    function paint(p, s) { ln.style.strokeDashoffset = String(1 - p); area.style.opacity = String(p * .9); dot.setAttribute('opacity', p > .98 ? '1' : '0'); dot.setAttribute('r', String(5 * s)); bt.textContent = '+' + Math.round(128 * p) + '%'; badge.style.opacity = String(Math.min(1, p * 2)); }
+    if (reduce) { paint(1, 1); return; }
+    jobs._l = requestAnimationFrame(function step(t) { if (!t0) t0 = t; var e = t - t0, p = easeOut(e / D), s = e > D ? spring((e - D) / 1000, 400, .5) : 0; paint(p, e > D ? s : 1); if (e < D + 900) jobs._l = requestAnimationFrame(step); else paint(1, 1); });
+  }
+  jobs.line = runLine;
+
+  // ---- 04 Number -> Roll (Zählwerk), nur transform
+  var odo = document.getElementById('odo'), val = '€1.285.012';
+  function buildOdo() {
+    odo.innerHTML = '';
+    val.split('').forEach(function (ch) {
+      var col = document.createElement('span'); col.className = 'col';
+      if (/\d/.test(ch)) { var reel = document.createElement('span'); reel.className = 'reel'; for (var k = 0; k < 10; k++) { var i = document.createElement('i'); i.textContent = k; reel.appendChild(i); } reel.dataset.d = ch; col.appendChild(reel); }
+      else { var i2 = document.createElement('i'); i2.style.cssText = 'display:block;height:1em;font-style:normal'; i2.textContent = ch; col.appendChild(i2); }
+      odo.appendChild(col);
+    });
+  }
+  function runRoll() {
+    buildOdo(); var reels = [].slice.call(odo.querySelectorAll('.reel')), D = css('--roll-ms', 1300), st = css('--roll-stagger-ms', 90), t0 = 0; cancelAnimationFrame(jobs._r);
+    function paint(e) { reels.forEach(function (r, i) { var p = easeOut((e - i * st) / D), target = +r.dataset.d; r.style.transform = 'translate3d(0,' + (-(target * p)) + 'em,0)'; }); }
+    if (reduce) { paint(1e6); return; } paint(-1e6);
+    jobs._r = requestAnimationFrame(function step(t) { if (!t0) t0 = t; var e = t - t0; paint(e); if (e < D + st * reels.length) jobs._r = requestAnimationFrame(step); });
+  }
+  jobs.roll = runRoll;
+
+  // ---- 05 Rings -> Orbit (Zeit, nicht Frames)
+  (function () {
+    var svg = document.getElementById('svgRings'), pls = [].slice.call(svg.querySelectorAll('.pl')), spec = [[100, 34, .55], [72, 24, -.8], [46, 15, 1.2]], rot = -18 * Math.PI / 180;
+    function paint(sec) { pls.forEach(function (pl, i) { var a = sec * spec[i][2], x = Math.cos(a) * spec[i][0], y = Math.sin(a) * spec[i][1]; pl.style.transform = 'translate(' + (125 + x * Math.cos(rot) - y * Math.sin(rot)).toFixed(1) + 'px,' + (85 + x * Math.sin(rot) + y * Math.cos(rot)).toFixed(1) + 'px)'; }); }
+    if (reduce) { paint(.4); return; }
+    var raf = 0, vis = true; new IntersectionObserver(function (es) { vis = es[0].isIntersecting; if (vis && !raf) raf = requestAnimationFrame(loop); }).observe(svg);
+    function loop(t) { paint(t / 1000); raf = vis ? requestAnimationFrame(loop) : 0; }
+    raf = requestAnimationFrame(loop);
+  })();
+
+  // ---- 06 Button -> Pay
+  (function () {
+    var b = document.getElementById('pay'), tm = [];
+    b.addEventListener('click', function () {
+      if (b.classList.contains('is-load') || b.classList.contains('is-done')) return;
+      b.classList.add('is-load'); b.setAttribute('aria-busy', 'true');
+      tm.push(setTimeout(function () { b.classList.remove('is-load'); b.classList.add('is-done'); b.removeAttribute('aria-busy'); b.setAttribute('aria-label', 'Bezahlt'); }, 1300));
+      tm.push(setTimeout(function () { b.classList.remove('is-done'); b.removeAttribute('aria-label'); }, 3300));
+    });
+  })();
+
+  // ---- 07 Confetti -> Burst (Physik mit dt)
+  (function () {
+    var c = document.getElementById('cConf'), btn = document.getElementById('burst'), parts = [], raf = 0, last = 0, s;
+    function burst() {
+      s = sizeC(c); var n = css('--burst-count', 90), cx = s.w / 2, cy = s.h / 2, cols = ['#ff7a45', '#ffd23f', '#ff4fa3', '#6a5cff', '#14b87f'];
+      for (var i = 0; i < n; i++) { var a = Math.random() * 6.283, v = 140 + Math.random() * 260; parts.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, r: Math.random() * 6.28, vr: (Math.random() - .5) * 14, w: 5 + Math.random() * 5, h: 3 + Math.random() * 4, c: cols[i % 5], life: 1.6 + Math.random() * .8, age: 0 }); }
+      if (!raf) { last = 0; raf = requestAnimationFrame(step); }
+    }
+    function step(t) {
+      var dt = Math.min(t - (last || t), 50) / 1000; last = t; var x = s.x; x.clearRect(0, 0, s.w, s.h);
+      parts = parts.filter(function (p) { return p.age < p.life; });
+      parts.forEach(function (p) { p.age += dt; var drag = Math.exp(-1.6 * dt); p.vx *= drag; p.vy = p.vy * drag + 520 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt;
+        x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.globalAlpha = Math.min(1, (p.life - p.age) / .6); x.fillStyle = p.c; x.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); x.restore(); });
+      raf = parts.length ? requestAnimationFrame(step) : 0; if (!raf) x.clearRect(0, 0, s.w, s.h);
+    }
+    btn.addEventListener('click', function () { if (reduce) return; burst(); });
+  })();
+
+  // ---- 08 Words -> Kinetic (Eintritt ease-out gestaffelt)
+  function runWords() {
+    var is = [].slice.call(document.querySelectorAll('#words i')), t0 = 0; cancelAnimationFrame(jobs._w);
+    function paint(e) { is.forEach(function (i, k) { var p = easeOut((e - k * 140) / 800); i.style.transform = 'translate3d(0,' + ((1 - p) * 105) + '%,0)'; }); }
+    if (reduce) { paint(1e6); return; } paint(-1e6);
+    jobs._w = requestAnimationFrame(function step(t) { if (!t0) t0 = t; var e = t - t0; paint(e); if (e < 1400) jobs._w = requestAnimationFrame(step); });
+  }
+  jobs.words = runWords;
+
+  (function () { var f = document.querySelector('.flow'); if (f && window.IntersectionObserver) new IntersectionObserver(function (es) { f.classList.toggle('is-off', !es[0].isIntersecting); }).observe(f); })();
+  document.querySelectorAll('[data-replay]').forEach(function (b) { b.addEventListener('click', function () { jobs[b.dataset.replay](); }); });
+  document.getElementById('theme').addEventListener('click', function () { var r = document.documentElement; r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark'; });
+  var start = function () { initParticles(); runLine(); runRoll(); runWords(); };
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { setTimeout(start, 250); }); else setTimeout(start, 250);
+})();
+</script>
+</body>
+</html>

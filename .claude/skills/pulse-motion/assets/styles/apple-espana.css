@@ -1,0 +1,22 @@
+/* Apple (España) Produktseite — „Kathedrale aus Weißraum“ (light). Einsatz: <section data-style="apple-espana"> (+ _base.css) */
+[data-style="apple-espana"] {
+  /* Marke */
+  --aes-ink: #1d1d1f; --aes-gray: #707070; --aes-deep: #474747; --aes-hairline: #d6d6d6; --aes-canvas: #f5f5f7; --aes-paper: #ffffff;
+  --aes-wash: #e8e8ed; --aes-nav: #fafafc; --aes-dot: #777779; --aes-blue: #0071e3; --aes-link: #0066cc; --aes-ember: #b64400;
+  /* Produkt-Finishes (nur als Bildfläche, nie als UI-Dekor) */
+  --aes-sky: #c8d8e0; --aes-citrus: #dddc8c; --aes-starlight: #f0e4d3; --aes-silver: #e3e4e5; --aes-blush: #e8d0d0; --aes-indigo: #596680; --aes-midnight: #2e3642;
+  /* Semantik-Schicht */
+  --s-bg: var(--aes-paper); --s-surface: var(--aes-canvas); --s-fg: var(--aes-ink); --s-fg-muted: var(--aes-gray);
+  --s-border: var(--aes-hairline); --s-border-strong: var(--aes-ink); --s-accent: var(--aes-blue); --s-link: var(--aes-link);
+  --s-action-bg: var(--aes-blue); --s-action-fg: #ffffff;
+  --s-radius-card: 28px; --s-radius-btn: 980px; --s-card-pad: 28px; --s-card-border: 0;
+  --s-btn-pad: 11px 16px; --s-btn-weight: 400;
+  --s-font-ui: 'SF Pro Text', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-display: 'SF Pro Display', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s-display-weight: 700; --s-display-leading: 1.04; --s-display-tracking: -0.015em; --s-body-weight: 400;
+  --s-ease: ease; --s-dur: .2s;
+  /* Extras: Sektionen wechseln Weiß ↔ #f5f5f7, keine Trennlinien, keine Schatten */
+  --aes-body-tracking: -0.022em; --aes-body-size: 17px; --aes-section-gap: 110px;
+  font-feature-settings: "numr";
+}

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Radial Share</title>
+<style>
+/* ===== CONFIG (hier hochdrehen) ===== */
+@property --r{syntax:"<length>";inherits:true;initial-value:0px}
+@property --fr{syntax:"<length>";inherits:false;initial-value:0px}
+:root{
+  --bg:#0f1115; --fg:#eef0f4; --muted:#8a90a0; --chip-bg:#1a1d24; --chip-line:#2b303b; --accent:#7aa2ff; --on-brand:#fff;
+  --font:Inter,Geist,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --d:48px;               /* Durchmesser jedes Knopfes */
+  --pitch:46deg;          /* Winkelabstand zwischen den Kanaelen */
+  --gap:1.5;              /* Mittenabstand in Durchmessern */
+  --count:5;              /* Anzahl Kanaele (gleich wie im HTML) */
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --ease-in:cubic-bezier(.55,.08,.4,.95);
+  --spring:cubic-bezier(.34,1.56,.64,1);   /* Feder mit leichtem Overshoot (Interface) */
+  --open-ms:520; --close-ms:220; --stagger-ms:38; --flood-ms:420;
+}
+:root[data-theme=light]{--bg:#f4f5f8;--fg:#14161b;--muted:#6b7183;--chip-bg:#fff;--chip-line:#d9dce4;--accent:#3b64e0}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]){--bg:#f4f5f8;--fg:#14161b;--muted:#6b7183;--chip-bg:#fff;--chip-line:#d9dce4;--accent:#3b64e0}}
+</style>
+<style>
+/* COMPONENT CSS */
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);display:grid;place-items:center;overflow:hidden}
+.rs{position:relative;margin-top:110px;width:var(--d);height:var(--d);
+  /* Bogenradius aus Winkelabstand und Mittenabstand: Sehne = 2*r*sin(pitch/2) = gap*d */
+  --r:calc(var(--d) * var(--gap) / (2 * sin(var(--pitch) / 2)));
+  --mid:calc((var(--count) - 1) / 2)}
+.rs__toggle,.rs__item{position:absolute;inset:0;width:var(--d);height:var(--d);border-radius:50%;border:1px solid var(--chip-line);
+  background:var(--chip-bg);color:var(--fg);display:grid;place-items:center;padding:0;cursor:pointer;overflow:hidden;-webkit-tap-highlight-color:transparent}
+.rs__toggle{z-index:3;transition:transform .2s var(--ease-out)}
+.rs__toggle:active{transform:scale(.93)}
+.rs__toggle svg{grid-area:1/1;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  transition:transform .3s var(--ease-out),opacity .2s var(--ease-out)}
+.rs__toggle .ic-x{opacity:0;transform:rotate(-90deg) scale(.5)}
+.rs.is-open .rs__toggle .ic-x{opacity:1;transform:none}
+.rs.is-open .rs__toggle .ic-share{opacity:0;transform:rotate(90deg) scale(.5)}
+.rs__toggle:focus-visible,.rs__item:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+/* Kanaele liegen auf einem Bogen ueber dem Toggle; Winkel 0 = senkrecht nach oben, Mitte des Faechers */
+.rs__item{--i:0;--a:calc((var(--i) - var(--mid)) * var(--pitch));z-index:2;opacity:0;visibility:hidden;pointer-events:none;
+  transform:translate(0,0) scale(.4);
+  transition:transform calc(var(--close-ms)*1ms) var(--ease-in),opacity calc(var(--close-ms)*1ms) var(--ease-in),visibility 0s linear calc(var(--close-ms)*1ms)}
+.rs.is-open .rs__item{opacity:1;visibility:visible;pointer-events:auto;
+  transform:translate(calc(var(--r) * sin(var(--a))),calc(var(--r) * cos(var(--a)) * -1)) scale(1);
+  transition:transform calc(var(--open-ms)*1ms) var(--spring),opacity calc(var(--open-ms)*.5ms) var(--ease-out),visibility 0s;
+  transition-delay:calc(var(--i) * var(--stagger-ms) * 1ms)}
+.rs__item:hover{border-color:var(--brand)}
+/* Fluten vom Druckpunkt: Flaeche + Glyph doppelt (neutral unten, weiss oben), beide mit demselben Kreis beschnitten */
+.rs__flood,.rs__glyph--on{position:absolute;inset:0;clip-path:circle(var(--fr) at var(--fx,50%) var(--fy,50%));transition:--fr calc(var(--flood-ms)*1ms) var(--ease-out)}
+.rs__flood{background:var(--brand)}
+.rs__glyph{grid-area:1/1;position:relative;width:20px;height:20px;fill:currentColor;z-index:1}
+.rs__glyph--on{display:grid;place-items:center;color:var(--on-brand);z-index:2}
+.rs__glyph--on svg{width:20px;height:20px;fill:currentColor}
+.rs__item.is-flood{--fr:80px}
+.rs__item.is-flood .rs__flood,.rs__item.is-flood .rs__glyph--on{--fr:80px}
+.rs__tip{position:absolute;left:50%;top:calc(100% + 18px);transform:translate(-50%,6px);font:500 12px var(--font);color:var(--muted);opacity:0;white-space:nowrap;
+  transition:transform .22s var(--ease-in),opacity .18s var(--ease-in);pointer-events:none}
+.rs__tip.is-on{opacity:1;transform:translate(-50%,0);transition:transform .32s var(--ease-out),opacity .22s var(--ease-out)}
+.rs__sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (prefers-reduced-motion:reduce){
+  .rs__item,.rs.is-open .rs__item{transition:opacity .12s var(--ease-out),visibility 0s;transition-delay:0s}
+  .rs__flood,.rs__glyph--on{transition:none}
+}
+.theme{position:fixed;top:12px;right:12px;font:500 12px var(--font);color:var(--muted);background:none;border:1px solid var(--chip-line);border-radius:999px;padding:6px 12px;cursor:pointer}
+</style>
+</head>
+<body>
+<button class="theme" id="theme" type="button">Hell / Dunkel</button>
+<!-- COMPONENT:START -->
+<div class="rs" id="rs" role="group" aria-label="Teilen">
+  <button class="rs__item" style="--i:0;--brand:#25d366" data-ch="whatsapp" type="button" aria-label="Per WhatsApp teilen" tabindex="-1"><i class="rs__flood"></i><svg class="rs__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.5-1.2A9 9 0 1 0 12 3Zm4.6 12.3c-.2.6-1.2 1.1-1.7 1.1-.4 0-1 .2-3.2-.7-2.7-1.1-4.4-3.8-4.6-4-.1-.2-1.1-1.4-1.1-2.7 0-1.3.7-1.9.9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 1.9c.1.2.1.4 0 .6l-.4.6c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.4.1.6-.1l.8-1c.2-.2.4-.2.6-.1l1.8.9c.3.1.4.2.5.3.1.3.1.8-.1 1.4Z"/></svg><span class="rs__glyph--on" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.5-1.2A9 9 0 1 0 12 3Zm4.6 12.3c-.2.6-1.2 1.1-1.7 1.1-.4 0-1 .2-3.2-.7-2.7-1.1-4.4-3.8-4.6-4-.1-.2-1.1-1.4-1.1-2.7 0-1.3.7-1.9.9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 1.9c.1.2.1.4 0 .6l-.4.6c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.4.1.6-.1l.8-1c.2-.2.4-.2.6-.1l1.8.9c.3.1.4.2.5.3.1.3.1.8-.1 1.4Z"/></svg></span></button>
+  <button class="rs__item" style="--i:1;--brand:#1d9bf0" data-ch="x" type="button" aria-label="Auf X teilen" tabindex="-1"><i class="rs__flood"></i><svg class="rs__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.7 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.3L5.3 21H2.2l7.2-8.3L2 3h6.4l4.4 5.8L17.7 3Zm-1.1 16.2h1.7L7.5 4.7H5.7l10.9 14.5Z"/></svg><span class="rs__glyph--on" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17.7 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.3L5.3 21H2.2l7.2-8.3L2 3h6.4l4.4 5.8L17.7 3Zm-1.1 16.2h1.7L7.5 4.7H5.7l10.9 14.5Z"/></svg></span></button>
+  <button class="rs__item" style="--i:2;--brand:#0a66c2" data-ch="linkedin" type="button" aria-label="Auf LinkedIn teilen" tabindex="-1"><i class="rs__flood"></i><svg class="rs__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h3.8v11H4.5V9Zm1.9-5.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4ZM10.6 9h3.6v1.5h.1c.5-1 1.8-1.8 3.6-1.8 3.8 0 4.5 2.5 4.5 5.7V20h-3.8v-5c0-1.2 0-2.7-1.7-2.7s-1.9 1.3-1.9 2.6V20h-3.8V9Z"/></svg><span class="rs__glyph--on" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 9h3.8v11H4.5V9Zm1.9-5.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4ZM10.6 9h3.6v1.5h.1c.5-1 1.8-1.8 3.6-1.8 3.8 0 4.5 2.5 4.5 5.7V20h-3.8v-5c0-1.2 0-2.7-1.7-2.7s-1.9 1.3-1.9 2.6V20h-3.8V9Z"/></svg></span></button>
+  <button class="rs__item" style="--i:3;--brand:#ea4335" data-ch="mail" type="button" aria-label="Per E-Mail teilen" tabindex="-1"><i class="rs__flood"></i><svg class="rs__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm1.6 2 7.4 5.6L19.4 7H4.6Z"/></svg><span class="rs__glyph--on" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm1.6 2 7.4 5.6L19.4 7H4.6Z"/></svg></span></button>
+  <button class="rs__item" style="--i:4;--brand:#3b64e0" data-ch="copy" type="button" aria-label="Link kopieren" tabindex="-1"><i class="rs__flood"></i><svg class="rs__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h9a2 2 0 0 1 2 2v11h-2V5H9V3Zm-3 4h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/></svg><span class="rs__glyph--on" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h9a2 2 0 0 1 2 2v11h-2V5H9V3Zm-3 4h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/></svg></span></button>
+  <button class="rs__toggle" type="button" aria-expanded="false" aria-label="Teilen oeffnen">
+    <svg class="ic-share" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="m8.2 10.8 7.6-3.6M8.2 13.2l7.6 3.6"/></svg>
+    <svg class="ic-x" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+  </button>
+  <span class="rs__tip" id="rsTip" role="status" aria-live="polite"></span>
+</div>
+<!-- COMPONENT:END -->
+<script>
+/* Init: initRadialShare(rootEl, {url, title, text}). Kopieren schreibt in der Geste (Klick) in die Zwischenablage.
+   Fluten: der Kreis startet am Druckpunkt (--fx/--fy) und waechst per registrierter Eigenschaft --fr. */
+function initRadialShare(root, opts){
+  opts = opts || {};
+  var toggle = root.querySelector('.rs__toggle'), items = [].slice.call(root.querySelectorAll('.rs__item')), tip = root.querySelector('.rs__tip');
+  var tipTimer = 0, open = false;
+  var names = { whatsapp:'WhatsApp', x:'X', linkedin:'LinkedIn', mail:'E-Mail', copy:'Link kopiert' };
+  function url(){ return opts.url || location.href; }
+  function setOpen(v, focusToggle){
+    open = v; root.classList.toggle('is-open', v);
+    toggle.setAttribute('aria-expanded', v ? 'true' : 'false'); toggle.setAttribute('aria-label', v ? 'Teilen schliessen' : 'Teilen oeffnen');
+    items.forEach(function(b){ b.tabIndex = v ? 0 : -1; });
+    if (v) items[0].focus({ preventScroll:true }); else if (focusToggle) toggle.focus();
+  }
+  function say(t){ tip.textContent = t; tip.classList.add('is-on'); clearTimeout(tipTimer); tipTimer = setTimeout(function(){ tip.classList.remove('is-on'); }, 1600); }
+  function go(ch){
+    var u = encodeURIComponent(url()), t = encodeURIComponent(opts.title || document.title), x = encodeURIComponent(opts.text || '');
+    if (ch === 'copy'){
+      var ok = function(){ say('Link kopiert'); }, fail = function(){ say('Kopieren nicht moeglich'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url()).then(ok, fail); else fail();
+      return;
+    }
+    var link = ch === 'whatsapp' ? 'https://wa.me/?text=' + t + '%20' + u
+      : ch === 'x' ? 'https://x.com/intent/post?url=' + u + '&text=' + t
+      : ch === 'linkedin' ? 'https://www.linkedin.com/sharing/share-offsite/?url=' + u
+      : 'mailto:?subject=' + t + '&body=' + (x ? x + '%0A' : '') + u;
+    if (opts.dryRun) { say(names[ch] + ' (Probelauf, nichts gesendet)'); return; }
+    window.open(link, '_blank', 'noopener');
+  }
+  toggle.addEventListener('click', function(){ setOpen(!open, false); });
+  items.forEach(function(b){
+    b.addEventListener('pointerdown', function(e){                       // Flutpunkt = Druckpunkt (bei Tastatur: Mitte)
+      var r = b.getBoundingClientRect();
+      b.style.setProperty('--fx', (e.clientX ? e.clientX - r.left : r.width / 2) + 'px');
+      b.style.setProperty('--fy', (e.clientY ? e.clientY - r.top : r.height / 2) + 'px');
+    });
+    b.addEventListener('click', function(){
+      var r = b.getBoundingClientRect();
+      if (!b.style.getPropertyValue('--fx')){ b.style.setProperty('--fx', r.width / 2 + 'px'); b.style.setProperty('--fy', r.height / 2 + 'px'); }
+      b.classList.add('is-flood');
+      go(b.dataset.ch);
+      setTimeout(function(){ b.classList.remove('is-flood'); b.style.removeProperty('--fx'); b.style.removeProperty('--fy'); }, 700);
+    });
+  });
+  root.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && open){ e.preventDefault(); setOpen(false, true); return; }
+    if (!open) return;
+    var i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown'){ e.preventDefault(); items[(i + 1) % items.length].focus(); }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp'){ e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+  });
+  document.addEventListener('pointerdown', function(e){ if (open && !root.contains(e.target)) setOpen(false, false); });
+  root._rs = { open:function(){ setOpen(true); }, close:function(){ setOpen(false); } };
+  return root._rs;
+}
+</script>
+<script>
+initRadialShare(document.getElementById('rs'), { dryRun:true });
+document.getElementById('theme').addEventListener('click', function(){
+  var r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : !matchMedia('(prefers-color-scheme:light)').matches;
+  r.dataset.theme = dark ? 'light' : 'dark';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trading Journal Frost</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,200;0,300;0,500;0,600;0,800;0,900;1,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#090b10; --fg:#f2f4f8; --dim:rgba(242,244,248,.58); --faint:rgba(242,244,248,.32);
+  --frost:rgba(255,255,255,.075); --frost-2:rgba(255,255,255,.035); --edge:rgba(255,255,255,.16); --edge-hi:rgba(255,255,255,.38);
+  --mint:#5cf2c8; --mint-d:rgba(92,242,200,.16); --loss:#ff7a7a; --loss-d:rgba(255,122,122,.14);
+  --sans:"Inter Tight",Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --ease-out:cubic-bezier(.16,1,.3,1); --ease-in:cubic-bezier(.55,.08,.4,.95); --spring:cubic-bezier(.34,1.56,.64,1);
+}
+*{box-sizing:border-box}
+html{background:var(--ink)}
+body{margin:0;color:var(--fg);font-family:var(--sans);-webkit-font-smoothing:antialiased;position:relative;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:-10%;z-index:-2;pointer-events:none;
+  background:radial-gradient(42% 36% at 12% 8%,rgba(92,242,200,.16),transparent 70%),radial-gradient(40% 40% at 92% 30%,rgba(122,108,255,.18),transparent 70%),radial-gradient(50% 40% at 50% 100%,rgba(47,208,192,.12),transparent 70%)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.06;mix-blend-mode:overlay;
+  background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+.wrap{max-width:1120px;margin:0 auto;padding:28px clamp(16px,4vw,40px) 64px;display:grid;gap:28px}
+.top{display:flex;justify-content:space-between;align-items:center;font:500 12px var(--mono);color:var(--faint);letter-spacing:.04em}
+.top b{color:var(--dim);font-weight:600}
+/* Frost-Flaeche */
+.frost{background:linear-gradient(150deg,var(--frost),var(--frost-2) 60%,var(--frost));-webkit-backdrop-filter:blur(26px) saturate(1.35);backdrop-filter:blur(26px) saturate(1.35);
+  border:1px solid var(--edge);border-radius:28px;box-shadow:inset 0 1px 0 var(--edge-hi),0 24px 60px rgba(0,0,0,.45)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--edge);background:rgba(255,255,255,.06);font:500 12px var(--sans);color:var(--dim);white-space:nowrap}
+.btn{font:600 13px var(--sans);color:var(--fg);background:rgba(255,255,255,.08);border:1px solid var(--edge);border-radius:999px;padding:9px 16px;cursor:pointer;transition:transform .22s var(--spring),background-color .2s var(--ease-out)}
+.btn:hover{background:rgba(255,255,255,.14);transform:translate3d(0,-2px,0)} .btn:active{transform:scale(.95)}
+.btn:focus-visible,.chk:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
+
+/* ===== 1 Kristallisation (Signatur) ===== */
+.crys{padding:22px 22px 18px;position:relative}
+.crys__head{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:flex-end}
+.crys h1{margin:0;font-size:clamp(34px,5vw,56px);font-weight:800;letter-spacing:-.04em;line-height:.95}
+.crys h1 small{display:block;font-size:13px;font-weight:500;letter-spacing:0;color:var(--dim);margin-top:10px}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{padding:10px 14px;border-radius:16px;border:1px solid var(--edge);background:rgba(255,255,255,.04);min-width:132px}
+.stat span{display:block;font:500 11px var(--sans);color:var(--faint);letter-spacing:.06em;text-transform:uppercase}
+.stat b{display:block;font:600 20px var(--mono);font-variant-numeric:tabular-nums;margin-top:4px;transition:color .3s var(--ease-out)}
+.stat b.pop{animation:pop .5s var(--spring)}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.12);color:var(--mint)}100%{transform:scale(1)}}
+.phases{display:flex;gap:6px;margin:16px 0 12px;flex-wrap:wrap}
+.phases .pill{transition:background-color .3s var(--ease-out),color .3s var(--ease-out),border-color .3s var(--ease-out)}
+.phases .pill.on{color:var(--ink);background:var(--mint);border-color:var(--mint)}
+.phases .pill.done{color:var(--fg)}
+.stage{position:relative}
+.plot{position:relative;aspect-ratio:16/7;border-radius:20px;overflow:hidden;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.06)}
+.plot canvas{position:absolute;inset:0;width:100%;height:100%}
+[hidden]{display:none!important}
+.zone{position:absolute;top:10px;font:500 11px var(--mono);color:var(--faint);letter-spacing:.04em}
+.zone--a{left:14px} .zone--b{right:14px;text-align:right}
+.result{position:absolute;right:14px;bottom:14px;width:min(320px,calc(100% - 28px));padding:16px 18px;border-radius:20px;
+  opacity:0;transform:translate3d(0,18px,0) scale(.96);transition:opacity .45s var(--ease-in),transform .45s var(--ease-in);pointer-events:none}
+.result.in{opacity:1;transform:none;transition:opacity .5s var(--ease-out),transform .7s var(--spring);pointer-events:auto}
+.result h3{margin:0 0 10px;font-size:15px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.result h3 i{font:600 13px var(--mono);font-style:normal;color:var(--mint)}
+.row{display:flex;justify-content:space-between;font-size:13px;color:var(--dim);padding:4px 0}
+.row b{font:600 13px var(--mono);color:var(--fg)}
+.verdict{margin-top:10px;display:inline-flex;padding:6px 12px;border-radius:999px;font:600 12px var(--sans)}
+.verdict.ok{background:var(--mint-d);color:var(--mint)} .verdict.no{background:var(--loss-d);color:var(--loss)}
+.result p{margin:10px 0 0;font-size:12px;color:var(--faint);line-height:1.45}
+.crys__foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.crys__foot small{font-size:12px;color:var(--faint)}
+.crys__foot div{display:flex;gap:8px}
+
+/* ===== 2 Review: Riesenwort + Journal-Karte ueber dem Markt ===== */
+.review{position:relative;border-radius:32px;overflow:hidden;min-height:600px;display:grid;justify-items:center;align-items:end;padding:clamp(150px,17vw,210px) 20px 48px;border:1px solid rgba(255,255,255,.06)}
+.review__chart{position:absolute;inset:0;width:100%;height:100%;filter:blur(1.5px) saturate(1.15)}
+.review__shade{position:absolute;inset:0;background:radial-gradient(80% 70% at 50% 55%,transparent 40%,rgba(9,11,16,.7))}
+.giant{position:absolute;left:0;right:0;top:7%;text-align:center;margin:0;font-weight:900;font-size:clamp(84px,19vw,250px);letter-spacing:-.06em;line-height:.8;color:#dde0e7;white-space:nowrap;overflow:hidden;padding-bottom:.08em}
+.giant span{display:inline-block;transform:translate3d(0,105%,0)}
+.in-view .giant span{transform:none;transition:transform .9s var(--ease-out);transition-delay:calc(var(--i)*55ms)}
+.jcard{position:relative;width:min(560px,100%);padding:26px 26px 22px;border-radius:36px;background:linear-gradient(rgba(12,14,20,.42),rgba(12,14,20,.42)),linear-gradient(150deg,var(--frost),var(--frost-2) 60%,var(--frost));opacity:0;transform:translate3d(0,40px,0) scale(.97)}
+.in-view .jcard{opacity:1;transform:none;transition:opacity .6s var(--ease-out) .35s,transform .9s var(--spring) .35s}
+.jcard__top{display:flex;justify-content:space-between;align-items:flex-start}
+.num{font-size:84px;font-weight:200;line-height:.8;color:transparent;-webkit-text-stroke:1.4px rgba(242,244,248,.75);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.jcard h2{margin:18px 0 10px;font-size:clamp(28px,4.4vw,40px);font-weight:600;letter-spacing:-.035em;line-height:1}
+.jcard h2 em{font-style:normal;color:var(--dim);font-weight:300}
+.jcard p{margin:0;font-size:17px;line-height:1.45;color:rgba(242,244,248,.82)}
+.label{margin:20px 0 10px;font:600 11px var(--sans);letter-spacing:.14em;color:var(--faint)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chips .pill{font-size:13px;color:var(--fg);padding:8px 14px}
+.chips .pill i{font-style:normal;color:var(--mint)}
+.chips .plus{color:var(--faint);font-size:14px}
+.jcard__res{margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.jcard__res b{font:600 22px var(--mono);color:var(--loss)}
+.jcard__res .pill{color:var(--mint);border-color:rgba(92,242,200,.35);background:var(--mint-d)}
+
+/* ===== 3 Gewohnheit + Frag dein Journal ===== */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.panel{padding:22px;border-radius:28px;min-height:330px;display:flex;flex-direction:column}
+.panel h3{margin:0;font-size:20px;font-weight:600;letter-spacing:-.02em}
+.panel > small{color:var(--faint);font-size:12px;margin-top:4px}
+.list{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:8px}
+.list li{display:flex;align-items:center;gap:10px;font-size:14px;color:rgba(242,244,248,.86)}
+.list li::before{content:"";width:18px;height:18px;border-radius:6px;border:1px solid var(--edge);background:rgba(255,255,255,.05);flex:none}
+.list li.ok::before{background:var(--mint);border-color:var(--mint);box-shadow:inset 0 0 0 4px var(--ink)}
+.done{margin-top:auto;display:flex;align-items:center;gap:14px;padding-top:18px}
+.chk{position:relative;width:64px;height:64px;border-radius:50%;border:1px solid var(--edge);background:rgba(255,255,255,.07);cursor:pointer;flex:none;transition:transform .25s var(--spring),background-color .3s var(--ease-out)}
+.chk:active{transform:scale(.9)}
+.chk svg{position:absolute;inset:0;margin:auto;width:28px;height:28px}
+.chk path{fill:none;stroke:var(--ink);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:30;stroke-dashoffset:30}
+.chk::after{content:"";position:absolute;inset:-1px;border-radius:50%;border:2px solid var(--mint);opacity:0;transform:scale(.7)}
+.chk.on{background:var(--mint);border-color:var(--mint);transform:scale(1)}
+.chk.on path{stroke-dashoffset:0;transition:stroke-dashoffset .45s var(--ease-out) .12s}
+.chk.on::after{animation:ring .8s var(--ease-out)}
+@keyframes ring{0%{opacity:.9;transform:scale(.8)}100%{opacity:0;transform:scale(1.9)}}
+.done__txt b{display:block;font-size:15px;font-weight:600}
+.done__txt span{font-size:13px;color:var(--dim)}
+.week{display:flex;gap:6px;margin-top:14px;align-items:center}
+.week i{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.12)}
+.week i.f{background:rgba(92,242,200,.55)}
+.week i.today{outline:1px dashed rgba(92,242,200,.6);outline-offset:2px}
+.week i.today.f{background:var(--mint);animation:dot .6s var(--spring)}
+@keyframes dot{0%{transform:scale(.4)}100%{transform:scale(1)}}
+.week small{margin-left:8px;font-size:12px;color:var(--faint)}
+.opts{display:flex;gap:8px;margin-top:12px}
+.opts label{font-size:12px;color:var(--faint);display:flex;align-items:center;gap:6px;cursor:pointer}
+/* Frag dein Journal */
+.ask{margin-top:22px;position:relative;height:52px;display:flex;align-items:center}
+.ask__pill{position:absolute;inset:0;border-radius:999px;border:1px solid var(--edge);background:rgba(255,255,255,.08);clip-path:inset(0 calc(50% - 6px) 0 calc(50% - 6px) round 999px);transition:clip-path .7s var(--spring)}
+.ask.open .ask__pill{clip-path:inset(0 0 0 0 round 999px)}
+.ask__txt{position:relative;padding:0 18px;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .3s var(--ease-out)}
+.ask.open .ask__txt{opacity:1}
+.ask__txt::after{content:"";display:inline-block;width:1.5px;height:1.1em;background:var(--mint);vertical-align:-3px;margin-left:2px;animation:blink 1s steps(2,jump-none) infinite}
+@keyframes blink{50%{opacity:0}}
+.seek{margin-top:12px;font:600 13px var(--sans);background:linear-gradient(90deg,var(--faint) 30%,var(--fg) 50%,var(--faint) 70%);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;opacity:0}
+.seek.on{opacity:1;animation:shim 1.4s var(--ease-out) infinite}
+@keyframes shim{0%{background-position:100% 0}100%{background-position:0 0}}
+.fan{display:flex;gap:10px;margin-top:14px;padding:6px 2px}
+.fan > div{flex:1;min-width:0;padding:14px 12px;border-radius:18px;opacity:0;transform:translate3d(var(--fx,0),18px,0) scale(.88);transition:opacity .25s var(--ease-in),transform .3s var(--ease-in)}
+.fan b{display:block;font:600 20px var(--mono)} .fan span{display:block;margin-top:4px;font-size:12px;line-height:1.3;color:var(--dim)}
+.fan > div:nth-child(1){--fx:105%} .fan > div:nth-child(3){--fx:-105%}
+.fan.on > div{opacity:1;transition:opacity .4s var(--ease-out),transform .85s var(--spring)}
+.fan.on > div:nth-child(1){transform:translate3d(0,6px,0) rotate(-4deg)}
+.fan.on > div:nth-child(2){transform:none;transition-delay:.06s}
+.fan.on > div:nth-child(3){transform:translate3d(0,6px,0) rotate(4deg);transition-delay:.12s}
+.fan > div:nth-child(1) b{color:var(--fg)} .fan > div:nth-child(2) b{color:var(--loss)} .fan > div:nth-child(3) b{color:var(--mint)}
+.note{font-size:12px;color:var(--faint);line-height:1.5;text-align:center;max-width:640px;margin:0 auto}
+
+@media (max-width:760px){
+  .plot{aspect-ratio:4/3.6}
+  .result{position:relative;right:auto;bottom:auto;width:100%;margin-top:12px}
+  .top{flex-direction:column;align-items:flex-start;gap:4px}
+  .duo{grid-template-columns:1fr}
+  .review{min-height:540px;padding-top:118px}
+  .giant{top:26px;font-size:23vw}
+  .num{font-size:64px}
+}
+@media (prefers-reduced-motion:reduce){
+  .giant span,.jcard{transform:none!important;opacity:1!important;transition:none!important}
+  .fan > div,.ask__pill,.chk path,.result{transition:none!important}
+  .seek.on,.stat b.pop,.chk.on::after,.week i.today.f{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><span><b>Trading Journal</b> · Frost-Elemente</span><span>Demo-Daten · keine Orders</span></div>
+
+  <!-- 1 Signatur: Kristallisation -->
+  <section class="crys frost" aria-labelledby="t1">
+    <div class="crys__head">
+      <h1 id="t1"><span id="scr">1.000 Varianten. Eine bleibt.</span><small>Jede Linie wird geprüft, jeder Ausgang bewertet. Am Ende zählt nur der Endtest.</small></h1>
+      <div class="stats" aria-live="polite">
+        <div class="stat"><span id="lChecked">Gezeichnet</span><b id="sChecked">0</b></div>
+        <div class="stat"><span>Bester bisher</span><b id="sBest">–</b></div>
+      </div>
+    </div>
+    <div class="phases" id="phases"><span class="pill" data-p="1">Zeichnen</span><span class="pill" data-p="2">Prüfen</span><span class="pill" data-p="3">Kristallisieren</span><span class="pill" data-p="4">Endtest</span></div>
+    <div class="stage" id="stage"><div class="plot">
+      <canvas id="cv" aria-label="1.000 simulierte Varianten-Kurven; die beste nach Sharpe wird hervorgehoben und im Endtest weitergeführt" role="img"></canvas>
+      <span class="zone zone--a">AUSWAHL · 80 %</span><span class="zone zone--b">ENDTEST · 20 %<br>ungesehen</span></div>
+      <div class="result frost" id="result" hidden></div>
+    </div>
+    <div class="crys__foot"><small>Simulierte Kurven (Seed <span id="seed">7</span>) · Auswahl nach Sharpe auf den ersten 80 %</small>
+      <div><button class="btn" id="again" type="button">Nochmal</button><button class="btn" id="reseed" type="button">Neue Stichprobe</button></div></div>
+  </section>
+
+  <!-- 2 Review -->
+  <section class="review" id="review" aria-label="Journal-Eintrag">
+    <svg class="review__chart" id="chart" viewBox="0 0 960 560" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+    <div class="review__shade"></div>
+    <p class="giant" aria-hidden="true"><span style="--i:0">R</span><span style="--i:1">E</span><span style="--i:2">V</span><span style="--i:3">I</span><span style="--i:4">E</span><span style="--i:5">W</span></p>
+    <article class="jcard frost">
+      <div class="jcard__top"><span class="pill">Eintrag 06 von 12</span><span class="num" aria-hidden="true">06</span></div>
+      <h2>NVDA <em>· Long · Ausbruch</em></h2>
+      <p>Plan: Einstieg über 128, Stopp 121, Ziel 142. Ausgestoppt bei 121,40 – Stopp nicht verschoben.</p>
+      <div class="label">SETUP</div>
+      <div class="chips"><span class="pill"><i>✓</i> Plan vorher</span><span class="plus">+</span><span class="pill"><i>✓</i> Stopp gehalten</span><span class="plus">+</span><span class="pill">Screenshot</span></div>
+      <div class="jcard__res"><b>−0,8 R</b><span class="pill">Regel eingehalten</span></div>
+    </article>
+  </section>
+
+  <!-- 3 Gewohnheit + Frage -->
+  <div class="duo">
+    <section class="panel frost" aria-labelledby="t3">
+      <h3 id="t3">Heute abschließen</h3><small>Belohnt wird Disziplin, nicht der Ausgang.</small>
+      <ul class="list"><li class="ok">Plan vor dem Trade geschrieben</li><li class="ok">Stopp nicht verschoben</li><li id="liReview">Review geschrieben</li></ul>
+      <div class="done">
+        <button class="chk" id="chk" type="button" aria-pressed="false" aria-label="Review abschließen"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+        <div class="done__txt" id="doneTxt"><b>Review abschließen</b><span>Ein Tipp – fertig.</span></div>
+      </div>
+      <div class="week" aria-label="Review-Tage diese Woche"><i class="f"></i><i class="f"></i><i></i><i class="f"></i><i class="f"></i><i class="today" id="today"></i><i></i><small id="weekTxt">4 von 7 Tagen</small></div>
+      <div class="opts"><label><input type="checkbox" id="optHaptic" checked> Haptik</label><label><input type="checkbox" id="optSound"> Ton</label></div>
+    </section>
+    <section class="panel frost" aria-labelledby="t4" id="askPanel">
+      <h3 id="t4">Frag dein Journal</h3><small>Antworten nur aus deinen eigenen Einträgen.</small>
+      <div class="ask" id="ask"><div class="ask__pill"></div><div class="ask__txt" id="askTxt"></div></div>
+      <div class="seek" id="seek">Durchsuche 214 Einträge …</div>
+      <div class="fan" id="fan">
+        <div class="frost"><b>12</b><span>Trades, Stopp verschoben</span></div>
+        <div class="frost"><b>−1,6 R</b><span>Ø wenn verschoben</span></div>
+        <div class="frost"><b>−0,9 R</b><span>Ø wenn gehalten</span></div>
+      </div>
+      <div style="margin-top:auto;display:flex;justify-content:flex-end"><button class="btn" id="askAgain" type="button">Nochmal fragen</button></div>
+    </section>
+  </div>
+  <p class="note">Alle Zahlen sind Beispieldaten. Das Journal feiert keine Gewinne und keine Trade-Anzahl, sondern eingehaltene Regeln. Verluste bleiben sichtbar Verluste.</p>
+</div>
+
+<script>
+(function(){
+'use strict';
+var RM = matchMedia('(prefers-reduced-motion:reduce)').matches;
+var fmt = new Intl.NumberFormat('de-DE'), f2 = new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}), f1 = new Intl.NumberFormat('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1,signDisplay:'always'});
+function clamp(x){return x<0?0:x>1?1:x}
+function eOut(t){return 1-Math.pow(1-t,3)} function eIn(t){return t*t*t} function eIO(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2}
+function spring(t){return 1-Math.exp(-7*t)*Math.cos(10*t)}
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function gauss(r){var u=0;while(!u)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r())}
+
+/* ===== Daten: 1.000 simulierte Varianten ===== */
+var N=1000, T=240, SEL=192, data, order, off;
+function gen(seed){
+  var r=rng(seed), V=[];
+  for(var i=0;i<N;i++){
+    var mu=0.00012+gauss(r)*0.00035, sg=0.006+r()*0.012, y=new Float32Array(T+1), s=0, a=0, b=0, c=0, d=0;
+    for(var t=1;t<=T;t++){ var x=mu+sg*gauss(r); s+=x; y[t]=s; if(t<=SEL){a+=x;b+=x*x}else{c+=x;d+=x*x} }
+    var m=a/SEL, sd=Math.sqrt(b/SEL-m*m), m2=c/(T-SEL), sd2=Math.sqrt(d/(T-SEL)-m2*m2);
+    V.push({id:i, y:y, sh:m/sd*Math.sqrt(252), shE:m2/sd2*Math.sqrt(252), er:Math.exp(y[T]-y[SEL])-1});
+  }
+  order=V.map(function(v){return v.id}); for(var k=N-1;k>0;k--){var j=Math.floor(r()*(k+1)),tmp=order[k];order[k]=order[j];order[j]=tmp}
+  off=V.map(function(){return r()*1.1});
+  return V;
+}
+
+/* ===== Canvas ===== */
+var cv=document.getElementById('cv'), ctx=cv.getContext('2d'), base=document.createElement('canvas'), bx=base.getContext('2d'), ticks=document.createElement('canvas'), tx=ticks.getContext('2d');
+var W=0,H=0,DPR=1,ymin=0,ymax=1,PL=0,PR=0,PT=0,PB=0;
+function size(){
+  var r=cv.getBoundingClientRect(); DPR=Math.min(2,window.devicePixelRatio||1); W=Math.round(r.width*DPR); H=Math.round(r.height*DPR);
+  [cv,base,ticks].forEach(function(c){c.width=W;c.height=H});
+  PL=14*DPR; PR=14*DPR; PT=46*DPR; PB=16*DPR;
+}
+function X(t){return PL+t/T*(W-PL-PR)} function Y(v){return PT+(ymax-v)/(ymax-ymin)*(H-PT-PB)}
+function range(best){
+  var lo=[],hi=[]; data.forEach(function(v){var a=0,b=0;for(var t=0;t<=SEL;t++){if(v.y[t]<a)a=v.y[t];if(v.y[t]>b)b=v.y[t]}lo.push(a);hi.push(b)});
+  lo.sort(function(a,b){return a-b}); hi.sort(function(a,b){return a-b});
+  ymin=lo[Math.floor(N*.01)]; ymax=hi[Math.floor(N*.99)];
+  if(best){for(var t=0;t<=T;t++){ymin=Math.min(ymin,best.y[t]);ymax=Math.max(ymax,best.y[t])}}
+  var p=(ymax-ymin)*.06; ymin-=p; ymax+=p;
+}
+function grid(c){
+  c.save(); c.strokeStyle='rgba(255,255,255,.06)'; c.lineWidth=DPR; c.setLineDash([3*DPR,5*DPR]);
+  c.beginPath(); c.moveTo(X(SEL),PT-30*DPR); c.lineTo(X(SEL),H-PB); c.stroke();
+  c.setLineDash([]); c.strokeStyle='rgba(255,255,255,.09)'; c.beginPath(); c.moveTo(PL,Y(0)); c.lineTo(W-PR,Y(0)); c.stroke();
+  c.fillStyle='rgba(255,255,255,.018)'; c.fillRect(X(SEL),0,W-X(SEL),H); c.restore();
+}
+function path(c,v,from,to){c.beginPath();c.moveTo(X(from),Y(v.y[from]));for(var t=from+1;t<=to;t++)c.lineTo(X(t),Y(v.y[t]))}
+
+/* ===== Ablauf ===== */
+var phase=0, t0=0, raf=0, drawn, checked, best, bestSh, flash, user=false, seed=7;
+var elC=document.getElementById('sChecked'), elB=document.getElementById('sBest'), res=document.getElementById('result'), ph=[].slice.call(document.querySelectorAll('#phases .pill'));
+function setPhase(p){phase=p; t0=performance.now(); document.getElementById('lChecked').textContent=p===1?'Gezeichnet':'Geprüft'; ph.forEach(function(e){var n=+e.dataset.p; e.classList.toggle('on',n===p); e.classList.toggle('done',n<p)})}
+function setBest(v){ best=v; bestSh=v.sh; elB.textContent='#'+String(v.id).padStart(4,'0'); elB.classList.remove('pop'); void elB.offsetWidth; elB.classList.add('pop'); flash=1; }
+function start(){
+  cancelAnimationFrame(raf); res.classList.remove('in'); res.hidden=true; size();
+  data=gen(seed); var top=data.reduce(function(a,b){return b.sh>a.sh?b:a}); range(top);
+  bx.clearRect(0,0,W,H); tx.clearRect(0,0,W,H); grid(bx);
+  drawn=new Int16Array(N); checked=0; best=null; bestSh=-1e9; flash=0; elC.textContent='0'; elB.textContent='–';
+  document.getElementById('seed').textContent=seed;
+  if(RM){ for(var i=0;i<N;i++){bx.strokeStyle='rgba(255,255,255,.1)';bx.lineWidth=DPR*.9;path(bx,data[i],0,SEL);bx.stroke()} order.forEach(tick); checked=N; setBest(top); elC.textContent=fmt.format(N); setPhase(4); finish(1); return; }
+  setPhase(1); raf=requestAnimationFrame(loop);
+}
+function tick(id){var v=data[id]; tx.fillStyle='rgba(255,255,255,.35)'; tx.beginPath(); tx.arc(X(SEL),Y(v.y[SEL]),1.3*DPR,0,7); tx.fill()}
+function loop(now){
+  var s=(now-t0)/1000;
+  ctx.clearRect(0,0,W,H);
+  if(phase===1){                                   // 1 Zeichnen: jede Linie mit eigenem Start, ease-out
+    bx.lineWidth=DPR*.9; bx.strokeStyle='rgba(255,255,255,.1)';
+    for(var i=0;i<N;i++){ var to=Math.round(eOut(clamp((s-off[i])/1.2))*SEL); if(to>drawn[i]){ path(bx,data[i],drawn[i],to); bx.stroke(); drawn[i]=to; } }
+    ctx.drawImage(base,0,0); elC.textContent=fmt.format(Math.round(eOut(clamp(s/2.3))*N));
+    if(s>=2.35){ elC.textContent='0'; setPhase(2); }
+  } else if(phase===2){                            // 2 Pruefen: Scanner, Bester bisher blitzt
+    var k=Math.round(eIO(clamp(s/4.4))*N);
+    for(;checked<k;checked++){ var id=order[checked]; tick(id); if(data[id].sh>bestSh) setBest(data[id]); }
+    elC.textContent=fmt.format(checked);
+    ctx.drawImage(base,0,0); ctx.drawImage(ticks,0,0);
+    ctx.lineWidth=DPR*1.2;
+    for(var j=Math.max(0,checked-10);j<checked;j++){ ctx.strokeStyle='rgba(255,255,255,'+(.05+.5*(j-checked+10)/10).toFixed(3)+')'; path(ctx,data[order[j]],0,SEL); ctx.stroke(); }
+    if(best){ drawBest(1.8,.95,8+16*flash); flash*=.9; }
+    if(s>=4.5) setPhase(3);
+  } else if(phase===3){                            // 3 Kristallisieren: Rest tritt ab (ease-in), Siegerin waechst (Feder)
+    var a=clamp(s/1.3);
+    ctx.globalAlpha=1-.68*eIn(a); ctx.drawImage(base,0,0); ctx.globalAlpha=1-.6*eIn(a); ctx.drawImage(ticks,0,0); ctx.globalAlpha=1;
+    drawBest(1.8+1.6*eOut(a),1,10+10*eOut(a)); dot(SEL,5*spring(a));
+    if(s>=1.35) setPhase(4);
+  } else if(phase===4){ finish(clamp(s/1.8)); if(s>=1.85){ return; } }
+  raf=requestAnimationFrame(loop);
+}
+function drawBest(w,al,glow){ctx.save();ctx.strokeStyle='rgba(92,242,200,'+al+')';ctx.lineWidth=w*DPR;ctx.shadowColor='rgba(92,242,200,.8)';ctx.shadowBlur=glow*DPR;path(ctx,best,0,SEL);ctx.stroke();ctx.restore()}
+function dot(t,r){ctx.save();ctx.fillStyle='#5cf2c8';ctx.shadowColor='rgba(92,242,200,.9)';ctx.shadowBlur=14*DPR;ctx.beginPath();ctx.arc(X(t),Y(best.y[t]),Math.max(0,r)*DPR,0,7);ctx.fill();ctx.restore()}
+function finish(p){                                 // 4 Endtest: Siegerin laeuft ehrlich ins Ungesehene
+  ctx.clearRect(0,0,W,H); ctx.globalAlpha=.32; ctx.drawImage(base,0,0); ctx.globalAlpha=.4; ctx.drawImage(ticks,0,0); ctx.globalAlpha=1;
+  drawBest(3.4,1,20); var to=SEL+Math.round(eOut(p)*(T-SEL));
+  ctx.save(); ctx.strokeStyle=best.er>=0?'rgba(92,242,200,.95)':'rgba(255,122,122,.95)'; ctx.lineWidth=2.6*DPR; ctx.setLineDash([6*DPR,4*DPR]); path(ctx,best,SEL,to); ctx.stroke(); ctx.restore();
+  dot(SEL,5); dot(to,3.5);
+  if(p>=1) card();
+}
+function card(){
+  var rank=1+data.filter(function(v){return v.er>best.er}).length, ok=best.er>0&&best.shE>0;
+  res.innerHTML='<h3>Bester in der Auswahl <i>#'+String(best.id).padStart(4,'0')+'</i></h3>'+
+    '<div class="row">Sharpe Auswahl<b>'+f2.format(best.sh)+'</b></div>'+
+    '<div class="row">Endtest Rendite<b>'+f1.format(best.er*100)+' %</b></div>'+
+    '<div class="row">Rang im Endtest<b>'+fmt.format(rank)+' von '+fmt.format(N)+'</b></div>'+
+    '<span class="verdict '+(ok?'ok':'no')+'">'+(ok?'Endtest bestanden':'Endtest verworfen')+'</span>'+
+    '<p>Bester in der Stichprobe heißt nicht bester in der Zukunft. Erst der ungesehene Teil entscheidet.</p>';
+  res.hidden=false; requestAnimationFrame(function(){requestAnimationFrame(function(){res.classList.add('in')})});
+  if(user&&document.getElementById('optHaptic').checked&&navigator.vibrate) navigator.vibrate(ok?[12,50,18]:[30]);
+}
+document.getElementById('again').onclick=function(){user=true;start()};
+document.getElementById('reseed').onclick=function(){user=true;seed=1+Math.floor(Math.random()*9999);start()};
+var rt=0; addEventListener('resize',function(){clearTimeout(rt);rt=setTimeout(function(){var w=cv.getBoundingClientRect().width*Math.min(2,devicePixelRatio||1);if(Math.abs(w-W)>2){user=false;start()}},200)});
+
+/* Titel: Zeichen loesen sich auf (Scramble, ease-out je Buchstabe) */
+function scramble(el){
+  var txt=el.textContent, G='ABCDEFGHJKLMNPQRSTUVWXYZ0123456789', t1=performance.now();
+  if(RM) return;
+  (function f(now){var s=(now-t1)/1000, out='', done=true;
+    for(var i=0;i<txt.length;i++){var at=.15+i*.025, p=clamp((s-at)/.35); if(txt[i]===' '||p>=1)out+=txt[i]; else {done=false; out+=p>0?G[Math.floor(Math.random()*G.length)]:' '}}
+    el.textContent=out; if(!done)requestAnimationFrame(f)})(t1);
+}
+
+/* ===== Review: Chart im Hintergrund ===== */
+(function(){
+  var r=rng(3), svg=document.getElementById('chart'), n=56, w=960/n, p=330, h='', ma=[];
+  h+='<defs><radialGradient id="gl" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#2fd0c0" stop-opacity=".22"/><stop offset="1" stop-color="#090b10" stop-opacity="0"/></radialGradient></defs><rect width="960" height="560" fill="url(#gl)"/>';
+  for(var i=0;i<n;i++){var o=p, c=o+gauss(r)*14+1.2, hi=Math.max(o,c)+r()*12, lo=Math.min(o,c)-r()*12, up=c<o, col=up?'#3fd5a0':'#ff6b6b', x=i*w+w*.2;
+    h+='<line x1="'+(x+w*.3)+'" x2="'+(x+w*.3)+'" y1="'+hi+'" y2="'+lo+'" stroke="'+col+'" stroke-opacity=".75" stroke-width="2"/>';
+    h+='<rect x="'+x+'" y="'+Math.min(o,c)+'" width="'+(w*.6)+'" height="'+Math.max(2,Math.abs(c-o))+'" rx="2" fill="'+col+'" fill-opacity=".82"/>'; p=Math.min(470,Math.max(150,c)); ma.push([x+w*.3,p]);}
+  var m='';ma.forEach(function(q,i){var a=ma.slice(Math.max(0,i-6),i+1),av=a.reduce(function(s,z){return s+z[1]},0)/a.length;m+=(i?'L':'M')+q[0].toFixed(1)+' '+(av-28).toFixed(1)});
+  h+='<path d="'+m+'" fill="none" stroke="#7a6cff" stroke-opacity=".55" stroke-width="2.5"/>';
+  svg.innerHTML=h;
+})();
+
+/* ===== Gewohnheit: zwei Kanaele (Bild + Haptik, Ton optional) ===== */
+var chk=document.getElementById('chk');
+chk.onclick=function(){
+  var on=!chk.classList.contains('on'); chk.classList.toggle('on',on); chk.setAttribute('aria-pressed',on);
+  document.getElementById('liReview').classList.toggle('ok',on); document.getElementById('today').classList.toggle('f',on);
+  document.getElementById('weekTxt').textContent=(on?5:4)+' von 7 Tagen';
+  document.getElementById('doneTxt').innerHTML=on?'<b>Erledigt.</b><span>Regeln gehalten – das zählt, nicht der Ausgang.</span>':'<b>Review abschließen</b><span>Ein Tipp – fertig.</span>';
+  if(!on) return;
+  if(document.getElementById('optHaptic').checked&&navigator.vibrate) navigator.vibrate([14,40,10]);
+  if(document.getElementById('optSound').checked) chime();
+};
+var ac; function chime(){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); [[1046.5,0],[1568,.07]].forEach(function(n){var o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+n[1];o.type='sine';o.frequency.value=n[0];g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.08,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+.28);o.connect(g).connect(ac.destination);o.start(t);o.stop(t+.3)}) }catch(e){} }
+
+/* ===== Frag dein Journal: Punkt -> Pille -> Tippen -> Schimmer -> Karten ===== */
+var ask=document.getElementById('ask'), askT=document.getElementById('askTxt'), seek=document.getElementById('seek'), fan=document.getElementById('fan'), Q='Wann habe ich meinen Stopp verschoben?', timers=[];
+function later(fn,ms){timers.push(setTimeout(fn,ms))}
+function runAsk(){
+  timers.forEach(clearTimeout); timers=[]; ask.classList.remove('open'); seek.classList.remove('on'); fan.classList.remove('on'); askT.textContent='';
+  if(RM){ask.classList.add('open'); askT.textContent=Q; fan.classList.add('on'); return}
+  later(function(){ask.classList.add('open')},250);
+  var t=900; for(var i=1;i<=Q.length;i++){(function(i){later(function(){askT.textContent=Q.slice(0,i)},t)})(i); t+=28+((i*37)%45);}
+  later(function(){seek.classList.add('on')},t+250);
+  later(function(){seek.classList.remove('on');fan.classList.add('on')},t+1700);
+}
+document.getElementById('askAgain').onclick=runAsk;
+
+/* ===== Start, sobald sichtbar ===== */
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return; var el=e.target;
+  if(el.id==='review') el.classList.add('in-view'); if(el.id==='askPanel') runAsk(); io.unobserve(el)})},{threshold:.35});
+io.observe(document.getElementById('review')); io.observe(document.getElementById('askPanel'));
+scramble(document.getElementById('scr'));
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(start); else start();
+window.__tj={jump:function(p){phase=p;}};
+})();
+</script>
+</body>
+</html>
