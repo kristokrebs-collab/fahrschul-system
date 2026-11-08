@@ -9,8 +9,8 @@
  *
  * Warum diese sechs: (1–3) genug Trades und eine positive Erwartung nach Kosten im Training und im Endtest; (4) der Endtest hält mindestens
  * die Hälfte der Trainings-Zahl (eine Zufallsvariante fällt zurück); (5) der Endtest allein ist ein einzelner, ungesehener Test –
- * sein p ist ehrlich; (6) das Training allein ist es nicht: unter 1.000 Versuchen gibt es zufällig ein p um 0,001, darum wird sein p mit der
- * Zahl der Versuche korrigiert (Šidák/Bonferroni). Auf reinen Zufallspfaden liegt die korrigierte Zahl fast immer bei 1,0 (Test pinnt das).
+ * sein p ist ehrlich; (6) das Training allein ist es nicht: unter 3.000 Versuchen (1.000 Varianten × 3 Stop-Führungen) gibt es zufällig ein
+ * p um 0,0003, darum wird sein p mit der Zahl ALLER Kandidaten korrigiert (Šidák). Auf reinen Zufallspfaden liegt die korrigierte Zahl fast immer bei 1,0 (Test pinnt das).
  * Der Rang des Siegers im Endtest unter allen Varianten wird gezeigt (Selektionsverzerrung sichtbar), ist aber kein Kriterium: R-Vielfache
  * verschiedener Stop-/Ziel-Aufbauten sind nur grob vergleichbar, ein echter Treffer kann dort mittelmäßig stehen.
  */
@@ -100,5 +100,5 @@ const FAIL_TEXT: Readonly<Record<CheckResult["id"], string>> = {
   oosPositive: "Im Endtest ist die Erwartung nach Kosten nicht positiv – die gute Zahl aus dem Training war Zufall oder hat die Kosten nicht überlebt.",
   retention: "Im Endtest bleibt weniger als die Hälfte der Trainings-Erwartung übrig – typisch für eine zufällig gute Variante.",
   oosSignificance: "Der Endtest ist nicht klar genug vom Zufall zu unterscheiden.",
-  multiTest: "Unter 1.000 Versuchen findet man allein durch Glück eine Variante, die im Training so gut aussieht – nach der Korrektur für die Zahl der Versuche bleibt davon kein Beleg übrig.",
+  multiTest: "Unter so vielen Versuchen (Varianten × Stop-Führungen) findet man allein durch Glück eine, die im Training so gut aussieht – nach der Korrektur für die Zahl der Versuche bleibt davon kein Beleg übrig.",
 };

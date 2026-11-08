@@ -1,7 +1,8 @@
 /**
  * Eröffnungs-Range-Ausbruch (zweite Familie der Strategiesuche): jede Regel gegen eine HANDRECHNUNG auf gebauten Sitzungen
  * (Mittwoch 07.01.2026, New York 13:30 UTC, 5-Minuten-Kerzen): Range, Signal im 3-Stunden-Fenster, Gründe (Volumen-Faktor, Trend),
- * Note A+ / A / B / C, Einstieg zur Eröffnung der Folgekerze, Stop vor Ziel, Lücke über den Stop, Zeit-Stopp, Gebühren, kein Blick voraus.
+ * Note A+ / A / B / C, Einstieg zur Eröffnung der Folgekerze, Stop vor Ziel, Lücke über den Stop, Zeit-Stopp, Gebühren, kein Blick voraus,
+ * Stop-Führung (fest / Einstand / Nachziehen ab +1 R, gültig ab der nächsten Kerze).
  */
 import { describe, expect, it } from "vitest";
 import type { Bar } from "@/domain/backtest/types";
@@ -202,5 +203,62 @@ describe("Ausführung (Handrechnung, ohne Slippage)", () => {
   it("der Suchraum der Familie hat 540 Punkte", () => {
     const S = ORB_SPACE;
     expect(S.session.length * S.rangeMin.length * S.volThr.length * S.targetR.length * S.stop.length * S.trend.length).toBe(540);
+  });
+});
+
+describe("Stop-Führung (Handrechnung): fest / Einstand ab +1 R / Nachziehen ab +1 R", () => {
+  // Einstieg 102,2 (Eröffnung nach dem Ausbruch), Stop = Range-Tief 99,0 → 1 R = 3,2; +1 R = 105,4; Ziel 2 R = 108,6.
+  // Kerze 1 läuft bis 106,0 (über +1 R, Schluss 105,8), Kerze 2 fällt bis 101,0, danach ruhige Kerzen um 100,4 bis zum Sitzungsende.
+  const bars = day([...RANGE, BREAK_UP, [102.2, 106.0, 102.0, 105.8, 100], [105.8, 105.9, 101.0, 101.5, 100]]);
+  const prep = orbPrepare(bars);
+  const d = orbDetect(prep, orbDays(prep, "ny")[0]!, "ny", 15)!;
+  const run = (m: "fixed" | "be" | "trail") => orbTrade(prep, d, "range", 2, NO_COSTS, m)!;
+
+  it("fest: der Stop bleibt bei 99,0 – Zeit-Stopp am Sitzungsende bei 100,4 → (100,4 − 102,2) ÷ 3,2 = −0,5625 R vor Kosten", () => {
+    const t = run("fixed");
+    expect(t.state).toBe("closed");
+    if (t.state !== "closed") return;
+    expect(t.exitKind).toBe("time");
+    near(t.exit, 100.4);
+    near(t.path[t.path.length - 1]!, -0.5625);
+    expect(run("fixed")).toEqual(orbTrade(prep, d, "range", 2, NO_COSTS));
+  });
+
+  it("Einstand: am Schluss von Kerze 1 (bester Kurs 106,0 ≥ 105,4) zieht der Stop auf 102,2 – Kerze 2 stoppt dort aus: 0 R vor Kosten", () => {
+    const t = run("be");
+    if (t.state !== "closed") throw new Error("offen");
+    expect(t.exitKind).toBe("stop");
+    near(t.exit, 102.2);
+    near(t.path[t.path.length - 1]!, 0);
+    // R bleibt am ANFANGS-Stop gemessen
+    expect(t.stop).toBe(99.0);
+    near(t.risk, 3.2);
+    // Gebühren: Einstieg 102,2 × 0,05 % + Stop 102,2 × 0,05 % = 0,1022 → −0,1022 ÷ 3,2 R
+    near(t.r, -(102.2 * 0.0005 * 2) / 3.2, 1e-9);
+  });
+
+  it("Nachziehen: Stop auf bester Kurs − 1 R = 106,0 − 3,2 = 102,8 – Kerze 2 stoppt dort aus: (102,8 − 102,2) ÷ 3,2 = +0,1875 R vor Kosten", () => {
+    const t = run("trail");
+    if (t.state !== "closed") throw new Error("offen");
+    expect(t.exitKind).toBe("stop");
+    near(t.exit, 102.8);
+    near(t.path[t.path.length - 1]!, 0.1875);
+    expect(t.kExit).toBe(d.signal!.j + 2);
+  });
+
+  it("vor +1 R greift keine Führung, und sie wirkt erst ab der nächsten Kerze (nie in der Kerze, die sie auslöst)", () => {
+    // Kerze 1 erreicht nur 105,0 (< 105,4): alle drei bleiben beim festen Stop
+    const b2 = orbPrepare(day([...RANGE, BREAK_UP, [102.2, 105.0, 102.0, 104.8, 100], [104.8, 104.9, 101.0, 101.5, 100]]));
+    const d2 = orbDetect(b2, orbDays(b2, "ny")[0]!, "ny", 15)!;
+    const f = orbTrade(b2, d2, "range", 2, NO_COSTS, "fixed");
+    expect(orbTrade(b2, d2, "range", 2, NO_COSTS, "be")).toEqual(f);
+    expect(orbTrade(b2, d2, "range", 2, NO_COSTS, "trail")).toEqual(f);
+    // dieselbe Kerze erreicht +1 R und fällt bis 101,0: der neue Stop gilt erst danach – kein Ausstieg auf dieser Kerze
+    const b3 = orbPrepare(day([...RANGE, BREAK_UP, [102.2, 106.0, 101.0, 105.8, 100], [105.8, 105.9, 101.0, 101.5, 100]]));
+    const d3 = orbDetect(b3, orbDays(b3, "ny")[0]!, "ny", 15)!;
+    const t3 = orbTrade(b3, d3, "range", 2, NO_COSTS, "trail")!;
+    if (t3.state !== "closed") throw new Error("offen");
+    expect(t3.kExit).toBe(d3.signal!.j + 2);
+    near(t3.exit, 102.8);
   });
 });

@@ -23,12 +23,12 @@ describe("Eröffnungs-Range in der Suche: Muster gefunden, Rauschen verworfen", 
     expect(edge.filter((r) => r.verdict.passed).length).toBeGreaterThanOrEqual(5);
     // die Familie ist voll enthalten: 540 Varianten, jede mit eigener Zeile und Kurve
     expect(edge[0]!.counts.byFamily).toEqual({ orb: 540, trend: 0 });
-    expect(edge[0]!.counts).toMatchObject({ variants: 540, isRuns: 540, oosRuns: 540, winnerOosRuns: 1 });
+    expect(edge[0]!.counts).toMatchObject({ variants: 540, candidates: 1620, isRuns: 1620, oosRuns: 542, winnerOosRuns: 1, compareRuns: 2 });
     expect(edge[0]!.curves.is).toHaveLength(540);
     expect(edge[0]!.datasets[0]).toMatchObject({ family: "orb", unit: "Tage", interval: "5m" });
   });
 
-  it("reines Rauschen: höchstens 10 % Fehlalarme (30 Pfade, gemessen 0) – meist fehlt schon im Training die Mindestzahl Trades (8)", () => {
+  it("reines Rauschen: höchstens 10 % Fehlalarme (30 Pfade, gemessen 0) – meist fehlt schon im Training die Mindestzahl Trades (8)", { timeout: 180_000 }, () => {
     const runs = Array.from({ length: 30 }, (_, i) => runSearchSync(orbInput(orbMarket(130, 800 + i), 7)));
     expect(runs.filter((r) => r.verdict.passed).length / 30).toBeLessThanOrEqual(0.1);
     // wo es einen Sieger gibt, hat er im Training mindestens 8 Trades
@@ -73,14 +73,14 @@ describe("beide Familien teilen sich die 1.000", () => {
     const trendBars = market(3000, 41);
     const input = { ...searchInput(trendBars, 7), ...orbInput(orbMarket(130, 12, { pattern: true }), 7) };
     const r = runSearchSync({ ...searchInput(trendBars, 7), orb: input.orb });
-    expect(r.counts).toMatchObject({ variants: 1000, isRuns: 1000, oosRuns: 1000, winnerOosRuns: 1, byFamily: { orb: 540, trend: 460 } });
+    expect(r.counts).toMatchObject({ variants: 1000, candidates: 3000, isRuns: 3000, oosRuns: 1002, winnerOosRuns: 1, byFamily: { orb: 540, trend: 460 } });
     expect(r.rows).toHaveLength(1000);
     expect(r.families.sort()).toEqual(["orb", "trend"]);
     expect(r.datasets.map((d) => d.family).sort()).toEqual(["orb", "trend"]);
     expect(r.winnerFamily).toBe("orb");
     expect(r.verdict.passed).toBe(true);
-    // die Mehrfachtest-Korrektur zählt alle 1.000
-    expect(r.deflation!.trials).toBe(1000);
+    // die Mehrfachtest-Korrektur zählt alle 3.000 Kandidaten (1.000 Varianten × 3 Stop-Führungen)
+    expect(r.deflation!.trials).toBe(3000);
   });
 });
 

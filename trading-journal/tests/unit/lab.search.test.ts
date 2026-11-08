@@ -3,7 +3,9 @@
  *  (a) ein eingebautes, wiederholbares Muster wird gefunden und der Endtest besteht,
  *  (b) auf reinen Zufallspfaden wird in der überwiegenden Mehrzahl verworfen (Fehlalarm-Rate gepinnt),
  *  (c) kein Blick in die Zukunft (Abschneide- und Verschiebe-Test; der Endtest fließt nie in die Auswahl),
- *  (d) alle 1.000 Varianten werden gerechnet, deterministisch, in beliebigen Häppchen,
+ *  (d) alle 1.000 Varianten werden gerechnet (je mit drei Stop-Führungen), deterministisch, in beliebigen Häppchen,
+ *  (f) Stop-Führung: ein eingebauter Lauf, den nur ein nachgezogener Stop mitnimmt, wird gefunden und im Endtest als besser belegt;
+ *      auf Zufallspfaden wird keine Stop-Führung als besser ausgewiesen,
  * plus die Kriterien, der Suchraum und der aktuelle Kandidat mit Handrechnung.
  */
 import { describe, expect, it } from "vitest";
@@ -16,6 +18,8 @@ import type { Bar } from "@/domain/backtest/types";
 import {
   adjustedP,
   candidateOf,
+  manageOf,
+  STOP_RULES,
   condsOf,
   CRITERIA,
   createSearchJob,
@@ -136,12 +140,21 @@ describe("(a) eingebautes Muster: die Suche findet es, der Endtest besteht", () 
     for (const r of results.filter((x) => !x.verdict.passed)) expect(r.verdict.checks.filter((c) => !c.ok).map((c) => c.id)).toEqual(["oosTrades"]);
   });
 
-  it("liegt in der Nähe des wahren Parameters (Rückblick 16–24 in allen Läufen) und das Profil über alle 1.000 stimmt", () => {
-    for (const r of results) expect((r.winner!.variant as SearchVariant).lookback, "Sieger-Rückblick").toBeGreaterThanOrEqual(16);
-    for (const r of results) expect((r.winner!.variant as SearchVariant).lookback, "Sieger-Rückblick").toBeLessThanOrEqual(24);
+  it("liegt in der Nähe des wahren Parameters (Rückblick 16–24 mit festem Stop in allen Läufen) und das Profil über alle 1.000 stimmt", () => {
+    const vs = drawVariants("4h", 7);
+    for (const r of results) {
+      // die Auswahl unter den Kandidaten mit festem Stop (dieselben Läufe wie vor der Stop-Führung): Rückblick 16–24 in allen Läufen
+      const fixed = r.rows.filter((x) => x.isScores[0] != null).reduce((a, b) => (b.isScores[0]! > a.isScores[0]! ? b : a));
+      expect(vs[fixed.id]!.lookback, "Rückblick, fester Stop").toBeGreaterThanOrEqual(16);
+      expect(vs[fixed.id]!.lookback, "Rückblick, fester Stop").toBeLessThanOrEqual(24);
+      // der Sieger über alle 3.000 (mit Stop-Führung): höchstens ein Rasterpunkt neben 16–24 (gemessen: 9 von 10 bei 18–22, einmal 25)
+      const lb = (r.winner!.variant as SearchVariant).lookback;
+      expect(lb, "Sieger-Rückblick").toBeGreaterThanOrEqual(16);
+      expect(lb, "Sieger-Rückblick").toBeLessThanOrEqual(25);
+    }
+    expect(results.filter((r) => (r.winner!.variant as SearchVariant).lookback <= 24).length, "Sieger-Rückblick 16–24").toBeGreaterThanOrEqual(9);
     // Profil: die mittlere Trainings-Erwartung der Long-Varianten mit Rückblick 16–28 liegt klar über der mit Rückblick ≥ 40 – dort feuert die
     // Regel nur noch selten und nicht mehr auf den Impuls
-    const vs = drawVariants("4h", 7);
     for (const r of results) {
       const avg = (pick: (v: SearchVariant) => boolean): number => {
         const xs = vs.filter((v) => v.side === "long" && pick(v) && r.rows[v.id]!.isAvgR != null && r.rows[v.id]!.isN >= 20).map((v) => r.rows[v.id]!.isAvgR!);
@@ -178,8 +191,64 @@ describe("(b) reiner Zufallspfad: überwiegend verworfen, Fehlalarm-Rate gepinnt
   });
 });
 
+describe("(b) Zufallspfad: keine Stop-Führung wird als besser ausgewiesen", () => {
+  // dieselben 40 Zufallspfade wie oben (eigene Rechnung, gleiche Seeds)
+  const N = 40;
+  const runs = Array.from({ length: N }, (_, i) => runSearchSync(searchInput(market(4800, 900 + i), 7)));
+
+  it("ausgewiesen („declared“) in 0 von 40; schon der Endtest allein trennt höchstens in 10 % – und dann nie ohne bestandenen Endtest", () => {
+    const withWinner = runs.filter((r) => r.winner);
+    expect(withWinner.length).toBeGreaterThanOrEqual(N * 0.9);
+    expect(withWinner.filter((r) => r.winner!.stops.declared).length).toBe(0);
+    expect(withWinner.filter((r) => r.winner!.stops.edge).length / withWinner.length).toBeLessThanOrEqual(0.1);
+    for (const r of withWinner) {
+      const st = r.winner!.stops;
+      // der Vergleich ist da, auch wenn nichts ausgewiesen wird: drei Stop-Führungen, der Partner ist eine andere, die Spanne umschließt die Differenz
+      expect(st.lines.map((l) => l.rule)).toEqual(["fixed", "be", "trail"]);
+      expect(st.vs).not.toBe(st.rule);
+      if (st.lo != null && st.hi != null) expect(st.lo).toBeLessThanOrEqual(st.hi);
+      expect(st.declared).toBe(r.verdict.passed && st.edge);
+    }
+    // jede der drei Stop-Führungen gewinnt mal – keine ist auf Zufall eingebaut bevorzugt
+    expect(new Set(withWinner.map((r) => r.winner!.stop)).size).toBe(3);
+  });
+});
+
+describe("(f) eingebauter Lauf, den nur ein nachgezogener Stop mitnimmt: gefunden und im Endtest belegt", () => {
+  // Muster (Testdaten, Wahrheit bekannt): auf jeden Schluss über dem Hoch der letzten 20 Kerzen läuft der Preis eine zufällige Zahl Kerzen
+  // (Mittel 6) um 1 σ je Kerze und stürzt danach in 2 Kerzen bis 4 σ unter den Ausbruch – ein fester Stop gibt den Lauf zurück, ein
+  // nachgezogener behält den größten Teil. Wahr: Long, Rückblick 20, Stop-Führung Nachziehen.
+  const SEEDS = [301, 302, 303, 304, 305, 306, 307, 308, 309, 310];
+  const results = SEEDS.map((s) => runSearchSync(searchInput(market(4800, s, { edge: { lookback: 20, hold: 6, drift: 1, random: true } }), 7)));
+
+  it("der Sieger zieht nach (10 von 10), besteht den Endtest, und Nachziehen schlägt den festen Stop auch im Endtest", () => {
+    for (const r of results) {
+      const w = r.winner!;
+      expect((w.variant as SearchVariant).side).toBe("long");
+      expect((w.variant as SearchVariant).lookback).toBeGreaterThanOrEqual(18);
+      expect((w.variant as SearchVariant).lookback).toBeLessThanOrEqual(28);
+      expect(w.stop).toBe("trail");
+      expect(r.verdict.passed).toBe(true);
+      const line = (rule: string) => w.stops.lines.find((l) => l.rule === rule)!;
+      // Training: Nachziehen vor Einstand vor fest (die Wahrheit des Musters)
+      expect(line("trail").isAvgR!).toBeGreaterThan(line("fixed").isAvgR!);
+      expect(w.stops.vs).toBe("fixed");
+      // Endtest: gegen den festen Stop gemessen, gepaart über dieselben Einstiege
+      expect(w.stops.pairs).toBeGreaterThanOrEqual(15);
+    }
+    // im Endtest vorn in (fast) allen Läufen, statistisch ausgewiesen in der Mehrzahl (gemessen 7 von 10)
+    expect(results.filter((r) => r.winner!.stops.diffAvgR! > 0).length).toBeGreaterThanOrEqual(8);
+    expect(results.filter((r) => r.winner!.stops.declared).length).toBeGreaterThanOrEqual(6);
+    for (const r of results.filter((x) => x.winner!.stops.declared)) {
+      const st = r.winner!.stops;
+      expect(st.p!).toBeLessThanOrEqual(0.05);
+      expect(st.diffAvgR!).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe("(b2) Zufallspfad mit wechselnder Schwankung (Regime)", () => {
-  it("auch hier höchstens 10 % Fehlalarme (20 Pfade), und die Verteilung der Endtest-Erwartung ist da", () => {
+  it("auch hier höchstens 10 % Fehlalarme (20 Pfade), und die Verteilung der Endtest-Erwartung ist da", { timeout: 180_000 }, () => {
     const runs = Array.from({ length: 20 }, (_, i) => runSearchSync(searchInput(market(4800, 7000 + i, { volCycle: true }), 7)));
     expect(runs.filter((r) => r.verdict.passed).length).toBeLessThanOrEqual(2);
     const r = runs[0]!;
@@ -232,6 +301,32 @@ describe("(c) kein Blick in die Zukunft", () => {
     }
   });
 
+  it("Verschiebe-Test auch mit Stop-Führung: Einstand und Nachziehen entscheiden am Schluss – andere Zukunft ab t ändert keinen Trade bis t", () => {
+    const t0 = 1200;
+    const future = market(600, 4711).map((b, i): Bar => ({ ...b, t: bars[t0]!.t + (i + 1) * 4 * 3600, o: bars[t0]!.c * (b.o / 30_000), h: bars[t0]!.c * (b.h / 30_000), l: bars[t0]!.c * (b.l / 30_000), c: bars[t0]!.c * (b.c / 30_000) }));
+    const other = [...bars.slice(0, t0 + 1), ...future];
+    const strat = ruleBuilder as unknown as LabStrategy<RuleFacts, unknown>;
+    let moved = 0;
+    for (const v of vs) {
+      for (const rule of ["be", "trail"] as const) {
+        const run = (series: Bar[]) => {
+          const hit = evalConds(series, condsOf(v));
+          const atr = atrSeries(series);
+          const prep = { interval: "4h" as const, bars: series, atr, start: 400, facts: { hit, side: v.side } };
+          const base = strat.build(prep, { targetR: v.targetR, stopAtr: v.stopAtr, maxBars: v.maxBars });
+          const manage = manageOf(rule, v)!;
+          const s = { start: base.start, signalAt: (i: number) => { const x = base.signalAt(i); return x ? { ...x, manage } : null; } };
+          return runBacktest(series, s, ENGINE, { from: 400, to: t0, equity: false, atr, secLen: 14_400 }).trades;
+        };
+        const a = run(bars);
+        moved += a.filter((t) => t.stopExit != null).length;
+        expect(run(other), `Variante ${v.id} ${rule}`).toEqual(a);
+      }
+    }
+    // die Führung hat wirklich gegriffen (sonst prüfte der Test nichts)
+    expect(moved).toBeGreaterThan(10);
+  });
+
   it("Befund im Labor-Engine: die Funding-Marke am Fensterrand liest die nächste Kerze – darum bekommt das Training nur seine eigenen Kerzen", () => {
     // 4h-Kerzen ab 00:00 UTC; Long auf Kerze 2, Fensterende nach Kerze 5 = genau 24:00, dort liegt eine Funding-Abrechnung (00:00 UTC)
     const mk = (lastClose: number): Bar[] => Array.from({ length: 7 }, (_, i) => ({ t: Date.UTC(2026, 0, 1) / 1000 + i * 14_400, o: 100, h: 101, l: 99, c: i === 6 ? lastClose : 100 }));
@@ -252,7 +347,10 @@ describe("(c) kein Blick in die Zukunft", () => {
     const wild = base.map((b, i): Bar => (i < cutIdx ? b : { ...b, o: b.o * (i % 2 ? 0.5 : 2), h: b.h * (i % 2 ? 0.55 : 2.2), l: b.l * (i % 2 ? 0.45 : 1.8), c: b.c * (i % 2 ? 0.5 : 2) }));
     const b = runSearchSync(searchInput(wild, 7));
     expect(b.winner!.variant.id).toBe(a.winner!.variant.id);
-    expect(b.rows.map((r) => [r.isN, r.isAvgR, r.isScore])).toEqual(a.rows.map((r) => [r.isN, r.isAvgR, r.isScore]));
+    expect(b.winner!.stop).toBe(a.winner!.stop);
+    expect(b.rows.map((r) => [r.isN, r.isAvgR, r.isScore, r.stop, r.isScores])).toEqual(a.rows.map((r) => [r.isN, r.isAvgR, r.isScore, r.stop, r.isScores]));
+    // auch die Trainingszahlen der drei Stop-Führungen des Siegers
+    expect(b.winner!.stops.lines.map((l) => [l.isN, l.isAvgR, l.isScore])).toEqual(a.winner!.stops.lines.map((l) => [l.isN, l.isAvgR, l.isScore]));
     expect(b.winner!.is).toEqual(a.winner!.is);
     expect(b.curves.is).toEqual(a.curves.is);
     // nur der Endtest hat sich geändert
@@ -260,16 +358,34 @@ describe("(c) kein Blick in die Zukunft", () => {
   });
 });
 
-describe("(d) alle 1.000 werden gerechnet, deterministisch", () => {
+describe("(d) alle 1.000 werden gerechnet (je dreimal), deterministisch", () => {
   const bars = market(2400, 55, { edge: { lookback: 20, hold: 4, drift: 1 } });
   const input = searchInput(bars, 7);
 
-  it("Zähler: 1.000 Trainingsläufe, 1.000 Endtest-Läufe (der Sieger genau einmal), 1.000 Zeilen mit eigenen Kurven", () => {
+  it("Zähler: 3.000 Trainingsläufe (1.000 × 3 Stop-Führungen), 1.002 Endtest-Läufe (der Sieger genau einmal, 2 Vergleiche), 1.000 Zeilen mit eigenen Kurven", () => {
     const r = runSearchSync(input);
     expect(r.counts.variants).toBe(1000);
-    expect(r.counts.isRuns).toBe(1000);
-    expect(r.counts.oosRuns).toBe(1000);
+    expect(r.counts.stopRules).toBe(3);
+    expect(r.counts.candidates).toBe(3000);
+    expect(r.counts.isRuns).toBe(3000);
+    expect(r.counts.oosRuns).toBe(1002);
+    expect(r.counts.compareRuns).toBe(2);
     expect(r.counts.winnerOosRuns).toBe(1);
+    expect(r.deflation!.trials).toBe(3000);
+    // jede Zeile: drei Zielgrößen (fest, Einstand, Nachziehen); die Zahlen der Zeile gehören zur besten (bei Gleichstand die einfachere)
+    for (const row of r.rows) {
+      expect(row.isScores).toHaveLength(3);
+      const ok = row.isScores.filter((x): x is number => x != null);
+      if (!ok.length) expect(row.isScore).toBeNull();
+      else {
+        expect(row.isScore).toBe(Math.max(...ok));
+        expect(row.stop).toBe(STOP_RULES[row.isScores.indexOf(Math.max(...ok))]);
+      }
+    }
+    // der Sieger ist der beste der 3.000 Kandidaten
+    const all = r.rows.flatMap((x) => x.isScores.filter((y): y is number => y != null));
+    expect(r.rows[r.winner!.variant.id]!.isScore).toBe(Math.max(...all));
+    expect(r.rows[r.winner!.variant.id]!.stop).toBe(r.winner!.stop);
     expect(r.rows).toHaveLength(1000);
     expect(new Set(r.rows.map((x) => x.id)).size).toBe(1000);
     expect(r.curves.is).toHaveLength(1000);
@@ -277,7 +393,7 @@ describe("(d) alle 1.000 werden gerechnet, deterministisch", () => {
     expect(r.curves.winner).toHaveLength(r.curves.grid.length);
     // jede Zeile trägt eine Endtest-Zahl, die nur der Rang-Lauf liefern kann (Trades oder 0 – nie "ungeprüft")
     expect(r.rows.every((x) => Number.isInteger(x.isN) && Number.isInteger(x.oosN))).toBe(true);
-    expect(r.counts.qualified).toBe(r.rows.filter((x) => x.isScore != null).length);
+    expect(r.counts.qualified).toBe(r.rows.reduce((a, x) => a + x.isScores.filter((y) => y != null).length, 0));
   });
 
   it("gleicher Seed → byte-genau gleiches Ergebnis; anderer Seed → andere Ziehung", () => {
@@ -318,7 +434,8 @@ describe("(d) alle 1.000 werden gerechnet, deterministisch", () => {
     const r = runSearchSync({ ...input, count: 40 });
     expect(r.counts.variants).toBe(40);
     expect(r.rows).toHaveLength(40);
-    expect(r.counts.isRuns).toBe(40);
+    expect(r.counts.isRuns).toBe(120);
+    expect(r.deflation?.trials ?? 120).toBe(120);
   });
 });
 

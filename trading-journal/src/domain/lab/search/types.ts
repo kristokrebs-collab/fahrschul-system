@@ -9,6 +9,15 @@ export type SearchInterval = "1h" | "4h" | "1d";
 
 export type SearchFamily = "trend" | "orb";
 
+/**
+ * Stop-Führung nach dem Einstieg – jede Variante läuft mit allen dreien (eine Regel je Lauf):
+ *   fixed  der Stop bleibt, wo er gesetzt wurde
+ *   be     ab +1 R (bester Kurs seit der Füllung) zieht der Stop auf den Einstand (Einstiegspreis)
+ *   trail  ab +1 R folgt der Stop dem besten Kurs im Abstand des Anfangs-Stops (Trend: k × ATR, Eröffnungs-Range: 1 R)
+ * Entschieden wird am Schluss einer Kerze, gültig ab der nächsten; der Stop wird nur enger, nie weiter.
+ */
+export type StopRule = "fixed" | "be" | "trail";
+
 /** Eine Parameter-Variante der Familie „Ausbruch mit Trendfilter“. */
 export interface SearchVariant {
   family: "trend";
@@ -86,6 +95,10 @@ export type SearchPhase = "prepare" | "score" | "seal" | "rank" | "done";
 export interface VariantRow {
   id: number;
   family: SearchFamily;
+  /** die Stop-Führung mit der besten Zielgröße dieser Variante im Training (bei Gleichstand die einfachere: fest vor Einstand vor Nachziehen) – die Zahlen der Zeile gehören zu ihr */
+  stop: StopRule;
+  /** Zielgröße je Stop-Führung in der Reihenfolge fest / Einstand / Nachziehen (`null` = nicht qualifiziert) – jede ist ein eigener Kandidat der Auswahl */
+  isScores: (number | null)[];
   /** Trainingsabschnitt (erste 80 %) */
   isN: number;
   isAvgR: number | null;
@@ -162,10 +175,88 @@ export interface Distribution {
 
 export interface WinnerInfo {
   variant: AnyVariant;
-  /** Klartext der Regeln */
+  /** die Stop-Führung des Siegers (im Training gewählt, zusammen mit der Variante) */
+  stop: StopRule;
+  /** Klartext der Regeln (mit Stop-Führung) */
   text: string;
   is: SectionStats;
   oos: SectionStats;
+  /** die drei Stop-Führungen derselben Einstiegsregeln im Training und im Endtest – Vergleich, keine Auswahl */
+  stops: StopCompare;
+  /** Rückgang und Spanne der Endtest-Trades (Neuziehung), `null` unter 2 Endtest-Trades */
+  risk: RiskInfo | null;
+}
+
+/** Eine Stop-Führung derselben Einstiegsregeln: Training (Teil der Auswahl) und Endtest (Vergleichslauf nach der Auswahl). */
+export interface StopLine {
+  rule: StopRule;
+  isN: number;
+  isAvgR: number | null;
+  isScore: number | null;
+  oosN: number;
+  oosAvgR: number | null;
+  oosSumR: number;
+}
+
+/**
+ * Die Stop-Führung des Siegers gegen eine andere im Endtest. Partner: „fest“, wenn der Sieger nachzieht; sonst die bessere der beiden
+ * anderen (im Endtest). Die Spanne der Differenz kommt aus einer Neuziehung beider Trade-Listen (gesetzt, `n` Ziehungen). „Besser“ gilt
+ * erst, wenn der Endtest allein die Differenz vom Zufall trennt (einseitig p ≤ 0,05; es wird genau EIN Paar verglichen) UND das Training in
+ * dieselbe Richtung zeigt; ausgesprochen wird es nur bei „bestanden“.
+ */
+export interface StopCompare {
+  rule: StopRule;
+  /** fest, Einstand, Nachziehen */
+  lines: StopLine[];
+  vs: StopRule;
+  /** gepaarte Einstiege (gleiche Einstiegskerze); 0 = ungepaart verglichen (zu wenige Paare) */
+  pairs: number;
+  /** Ø R je Trade im Endtest: Sieger − Partner (alle Trades beider Läufe) */
+  diffAvgR: number | null;
+  /** Summe R im Endtest: Sieger − Partner */
+  diffSumR: number | null;
+  /** 5 % / 95 % der neu gezogenen Differenz (Ø R; gepaart, wenn `pairs` > 0) */
+  lo: number | null;
+  hi: number | null;
+  /** einseitig: Anteil der Neuziehungen mit Differenz ≤ 0 */
+  p: number | null;
+  /** der Endtest trennt die Differenz vom Zufall und das Training zeigt in dieselbe Richtung */
+  edge: boolean;
+  /** nur nach „bestanden“: die Stop-Führung des Siegers wird als besser ausgewiesen */
+  declared: boolean;
+  /** Ziehungen der Neuziehung */
+  n: number;
+}
+
+/** Quantile 5 % / 50 % / 95 %. */
+export interface Q3 {
+  p5: number;
+  p50: number;
+  p95: number;
+}
+
+/**
+ * Rückgangs-Risiko aus den Endtest-Trades des Siegers – keine Prognose: die Trades werden `n`-mal mit Zurücklegen neu gezogen (gesetzt), in
+ * ihrer Anzahl; daraus die Spanne des größten Rückgangs und der Summe. In Prozent mit `riskPct` je Trade (Versuchsaufbau, mit Zinseszins).
+ */
+export interface RiskInfo {
+  /** Ziehungen */
+  n: number;
+  /** Endtest-Trades, aus denen gezogen wird */
+  trades: number;
+  riskPct: number;
+  /** tatsächlicher größter Rückgang im Endtest */
+  ddR: number;
+  ddPct: number;
+  /** größter Rückgang über die Ziehungen (p95 = schlechte Fälle) */
+  ddRq: Q3;
+  ddPctQ: Q3;
+  /** Summe R über die Ziehungen: p5 = ungünstiger, p95 = günstiger Fall */
+  sumRq: Q3;
+  /** Anteil der Ziehungen, deren Summe ≤ 0 ist */
+  pLoss: number;
+  /** Spanne der Summenkurve an den Endtest-Rasterpunkten (kumulierte R ab dem Schnitt, relativ 0): unten 5 %, Mitte 50 %, oben 95 % */
+  band: { lo: number[]; mid: number[]; hi: number[] };
 }
 
 export interface SearchCurves {
@@ -182,12 +273,28 @@ export interface SearchCounts {
   variants: number;
   /** davon je Familie */
   byFamily: Record<SearchFamily, number>;
-  /** wie oft die Engine für das Training lief (muss `variants` sein) */
+  /** Stop-Führungen je Variante (3) */
+  stopRules: number;
+  /** Kandidaten der Auswahl = Varianten × Stop-Führungen; so viele Versuche zählt die Mehrfachtest-Korrektur */
+  candidates: number;
+  /** wie oft im Training gerechnet wurde (muss `candidates` sein) */
   isRuns: number;
+  /** qualifizierte Kandidaten (genug Trades, Erwartung > 0) */
   qualified: number;
-  /** Endtest-Läufe insgesamt (der Sieger genau einmal, dazu die übrigen für die Verteilung) */
+  /** Endtest-Läufe insgesamt: der Sieger genau einmal, seine zwei anderen Stop-Führungen zum Vergleich, die übrigen Varianten (je mit ihrer Trainings-Stop-Führung) für die Verteilung */
   oosRuns: number;
   winnerOosRuns: number;
+  /** Vergleichsläufe der Stop-Führung im Endtest (2) */
+  compareRuns: number;
+}
+
+/** Kosten-Annahmen der Läufe in Worten (für die Zeile unter dem Ergebnis). */
+export interface CostInfo {
+  takerBps: number;
+  makerBps: number;
+  slippage: string;
+  /** Trend-Familie; die Eröffnungs-Range rechnet kein Funding */
+  funding: string;
 }
 
 /** Datenstand einer Familie. Bei ORB zählen `window` / `isBars` / `oosBars` Handelstage, sonst Kerzen. */
@@ -223,4 +330,5 @@ export interface SearchResult {
   /** Verteilung der Endtest-Erwartung (Ø R) aller bewertbaren Varianten – „die beste von 1.000 sieht zufällig gut aus“ */
   distribution: Distribution | null;
   curves: SearchCurves;
+  costs: CostInfo;
 }

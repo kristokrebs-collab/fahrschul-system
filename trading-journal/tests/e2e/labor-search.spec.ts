@@ -1,7 +1,8 @@
 /**
  * Labor · „1.000 Varianten. Eine bleibt.“ end to end against the market mock with REAL Binance BTCUSDT 4h bars (`boxes: true`, no network):
- * the search runs on the lab worker, the stage keeps its height (no layout shift), the replay ends in the result card, reduced motion jumps to
- * the end state, touch targets on the phone are ≥ 44 px, no horizontal scroll, axe in both themes. Trend family only (the mock serves no
+ * the search runs on the lab worker, the stage keeps its height (no layout shift), the Frost block counts real runs (1.000 variants × 3 stop rules),
+ * the replay ends in the result over the stage and the result card (stop management, drawdown risk, legal line), reduced motion jumps to the end
+ * state, touch targets on the phone are ≥ 44 px, no horizontal scroll, axe in both themes. Trend family only (the mock serves no
  * 5-minute history); the opening range has its unit and component tests.
  */
 import AxeBuilder from "@axe-core/playwright";
@@ -44,19 +45,31 @@ test.describe("Labor · Strategiesuche", () => {
     const errors = await open(page, info);
     await expect(page.getByTestId("search-stage-text")).toContainText("1.000 Kurven");
     const before = await box(page, "search-stage-box");
-    expect(before.height).toBeCloseTo(260, 1);
+    // the stage's size comes from its aspect ratio (16 : 7, on the phone 4 : 3,6) – reserved before anything is drawn
+    expect(before.height).toBeCloseTo(before.width / (info.project.name === "mobile" ? 4 / 3.6 : 16 / 7), 0);
     await page.getByTestId("search-start").click();
     // the result card is reserved but hidden until the replay ends
     await expect(page.getByTestId("search-section")).toHaveAttribute("data-status", "done", { timeout: 120_000 });
     const stage = page.getByTestId("search-stage");
     await expect(stage).toHaveAttribute("data-curves", "1000");
     await expect(page.getByTestId("search-counts")).toHaveAttribute("data-variants", "1000");
-    await expect(page.getByTestId("search-counts")).toHaveAttribute("data-is-runs", "1000");
+    await expect(page.getByTestId("search-counts")).toHaveAttribute("data-candidates", "3000");
+    await expect(page.getByTestId("search-counts")).toHaveAttribute("data-is-runs", "3000");
     expect((await box(page, "search-stage-box")).height).toBeCloseTo(before.height, 1);
     await skipIfPlaying(page);
     await expect(stage).toHaveAttribute("data-state", "done");
     await expect(page.getByTestId("search-result-wrap")).toHaveAttribute("data-ready", "true");
+    // the counters show the real stand: 1.000 compared, the winner's number; the result sits over the stage
+    await expect(page.getByTestId("search-stat-checked")).toHaveText("1.000");
+    await expect(page.getByTestId("search-stat-best")).toHaveText(/^#\d{4}$/);
+    await expect(page.getByTestId("search-overlay")).toHaveAttribute("data-in", "1");
+    await expect(page.getByTestId("search-caption")).toContainText("3.000 Trainingsläufe");
     await expect(page.getByTestId("search-verdict")).toHaveText(/Bestanden|Verworfen/);
+    // what follows from the final test: three stop rules, the drawdown risk from resampling (2.000), the legal line with the assumptions
+    await expect(page.getByTestId("search-stops").locator("tbody tr")).toHaveCount(3);
+    await expect(page.getByTestId("search-risk")).toBeVisible();
+    await expect(page.getByTestId("search-legal")).toContainText("keine Prognose");
+    await expect(page.getByTestId("search-legal")).toContainText("Slippage");
     await expect(page.getByTestId("search-reason")).not.toBeEmpty();
     // real Binance-shaped candles: no demo label
     await expect(page.getByTestId("search-demo")).toHaveCount(0);
@@ -78,6 +91,8 @@ test.describe("Labor · Strategiesuche", () => {
     await expect(page.getByTestId("search-stage")).toHaveAttribute("data-state", "done");
     await expect(page.getByTestId("search-result-wrap")).toHaveAttribute("data-ready", "true");
     await expect(page.getByTestId("search-skip")).toHaveCount(0);
+    await expect(page.getByTestId("search-overlay")).toHaveAttribute("data-in", "1");
+    await expect(page.getByTestId("search-stat-checked")).toHaveText("1.000");
   });
 
   test("Abbrechen beendet die Suche, nichts wird gespeichert", async ({ page }, info) => {
