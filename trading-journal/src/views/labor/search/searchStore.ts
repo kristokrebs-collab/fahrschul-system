@@ -6,7 +6,7 @@
  *
  * `startSearch()` loads the real candles – the Labor's loader for the trend family (`loadLabData`: cache first, closed bars only, fallbacks
  * named), 5-minute candles of Binance for the opening-range family (`orbSource.ts`, NO substitute data) – and runs the job on the lab worker
- * (`runSearch`). A `fixture` (tests, showroom) skips the network and is labelled as demo data.
+ * (`runSearch`). A `fixture` (tests, demo preview) skips the network and is labelled as demo data.
  */
 import { create } from "zustand";
 import { DEFAULT_FUNDING_RATE, estimatePages, feePreset, fundingModelOf, HIST_MS, isLabAbort, runSearch, type Bar, type EngineCfg, type HistInterval } from "@/domain/backtest/index";
@@ -48,7 +48,7 @@ export const DEFAULT_SEARCH_CFG: SearchCfg = { family: "both", interval: "4h", s
 export const ORB_DAYS = 60;
 export const ORB_WARMUP_DAYS = 2;
 
-/** Test / showroom data: candles handed in, no network. Always labelled as demo. */
+/** Test / demo-preview data: candles handed in, no network. Always labelled as demo. */
 export interface SearchFixture {
   trend?: { bars: readonly Bar[]; symbol: string; interval: SearchInterval };
   orb?: { bars: readonly Bar[]; symbol: string };
@@ -186,7 +186,7 @@ function finish(result: SearchResult, bars: Partial<Record<SearchFamily, readonl
 const IS_ABORT = (e: unknown): boolean => isLabAbort(e) || (e instanceof Error && e.name === "AbortError");
 
 /**
- * Runs a search. With a `fixture` (tests, showroom) the candles are handed in and labelled demo; otherwise the Labor's market and
+ * Runs a search. With a `fixture` (tests, demo preview) the candles are handed in and labelled demo; otherwise the Labor's market and
  * period are loaded. A newer start aborts an older run.
  */
 export async function startSearch(opts: { fixture?: SearchFixture; now?: number } = {}): Promise<void> {

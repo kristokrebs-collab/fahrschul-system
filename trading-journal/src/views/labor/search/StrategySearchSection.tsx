@@ -2,7 +2,7 @@
  * Labor · „1.000 Varianten. Eine bleibt.“: the real strategy search. Set-up (family, candle length, seed; market and period are the Versuchsaufbau's),
  * start / cancel, the running count in real numbers („412 von 1.000 geprüft“), the replay of the finished search on a canvas (the real curves, a scanner,
  * the best so far flashes mint, the others step back, the winner runs dashed into the final test), then the result card and the current candidate.
- * Own lazy chunk of `LaborView`. Works with real candles and with fixtures (`fixture` prop: tests, showroom – labelled as demo).
+ * Own lazy chunk of `LaborView`. Works with real candles and with fixtures (`fixture` prop: tests, demo preview – labelled as demo).
  * Reduced motion: end state at once; no loop; the stage height is reserved (no layout shift).
  */
 import { useMemo, useState } from "react";

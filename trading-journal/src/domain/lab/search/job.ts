@@ -505,7 +505,7 @@ export function createSearchJob(input: SearchJobInput): SearchJob {
   };
 }
 
-/** Bequem für Tests und Showroom: die ganze Suche in einem Rutsch. */
+/** Bequem für Tests und die Demo-Vorschau: die ganze Suche in einem Rutsch. */
 export function runSearchSync(input: SearchJobInput): SearchResult {
   return createSearchJob(input).result();
 }
