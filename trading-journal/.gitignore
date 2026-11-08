@@ -10,3 +10,4 @@ playwright-report
 test-results
 *.local
 *.tsbuildinfo
+test-results-audit

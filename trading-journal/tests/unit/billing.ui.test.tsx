@@ -258,6 +258,8 @@ describe("PreiseView", () => {
     expect(screen.queryByTestId("cta-pro")).toBeNull();
     expect(screen.getByTestId("note-pro")).toHaveTextContent("Noch nicht buchbar");
     for (const p of ["free", "pro", "premium", "team"]) expect(screen.queryByTestId(`cta-${p}`)).toBeNull();
+    // Launch-Audit D1: „Tarif im Detail“ opened a sheet that no host mounts without billing – a dead button on the Preise page of the plain build
+    for (const p of ["pro", "premium", "team"]) expect(screen.queryByTestId(`details-${p}`)).toBeNull();
   });
 
   it("the cards: the free card registers, a paid card leads to the order (signed out: noted for returnTo, registration opens) or to the detail", async () => {

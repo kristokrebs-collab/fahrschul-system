@@ -164,7 +164,10 @@ describe("Handelsplan · Zeitrahmen, Markt, Fehler", () => {
     renderPlan();
     await screen.findByTestId("hplan-stop");
     const input = screen.getByTestId("hplan-symbol-input");
+    // an empty field: the button does not pretend to do something (it used to be a silent no-op)
+    expect(screen.getByTestId("hplan-symbol-add")).toBeDisabled();
     fireEvent.change(input, { target: { value: "bt c!" } });
+    expect(screen.getByTestId("hplan-symbol-add")).toBeEnabled();
     fireEvent.click(screen.getByTestId("hplan-symbol-add"));
     expect(await screen.findByRole("alert")).toHaveTextContent("Ein Symbol besteht aus 3 bis 20 Buchstaben oder Ziffern");
     fireEvent.change(input, { target: { value: "ethusdt" } });
