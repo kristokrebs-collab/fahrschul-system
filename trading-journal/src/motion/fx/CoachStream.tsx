@@ -3,13 +3,12 @@ import { cn } from "@/lib/cn";
 import { createTimeline, splitChars, type Timeline } from "@/motion/pulse/textKit";
 import { CONFIG as TYPEWRITER } from "@/motion/pulse/Typewriter";
 import { TextShimmer } from "@/motion/TextShimmer";
-import { ThinkingOrb } from "@/motion/ThinkingOrb";
 import { useReducedFx } from "@/motion/useReducedFx";
 
 /**
  * CoachStream – a coach answer that types itself out while it streams in: `Typewriter` timing (65 ms per character,
  * hard cut-in, caret) on the shared rAF clock (`createTimeline`: pauses off-screen, lands on the right character on
- * return), plus a `TextShimmer` "Coach denkt …" with the voice ring (Runde 12) while `thinking` and nothing has arrived yet.
+ * return), plus a `TextShimmer` "Coach denkt …" while `thinking` and nothing has arrived yet.
  *
  * Streaming: when `text` grows (`text` starts with what is already typed) typing simply continues; any other change
  * restarts. Long answers never crawl: a chunk is typed in at most `maxCatchUp` ms (per-character time shrinks).
@@ -128,13 +127,7 @@ export function CoachStream({ text, thinking = false, thinkingLabel = COACH_STRE
           {CARET_CSS}
         </style>
       ) : null}
-      {waiting ? (
-        // the voice ring (Runde 12, mood `think`) beside the shimmering label: a short wait for the answer; the ring is decorative, the label says it
-        <span className="inline-flex items-center gap-2" data-testid="coach-thinking">
-          <ThinkingOrb variant="ring" mood="think" size={20} className="text-mute" />
-          <TextShimmer className="text-[13px]">{thinkingLabel}</TextShimmer>
-        </span>
-      ) : null}
+      {waiting ? <TextShimmer className="text-[13px]">{thinkingLabel}</TextShimmer> : null}
       <span className="sr-only">{text}</span>
       <span aria-hidden="true" className="whitespace-pre-wrap">
         <span ref={nodeRef} />

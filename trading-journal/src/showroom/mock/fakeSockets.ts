@@ -1,12 +1,11 @@
 /**
- * The Showroom's WebSocket replacement (Paket S): `window.WebSocket` is swapped for `ShowroomSocketFactory`, which hands out
- *   - a Supabase Realtime connection (answered by the mock project's Phoenix handler, `supabaseCore.realtime`),
- *   - a Binance combined-stream connection (generated frames, `marketCore.wsFrame`: mark price once a second, trades, the book top, candles),
- *   - and, for any other address, a socket that never opens and closes at once (no connection to a foreign host exists in the Showroom).
- * Only the part of the WebSocket interface the app and supabase-js use is implemented.
+ * The Showroom's WebSocket replacement (Paket S): `window.WebSocket` is swapped for a factory that hands out
+ *   - a Supabase Realtime connection (answered by the mock project's Phoenix handler, `supabaseCore.realtime`) – only the part of the
+ *     WebSocket interface supabase-js uses is implemented,
+ *   - and, for every other address (the Binance stream `fstream.binance.com` …), the browser's real WebSocket: market data is live, as in
+ *     the normal build.
  */
 import type { Backend } from "./backend";
-import { wsFrame } from "./marketCore";
 
 type Handler = ((ev: Event) => void) | null;
 
@@ -94,56 +93,16 @@ function supabaseSocket(backend: Backend) {
   };
 }
 
-/** Binance combined stream (`wss://fstream.binance.com/stream?streams=a/b/c`). */
-function marketSocket(backend: Backend) {
-  return class MarketSocket extends BaseSocket {
-    private n = 0;
-    constructor(url: string) {
-      super(url);
-      const streams = (new URL(url).searchParams.get("streams") ?? "").split("/").filter(Boolean);
-      const send = (match: (s: string) => boolean) => {
-        for (const s of streams) {
-          if (!match(s)) continue;
-          const f = wsFrame(s, backend.market, ++this.n);
-          if (f) this.emitMessage(JSON.stringify(f));
-        }
-      };
-      this.later(30, () => {
-        this.emitOpen();
-        send((s) => s.includes("@markPrice") || s.includes("@kline_") || s.includes("@bookTicker") || s.includes("@aggTrade"));
-      });
-      this.every(1000, () => send((s) => s.includes("@markPrice")));
-      this.every(650, () => send((s) => s.endsWith("@aggTrade")));
-      this.every(900, () => send((s) => s.endsWith("@bookTicker")));
-      this.every(4000, () => send((s) => s.includes("@kline_")));
-    }
-  };
-}
-
-/** A socket to a host that does not exist here: it never opens. */
-class DeadSocket extends BaseSocket {
-  constructor(url: string) {
-    super(url);
-    this.later(20, () => {
-      const ev = new Event("error");
-      this.onerror?.(ev);
-      this.dispatchEvent(ev);
-      this.emitClose(1006);
-    });
-  }
-}
-
 export function installSockets(backend: Backend): () => void {
   const Supabase = supabaseSocket(backend);
-  const Market = marketSocket(backend);
-  const Factory = function (this: unknown, url: string | URL) {
+  const original = window.WebSocket;
+  const Factory = function (this: unknown, url: string | URL, protocols?: string | string[]) {
     const u = new URL(String(url));
-    if (backend.isSupabaseHost(u.hostname) || u.pathname.includes("/realtime/")) return new Supabase(String(url));
-    if (u.hostname === "fstream.binance.com") return new Market(String(url));
-    return new DeadSocket(String(url));
+    if (backend.isSupabaseHost(u.hostname)) return new Supabase(String(url));
+    // market streams: the real socket
+    return protocols === undefined ? new original(url) : new original(url, protocols);
   } as unknown as typeof WebSocket;
   Object.assign(Factory, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
-  const original = window.WebSocket;
   Object.defineProperty(window, "WebSocket", { value: Factory, configurable: true, writable: true });
   return () => Object.defineProperty(window, "WebSocket", { value: original, configurable: true, writable: true });
 }

@@ -1,6 +1,6 @@
 /**
  * Showroom runtime state shared by the installer (`install.ts`) and the lazy UI (`ui/*`): the backend, the page the simulated "Stripe" is showing,
- * the panel's open flag. A light zustand store; nothing here touches the network.
+ * the panel's open flag (closed until the visitor opens it). A light zustand store; nothing here touches the network.
  */
 import { create } from "zustand";
 import type { Backend } from "./mock/backend";
@@ -20,11 +20,12 @@ export interface ShowroomState {
 
 const PANEL_KEY = "tj2-showroom-panel";
 
+/** The panel never opens by itself: only a click on its pill opens it (and the choice is remembered). */
 function readPanel(): boolean {
   try {
-    return localStorage.getItem(PANEL_KEY) !== "closed";
+    return localStorage.getItem(PANEL_KEY) === "open";
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -49,7 +50,7 @@ export function getBackend(): Backend {
 }
 export const hasBackend = (): boolean => backend !== null;
 
-/** Requests the page refused (a host the Showroom does not know) – the tests assert that nothing ever reached the real network. */
+/** Requests the page refused (a host of a mocked service the Showroom has no answer for) – the tests assert that no account, payment or AI host was reached. */
 export const netLog = { refused: [] as string[] };
 
 /** What the page was opened with (read once, before the app boots and its hosts remove the params): the Stripe return of the simulated payment page. */

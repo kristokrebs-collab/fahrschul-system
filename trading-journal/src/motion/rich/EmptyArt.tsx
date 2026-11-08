@@ -10,12 +10,12 @@ const RING = Array.from({ length: 12 }, (_, i) => {
 });
 
 /**
- * A small running picture for an empty state (rich pages, mounted lazily by `EmptyState`): a line that draws itself, a
- * dot with two small ones in orbit, or points that fly together into a ring. SVG + CSS keyframes (`rich.css`), transform and
+ * A small running picture for an empty state (rich pages, mounted lazily by `EmptyState`): a line that draws itself or points
+ * that fly together into a ring (the orbit is gone – `dots` is the static ∅ in `EmptyState`). SVG + CSS keyframes (`rich.css`), transform and
  * opacity only (the line draw is a stroke offset – a paint, no layout), slow cycles with a long rest, paused while off
  * screen or in a hidden tab. Decorative: `aria-hidden`; reduced motion never mounts this.
  */
-export default function EmptyArt({ kind }: { kind: EmptyArtKind }) {
+export default function EmptyArt({ kind }: { kind: Exclude<EmptyArtKind, "dots"> }) {
   const ref = useRef<SVGSVGElement>(null);
   useIdleGate(ref);
   return (
@@ -35,19 +35,6 @@ export default function EmptyArt({ kind }: { kind: EmptyArtKind }) {
           <path d="M3 37H61M3 37V4" className="rich-art__axis" />
           <path d="M5 31L16 22L26 26L38 11L48 17L59 5" pathLength={1} className="rich-art__line" />
           <circle cx="59" cy="5" r="2.4" className="rich-art__end" />
-        </>
-      )}
-      {kind === "orbit" && (
-        <>
-          <ellipse cx="32" cy="20" rx="26" ry="10" className="rich-art__axis" transform="rotate(-18 32 20)" />
-          <ellipse cx="32" cy="20" rx="17" ry="17" className="rich-art__axis" />
-          <circle cx="32" cy="20" r="3.2" className="rich-art__core" />
-          <g className="rich-art__spin rich-art__spin--a">
-            <circle cx="49" cy="20" r="2" className="rich-art__dot" />
-          </g>
-          <g className="rich-art__spin rich-art__spin--b">
-            <circle cx="6" cy="20" r="1.6" className="rich-art__dot" />
-          </g>
         </>
       )}
       {kind === "burst" &&

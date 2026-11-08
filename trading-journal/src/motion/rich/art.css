@@ -1,4 +1,4 @@
-/* motion-exception: rich-art – ambient, stroke offset of one line. Runde 10 – empty-state art: a line that draws itself, an orbit, points that gather into a ring. Loaded with the lazy
+/* motion-exception: rich-art – ambient, stroke offset of one line. Runde 10 – empty-state art: a line that draws itself, points that gather into a ring (the orbit is gone, Rücknahme R6). Loaded with the lazy
    `EmptyArt` chunk. Transform / opacity (and the stroke offset of the drawn line, a paint); slow cycles with a long rest;
    paused under [data-idle] (off screen / hidden tab); not animated under prefers-reduced-motion. */
 .rich-art {
@@ -28,21 +28,8 @@
   fill: var(--color-signal);
   animation: rich-end 6.5s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
-.rich-art__core {
-  fill: var(--color-signal);
-}
-.rich-art__dot,
 .rich-art__spark {
   fill: var(--color-fg);
-}
-.rich-art__spin {
-  transform-box: view-box;
-  transform-origin: 32px 20px;
-  animation: rich-spin 9s linear infinite;
-}
-.rich-art__spin--b {
-  animation-duration: 6s;
-  animation-direction: reverse;
 }
 .rich-art__spark {
   animation: rich-gather 7s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0s) infinite;
@@ -85,11 +72,6 @@
   100% {
     transform: scale(1);
     opacity: 0;
-  }
-}
-@keyframes rich-spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 @keyframes rich-gather {

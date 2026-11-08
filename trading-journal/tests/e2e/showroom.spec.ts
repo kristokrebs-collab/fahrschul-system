@@ -1,13 +1,16 @@
 /**
  * Showroom (Paket S) end to end – the SHOWROOM build (`npm run build:showroom`, served by `vite preview --outDir dist-showroom`; point the suite at it with
  * `PW_SHOWROOM_BASE_URL`, e.g. `PW_SHOWROOM_BASE_URL=http://127.0.0.1:4470 npx playwright test tests/e2e/showroom.spec.ts --project=mobile --project=desktop`).
- * Without that variable the whole file is skipped (the default and cloud builds have no showroom). Everything runs against the in-page mock backend:
- * no Supabase, Stripe, Binance or Anthropic is reached (asserted: not one request leaves the site), nothing is proven against a real service.
+ * Without that variable the whole file is skipped (the default and cloud builds have no showroom). Accounts, payment, coach and mail run against the
+ * in-page mock backend: no Supabase, Stripe or Anthropic host is reached (asserted), nothing is proven against a real service. Market data is NOT mocked
+ * (Rücknahme R5): Binance / Bybit go to the real network as in the normal build – what the market cards show depends on where the browser is (the
+ * sandbox gets 451 / 403), so this file asserts the card and its texts, never market numbers.
  *
- * Covered: the fixed banner (no control, the footer's legal links stay clear of it), the panel and a working jump for every entry (sign-in blade, registration →
- * simulated mail link → wizard, order window Premium yearly → the demo card page with its choreography → "Tarif aktiv", Markt with the flip chart and the
- * Wal-Karte, the coach's voice ring, the weekly close, the wizard, the share fan, the motion settings), the declined demo card, the payment error case, sign-in
- * with the demo access, password reset by the simulated link, axe (dark, panel + payment page), reduced motion, nothing wider than the screen.
+ * Covered: the fixed banner (no control, the footer's legal links stay clear of it), the panel (closed until its pill is clicked) and a working jump for every
+ * entry (sign-in, registration → simulated mail link → wizard, order window Premium yearly → the demo card page with its choreography → "Tarif aktiv", Markt ›
+ * Top-Trader-Karte with "Was ist ein Flip?", the coach's "Mit KI formulieren", the weekly close, the wizard, the share fan, the motion settings), the declined
+ * demo card, the payment error case, sign-in with the demo access, password reset by the simulated link, axe (dark, panel + payment page), reduced motion,
+ * nothing wider than the screen.
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
@@ -29,24 +32,33 @@ test.beforeEach(({ page }, info) => {
   test.skip(!PROJECTS.includes(info.project.name), "mobile + desktop");
 });
 
-/** Requests that leave the site (must stay empty). */
+/** Hosts of the services the Showroom mocks – a request to one of them must never leave the page. */
+const MOCKED_HOST = /(^|\.)(supabase\.co|supabase\.com|stripe\.com|anthropic\.com)$|^showroom\.invalid$/;
+/** Hosts of the real market data (Rücknahme R5: not mocked; what they answer depends on the browser's location). */
+const MARKET = /binance|bybit|okx|data-api\.binance\.vision/i;
+
+/** Requests to a mocked service that leave the site (must stay empty). Market data may go out – it is real. */
 function foreignRequests(page: Page): string[] {
   const out: string[] = [];
   page.on("request", (r) => {
     const u = new URL(r.url());
-    if (u.origin !== new URL(SHOWROOM ?? "http://127.0.0.1:4470").origin && u.protocol.startsWith("http")) out.push(r.url());
+    if (u.protocol.startsWith("http") && MOCKED_HOST.test(u.hostname)) out.push(r.url());
   });
   return out;
 }
 
-async function open(page: Page, opts: { path?: string; panel?: "open" | "closed" } = {}): Promise<void> {
+/** The app's own errors: without the browser's notes on the real market hosts (451 / 403 / CORS from a blocked region). */
+const appOnly = (errors: readonly string[]): string[] => errors.filter((e) => !MARKET.test(e));
+
+async function open(page: Page, opts: { path?: string; panel?: "open" | "closed" | "fresh" } = {}): Promise<void> {
+  const panel = opts.panel ?? "open";
   await page.addInitScript((panel) => {
     sessionStorage.setItem("tj2-intro", "1");
-    if (panel && !localStorage.getItem("tj2-showroom-panel")) localStorage.setItem("tj2-showroom-panel", panel);
-  }, opts.panel ?? "open");
+    if (panel !== "fresh" && !localStorage.getItem("tj2-showroom-panel")) localStorage.setItem("tj2-showroom-panel", panel);
+  }, panel);
   await page.goto(opts.path ?? "/");
   await expect(page.getByTestId("showroom-banner")).toBeVisible();
-  await expect(page.getByTestId(opts.panel === "closed" ? "sr-open" : "sr-panel")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId(panel === "open" ? "sr-panel" : "sr-open")).toBeVisible({ timeout: 30_000 });
 }
 
 /** Opens the panel again (a jump folds it away) and waits for the signed-in demo state when `signedIn`. */
@@ -67,10 +79,16 @@ async function waitSignedIn(page: Page): Promise<void> {
 test.describe("Showroom", () => {
   test.setTimeout(150_000);
 
-  test("Banner: fest, ohne Schließen-Knopf, Rechtstexte frei; kein Netz nach draußen; die Demo startet angemeldet", async ({ page }) => {
+  test("Banner: fest, ohne Schließen-Knopf, Rechtstexte frei; kein Konto-, Zahlungs- oder KI-Dienst erreicht; die Demo startet angemeldet; das Panel öffnet sich nicht von selbst", async ({ page }) => {
     const errors = collectErrors(page);
     const foreign = foreignRequests(page);
-    await open(page);
+    // a first visit: the panel "Neu in dieser Version" stays closed – only its pill is there (Rücknahme R5)
+    await open(page, { panel: "fresh" });
+    await expect(page.getByTestId("sr-panel")).toHaveCount(0);
+    await page.waitForTimeout(1500);
+    await expect(page.getByTestId("sr-panel")).toHaveCount(0);
+    await page.getByTestId("sr-open").click();
+    await expect(page.getByTestId("sr-panel")).toBeVisible();
     const bar = page.getByTestId("showroom-banner");
     await expect(bar).toHaveText("SHOWROOM · Demo-Daten · keine echten Konten oder Zahlungen");
     expect(await bar.evaluate((el) => getComputedStyle(el).position)).toBe("fixed");
@@ -104,7 +122,7 @@ test.describe("Showroom", () => {
     await expect(page.getByTestId("sr-open")).toBeVisible({ timeout: 30_000 });
     await expectNoHorizontalScroll(page);
     expect(foreign, foreign.join("\n")).toEqual([]);
-    expect(errors, errors.join("\n")).toEqual([]);
+    expect(appOnly(errors), errors.join("\n")).toEqual([]);
   });
 
   test("Neu-Panel: jeder Sprung führt zum Ziel (Markt · Coach · Berichte · Wizard · Teilen · Bewegung)", async ({ page }) => {
@@ -114,20 +132,20 @@ test.describe("Showroom", () => {
     await waitSignedIn(page);
     await expect(page.getByTestId("sr-panel").getByRole("button")).toHaveCount(11); // 9 jumps + close + reset
 
-    // Markt › Flip-Grafik: the Wal-Karte with data, the flip marker
+    // Markt › Top-Trader-Karte: the card with "Was ist ein Flip?" (text only – no chart and no marker of its own; the data is the real market's)
     await jump(page, "flip");
     const card = page.getByTestId("markt-trader-net");
     await expect(card).toBeVisible({ timeout: 30_000 });
-    await expect(card.getByText("Echte Daten")).toBeVisible({ timeout: 20_000 });
-    await expect(card.getByText(/Flip \d\d\.\d\d\./).first()).toBeVisible();
-    await expect(card.getByText(/netto Short/).first()).toBeVisible();
+    await expect(card.getByRole("heading", { name: "Was ist ein Flip?" })).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByTestId("flip-explainer-caption")).not.toBeEmpty({ timeout: 30_000 });
+    await expect(card.getByText("Echte Daten")).toHaveCount(0);
+    await expect(card.getByTestId("flip-explainer-chart")).toHaveCount(0);
 
-    // Coach › Voice-Ring: the question is asked and "Mit KI formulieren" is pressed – the ring thinks, then the demo wording lands
+    // Coach › Mit KI formulieren: the question is asked and "Mit KI formulieren" is pressed – "KI formuliert …", then the demo wording lands
     await jump(page, "voice");
     const ai = page.getByTestId("coach-ai").first();
     await expect(ai).toBeVisible({ timeout: 40_000 });
     await expect(ai.getByText("KI formuliert …")).toBeVisible({ timeout: 20_000 });
-    await expect(ai.locator("canvas, [data-testid=thinking-orb], svg").first()).toBeAttached();
     await expect(ai.getByText(/Demo-Formulierung des Showrooms/)).toBeVisible({ timeout: 30_000 });
 
     // Berichte › Wochenabschluss
@@ -148,10 +166,10 @@ test.describe("Showroom", () => {
     await expect(page.getByRole("dialog", { name: /Einrichtung|Willkommen|Los geht/i })).toBeVisible({ timeout: 20_000 });
     await expectNoHorizontalScroll(page);
     expect(foreign, foreign.join("\n")).toEqual([]);
-    expect(errors, errors.join("\n")).toEqual([]);
+    expect(appOnly(errors), errors.join("\n")).toEqual([]);
   });
 
-  test("Anmelden: die Klinge, Demo-Zugang, Abmelden und wieder Anmelden; Passwort-Reset über den simulierten Link", async ({ page }) => {
+  test("Anmelden: Demo-Zugang, Abmelden und wieder Anmelden; Passwort-Reset über den simulierten Link", async ({ page }) => {
     const errors = collectErrors(page);
     await open(page);
     await waitSignedIn(page);
@@ -186,7 +204,7 @@ test.describe("Showroom", () => {
     await expect(knob).toContainText("Demo · keine echte Mail");
     await page.getByTestId("sr-mail-open").click();
     await expect(page.getByRole("dialog").getByLabel(/Neues Passwort|Passwort/).first()).toBeVisible({ timeout: 30_000 });
-    expect(errors, errors.join("\n")).toEqual([]);
+    expect(appOnly(errors), errors.join("\n")).toEqual([]);
   });
 
   test("Registrieren: Mail-Schritt mit Demo-Knopf, simulierter Link, neues Konto landet im Einrichtungs-Wizard", async ({ page }) => {
@@ -223,10 +241,10 @@ test.describe("Showroom", () => {
     await expect(wizard).toContainText(email);
     await expect(wizard).toContainText("E-Mail bestätigt");
     expect(foreign, foreign.join("\n")).toEqual([]);
-    expect(errors, errors.join("\n")).toEqual([]);
+    expect(appOnly(errors), errors.join("\n")).toEqual([]);
   });
 
-  test("Bezahlen: Premium jährlich → Zahlungsbühne → Demo-Karte (live, Flip beim CVC) → Prüfung → Bezahlt (Demo) → Tarif aktiv", async ({ page }) => {
+  test("Bezahlen: Premium jährlich → Bestellung → Demo-Karte (live, Flip beim CVC) → Prüfung → Bezahlt (Demo) → Tarif aktiv", async ({ page }) => {
     const errors = collectErrors(page);
     const foreign = foreignRequests(page);
     await open(page);
@@ -234,10 +252,10 @@ test.describe("Showroom", () => {
     await jump(page, "order");
     const sheet = page.getByTestId("order-sheet");
     await expect(sheet).toBeVisible({ timeout: 40_000 });
-    await expect(page.getByTestId("order-steps")).toBeVisible();
+    // the order window of before Paket B (Rücknahme R2): no path band, no stage
+    await expect(page.getByTestId("order-steps")).toHaveCount(0);
     for (const box of await sheet.getByRole("checkbox").all()) await box.check();
     await page.getByTestId("order-pay").click();
-    await expect(page.getByTestId("pay-stage")).toBeVisible({ timeout: 20_000 });
 
     // the simulated hosted page: labelled as a demo, in the real purchase the card goes to Stripe
     const pay = page.getByTestId("demo-checkout");
@@ -270,7 +288,7 @@ test.describe("Showroom", () => {
     await expect(page.getByText("Dein Abo ist aktiv").first()).toBeVisible({ timeout: 40_000 });
     await expect(page.getByText("Demo: Tarif aktiv (simuliert)").first()).toBeVisible({ timeout: 20_000 });
     expect(foreign, foreign.join("\n")).toEqual([]);
-    expect(errors, errors.join("\n")).toEqual([]);
+    expect(appOnly(errors), errors.join("\n")).toEqual([]);
   });
 
   test("Bezahlen: die abgelehnte Demo-Karte (4000 0000 0000 0002) und der Fehlerfall nach der Prüfung", async ({ page }) => {

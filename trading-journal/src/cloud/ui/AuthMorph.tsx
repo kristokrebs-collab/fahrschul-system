@@ -59,12 +59,6 @@ export interface AuthMorphProps {
   dir: number;
   /** The body of the current view (`AuthSheet`'s `ViewBody`). */
   children: ReactNode;
-  /**
-   * What sits ABOVE the steps and may change its height with the view (Paket B: the brand strip, whose claim is one or two lines).
-   * It lives inside the height-following box: a height change outside it would reach the sheet's panel un-pinned and make the panel
-   * run its own FLIP on top of the card's spring – two animations on one edge (the card then overshoots under a slow frame).
-   */
-  lead?: ReactNode;
 }
 
 /**
@@ -134,7 +128,7 @@ function MorphHeight({ trigger, className, children }: { trigger: string; classN
 }
 
 /** The morphing card: one height-following box, the steps cross over inside it. */
-export function AuthMorph({ view, dir, children, lead }: AuthMorphProps) {
+export function AuthMorph({ view, dir, children }: AuthMorphProps) {
   const reduced = useReducedFx();
   const step = stepOf(view);
   const box = useRef<HTMLDivElement>(null);
@@ -157,7 +151,6 @@ export function AuthMorph({ view, dir, children, lead }: AuthMorphProps) {
 
   return (
     <MorphHeight trigger={view} className="-m-1 p-1">
-      {lead}
       <div ref={box} className="relative" data-auth-morph={step}>
         {/* variant LABELS (not objects): the sheet body's hidden → shown reaches this step's `StaggerItem`s, also for a step that mounts later */}
         <AnimatePresence initial={false} mode="popLayout" custom={dir}>

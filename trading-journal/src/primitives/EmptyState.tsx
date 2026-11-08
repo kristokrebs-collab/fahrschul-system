@@ -9,7 +9,7 @@ import { Quiet, useRichFx } from "@/motion/rich";
 import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { EMPTY_ART_FLOW_H, EMPTY_ART_H, EMPTY_ART_W, pickArt, type EmptyArtKind } from "@/primitives/emptyArt";
-import { EMPTY_GLYPH_FRAMES } from "@/primitives/emptyGlyph";
+import { EMPTY_GLYPH, EMPTY_GLYPH_FRAMES } from "@/primitives/emptyGlyph";
 
 /** Rich pages: the ∅ gives way to a small running picture (lazy chunk with its own CSS). */
 const EmptyArt = lazy(() => import("@/motion/rich/EmptyArt"));
@@ -22,7 +22,7 @@ export interface EmptyStateProps {
   line?: string | false;
   /** A chart card without data: on the rich pages a calm breathing line sits under the text (hidden elsewhere). */
   chart?: boolean;
-  /** Rich pages: the running picture – a line that draws itself, an orbit, points that gather. Default: one of the three, picked from the title. */
+  /** Rich pages: the picture – a line that draws itself, the static dot ∅ (`dots`), points that gather. Default: one of the three, picked from the title. */
   art?: EmptyArtKind;
   className?: string;
 }
@@ -68,6 +68,7 @@ export function EmptyState({ title, text, action, line = EMPTY_LINE, chart, art,
   const ants = useRef<HTMLSpanElement>(null);
   const cta = useRef<HTMLSpanElement>(null);
   const hasAction = Boolean(action);
+  const kind = art ?? pickArt(typeof title === "string" ? title : "");
 
   useEffect(() => {
     const el = root.current;
@@ -92,12 +93,17 @@ export function EmptyState({ title, text, action, line = EMPTY_LINE, chart, art,
           // height was reserved for the glyph does not grow when the page turns rich
           <div className="relative mb-1.5 text-mute" style={{ width: EMPTY_ART_W, height: EMPTY_ART_FLOW_H }}>
             {/* the box is reserved from the first paint: the chunk arrives into it, nothing moves */}
-            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2" style={{ height: EMPTY_ART_H }} data-empty-art-box="">
-              <Quiet>
-                <Suspense fallback={null}>
-                  <EmptyArt kind={art ?? pickArt(typeof title === "string" ? title : "")} />
-                </Suspense>
-              </Quiet>
+            <div className="absolute inset-x-0 top-1/2 grid -translate-y-1/2 place-items-center" style={{ height: EMPTY_ART_H }} data-empty-art-box="">
+              {kind === "dots" ? (
+                // the static dot symbol of the plain empty state: the ∅, one frame, no running picture
+                <DotMatrix pattern={EMPTY_GLYPH} playing={false} size={3} gap={2} tone="fg" />
+              ) : (
+                <Quiet>
+                  <Suspense fallback={null}>
+                    <EmptyArt kind={kind} />
+                  </Suspense>
+                </Quiet>
+              )}
             </div>
           </div>
         ) : (

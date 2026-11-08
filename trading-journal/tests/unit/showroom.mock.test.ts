@@ -1,7 +1,7 @@
 /**
  * Showroom (Paket S): the transport-free mock handlers the e2e mocks and the in-app interceptor share – Supabase (auth, mail box, PKCE exchange, rows),
- * billing (checkout → hosted page → webhook result, per account), the generated Binance data (flip inside the last 14 days), the demo journal, the
- * backend's routing (unknown hosts are nobody's) and the fixed banner. Pure functions and jsdom, no network.
+ * billing (checkout → hosted page → webhook result, per account), the demo journal, the backend's routing (market data and unknown hosts are
+ * nobody's – market data goes to the real network) and the fixed banner. Pure functions and jsdom, no network.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BANNER_ID, BANNER_TEXT, mountBanner } from "@/showroom/banner";
@@ -10,9 +10,7 @@ import { createBackend, COACH_DELAY_MS, DEMO_ACCOUNT } from "@/showroom/mock/bac
 import { createBillingCore } from "@/showroom/mock/billingCore";
 import { buildDemoJournal } from "@/showroom/mock/demoJournal";
 import type { MockReq } from "@/showroom/mock/http";
-import { binanceRest, bybitRest, wsFrame } from "@/showroom/mock/marketCore";
 import { claimsOf, createSupabaseCore } from "@/showroom/mock/supabaseCore";
-import { ratioLongPct } from "@/showroom/mock/synth";
 
 const req = (method: string, url: string, body: Record<string, unknown> = {}, headers: Record<string, string> = {}): MockReq => ({ method, url: new URL(url), headers, body });
 const bearer = (t: string) => ({ authorization: `Bearer ${t}` });
@@ -176,51 +174,6 @@ describe("billing core", () => {
   });
 });
 
-describe("market fixtures", () => {
-  const now = Date.UTC(2026, 10, 8, 12, 0);
-  const ctx = { now: () => now, anchor: now - 60_000 };
-  const rows = (path: string) => JSON.parse(binanceRest(new URL(`https://fapi.binance.com${path}`), ctx)!.body!) as Array<Record<string, string>>;
-
-  it("serves klines for every interval and the same data through the same-origin proxy path", () => {
-    for (const iv of ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]) {
-      const k = JSON.parse(binanceRest(new URL(`https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=${iv}&limit=50`), ctx)!.body!) as unknown[][];
-      expect(k.length, iv).toBeGreaterThan(5);
-    }
-    const viaProxy = binanceRest(new URL("https://site.test/api/binance/fapi/v1/time"), ctx)!;
-    expect(JSON.parse(viaProxy.body!)).toEqual({ serverTime: now });
-    expect(binanceRest(new URL("https://fapi.binance.com/nothing"), ctx)).toBeNull();
-    expect(binanceRest(new URL("https://fapi.binance.com/fapi/v1/klines?interval=7m"), ctx)!.status).toBe(400);
-  });
-
-  it("the top-trader POSITION series flipped from net long to net short inside the last 14 days; the account series slides", () => {
-    const pos = rows("/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=1h&limit=500");
-    expect(pos).toHaveLength(500);
-    const long = pos.map((r) => Number(r.longAccount));
-    const newest = long.at(-1)!;
-    expect(newest).toBeLessThan(0.5); // net short now
-    // the last sign change (long > 50 % → short < 50 %) lies within 14 days (336 hourly points)
-    let flipAt = -1;
-    for (let i = long.length - 1; i > 0; i--) if (long[i]! < 0.5 && long[i - 1]! >= 0.5) { flipAt = i; break; }
-    expect(flipAt).toBeGreaterThan(0);
-    expect(long.length - 1 - flipAt).toBeLessThanOrEqual(336);
-    expect(long.length - 1 - flipAt).toBeGreaterThan(10);
-    expect(long[0]!).toBeGreaterThan(0.5); // net long before
-    const acc = rows("/futures/data/topLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=500").map((r) => Number(r.longAccount));
-    expect(acc.at(-1)!).toBeLessThan(acc[0]! - 0.05);
-    expect(ratioLongPct("top-position", 0, "slide-account")).toBeLessThan(50);
-  });
-
-  it("every other endpoint the app reads answers, Bybit has its klines, the stream frames carry a live price", () => {
-    for (const p of ["/fapi/v1/premiumIndex?symbol=BTCUSDT", "/fapi/v1/ticker/24hr?symbol=BTCUSDT", "/fapi/v1/openInterest?symbol=BTCUSDT", "/fapi/v1/fundingRate?symbol=BTCUSDT&limit=20", "/fapi/v1/depth?symbol=BTCUSDT&limit=50", "/futures/data/openInterestHist?symbol=BTCUSDT&period=1h&limit=30", "/futures/data/takerlongshortRatio?symbol=BTCUSDT&period=1h&limit=30", "/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=30"]) {
-      expect(binanceRest(new URL(`https://fapi.binance.com${p}`), ctx)!.status, p).toBe(200);
-    }
-    expect(bybitRest(new URL("https://api.bybit.com/v5/market/kline?interval=60&limit=20"), ctx).status).toBe(200);
-    const f = wsFrame("btcusdt@markPrice@1s", ctx, 1)!.data as { p: string };
-    expect(Number(f.p)).toBeGreaterThan(80_000);
-    expect(wsFrame("btcusdt@kline_1h", ctx, 1)).not.toBeNull();
-    expect(wsFrame("btcusdt@whatever", ctx, 1)).toBeNull();
-  });
-});
 
 describe("demo journal", () => {
   const now = new Date(2026, 10, 8, 14, 30).getTime(); // a Sunday afternoon
@@ -245,15 +198,45 @@ describe("demo journal", () => {
     // the current week (Mon 2026-11-02 …) has trades
     expect(a.trades.filter((t) => String(t.date) >= "2026-11-02").length).toBeGreaterThanOrEqual(3);
   });
+
+  it("Rücknahme R7: the results scatter like a real journal – no smooth rise (win rate under ⅔, a drawdown, frequent sign changes, uneven steps)", () => {
+    for (const day of [now, now - 3 * 86_400_000, now + 9 * 86_400_000]) {
+      const pnl = buildDemoJournal(day).trades.map((t) => Number(t.pnl));
+      const wins = pnl.filter((p) => p > 0).length / pnl.length;
+      expect(wins).toBeGreaterThan(0.3);
+      expect(wins).toBeLessThan(0.66);
+      let eq = 0;
+      let peak = 0;
+      let drawdown = 0;
+      let turns = 0;
+      for (let i = 0; i < pnl.length; i++) {
+        eq += pnl[i]!;
+        peak = Math.max(peak, eq);
+        drawdown = Math.max(drawdown, peak - eq);
+        if (i > 0 && Math.sign(pnl[i]!) !== Math.sign(pnl[i - 1]!)) turns++;
+      }
+      // the equity line falls back noticeably at least once and changes direction often
+      expect(drawdown).toBeGreaterThan(150);
+      expect(turns / (pnl.length - 1)).toBeGreaterThan(0.3);
+      // uneven steps: the biggest win is several times the typical one
+      const winsAbs = pnl.filter((p) => p > 0).sort((x, y) => x - y);
+      expect(winsAbs.at(-1)! / winsAbs[Math.floor(winsAbs.length / 2)]!).toBeGreaterThan(2);
+    }
+  });
 });
 
 describe("backend routing", () => {
   const mk = () => createBackend({ selfHost: "site.test", anchor: Date.now(), journal: null });
 
-  it("answers the project, the functions and the market – and is nobody for a host it does not know", async () => {
+  it("answers the project and the functions – and leaves market data (and every host it does not know) to the interceptor", async () => {
     const b = mk();
     expect(b.route(req("POST", `${SB}/auth/v1/token?grant_type=password`, { email: DEMO_ACCOUNT.email, password: DEMO_ACCOUNT.password }))).toMatchObject({ status: 200 });
-    expect(b.route(req("GET", "https://fapi.binance.com/fapi/v1/time"))).toMatchObject({ status: 200 });
+    // Rücknahme R5: no generated market – Binance, Bybit and the site's relays are the real network's
+    expect(b.route(req("GET", "https://fapi.binance.com/fapi/v1/time"))).toBeNull();
+    expect(b.route(req("GET", "https://api.bybit.com/v5/market/kline?interval=60&limit=20"))).toBeNull();
+    expect(b.route(req("GET", "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1h"))).toBeNull();
+    expect(b.route(req("GET", "https://site.test/api/binance/fapi/v1/time"))).toBeNull();
+    expect(b.route(req("GET", "https://site.test/api/v1/klines?interval=1h"))).toBeNull();
     expect(b.route(req("GET", "https://site.test/api/v1/billing/status"))).toMatchObject({ status: 200 });
     expect(b.route(req("GET", "https://site.test/api/v1/nothing-here"))).toMatchObject({ status: 401 }); // the functions' own 404 / 401 – never the network
     expect(b.route(req("GET", "https://api.stripe.com/v1/charges"))).toBeNull();

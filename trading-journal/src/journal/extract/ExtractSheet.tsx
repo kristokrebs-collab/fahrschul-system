@@ -214,8 +214,7 @@ export default function ExtractSheet() {
         {busy && (
           <StaggerItem>
             <p role="status" aria-live="polite" className="flex items-center gap-3 rounded-xl border border-line bg-ink-950/40 px-3.5 py-3 text-[13px] text-mute" data-testid="extract-busy">
-              {/* the voice ring (Runde 12): preparing the images moves visibly (`active`), reading waits for the service (`think`) */}
-              <ThinkingOrb variant="ring" mood={phase.name === "preparing" ? "active" : "think"} size={24} className="text-mute" />
+              <ThinkingOrb variant={phase.name === "preparing" ? "calc" : "plan"} size={20} className="text-mute" />
               {phase.name === "preparing" ? S.preparing : S.reading}
             </p>
             <Button

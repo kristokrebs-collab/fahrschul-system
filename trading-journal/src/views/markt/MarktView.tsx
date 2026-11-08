@@ -212,9 +212,9 @@ export function MarktView({ className }: { className?: string }) {
             <SectionTitle id={ids.context} section="context" title="Einordnung" sub="Wie die größten Konten positioniert sind, Squeeze, Preis- und RSI-Struktur und ähnliche Situationen – Beobachtungen aus Börsen-Statistik, Kerzen und Archiv, keine Signale." className="lg:col-span-12" />
             {/* the big card sits first: it is the picture of who is positioned how, right under the chart of „Jetzt“ and before the
                 folded rows (Squeeze reads the same positioning from the archive) */}
-            {/* reserve = the card plus the "Was ist ein Flip?" panel on top of it (Paket W, `flipExplainerReserve.ts`): 1390 / 977 / 975 + 1300 / 1002 / 682 + gap */}
+            {/* reserve = the card plus the "Was ist ein Flip?" panel on top of it (Paket W, text only since the Rücknahme R4; `flipExplainerReserve.ts`): measured 2039 / 1437 / 1398 px at 390 / 820 / 1440 */}
             <Cell index={2} span="lg:col-span-12">
-              <Suspense fallback={<PendingCard title={NETCARD.title} testId="markt-trader-net-loading" height={{ base: 2702, sm: 1991, lg: 1669 }} />}>
+              <Suspense fallback={<PendingCard title={NETCARD.title} testId="markt-trader-net-loading" height={{ base: 2039, sm: 1437, lg: 1398 }} />}>
                 <TraderNetCard />
               </Suspense>
             </Cell>

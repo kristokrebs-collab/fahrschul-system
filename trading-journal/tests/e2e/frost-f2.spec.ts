@@ -302,24 +302,23 @@ test.describe("Paket F2: Frost – drei Elemente mit echter Funktion", () => {
   });
 
   /* ------------------------------------------------------------------------------------------------ C */
-  test("C · Frag dein Journal: Punkt → Leiste → Schimmer → drei Karten mit echten Zahlen; Unverstandenes wird nicht geraten", async ({ page }, info) => {
+  test("C · Frag dein Journal: offene Leiste → Schimmer → drei Karten mit echten Zahlen; Unverstandenes wird nicht geraten", async ({ page }, info) => {
     const errors = collectErrors(page);
     await open(page, WED);
     const ask = page.getByTestId("ask-journal");
     await scrollUntilVisible(page, ask);
     await expect(ask).toHaveAttribute("data-phase", "idle", { timeout: 20_000 });
-    // collapsed: a dot with three example questions
-    await expect(ask.getByTestId("ask-bar")).not.toHaveAttribute("data-open", "");
+    // Rücknahme R3: the bar stands open with three example questions – no lone dot in an empty card, no loader while idle
+    await expect(ask.getByTestId("ask-bar")).toHaveAttribute("data-open", "");
+    await expect(ask.getByTestId("ask-open")).toHaveCount(0);
     await expect(ask.getByTestId("ask-example")).toHaveCount(3);
-    const dot = await box(ask.getByTestId("ask-open"));
-    expect(Math.min(dot.width, dot.height)).toBeGreaterThanOrEqual(43.5);
+    await expect(ask.getByTestId("ask-seek")).toBeHidden();
+    const send = await box(ask.getByTestId("ask-send"));
+    expect(Math.min(send.width, send.height)).toBeGreaterThanOrEqual(43.5);
     const idleHeight = (await box(ask)).height;
     await shot(ask, info, "c-frag-dein-journal-ruhe");
 
-    // the dot grows into the bar and takes focus
-    await ask.getByTestId("ask-open").click();
-    await expect(ask.getByTestId("ask-bar")).toHaveAttribute("data-open", "");
-    await expect(ask.getByTestId("ask-input")).toBeFocused();
+    await ask.getByTestId("ask-input").click();
     await ask.getByTestId("ask-input").pressSequentially("Trades ohne Stopp", { delay: 15 });
     await ask.getByTestId("ask-input").press("Enter");
     // the shimmer names the real count, then three cards
@@ -338,8 +337,8 @@ test.describe("Paket F2: Frost – drei Elemente mit echter Funktion", () => {
     else for (let i = 1; i < 3; i++) expect(boxes[i]!.x).toBeGreaterThan(boxes[i - 1]!.x + boxes[i - 1]!.width - 2);
     await expectNoHorizontalScroll(page);
     await shot(ask, info, "c-frag-dein-journal-antwort");
-    // the card grew by the answer, not by a surprise: the reserved stage holds the answer's size (a few px at most for a longer sentence)
-    expect((await box(ask)).height - idleHeight).toBeLessThan(260);
+    // no reserved empty stage any more: the card grows by the answer the person asked for (a user action, not a layout shift)
+    expect((await box(ask)).height).toBeGreaterThan(idleHeight);
 
     // the trades behind it – one tap opens the trade
     await ask.getByTestId("ask-trades-toggle").click();
@@ -380,7 +379,6 @@ test.describe("Paket F2: Frost – drei Elemente mit echter Funktion", () => {
     });
     const ask = page.getByTestId("ask-journal");
     await scrollUntilVisible(page, ask);
-    await ask.getByTestId("ask-open").click();
     await page.context().setOffline(true);
     const before = requests.length;
     await ask.getByTestId("ask-input").fill("Beste Wochentage");
@@ -408,7 +406,6 @@ test.describe("Paket F2: Frost – drei Elemente mit echter Funktion", () => {
       await scrollUntilVisible(page, ask);
       await expect(ask).toHaveAttribute("data-phase", "idle", { timeout: 20_000 });
       await accessible(page, '[data-testid="ask-journal"]', `Frag dein Journal, Ruhe (${theme ?? "dark"})`);
-      await ask.getByTestId("ask-open").click();
       await ask.getByTestId("ask-input").fill("Verluste letzten Monat");
       await ask.getByTestId("ask-input").press("Enter");
       await expect(ask).toHaveAttribute("data-phase", "done", { timeout: 5000 });

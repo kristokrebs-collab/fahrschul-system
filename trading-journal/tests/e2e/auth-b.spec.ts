@@ -1,8 +1,9 @@
 /**
- * Paket B end to end (cloud edition against the Supabase mock and the billing / (FAKE) Stripe mock): Premium · jährlich chosen
- * signed out → registration shows the choice → the "mail sent" step is neutral → the confirmation link opens a NEW tab (empty
- * sessionStorage) and the sign-in there lands on exactly this order; "Ohne Kauf weiter" drops it; the blade between Anmelden ↔
- * Registrieren (and none under reduced motion); offline said before anything is sent; the setup wizard once after a registration.
+ * Paket B end to end (cloud edition against the Supabase mock and the billing / (FAKE) Stripe mock), as it stands after the Rücknahme R1
+ * (the sheet looks and moves as before Paket B: no brand strip, no blade, no order card): Premium · jährlich chosen signed out → the
+ * "mail sent" step is neutral → the confirmation link opens a NEW tab (empty sessionStorage) and the sign-in there lands on exactly this
+ * order; "Kostenlos starten" drops an earlier choice; Anmelden ↔ Registrieren switch at once; offline said before anything is sent; the
+ * setup wizard once after a registration.
  *
  * It proves the browser flow, NOT a delivered mail, a real Stripe account or a webhook (docs/BETREIBER-AUFGABEN.md: what the
  * operator must supply). `PW_PREISE_URL` overrides the cloud URL like in `preise.spec.ts`.
@@ -48,7 +49,7 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
     test.skip(!PROJECTS.includes(info.project.name), "Paket B runs on mobile + desktop");
   });
 
-  test("Premium · jährlich → Registrierung zeigt die Auswahl → Mail-Schritt neutral → Bestätigungslink im NEUEN Tab → genau diese Bestellung", async ({ page, context }) => {
+  test("Premium · jährlich → Registrierung → Mail-Schritt neutral → Bestätigungslink im NEUEN Tab → genau diese Bestellung", async ({ page, context }) => {
     const { errors } = await setup(page, { signupConfirm: true });
     // AUTH-06: the sign-up request carries the choice in the link of the mail (redirect_to) – plan.interval.seats, never a price
     const signupUrls: string[] = [];
@@ -61,12 +62,11 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
     await cta.scrollIntoViewIfNeeded();
     await expect(cta).toHaveText("Premium auswählen");
     await cta.click();
-    // the registration shows the choice (and the amount due) and the way out
+    // the registration: the sheet of before Paket B (no order card in it) – the choice is noted for the way back
     const sheet = await register(page);
-    await expect(page.getByTestId("auth-order")).toHaveAttribute("data-plan", "premium");
-    await expect(page.getByTestId("auth-order-line")).toHaveText("Premium · jährlich · 240 € pro Jahr");
+    await expect(page.getByTestId("auth-order")).toHaveCount(0);
     expect(await page.evaluate(() => localStorage.getItem("tj2-return-to-order"))).toContain("premium.year.1");
-    // the mail step: neutral (no "account exists"), resend waits, the limit is said up front, the way to the login is there
+    // the mail step: neutral (no "account exists"), resend waits
     await expect(page.getByRole("dialog", { name: "Schau in dein Postfach" })).toBeVisible({ timeout: 20_000 });
     const text = page.getByTestId("auth-sent-text");
     await expect(text).toContainText(EMAIL);
@@ -78,8 +78,6 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
     expect(redirect).toMatch(/\/\?order=premium\.year\.1$/);
     expect(redirect).not.toMatch(/price|cent|amount/i);
     await expect(page.getByTestId("auth-resend")).toBeDisabled();
-    await expect(page.getByTestId("auth-limit-hint")).toContainText("erst nach einer Minute");
-    await expect(page.getByTestId("auth-order")).toBeVisible(); // still shown on the mail step
     await expectNoHorizontalScroll(page);
     void sheet;
 
@@ -106,12 +104,10 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
     await page.getByTestId("cta-team").click();
     const sheet = page.getByRole("dialog", { name: "Konto erstellen" });
     await expectNotInert(sheet.getByLabel("E-Mail"));
-    await expect(page.getByTestId("auth-order-line")).toHaveText("Team · jährlich · 2 Sitze · 380 € pro Jahr");
-    // an existing account: the blade leads over to the login with the choice kept
-    await sheet.getByRole("button", { name: "Schon registriert? Zur Anmeldung" }).click();
+    // an existing account: the mode switch leads over to the login, the choice stays noted
+    await sheet.getByRole("radio", { name: "Passwort", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Anmelden" })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId("auth-order")).toHaveAttribute("data-plan", "team");
-    await expect(page.getByRole("dialog").getByLabel("E-Mail")).toBeFocused();
+    expect(await page.evaluate(() => localStorage.getItem("tj2-return-to-order"))).toContain("team.year.2");
     await signInViaSheet(page, { fromPill: false, email: EMAIL, password: PASSWORD, expectNext: true, synced: true });
     const order = page.getByTestId("order-sheet");
     await expect(order).toBeVisible({ timeout: 30_000 });
@@ -154,68 +150,36 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
     await expect(page.getByTestId("order-sheet")).toHaveCount(0);
   });
 
-  test("„Ohne Kauf weiter“: die Auswahl ist weg, das Journal bleibt frei nutzbar, die spätere Anmeldung öffnet keine Bestellung", async ({ page }) => {
-    await setup(page, { users: [{ email: EMAIL, password: PASSWORD }] });
-    await openRoute(page, PREISE, "Preise", { timeout: 30_000 });
-    await page.getByTestId("cta-pro").click();
-    await expect(page.getByTestId("auth-order")).toBeVisible({ timeout: 20_000 });
-    await page.getByTestId("auth-order-skip").click();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    expect(await page.evaluate(() => localStorage.getItem("tj2-return-to-order"))).toBeNull();
-    // free area still works; a later login brings no order
-    await signInViaSheet(page, { email: EMAIL, password: PASSWORD, synced: true });
-    await page.waitForTimeout(800);
-    await expect(page.getByTestId("order-sheet")).toHaveCount(0);
-  });
-
-  test("„Kostenlos starten“ zeigt keine Bestellung – auch nicht die einer früher abgebrochenen Auswahl", async ({ page }) => {
+  test("„Kostenlos starten“ trägt keine Bestellung – auch nicht die einer früher abgebrochenen Auswahl", async ({ page }) => {
     await setup(page);
     await openRoute(page, PREISE, "Preise", { timeout: 30_000 });
     await page.getByTestId("cta-premium").click();
-    await expect(page.getByTestId("auth-order")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("dialog", { name: "Konto erstellen" })).toBeVisible({ timeout: 20_000 });
+    expect(await page.evaluate(() => localStorage.getItem("tj2-return-to-order"))).toContain("premium.year.1");
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await page.getByTestId("cta-free").scrollIntoViewIfNeeded();
     await page.getByTestId("cta-free").click();
     await expect(page.getByRole("dialog", { name: "Konto erstellen" })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId("auth-order")).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem("tj2-return-to-order"))).toBeNull();
   });
 
-  test("Klinge: Anmelden ↔ Registrieren – ein Band, Inhalt wechselt dahinter, Fokus im ersten Feld, kein Layoutsprung der Seite", async ({ page }) => {
+  test("Anmelden ↔ Registrieren wie vor Paket B: kein Markenstreifen, kein Band, der Wechsel ist sofort da, nichts bleibt unsichtbar", async ({ page }) => {
     await setup(page);
     await openRoute(page, KONTO, "Konto", { timeout: 30_000 });
     await page.locator('[data-cloud-pill="signin"]').click();
     const sheet = page.getByRole("dialog", { name: "Anmelden" });
     await expectNotInert(sheet.getByLabel("E-Mail"));
-    await expect(page.getByTestId("auth-brand")).toContainText("TRADE JOURNAL");
-    await expect(page.getByTestId("auth-brand-claim")).toHaveText("Willkommen zurück.");
-    // a second sheet frame later (the open morph has settled) the switch starts the blade
+    await expect(page.getByTestId("auth-brand")).toHaveCount(0);
+    await expect(sheet.getByRole("button", { name: "Neu hier? Jetzt registrieren" })).toHaveCount(0);
     await page.waitForTimeout(500);
-    await sheet.getByRole("button", { name: "Neu hier? Jetzt registrieren" }).click();
-    await expect(page.getByTestId("auth-blade")).toBeAttached();
-    // the content changes behind the band, not before it
+    await sheet.getByRole("radio", { name: "Neu hier" }).click();
     await expect(page.getByRole("dialog", { name: "Konto erstellen" })).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByTestId("auth-brand-claim")).toHaveText("Dein Journal. Dein Start.");
-    await expect(page.getByTestId("auth-blade")).toHaveCount(0, { timeout: 5_000 });
-    await expect(page.getByRole("dialog").getByLabel("E-Mail")).toBeFocused();
-    // the band only moves (transform) and never blocks the page: while it runs a click goes through to the card
-    await expectNoHorizontalScroll(page);
-    await page.getByRole("dialog").getByRole("button", { name: "Schon registriert? Zur Anmeldung" }).click();
-    await expect(page.getByRole("dialog", { name: "Anmelden" })).toBeVisible({ timeout: 5_000 });
-  });
-
-  test("Reduced Motion: kein Band, sofortiger Wechsel, nichts bleibt unsichtbar", async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await setup(page);
-    await openRoute(page, KONTO, "Konto", { timeout: 30_000 });
-    await page.locator('[data-cloud-pill="signin"]').click();
-    const sheet = page.getByRole("dialog", { name: "Anmelden" });
-    await expectNotInert(sheet.getByLabel("E-Mail"));
-    await sheet.getByRole("button", { name: "Neu hier? Jetzt registrieren" }).click();
-    await expect(page.getByRole("dialog", { name: "Konto erstellen" })).toBeVisible({ timeout: 3_000 });
     await expect(page.getByTestId("auth-blade")).toHaveCount(0);
-    await expect(page.getByTestId("auth-brand-claim")).toBeVisible();
     await expect(page.getByRole("dialog").getByLabel("Passwort", { exact: true })).toBeVisible();
+    await expectNoHorizontalScroll(page);
+    await page.getByRole("dialog").getByRole("radio", { name: "Passwort", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Anmelden" })).toBeVisible({ timeout: 5_000 });
   });
 
   test("offline: gesagt, bevor etwas gesendet wird – die Eingabe bleibt", async ({ page, context }) => {
@@ -242,7 +206,7 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
     const sheet = page.getByRole("dialog", { name: "Anmelden" });
     await expectNotInert(sheet.getByLabel("E-Mail"));
     await page.waitForTimeout(500);
-    await sheet.getByRole("button", { name: "Neu hier? Jetzt registrieren" }).click();
+    await sheet.getByRole("radio", { name: "Neu hier" }).click();
     await register(page);
     // registration without a confirmation round: signed in, welcome → "Los geht's" → the wizard (and not before)
     await expect(page.locator('[data-auth-view="welcome"]')).toBeVisible({ timeout: 30_000 });

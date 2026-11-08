@@ -452,7 +452,7 @@ describe("TraderNetCard (C3)", () => {
   it("loading: the thinking orb stands in the plot's box (no number is shown)", () => {
     wrap(none("lädt", "loading"));
     const box = screen.getByTestId("trader-net-empty");
-    expect(box.querySelector("[data-thinking-orb='ring']")).not.toBeNull();
+    expect(box.querySelector("[data-thinking-orb='search']")).not.toBeNull();
     expect(box).toHaveTextContent("Top-Trader-Daten werden geladen");
     expect(screen.getByTestId("trader-net-kpi-net-value")).toHaveTextContent("–");
   });

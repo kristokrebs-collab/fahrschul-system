@@ -2,8 +2,8 @@
  * Installs the Showroom (Paket S) BEFORE the app boots (`main.tsx`, only when `SHOWROOM` is true – otherwise this chunk is not in the build):
  *   1. the fixed banner (plain DOM, from the first paint),
  *   2. the device's first-visit seed (demo journal, quiet defaults) and the mock backend (state restored from the last page load),
- *   3. `fetch` and `WebSocket` replaced: every request the app makes is answered in the page; a host the Showroom does not know fails like an
- *      offline network – NOTHING reaches Supabase, Stripe, Binance, Bybit, OKX or Anthropic,
+ *   3. `fetch` and `WebSocket` replaced: account, payment, coach and mail requests are answered in the page – NOTHING reaches Supabase, Stripe or
+ *      Anthropic; market data (Binance, Bybit, OKX …) goes to the real network, as in the normal build,
  *   4. the billing hand-over (`redirectToStripe`) opens the simulated hosted page instead of leaving the app.
  * The visitor starts signed in as the Premium demo account (so every gated page is open); the panel switches to a signed-out / Free / new account.
  */
@@ -71,17 +71,23 @@ async function readRequest(input: RequestInfo | URL, init?: RequestInit): Promis
   return { req: { method, url, headers, body }, signal: init?.signal ?? asRequest?.signal ?? null };
 }
 
+/** Hosts of the services the Showroom mocks (Supabase, Stripe, Anthropic): a request to them never leaves the page. */
+const MOCKED_HOST = /(^|\.)(supabase\.co|supabase\.com|stripe\.com|anthropic\.com)$|^showroom\.invalid$/;
+
 function patchFetch(backend: Backend): void {
   const real = window.fetch.bind(window);
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const { req, signal } = await readRequest(input, init);
     const hit = backend.route(req);
     if (hit) return toResponse(await withSignal(Promise.resolve(hit), signal));
-    // the page's own files (chunks, fonts, the OCR assets, the manifest) come from the site itself
-    if (req.url.origin === location.origin) return real(input, init);
-    // everything else: no connection – the same failure an offline browser gives
-    netLog.refused.push(`${req.method} ${req.url.origin}${req.url.pathname}`);
-    throw new TypeError("Failed to fetch");
+    // a mocked service the backend has no answer for (account, payment, AI): no connection – the same failure an offline browser gives
+    if (MOCKED_HOST.test(req.url.hostname)) {
+      netLog.refused.push(`${req.method} ${req.url.origin}${req.url.pathname}`);
+      throw new TypeError("Failed to fetch");
+    }
+    // everything else goes to the real network, as in the normal build: the page's own files (chunks, fonts, OCR assets, the site's relays)
+    // and the market data (Binance, Bybit, OKX …) – real quotes, nothing generated
+    return real(input, init);
   };
 }
 

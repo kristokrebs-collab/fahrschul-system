@@ -1,5 +1,11 @@
 # Paket B – Vorbild-Videos für Anmeldung/Registrierung und Bezahlfenster
 
+> **Rücknahme R1/R2 (Runde 12, 08.11.2026):** Der Nutzer hat Anmeldung und Bestellfenster in der Vorschau eingekreist („wieder ins Original“). Anmelde-Sheet und
+> Bestellfenster sehen wieder aus und bewegen sich wie vor Paket B (`4df73667`): Klinge, Markenstreifen, Bestellkarte in der Anmeldung, Plan-Karte, Ablaufband,
+> Zahlungsbühne und Summe am Knopf sind entfernt (`AuthBlade.tsx`, `OrderContext.tsx`, `PayStage.tsx` gelöscht; `PlanCardArt.tsx` nur noch auf der Ergebnisseite).
+> Geblieben sind die unsichtbaren Fixes: AUTH-03 (neutrale Registrier-Antwort), AUTH-06 (`?order=` im Mail-Link), Offline-Hinweis, „E-Mail nicht bestätigt“,
+> 60 s Wartezeit, Einrichtungs-Assistent, Team-Standard 2 Sitze. Der Rest dieses Dokuments beschreibt den Stand von Paket B und ist Historie.
+
 Stand: 08.11.2026 (Runde 12, Paket B). Quelle: die Bildschirmaufnahmen des Nutzers (`/root/.claude/uploads/…`), jeweils per `ffmpeg` in Bilder zerlegt
 (`fps=3` Übersicht über alle, `fps=4–5` mit zugeschnittener Komponente für die zwei Hauptvorlagen) und Bild für Bild angesehen. **Kein Quelltext der Vorlagen wurde
 eingesehen oder übernommen** – die Videos zeigen Verhalten, keinen Code. „Übernehmen“ heißt hier eine Gestaltungs- und Verhaltensidee, im eigenen Token-System neu gebaut

@@ -3,11 +3,10 @@
  * serves a top-trader POSITION series that was net long and flipped to net short 60 periods (hours) ago (`flip-short`, `mocks/synth.ts`,
  * 500 hourly points). The expectation comes from the app's own pure functions on the same rows (`buildTraderNet`, `flipModel`).
  * NOT checked against real Binance values (fapi.binance.com answers 451 from the sandbox network) – fixtures only.
- * Covered: the real chart (window, flip marker, pill, caption, provenance), the schema marked "Schema, keine Daten", the three
- * reading steps, "Wie lese ich das?", the reveal (the ring pulses ONCE, the schema's ring once, nothing loops), reduced motion
- * (finished picture, no animation, nothing hidden), the state without Binance data (same box), no layout jump (CLS ≤ 0,02, the reserved
- * box is the size of the panel), touch targets ≥ 44 px, axe in dark and light, the alert link (opens Einstellungen › Alarme; without an
- * account it says so – nothing is switched on), screenshots (`FLIP_SHOTS_DIR`).
+ * Covered (text only since the Rücknahme R4 – no chart and no schema of its own, the card's plot is the picture): the flip sentence
+ * (window, flip, caption, provenance), "Wie lese ich das?", no motion of its own, the state without Binance data (same box), no layout
+ * jump (CLS ≤ 0,02, the reserved box is the size of the panel), touch targets ≥ 44 px, axe in dark and light, the alert link (opens
+ * Einstellungen › Alarme; without an account it says so – nothing is switched on), screenshots (`FLIP_SHOTS_DIR`).
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
@@ -39,7 +38,7 @@ async function openMarkt(page: Page, opts: { light?: boolean; cls?: boolean; aft
   const clock = await pinClock(page, at);
   const anchor = at - 60_000;
   await page.addInitScript(() => {
-    // every WAAPI animation the app starts is counted by the element's test id (the ring pulses are two of them)
+    // every WAAPI animation the app starts is counted by the element's test id (the explainer itself starts none)
     const w = window as unknown as { __animated: string[]; __cls: number };
     w.__animated = [];
     const orig = Element.prototype.animate;
@@ -58,8 +57,7 @@ async function openMarkt(page: Page, opts: { light?: boolean; cls?: boolean; aft
   await expect(page.locator('[data-page="markt"][data-page-role="current"] h1').first()).toBeAttached({ timeout: 30_000 });
   const card = page.getByTestId(CARD);
   await card.scrollIntoViewIfNeeded();
-  // the reveal waits for the chart to be on screen (the card is taller than a phone: "if needed" may centre its middle)
-  await page.getByTestId("flip-explainer-chart").scrollIntoViewIfNeeded();
+  await page.getByTestId("flip-explainer").scrollIntoViewIfNeeded();
   return { card, box: page.getByTestId("flip-explainer"), now: at, anchor };
 }
 
@@ -74,21 +72,11 @@ function expected(now: number, anchor: number) {
   const flip = view.flip!;
   const day = netDayText(flip.at).replace(/\./g, "\\.");
   const caption = new RegExp(`^Flip am ${day}: Top-Trader \\(oberste 20 % nach Einsatz, Binance\\) sind im geladenen Verlauf von 20 Tagen erstmals netto Short\\.`);
-  return { view, inWindow, flip, pill: `Flip ${netDayText(flip.at)} · netto Short`, caption };
+  return { view, inWindow, flip, caption };
 }
 
 const animated = (page: Page) => page.evaluate(() => (window as unknown as { __animated: string[] }).__animated);
 const clsOf = (page: Page) => page.evaluate(() => (window as unknown as { __cls: number }).__cls);
-
-/** Counts non-transparent painted pixels of a colour family in the explainer's chart (SVG → it has no canvas: the CSS says it). */
-async function strokes(svg: Locator) {
-  return svg.evaluate((root) => {
-    const pick = (sel: string) => Array.from(root.querySelectorAll(sel)) as SVGElement[];
-    const draw = pick("[data-draw]").map((e) => ({ dash: getComputedStyle(e).strokeDashoffset, op: getComputedStyle(e).opacity }));
-    const fill = pick("[data-fill]").map((e) => ({ op: getComputedStyle(e).opacity, tf: getComputedStyle(e).transform }));
-    return { draw, fill };
-  });
-}
 
 async function shot(page: Page, info: TestInfo, name: string, target: Locator): Promise<void> {
   if (!SHOTS) return;
@@ -102,7 +90,7 @@ test.describe("Was ist ein Flip? – on the Top-Trader card", () => {
     test.skip(!PROJECTS.includes(info.project.name), "runs on mobile + desktop");
   });
 
-  test("visible on top of the card: the real chart with the flip, the labelled schema, the hint, Quelle · Kohorte · Messzeit", async ({ page }, info) => {
+  test("visible on top of the card, text only: title and definition, the flip sentence, the hint, Quelle · Kohorte · Messzeit – no chart, no schema of its own", async ({ page }, info) => {
     const errors = collectErrors(page);
     const { card, box, now, anchor } = await openMarkt(page);
     const exp = expected(now, anchor);
@@ -116,27 +104,17 @@ test.describe("Was ist ein Flip? – on the Top-Trader card", () => {
     // it sits at the top of the card, above its headline
     const top = (await box.boundingBox())!.y;
     expect(top).toBeLessThan((await card.getByTestId("trader-net-title").boundingBox())!.y);
-    // the real chart: the window and the flip are those of the app's own functions on the same rows
-    const chart = box.getByTestId("flip-explainer-chart");
-    await expect(chart).toHaveAttribute("data-points", String(exp.inWindow), { timeout: 15_000 });
-    await expect(chart).toHaveAttribute("data-flip", String(Math.round(exp.flip.at)));
-    await expect(chart).toHaveAttribute("data-gaps", "0");
-    await expect(box.getByTestId("flip-explainer-pill")).toHaveText(exp.pill);
-    await expect(box.getByTestId("flip-explainer-pill")).toHaveText(/^Flip \d\d\.\d\d\. · netto Short$/);
+    // the sentence: the window and the flip are those of the app's own functions on the same rows
+    await expect(box).toHaveAttribute("data-points", String(exp.inWindow), { timeout: 15_000 });
+    await expect(box).toHaveAttribute("data-flip", String(Math.round(exp.flip.at)));
+    await expect(box).toHaveAttribute("data-gaps", "0");
     await expect(box.getByTestId("flip-explainer-caption")).toHaveText(exp.caption);
     await expect(box.getByTestId("flip-explainer-caption")).toContainText("netto Short");
-    await expect(box.getByTestId("flip-explainer-net")).toHaveText(/^Aktuell −\d+,\d Pkt\. · netto Short$/);
-    await expect(box.getByTestId("flip-explainer-window")).toHaveText("Positionen · letzte 14 Tage");
-    await expect(chart.getByRole("img")).toHaveAccessibleName(new RegExp(`^Top-Trader-Netto, ${exp.inWindow} Punkte von \\d\\d\\.\\d\\d\\. bis \\d\\d\\.\\d\\d\\.: zuletzt −\\d+,\\d Pkt\\. Flip am `));
-    // colour is never the only signal: signs, words and the hatching say the side too
-    await expect(box.getByTestId("flip-explainer-legend")).toContainText("+ netto Long");
-    await expect(box.getByTestId("flip-explainer-legend")).toContainText("− netto Short");
-    await expect(chart.locator("svg pattern")).toHaveCount(1);
-    // the schema: clearly not data
-    const schema = box.getByTestId("flip-explainer-schema");
-    await expect(schema.getByTestId("flip-explainer-schema-badge")).toHaveText("Schema, keine Daten");
-    for (const [n, title] of [[1, "Top-Trader netto long"], [2, "Positionierung kippt"], [3, "Netto short"]] as const) await expect(box.getByTestId(`flip-explainer-step-${n}`)).toContainText(title);
-    await expect(box.getByTestId("flip-explainer-step-3")).toContainText("Risiko für Rückgänge kann steigen");
+    // Rücknahme R4: the explainer's own chart, the three-panel schema and the legend of that chart are gone – the card's plot is the picture
+    await expect(box.locator("svg")).toHaveCount(0);
+    for (const id of ["flip-explainer-chart", "flip-explainer-schema", "flip-explainer-legend", "flip-explainer-pill"]) await expect(box.getByTestId(id), id).toHaveCount(0);
+    await expect(box).not.toContainText(/Schema, keine Daten|Echte Daten/);
+    await expect(card.getByTestId("trader-net-plot")).toBeVisible();
     // the hint is a hint
     await expect(box.getByTestId("flip-explainer-hint")).toContainText("keine Prognose und keine Anlageempfehlung");
     // provenance as the card shows it
@@ -161,66 +139,23 @@ test.describe("Was ist ein Flip? – on the Top-Trader card", () => {
     await expect(how).toContainText("Kein Kursziel");
   });
 
-  test("the reveal plays once: the ring at the flip pulses ONCE, the schema's ring once, nothing loops", async ({ page }) => {
+  test("no motion of its own: nothing of the panel is animated, under reduced motion either", async ({ page }) => {
     const { box } = await openMarkt(page);
-    const chart = box.getByTestId("flip-explainer-chart");
-    await expect(chart).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
-    await box.getByTestId("flip-explainer-schema").scrollIntoViewIfNeeded();
-    await expect.poll(async () => (await animated(page)).filter((n) => n === "flip-explainer-ring").length).toBe(1);
-    await expect.poll(async () => (await animated(page)).filter((n) => n === "flip-schema-ring").length).toBe(1);
-    await page.waitForTimeout(2500);
-    const names = await animated(page);
-    expect(names.filter((n) => n === "flip-explainer-ring")).toHaveLength(1);
-    expect(names.filter((n) => n === "flip-schema-ring")).toHaveLength(1);
-    // nothing of the panel runs for ever
+    await expect(box).toHaveAttribute("data-kind", "flip", { timeout: 25_000 });
+    await page.waitForTimeout(1500);
+    expect((await animated(page)).filter((n) => /^flip-/.test(n))).toEqual([]);
     const endless = await box.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a.effect?.getComputedTiming().iterations === Infinity).length);
     expect(endless).toBe(0);
-    // the finished picture: lines drawn (dash offset 0), areas filled, the rings back at rest
-    const s = await strokes(chart.locator("svg"));
-    expect(s.draw.length).toBeGreaterThan(1);
-    for (const d of s.draw) expect(parseFloat(d.dash)).toBe(0);
-    for (const f of s.fill) expect(f.op).toBe("1");
-    await expect(box.getByTestId("flip-explainer-ring")).toHaveCSS("opacity", "0");
-    // only transform / opacity / stroke-dashoffset are animated (the compositor properties plus the dash of a path)
-    const props = await box.evaluate((el) => {
-      const out = new Set<string>();
-      for (const a of el.getAnimations({ subtree: true })) for (const k of (a.effect as KeyframeEffect).getKeyframes()) for (const p of Object.keys(k)) if (!["offset", "easing", "composite", "computedOffset"].includes(p)) out.add(p);
-      return [...out];
-    });
-    for (const p of props) expect(["transform", "opacity", "strokeDashoffset", "strokeDasharray"]).toContain(p);
   });
 
-  test("reduced motion: the finished picture at once, no animation, nothing hidden", async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    const { box } = await openMarkt(page);
-    const chart = box.getByTestId("flip-explainer-chart");
-    await expect(chart).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
-    await box.getByTestId("flip-explainer-schema").scrollIntoViewIfNeeded();
-    await page.waitForTimeout(1200);
-    expect((await animated(page)).filter((n) => /^flip-/.test(n))).toEqual([]);
-    const s = await strokes(chart.locator("svg"));
-    for (const d of s.draw) expect(parseFloat(d.dash)).toBe(0);
-    for (const f of s.fill) expect(f.op).toBe("1");
-    await expect(box.getByTestId("flip-explainer-marker")).toHaveCSS("opacity", "1");
-    // the schema is all there too
-    for (const n of [1, 2, 3]) {
-      const sv = box.getByTestId(`flip-schema-svg-${n}`);
-      const st = await strokes(sv);
-      for (const d of st.draw) expect(parseFloat(d.dash)).toBe(0);
-      for (const f of st.fill) expect(f.op).toBe("1");
-    }
-  });
-
-  test("no Binance data: the panel keeps its size, says why and keeps the schema", async ({ page }) => {
+  test("no Binance data: the panel keeps its size and says why", async ({ page }) => {
     const { card, box } = await openMarkt(page, {
       afterSeed: () => page.route("https://fapi.binance.com/futures/data/topLongShortPositionRatio**", (route) => (new URL(route.request().url()).searchParams.get("period") === "1h" ? route.abort("failed") : route.fallback())),
     });
     await expect(card).toHaveAttribute("data-state", /^(none|loading)$/, { timeout: 25_000 });
     await expect(box).toHaveAttribute("data-kind", /^(empty|loading)$/, { timeout: 25_000 });
-    await expect(box.getByTestId("flip-explainer-empty")).toBeVisible({ timeout: 25_000 });
-    await expect(box.getByTestId("flip-explainer-chart")).toHaveAttribute("data-flip", "none");
-    await expect(box.getByTestId("flip-explainer-schema-badge")).toBeVisible();
-    await expect(box.getByTestId("flip-explainer-chart").locator("svg")).toHaveCount(0);
+    await expect(box).toHaveAttribute("data-flip", "none");
+    await expect(box.getByTestId("flip-explainer-caption")).not.toBeEmpty();
     const without = (await box.boundingBox())!;
     const page2 = await page.context().newPage();
     const ok = await openMarkt(page2);
@@ -235,7 +170,7 @@ test.describe("Was ist ein Flip? – on the Top-Trader card", () => {
     const { card, box } = await openMarkt(page, { cls: true });
     const grow = await page.evaluate(() => document.documentElement.scrollHeight);
     await expect(card).toHaveAttribute("data-state", "ok", { timeout: 25_000 });
-    await expect(box.getByTestId("flip-explainer-chart")).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
+    await expect(box).toHaveAttribute("data-kind", "flip", { timeout: 15_000 });
     await page.waitForTimeout(1500);
     const after = await page.evaluate(() => document.documentElement.scrollHeight);
     expect(after - grow, `the page grew from ${grow} to ${after} px`).toBeLessThan(60);
@@ -251,7 +186,7 @@ test.describe("Was ist ein Flip? – on the Top-Trader card", () => {
 
   test("touch targets ≥ 44 px and accessibility (dark): axe finds nothing, nothing scrolls sideways", async ({ page }, info) => {
     const { box } = await openMarkt(page);
-    await expect(box.getByTestId("flip-explainer-chart")).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
+    await expect(box).toHaveAttribute("data-kind", "flip", { timeout: 15_000 });
     await box.scrollIntoViewIfNeeded();
     if (hasTouch(info)) {
       const misses = await page.evaluate(auditHitBoxes, { selector: HIT_SELECTOR, root: '[data-testid="flip-explainer"]' });
@@ -266,14 +201,11 @@ test.describe("Was ist ein Flip? – on the Top-Trader card", () => {
     await expectNoHorizontalScroll(page);
   });
 
-  test("light theme: the same picture on paper, axe finds nothing", async ({ page }, info) => {
+  test("light theme: axe finds nothing", async ({ page }, info) => {
     const { box } = await openMarkt(page, { light: true });
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-    await expect(box.getByTestId("flip-explainer-chart")).toHaveAttribute("data-drawn", "true", { timeout: 15_000 });
+    await expect(box).toHaveAttribute("data-kind", "flip", { timeout: 15_000 });
     await box.scrollIntoViewIfNeeded();
-    // the lines use the theme's own (darker) green and red – read from the live style, not a neon on paper
-    const colors = await box.getByTestId("flip-explainer-chart").locator("[data-draw]").evaluateAll((els) => els.map((e) => getComputedStyle(e).stroke));
-    expect(colors.join(" ")).not.toContain("rgb(61, 220, 132)");
     const res = await new AxeBuilder({ page }).include('[data-testid="flip-explainer"]').withTags(TAGS).analyze();
     expect(res.violations.map((v) => `${v.id} (${v.impact}): ${v.help} → ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);
     await shot(page, info, "flip-erklaergrafik-hell", box);

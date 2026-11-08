@@ -1,5 +1,8 @@
-/** The running pictures of rich empty states (`@/motion/rich/EmptyArt`, a lazy chunk). Only the cheap parts live here. */
-export type EmptyArtKind = "draw" | "orbit" | "burst";
+/**
+ * The pictures of rich empty states. `draw` and `burst` run (`@/motion/rich/EmptyArt`, a lazy chunk); `dots` is the static dot-matrix ∅ of the
+ * plain empty state (no running picture – it took the place of the orbit, Rücknahme R6). Only the cheap parts live here.
+ */
+export type EmptyArtKind = "draw" | "dots" | "burst";
 
 /** Art box of an empty state (px) – the placeholder in `EmptyState` reserves exactly this while the chunk loads. */
 export const EMPTY_ART_W = 64;
@@ -11,5 +14,5 @@ export const EMPTY_ART_FLOW_H = 33;
 export function pickArt(seed: string): EmptyArtKind {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return (["draw", "orbit", "burst"] as const)[h % 3]!;
+  return (["draw", "dots", "burst"] as const)[h % 3]!;
 }

@@ -9,22 +9,7 @@ export const FLIP_WHO = "Top-Trader (oberste 20 % nach Einsatz, Binance)";
 export const FLIP = {
   title: "Was ist ein Flip?",
   lead: `Ein Flip ist der Moment, in dem die ${FLIP_WHO} von netto Long auf netto Short kippen – oder zurück: Ihr Netto (Long minus Short) kreuzt die Nulllinie.`,
-  realBadge: "Echte Daten",
-  schemaBadge: "Schema, keine Daten",
-  schemaTitle: "So sieht ein Flip aus",
-  schemaNote: "Eine Skizze zum Verstehen – die Kurven sind erfunden und zeigen keinen Markt.",
-  legendLong: "+ netto Long (Fläche über der Nulllinie)",
-  legendShort: "− netto Short (schraffiert, unter der Nulllinie)",
-  legendPrice: "Preislinie (eigene Skala)",
-  zoneLong: "+ netto Long",
-  zoneShort: "− netto Short",
   loading: "Die echten Daten werden geladen …",
-  gapLabel: "keine Daten",
-  steps: [
-    { n: 1, title: "Top-Trader netto long", text: "Mehr Long als Short: die Fläche liegt über der Nulllinie (+)." },
-    { n: 2, title: "Positionierung kippt", text: "Das Netto kreuzt die Nulllinie – dieser Moment ist der Flip." },
-    { n: 3, title: "Netto short", text: "Fläche unter der Nulllinie (−): ein mögliches Warnsignal, das Risiko für Rückgänge kann steigen." },
-  ],
   hint: "Einordnung: Ein Flip ins Netto-Short wird oft als Vorsichtszeichen gelesen – wenn die größten Konten mehrheitlich auf fallende Kurse setzen, kann das Risiko für Rückgänge steigen. Das ist eine Lesart, keine Prognose und keine Anlageempfehlung; die Karte prüft nicht, was der Kurs danach tat.",
   howTitle: "Wie lese ich das?",
   how: [

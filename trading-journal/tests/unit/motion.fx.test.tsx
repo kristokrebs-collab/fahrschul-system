@@ -521,20 +521,6 @@ describe("CoachStream", () => {
     rerender(<CoachStream text="Fertig." />);
     expect(container.querySelector('[data-fx="coach-stream"] > span[aria-hidden] > span')!.textContent).toBe("Fertig.");
   });
-
-  it("Runde 12: while it thinks, the voice ring (mood „denkt nach“) stands beside the label – decorative, gone once text arrives", () => {
-    const { container, rerender } = render(<CoachStream text="" thinking />);
-    const waiting = screen.getByTestId("coach-thinking");
-    const ring = waiting.querySelector("[data-thinking-orb='ring']");
-    expect(ring).not.toBeNull();
-    expect(ring).toHaveAttribute("data-ring-mood", "think");
-    expect(ring).toHaveAttribute("aria-hidden", "true");
-    // the label stays the one thing that says what is going on
-    expect(waiting).toHaveTextContent("Coach denkt …");
-    rerender(<CoachStream text="Antwort" thinking />);
-    expect(container.querySelector("[data-thinking-orb]")).toBeNull();
-    expect(screen.queryByTestId("coach-thinking")).toBeNull();
-  });
 });
 
 /* ------------------------------------------------------------------ ConfidenceMeter */

@@ -1,7 +1,8 @@
 /**
  * "Frag dein Journal" (Paket F2) – a question in German, answered from the journal on this device: no model, no network, no guessing.
  *
- * The dot opens into a search bar (a clip-path that grows from the middle), the question is typed, a short shimmer reads
+ * The search bar stands open (its red dot is the search symbol at the left – no lone dot in the middle of an empty card, and the card is as
+ * dense as the other report cards: no reserved empty stage, Rücknahme R3), the question is typed, a short shimmer line reads
  * "Durchsuche 214 Trades …" (the count is the real one; the calculation itself takes milliseconds, the half second is a deliberate beat
  * and is skipped under reduced motion) and three result cards fan out from the middle. The answer comes from `askCards`
  * (`@/domain/ask`): the closed set of question types, filter / aggregate over the real closed trades, the real numbers, the trades they
@@ -85,7 +86,8 @@ export function AskJournalCard({ page, className }: { page: Pick<ReportPage, "vi
   const reduced = useReducedFx();
   const uid = useId();
   const input = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState(false);
+  // the bar stands open from the start (Rücknahme R3): no lone dot in the middle of an empty card – the dot is the bar's search symbol
+  const [open, setOpen] = useState(true);
   const [q, setQ] = useState("");
   const [phase, setPhase] = useState<"idle" | "seek" | "done">("idle");
   const [result, setResult] = useState<AskResult | null>(null);

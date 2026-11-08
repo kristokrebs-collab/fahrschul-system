@@ -168,17 +168,13 @@ bevor das Panel selbst misst – sonst liefe seine eigene FLIP-Animation obendra
 (`username` bzw. `email`, `current-password` / `new-password`); ein abgelehntes Feld zeigt die Meldung am Feld und bekommt den Fokus; ein Fokus im verschwindenden Passwortfeld geht
 auf die E-Mail. Reduziert: sofortiger Wechsel.
 
-**Paket B (Runde 12) – Anmeldung / Registrierung:** `AuthBlade.tsx` legt den Markenstreifen („TRADE JOURNAL“ + ein Satz je Schritt, schräge Unterkante) über die Karte und fährt beim Wechsel
-Anmelden ↔ Registrieren ↔ Link EIN Glasband einmal quer über die ganze Karte (560 ms, Wechsel bei 46 %, nur `transform`, Zeitgeber entscheiden – nicht die Animation); der Fokus landet im ersten Feld,
-ohne Bewegung (Reduced Motion) wechselt die Ansicht sofort und es gibt kein Band. **Keine Konto-Abfrage:** `signUp` antwortet für eine neue und eine vorhandene Adresse gleich (`confirm: true`), der
-Mail-Schritt sagt beides in einem Satz; der Reset-Text ist ebenso neutral. **Mail-Schritt:** „Erneut senden“ wartet eine Minute (Voreinstellung des Servers), Ratenlimit-Hinweis immer sichtbar, ein
-abgelehntes Senden (Limit) steht als `role="alert"` unter den Knöpfen und verlängert die Wartezeit (nie eine Wiederholschleife), offline wird vor dem Senden gesagt; „E-Mail nicht bestätigt“ beim
-Login führt mit sofort verfügbarem „Erneut senden“ hierher. **Bestellung bleibt erhalten:** `OrderContext.tsx` zeigt die vorgewählte Bestellung (Tarif · Intervall · Sitze · fälliger Betrag) mit
-„Ohne Kauf weiter“; die Notiz (`returnTo`, Ziel `order:`) liegt zusätzlich in `localStorage` (60 Minuten), weil der Link der Bestätigungs-Mail einen NEUEN Tab öffnet; ein Link mit `?code=` zeigt nach
-der Anmeldung das Willkommen, ein abgelaufener Link öffnet das Blatt mit dem Grund. **Release-Audit AUTH-03 / AUTH-06:** der Satz bei „Adresse schon vergeben“ (`AUTH_NEUTRAL`) und der Mail-Schritt sagen weder „Konto
-gibt es“ noch „gibt es nicht“ (kein Text der Fehlertabelle tut das, geprüft über alle Codes); die Vorauswahl (nur `plan.intervall.sitze`, nie ein Preis) hängt als `?order=` am Link der Mail
-(`redirectUrl(order)` für Registrierung, Wiedersenden, Magic Link, Zurücksetzen), wird beim Öffnen (`captureOrderQuery`, `BillingHost`) erneut gegen die Whitelist geprüft, verlässt sofort die Adresse
-und wird zu EINER Notiz, die nach der Anmeldung die Bestellübersicht öffnet – bestellt wird nichts. Betreiber: Redirect-URL `https://<site>/**` (SETUP.md §2.2). Tests:
-`tests/unit/cloud.authB.test.tsx`, `tests/unit/cloud.signup.neutral.test.ts`, `tests/e2e/auth-b.spec.ts`.
+**Paket B (Runde 12) – Anmeldung / Registrierung, nach der Rücknahme R1:** Das Blatt sieht wieder aus und bewegt sich wie vor Paket B (kein Markenstreifen, keine Klinge, keine Bestellkarte,
+keine Zusatzlinks; `AuthBlade.tsx` und `OrderContext.tsx` sind entfernt). Geblieben sind die unsichtbaren Fixes: **Keine Konto-Abfrage** (AUTH-03): `signUp` antwortet für eine neue und eine
+vorhandene Adresse gleich (`confirm: true`), der Mail-Schritt sagt beides in einem Satz (`AUTH_NEUTRAL`, kein Text der Fehlertabelle sagt „gibt es“ / „gibt es nicht“). **Vorauswahl im Mail-Link**
+(AUTH-06): nur `plan.intervall.sitze`, nie ein Preis, hängt als `?order=` am Link (`redirectUrl(order)` für Registrierung, Wiedersenden, Magic Link, Zurücksetzen), wird beim Öffnen
+(`captureOrderQuery`, `BillingHost`) erneut gegen die Whitelist geprüft und verlässt sofort die Adresse; die Notiz (`returnTo`, Ziel `order:`) liegt zusätzlich 60 Minuten in `localStorage` (der
+Link öffnet einen neuen Tab). **Mail-Schritt:** „Erneut senden“ wartet eine Minute (Voreinstellung des Servers); ein abgelehntes Senden (Limit) sagt es als Toast und verlängert die Wartezeit (nie
+eine Wiederholschleife); offline wird vor dem Senden gesagt; „E-Mail nicht bestätigt“ beim Login führt mit sofort verfügbarem „Erneut senden“ in den Mail-Schritt. `MorphHeight` hält die
+Border-Box-Höhe (sonst lief das Blatt bei jedem Wechsel eine eigene kleine Skalierung).
 
 `privacy.ts`: `setPrivacy` liefert jetzt `Promise<boolean>` (Gerät hat gespeichert UND das Konto hat geantwortet); `resyncPrivacy()` sendet die Konto-Schlüssel erneut („Erneut versuchen“ der Karte Datenschutz).

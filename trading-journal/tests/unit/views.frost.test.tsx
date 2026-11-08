@@ -200,7 +200,6 @@ describe("Frag dein Journal: die Suchleiste", () => {
       </MotionRoot>,
     );
   const type = (q: string) => {
-    fireEvent.click(screen.getByTestId("ask-open"));
     fireEvent.change(screen.getByTestId("ask-input"), { target: { value: q } });
     fireEvent.click(screen.getByTestId("ask-send"));
   };
@@ -212,15 +211,15 @@ describe("Frag dein Journal: die Suchleiste", () => {
       vi.setSystemTime(new Date(2026, 5, 10, 12));
     });
 
-    it("starts as a dot with three example questions; opening grows the bar and focuses the input", () => {
+    it("starts with the bar open (no lone dot in an empty card, Rücknahme R3) and three example questions; no loader while idle", () => {
       renderAsk();
       const bar = screen.getByTestId("ask-bar");
-      expect(bar).not.toHaveAttribute("data-open");
-      expect(screen.getByTestId("ask-input")).toHaveAttribute("tabindex", "-1");
-      expect(screen.getAllByTestId("ask-example").map((b) => b.textContent)).toEqual(["Verluste im Setup Breakout letzten Monat", "Trades ohne Stopp", "Beste Wochentage"]);
-      fireEvent.click(screen.getByTestId("ask-open"));
       expect(bar).toHaveAttribute("data-open");
+      expect(screen.queryByTestId("ask-open")).toBeNull();
       expect(screen.getByTestId("ask-input")).toHaveAttribute("tabindex", "0");
+      expect(screen.getAllByTestId("ask-example").map((b) => b.textContent)).toEqual(["Verluste im Setup Breakout letzten Monat", "Trades ohne Stopp", "Beste Wochentage"]);
+      expect(screen.getByTestId("ask-seek")).toHaveTextContent("");
+      expect(screen.getByTestId("ask-seek")).not.toHaveAttribute("data-on");
     });
 
     it("typing a question shows the shimmer with the REAL trade count, then three cards with the hand-worked numbers", async () => {
@@ -324,7 +323,6 @@ describe("Frag dein Journal: die Suchleiste", () => {
     it("submit is off for an empty question; the whole thing runs without a network call", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
       renderAsk();
-      fireEvent.click(screen.getByTestId("ask-open"));
       expect(screen.getByTestId("ask-send")).toBeDisabled();
       fireEvent.change(screen.getByTestId("ask-input"), { target: { value: "Beste Wochentage" } });
       fireEvent.submit(screen.getByTestId("ask-bar"));
@@ -523,7 +521,6 @@ describe("Heute abschließen: das Abschluss-Ritual in Berichte", () => {
     renderView();
     const ask = await screen.findByTestId("ask-journal", undefined, { timeout: 5000 });
     expect(ask).toBeInTheDocument();
-    fireEvent.click(within(ask).getByTestId("ask-open"));
     fireEvent.change(within(ask).getByTestId("ask-input"), { target: { value: "Trades ohne Stopp" } });
     fireEvent.click(within(ask).getByTestId("ask-send"));
     await waitFor(() => expect(within(ask).getAllByTestId("ask-card")).toHaveLength(3));

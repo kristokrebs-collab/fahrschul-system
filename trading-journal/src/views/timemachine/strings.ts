@@ -21,8 +21,7 @@ export const TM = {
   invalidTitle: "So lässt sich der Plan nicht durchspielen",
   noCandles: "Keine Kerzen – ohne echte Kerzen gibt es nichts durchzuspielen.",
   phase: { pool: "Kerzen vorbereiten", sim: "Sitzungen simulieren", fan: "Fächer berechnen", history: "Frühere Vorfälle suchen", summary: "Auswerten", done: "Fertig" } satisfies Record<TmPhase, string>,
-  /** the status while it runs – the real number of paths of THIS run (`options.runs`), never a fixed one */
-  scenarios: (n: string) => `${n} Szenarien werden berechnet`,
+  running: "Rechnet",
   worker: "im Hintergrund",
   seed: "Seed",
   sessions: "Sitzungen",

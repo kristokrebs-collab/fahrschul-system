@@ -114,7 +114,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   } else if (state === "none") {
     body = (
       <EmptyState
-        art="orbit"
+        art="dots"
         title="Keine Treffer"
         text="Kein Trade passt zu diesen Filtern."
         line="Filter lockern oder zurücksetzen."

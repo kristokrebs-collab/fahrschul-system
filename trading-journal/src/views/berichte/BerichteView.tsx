@@ -85,7 +85,7 @@ const SIZE = {
   goals: { base: 410, sm: 237, lg: 237 },
   review: { base: 907, sm: 774, lg: 754 },
   journal: { base: 590, sm: 600 },
-  ask: { base: 560, sm: 400 },
+  ask: { base: 328, sm: 242 },
 } as const satisfies Record<string, ReserveHeight>;
 
 function Arrow({ dir, onClick, disabled, label }: { dir: "prev" | "next"; onClick: () => void; disabled?: boolean; label: string }) {

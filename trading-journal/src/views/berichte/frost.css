@@ -614,21 +614,20 @@
 .fr-bar[data-open] .fr-closedhit {
   display: none;
 }
+/* as dense as the other report cards (Rücknahme R3): no reserved empty stage – the card is as tall as what it shows */
 .fr-stage {
   display: grid;
   gap: 0.625rem;
   align-content: start;
-  min-height: 300px;
 }
-@media (min-width: 640px) {
-  .fr-stage {
-    min-height: 196px;
-  }
-}
+/* the loader is one small shimmering line, only while an answer runs */
 .fr-seek {
   min-height: 1.5rem;
   font: 600 13px/1.5 var(--font-sans);
   color: var(--color-mute);
+}
+.fr-seek:empty {
+  display: none;
 }
 .fr-seek[data-on] {
   background: linear-gradient(90deg, var(--color-mute) 30%, var(--color-fg) 50%, var(--color-mute) 70%);

@@ -1,7 +1,7 @@
 /**
  * "Was ist ein Flip?" (Paket W): the explainer on top of the Top-Trader card. Pure model (the window, flip detection, the sentence
- * from what the history gives, gaps that stay gaps, the empty states, the schema numbers, the alarm note) and the component in
- * jsdom (real chart + schema + "Wie lese ich das?" + the alert link). Wording: no string of the explainer – nor any sentence the model
+ * from what the history gives, gaps that stay gaps, the empty states, the alarm note) and the component in jsdom (text only since the
+ * Rücknahme R4: title, flip sentence, provenance, hint, "Wie lese ich das?", the alert link – no chart of its own, no schema). Wording: no string of the explainer – nor any sentence the model
  * builds – may contain the word for on-chain big holders, a data vendor's name or "Abverkauf kommt"; the actors are always
  * "Top-Trader (oberste 20 % nach Einsatz, Binance)". Mock series only; nothing here is checked against real Binance values.
  */
@@ -15,7 +15,7 @@ const opened = vi.hoisted(() => ({ ids: [] as string[] }));
 vi.mock("@/app/featureOpen", () => ({ openFeature: (id: string) => void opened.ids.push(id) }));
 
 import FlipExplainer from "@/views/markt/FlipExplainer";
-import { alarmNote, emptyCaption, flipModel, FLIP_WINDOW_DAYS, pillWidth, SCHEMA_CURVES, SCHEMA_FLIP, schemaArea, smoothPath, windowOf } from "@/views/markt/flipExplainerModel";
+import { alarmNote, emptyCaption, flipModel, FLIP_WINDOW_DAYS, windowOf } from "@/views/markt/flipExplainerModel";
 import { FLIP, FLIP_WHO, flipStringsFlat } from "@/views/markt/flipExplainerStrings";
 import { provenanceOf, type WalState } from "@/views/markt/traderNetWal";
 
@@ -40,16 +40,15 @@ function input(longs: number[], state: WalState = "ok", extra: Partial<Parameter
 }
 
 describe("flipModel: the flip and its sentence come from the history", () => {
-  it("a flip to Short inside the window: pill, sentence 'im geladenen Verlauf … erstmals', the price since the flip", () => {
+  it("a flip to Short inside the window: sentence 'im geladenen Verlauf … erstmals', the price since the flip", () => {
     const m = flipModel(input(SHORT_FLIP));
     expect(m.kind).toBe("flip");
     expect(m.side).toBe("short");
     expect(m.flip).toMatchObject({ from: "long", to: "short" });
-    expect(m.pill).toMatch(/^Flip \d\d\.\d\d\. · netto Short$/);
     expect(m.caption).toMatch(new RegExp(`^Flip am \\d\\d\\.\\d\\d\\.: ${FLIP_WHO.replace(/[()]/g, "\\$&")} sind im geladenen Verlauf von 6 Tagen erstmals netto Short\\. Preis seit dem Flip: [+−]\\d`));
     expect(m.netNow).toBe("−12,0 Pkt.");
     expect(m.windowLabel).toBe("geladener Verlauf: 6 Tage");
-    expect(m.label).toContain("Top-Trader-Netto, 160 Punkte");
+    expect(m.points).toHaveLength(160);
   });
 
   it("an earlier flip in the history: 'erstmals seit <Datum> netto Short' with the date of the flip before", () => {
@@ -65,7 +64,7 @@ describe("flipModel: the flip and its sentence come from the history", () => {
     const m = flipModel(input([...rep(44, 60), ...rep(56, 100)]));
     expect(m.kind).toBe("flip");
     expect(m.side).toBe("long");
-    expect(m.pill).toMatch(/netto Long$/);
+    expect(m.caption).toMatch(/netto Long\./);
   });
 
   it("the window is the newest 14 days; a flip before it is said honestly and not drawn", () => {
@@ -74,7 +73,6 @@ describe("flipModel: the flip and its sentence come from the history", () => {
     expect(windowOf(netPoints(longs)).windowLabel).toBe(`letzte ${FLIP_WINDOW_DAYS} Tage`);
     expect(m.kind).toBe("flip-before");
     expect(m.flip).toBeNull();
-    expect(m.pill).toBeNull();
     expect(m.caption).toMatch(/^Kein Flip in den gezeigten Tagen: .* sind seit \d\d\.\d\d\. netto Short\./);
     expect(m.points[m.points.length - 1]!.t - m.points[0]!.t).toBeLessThanOrEqual(FLIP_WINDOW_DAYS * DAY);
   });
@@ -112,7 +110,6 @@ describe("flipModel: the flip and its sentence come from the history", () => {
     expect(m.gaps).toHaveLength(1);
     expect(m.gaps[0]).toMatchObject({ from: T0 + 59 * H, to: T0 + 90 * H });
     expect(m.points).toHaveLength(points.length);
-    expect(m.label).toContain("1 Lücke ohne Messwerte");
   });
 
   it("no data / loading / too little history: an honest state with the reason, no chart", () => {
@@ -120,9 +117,9 @@ describe("flipModel: the flip and its sentence come from the history", () => {
     expect(loading.kind).toBe("loading");
     expect(loading.caption).toBe(FLIP.loading);
     const none = flipModel({ state: "none", points: [], gaps: [], view: null, reason: "Binance blockiert (Region)" });
-    expect(none).toMatchObject({ kind: "empty", points: [], flip: null, pill: null, caption: "Binance blockiert (Region)" });
-    expect(none.label).toContain("keine Grafik");
-    expect(emptyCaption("none")).toContain("nur das Schema");
+    expect(none).toMatchObject({ kind: "empty", points: [], flip: null, caption: "Binance blockiert (Region)" });
+    expect(emptyCaption("none")).toContain("kein Satz zum Flip");
+    expect(emptyCaption("none")).not.toMatch(/Schema|Grafik/);
     const short = flipModel({ state: "short", points: [], gaps: [], view: viewOf(rep(55, 5)) });
     expect(short.kind).toBe("empty");
     expect(short.caption).toMatch(/^Zu wenig Verlauf/);
@@ -131,25 +128,6 @@ describe("flipModel: the flip and its sentence come from the history", () => {
   it("stale and stored-only states still draw what is there (the card marks them itself)", () => {
     expect(flipModel(input(SHORT_FLIP, "stale")).kind).toBe("flip");
     expect(flipModel(input(SHORT_FLIP, "archive")).kind).toBe("flip");
-  });
-});
-
-describe("the schema numbers", () => {
-  it("step 1 stays above the zero line, step 3 below, step 2 crosses it exactly at the marker", () => {
-    expect(SCHEMA_CURVES[1].every(([, y]) => y < 36)).toBe(true);
-    expect(SCHEMA_CURVES[3].every(([, y]) => y > 36)).toBe(true);
-    const c = SCHEMA_CURVES[2];
-    expect(c.some(([x, y]) => x === SCHEMA_FLIP.x && y === SCHEMA_FLIP.y)).toBe(true);
-    expect(c[0]![1]).toBeLessThan(36);
-    expect(c[c.length - 1]![1]).toBeGreaterThan(36);
-    expect(smoothPath(c)).toContain("62 36");
-    expect(smoothPath(c)).toBe(smoothPath(c));
-    expect(schemaArea(2).endsWith("Z")).toBe(true);
-    expect(smoothPath([[1, 1]])).toBe("");
-  });
-
-  it("the pill is as wide as its text needs", () => {
-    expect(pillWidth("Flip 28.10. · netto Short")).toBeGreaterThan(pillWidth("Flip"));
   });
 });
 
@@ -172,7 +150,7 @@ describe("wording", () => {
       ...flipStringsFlat(),
       ...[SHORT_FLIP, TWO_FLIPS, rep(55, 160), [...rep(55, 100), ...rep(50.2, 60)], [...rep(55, 24), ...rep(44, 20 * 24)]].flatMap((l) => {
         const m = flipModel(input(l));
-        return [m.caption, m.label, m.pill ?? ""];
+        return [m.caption];
       }),
       emptyCaption("none"),
       emptyCaption("short"),
@@ -184,7 +162,6 @@ describe("wording", () => {
     // a hint, never a forecast or advice
     expect(FLIP.hint).toMatch(/keine Prognose und keine Anlageempfehlung/);
     expect(FLIP.hint).not.toMatch(/wird (fallen|sinken)|es kommt/i);
-    expect(FLIP.schemaBadge).toBe("Schema, keine Daten");
     expect(FLIP.how.map((h) => h.term)).toEqual(["Netto", "Nulllinie", "Flip", "Grenzen"]);
     expect(FLIP.how.find((h) => h.id === "limits")!.text).toMatch(/Verzug/);
   });
@@ -197,30 +174,26 @@ describe("FlipExplainer in jsdom", () => {
   });
   const v = viewOf(SHORT_FLIP);
   const prov = provenanceOf({ series: "position", state: "ok", source: "binance", measuredAt: v.last!.t, now: v.last!.t + 600_000, stepMs: H });
-  const props = { state: "ok" as const, points: v.points, gaps: [], view: v, prov, series: "position" as const, priceName: "BTC" };
+  const props = { state: "ok" as const, points: v.points, gaps: [], view: v, prov, series: "position" as const };
 
-  it("shows the real chart, the labelled schema, the hint, the provenance and the three reading steps", async () => {
-    render(<FlipExplainer {...props} />);
+  it("text only (Rücknahme R4): title and definition, the flip sentence, the hint, the provenance – no chart, no schema, no legend", () => {
+    const { container } = render(<FlipExplainer {...props} />);
     const root = screen.getByTestId("flip-explainer");
     expect(root).toHaveAttribute("data-kind", "flip");
+    expect(root).toHaveAttribute("data-points", "160");
+    expect(root).not.toHaveAttribute("data-flip", "none");
     expect(screen.getByRole("heading", { name: "Was ist ein Flip?" })).toBeInTheDocument();
     expect(screen.getByTestId("flip-explainer-lead")).toHaveTextContent(FLIP_WHO);
-    expect(screen.getByTestId("flip-explainer-schema-badge")).toHaveTextContent("Schema, keine Daten");
-    for (const n of [1, 2, 3]) expect(screen.getByTestId(`flip-explainer-step-${n}`)).toBeInTheDocument();
+    expect(screen.getByTestId("flip-explainer-caption")).toHaveTextContent(/^Flip am \d\d\.\d\d\.: .* erstmals netto Short\. Preis seit dem Flip: /);
     expect(screen.getByTestId("flip-explainer-hint")).toHaveTextContent("keine Prognose und keine Anlageempfehlung");
     expect(screen.getByTestId("flip-explainer-prov-source")).toHaveTextContent("Binance Futures");
     expect(screen.getByTestId("flip-explainer-prov-cohort")).toHaveTextContent("Obere 20 % der Konten nach Einsatz");
     expect(screen.getByTestId("flip-explainer-prov-time")).toHaveTextContent("UTC");
-    expect(screen.getByTestId("flip-explainer-net")).toHaveTextContent("Aktuell −12,0 Pkt. · netto Short");
-    expect(screen.getByTestId("flip-explainer-window")).toHaveTextContent("Positionen");
-    const chart = screen.getByTestId("flip-explainer-chart");
-    expect(chart).toHaveAttribute("data-points", "160");
-    expect(chart).not.toHaveAttribute("data-flip", "none");
-    expect(screen.getByTestId("flip-explainer-caption")).toHaveTextContent(/^Flip am \d\d\.\d\d\.:/);
     expect(root.textContent ?? "").not.toMatch(FORBIDDEN);
-    // the SVG draws in a measured box: jsdom has no layout, so the box is measured as 0 and the chart waits – the text states stand
-    await waitFor(() => expect(screen.getByTestId("flip-explainer-legend")).toHaveTextContent("+ netto Long"));
-    expect(screen.getByTestId("flip-explainer-legend")).toHaveTextContent("− netto Short");
+    // the explainer's own chart and the three-panel schema are gone, with the legend that only described the chart
+    expect(container.querySelector("svg")).toBeNull();
+    for (const id of ["flip-explainer-chart", "flip-explainer-schema", "flip-explainer-legend", "flip-explainer-net", "flip-explainer-window"]) expect(screen.queryByTestId(id), id).toBeNull();
+    expect(root.textContent ?? "").not.toMatch(/Schema, keine Daten|Echte Daten/);
   });
 
   it("'Wie lese ich das?' is a native disclosure with the four explanations (Netto, Nulllinie, Flip, Grenzen)", () => {
@@ -242,13 +215,11 @@ describe("FlipExplainer in jsdom", () => {
     return waitFor(() => expect(opened.ids).toEqual(["vier-alarme"]));
   });
 
-  it("without data: the chart box says why, the schema stays, no marker, no caption", () => {
+  it("without data: the sentence says why (the card's reason), nothing else changes", () => {
     render(<FlipExplainer {...props} state="none" points={[]} view={null} prov={provenanceOf({ series: "position", state: "none", source: null, measuredAt: null, now: 0, stepMs: null })} reason="Binance blockiert (Region)" />);
     expect(screen.getByTestId("flip-explainer")).toHaveAttribute("data-kind", "empty");
-    expect(screen.getByTestId("flip-explainer-empty")).toHaveTextContent("Binance blockiert (Region)");
-    expect(screen.getByTestId("flip-explainer-chart")).toHaveAttribute("data-flip", "none");
-    expect(screen.getByTestId("flip-explainer-caption")).toHaveTextContent("");
-    expect(screen.getByTestId("flip-explainer-schema-badge")).toBeInTheDocument();
-    expect(screen.getByTestId("flip-explainer-net")).toHaveTextContent("");
+    expect(screen.getByTestId("flip-explainer")).toHaveAttribute("data-flip", "none");
+    expect(screen.getByTestId("flip-explainer-caption")).toHaveTextContent("Binance blockiert (Region)");
+    expect(screen.getByRole("button", { name: "Bei Flip benachrichtigen" })).toBeInTheDocument();
   });
 });

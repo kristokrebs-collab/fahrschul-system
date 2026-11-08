@@ -89,7 +89,7 @@ export const JUMPS: Record<JumpId, () => Promise<void> | void> = {
   voice: async () => {
     await ensureEntitled("coachAi");
     openFeature("coach-fragen", { remember: false });
-    // ask the first suggested question and press "Mit KI formulieren": the ring thinks while the (demo) answer is on its way
+    // ask the first suggested question and press "Mit KI formulieren": "Coach denkt …" while the (demo) answer is on its way
     const chip = await until(() => document.querySelector<HTMLElement>('[data-testid="coach-chat"] [data-testid="coach-chip"]'));
     chip?.click();
     const ai = await until(() => Array.from(document.querySelectorAll<HTMLButtonElement>('[data-testid="coach-ai"] button')).find((b) => /KI formulieren/.test(b.textContent ?? "")));
@@ -118,11 +118,11 @@ export const JUMPS: Record<JumpId, () => Promise<void> | void> = {
 };
 
 export const JUMP_LIST: ReadonlyArray<{ id: JumpId; label: string; hint: string }> = [
-  { id: "signin", label: "Anmelden", hint: "Anmelde-Klinge (Demo-Zugang unten)" },
+  { id: "signin", label: "Anmelden", hint: "Anmelde-Blatt (Demo-Zugang unten)" },
   { id: "signup", label: "Registrieren", hint: "Neues Demo-Konto → simulierter Mail-Link → Einrichtung" },
-  { id: "order", label: "Bezahlfenster · Premium jährlich", hint: "Bestellung → Zahlungsbühne mit Demo-Karte" },
-  { id: "flip", label: "Markt › Flip-Grafik", hint: "Top-Trader netto mit Wal-Karte und Flip-Marke" },
-  { id: "voice", label: "Coach › Voice-Ring", hint: "Frage stellen, „Mit KI formulieren“ → der Ring denkt" },
+  { id: "order", label: "Bezahlfenster · Premium jährlich", hint: "Bestellung → Demo-Zahlungsseite mit Demo-Karte" },
+  { id: "flip", label: "Markt › Top-Trader-Karte", hint: "„Was ist ein Flip?“ über dem Top-Trader-Chart (echte Binance-Daten)" },
+  { id: "voice", label: "Coach › Mit KI formulieren", hint: "Frage stellen, „Mit KI formulieren“ → „Coach denkt …“, dann die Demo-Fassung" },
   { id: "week", label: "Berichte › Wochenabschluss", hint: "Verhalten der Woche, eine Lektion für morgen" },
   { id: "wizard", label: "Einrichtungs-Wizard", hint: "Vier kurze Schritte" },
   { id: "share", label: "Teilen-Fächer", hint: "Berichte › Export › Weitergeben" },

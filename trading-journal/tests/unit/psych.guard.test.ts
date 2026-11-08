@@ -159,7 +159,6 @@ describe("4 · no urgency in the buy and tariff path", () => {
     "src/billing/ui/PlanCard.tsx",
     "src/billing/ui/BillingBanner.tsx",
     "src/billing/purchase/OrderSheet.tsx",
-    "src/billing/purchase/PayStage.tsx",
     "src/billing/purchase/PayButton.tsx",
     "src/billing/purchase/ManageSheet.tsx",
     "src/billing/purchase/TariffDetailSheet.tsx",

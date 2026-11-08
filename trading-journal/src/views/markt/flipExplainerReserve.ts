@@ -4,4 +4,4 @@
  * with the app's own reserve utilities (`reserveStyle` + `RESERVE_CLASS` of `@/primitives/Reserve`) – no new CSS.
  * The numbers are px of the finished panel; `tests/e2e/flip-explainer.spec.ts` measures them again.
  */
-export const FLIP_RESERVE_PX = { base: 1300, sm: 1002, lg: 682 } as const;
+export const FLIP_RESERVE_PX = { base: 638, sm: 447, lg: 411 } as const;

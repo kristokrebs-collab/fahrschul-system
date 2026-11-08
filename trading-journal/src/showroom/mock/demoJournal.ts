@@ -100,9 +100,12 @@ interface Plan {
   note: string;
 }
 
-export function buildDemoJournal(nowMs: number): DemoJournal {
+/** Seed of the generator: the same journal on every device (the default one gives a mixed, slightly positive history). */
+export const DEMO_SEED = 42;
+
+export function buildDemoJournal(nowMs: number, seed = DEMO_SEED): DemoJournal {
   const now = new Date(nowMs);
-  const rand = rng(20261108);
+  const rand = rng(seed);
   const plans: Plan[] = [];
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const DAY = 86_400_000;
@@ -113,24 +116,42 @@ export function buildDemoJournal(nowMs: number): DemoJournal {
   plans.push({ at: new Date(t1), account: "scalp", side: "long", outcome: "loss", r: -1, followed: true, setup: "s_demo_bo", note: "Demo-Eintrag: Ausbruch fehlgeschlagen" });
   plans.push({ at: new Date(t2), account: "scalp", side: "long", outcome: "loss", r: -1.05, followed: false, setup: "s_demo_bo", note: "Demo-Eintrag: gleich noch einmal versucht (nicht nach Plan)" });
 
-  // the weeks before: 0–3 trades a weekday, a plus on average
+  // the weeks before: 0–3 trades a weekday. The results scatter like a real journal (Rücknahme R7 – no smooth rise): a thin edge, a win
+  // rate under one half, small scratches, slipped stops beyond −1 R, rare big winners, and a losing stretch two to three weeks back – the
+  // equity line goes up and down in uneven steps.
   for (let back = 1; back <= 40; back++) {
     const day = new Date(dayStart - back * DAY);
     const wd = day.getDay();
     if (wd === 0 || wd === 6) continue;
     const count = rand() < 0.2 ? 0 : 1 + Math.floor(rand() * (back < 9 ? 3 : 2.4));
+    const slump = back >= 13 && back <= 20;
     for (let k = 0; k < count; k++) {
       const hour = 8 + Math.floor(rand() * 13);
       const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, Math.floor(rand() * 60));
       const scalp = rand() < 0.72;
-      const win = rand() < (scalp ? 0.57 : 0.62);
-      const followed = win ? rand() < 0.92 : rand() < 0.55;
+      const u = rand();
+      const winP = slump ? 0.32 : scalp ? 0.53 : 0.56;
+      let r: number;
+      if (u < winP) {
+        // a winner: mostly 0.4–2 R, now and then a runner (capped at 5.5 R)
+        r = Math.min(5.5, 0.45 + -Math.log(1 - rand()) * 1.4);
+      } else if (u < winP + 0.12) {
+        // a scratch around break-even (fees decide the sign)
+        r = -0.25 + rand() * 0.55;
+      } else {
+        // a loss: the stop, sometimes early out, sometimes slipped past it
+        const v = rand();
+        r = v < 0.15 ? -(1.25 + rand() * 0.75) : v < 0.4 ? -(0.4 + rand() * 0.45) : -(0.9 + rand() * 0.2);
+      }
+      r = Math.round(r * 100) / 100;
+      const win = r > 0;
+      const followed = win ? rand() < 0.88 : rand() < 0.55;
       plans.push({
         at,
         account: scalp ? "scalp" : "makro",
-        side: rand() < 0.68 ? "long" : "short",
+        side: rand() < 0.62 ? "long" : "short",
         outcome: win ? "win" : "loss",
-        r: win ? Math.round((0.9 + rand() * 1.9) * 100) / 100 : -Math.round((0.85 + rand() * 0.35) * 100) / 100,
+        r,
         followed,
         setup: scalp ? (["s_demo_bo", "s_demo_sw", "s_demo_sh"] as const)[Math.floor(rand() * 3)]! : rand() < 0.6 ? "s_demo_mz" : "s_demo_sw",
         note: win ? "Demo-Eintrag" : followed ? "Demo-Eintrag: Stop getroffen" : "Demo-Eintrag: Plan nicht eingehalten",
@@ -141,8 +162,8 @@ export function buildDemoJournal(nowMs: number): DemoJournal {
 
   let price = 80_500;
   const trades = plans.map((p, i) => {
-    // a slow drift upwards over the weeks, so entries stay in a believable band
-    price += (rand() - 0.42) * 600;
+    // a random walk without a built-in trend, so entries stay in a believable band
+    price += (rand() - 0.5) * 900;
     const entry = Math.round(price / 10) * 10;
     const dir = p.side === "long" ? 1 : -1;
     const stopPct = p.account === "scalp" ? 0.006 + rand() * 0.004 : 0.02 + rand() * 0.012;

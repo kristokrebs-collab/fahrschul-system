@@ -149,14 +149,29 @@ describe("empty state", () => {
   });
 
   it("shows a running picture of its own kind on a rich page (the box is there at once, the art arrives into it)", async () => {
-    const { container } = render(rich(<EmptyState title="Noch nichts" art="orbit" line={false} action={<button type="button">Los</button>} />));
+    const { container } = render(rich(<EmptyState title="Noch nichts" art="draw" line={false} action={<button type="button">Los</button>} />));
     // in the flow it is as high as the dot glyph (33 px), the 64 × 40 picture overhangs inside it
     expect(container.querySelector("[style*='width: 64px'][style*='height: 33px']")).not.toBeNull();
     expect(container.querySelector("[data-empty-art-box][style*='height: 40px']")).not.toBeNull();
     const art = await screen.findByTestId("empty-art");
-    expect(art).toHaveAttribute("data-kind", "orbit");
+    expect(art).toHaveAttribute("data-kind", "draw");
     expect(art).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByRole("button", { name: "Los" })).toBeInTheDocument();
+  });
+
+  it("Rücknahme R6: no orbit anywhere – where the pick fell on it, the static dot ∅ of the plain empty state stands, in the same 33-px flow box", () => {
+    expect(["draw", "dots", "burst"]).toEqual(expect.arrayContaining([pickArt("Noch kein Plan"), pickArt("Keine Muster")]));
+    expect(pickArt("Noch kein Plan")).toBe("dots");
+    expect(pickArt("Keine Muster")).toBe("dots");
+    for (const title of ["Noch kein Plan", "Keine Muster"]) {
+      const { container, unmount } = render(rich(<EmptyState title={title} line={false} />));
+      const box = container.querySelector("[style*='width: 64px'][style*='height: 33px']");
+      expect(box, title).not.toBeNull();
+      // no running picture: no lazy art, a dot matrix that is not playing
+      expect(container.querySelector("[data-testid='empty-art']")).toBeNull();
+      expect(box!.querySelector("svg, canvas")).not.toBeNull();
+      unmount();
+    }
   });
 
   it("picks the picture from the title, always the same one", () => {

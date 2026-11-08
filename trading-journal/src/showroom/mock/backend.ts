@@ -1,24 +1,24 @@
 /**
- * The Showroom's whole backend in one object (Paket S): Supabase (auth, rows, Realtime), the billing functions, the Binance / Bybit data, the
- * coach, and a polite 404 for every other function. Transport-free: `route()` takes a `MockReq` and answers a `MockRes` (or says "not mine"),
- * the interceptor in `../install.ts` does the `fetch` / `WebSocket` side.
+ * The Showroom's whole backend in one object (Paket S): Supabase (auth, rows, Realtime, the mails), the billing functions, the coach, and a
+ * polite 404 for every other function. Transport-free: `route()` takes a `MockReq` and answers a `MockRes` (or says "not mine"), the
+ * interceptor in `../install.ts` does the `fetch` / `WebSocket` side.
  *
- * Nothing in here talks to a network. A request for a host this backend does not know is answered with a network error by the interceptor.
+ * Market data (Binance, Bybit, OKX … and the site's own relays) is NOT mocked: `route()` says "not mine" and the interceptor lets the request
+ * go to the real network, as in the normal build. Nothing in here talks to a network itself.
  */
 import { createBillingCore, mockSubscription, type BillingCore, type BillingSnapshot } from "./billingCore";
-import { fnRes, jsonRes, type MockReq, type MockRes } from "./http";
-import { binanceRest, bybitRest, wsFrame, type MarketCtx } from "./marketCore";
+import { fnRes, type MockReq, type MockRes } from "./http";
 import { claimsOf, createSupabaseCore, type SupabaseCore, type SupabaseSnapshot } from "./supabaseCore";
-import { SYNTH_INTERVAL_MS, synthKlines } from "./synth";
 import type { DemoJournal } from "./demoJournal";
 
 /** The demo accounts every visitor may use (the panel says so). The password is a public demo string, not a secret. */
 export const DEMO_ACCOUNT = { email: "demo@showroom.test", password: "demo-konto-1234" } as const;
-/** Latency of the coach's reply: long enough to see the ring think. */
+/** Latency of the coach's reply: long enough to see "Coach denkt …". */
 export const COACH_DELAY_MS = 2600;
 
 export interface ShowroomPersisted {
   v: 1;
+  /** the time of the first visit (kept in the stored state) */
   anchor: number;
   sb: SupabaseSnapshot;
   bill: BillingSnapshot;
@@ -28,7 +28,7 @@ export interface BackendOptions {
   now?: () => number;
   /** the host name of the page itself (same-origin `/api/v1/*` requests are this backend's) */
   selfHost: string;
-  /** anchor of the synthetic price path – fixed for the whole visit */
+  /** the time of the first visit (kept in the stored state) */
   anchor: number;
   /** the demo journal: the demo accounts' rows (a first visit) – read from the live journal at the first sync, see `lazyDocs` */
   journal: (() => DemoJournal) | null;
@@ -42,8 +42,7 @@ export interface BackendOptions {
 export interface Backend {
   sb: SupabaseCore;
   billing: BillingCore;
-  market: MarketCtx;
-  /** `null` = no rule of this backend (the interceptor decides: assets pass, foreign hosts fail) */
+  /** `null` = no rule of this backend (the interceptor decides: the site's files and market data pass, the hosts of mocked services fail) */
   route(req: MockReq): MockRes | Promise<MockRes> | null;
   /** the host to hand to a fake socket: which socket does a URL belong to */
   isSupabaseHost(host: string): boolean;
@@ -64,7 +63,6 @@ function coachReply(body: Record<string, unknown>): Record<string, unknown> {
 export function createBackend(o: BackendOptions): Backend {
   const now = o.now ?? Date.now;
   const restore = o.restore ?? null;
-  const market: MarketCtx = { now, anchor: o.anchor, script: "slide-account" };
   const changed = () => o.onChange?.();
 
   const sb = createSupabaseCore({
@@ -114,42 +112,26 @@ export function createBackend(o: BackendOptions): Backend {
     const { url } = req;
     const host = url.hostname;
     if (SUPABASE_HOSTS(host)) return sb.handleSupabase(req);
-    if (host === "fapi.binance.com") return binanceRest(url, market) ?? jsonRes(404, { code: -1, msg: "not mocked" });
-    if (host === "api.bybit.com") return bybitRest(url, market);
-    if (host === "data-api.binance.vision") {
-      if (url.pathname === "/api/v3/klines") {
-        const iv = url.searchParams.get("interval") ?? "1h";
-        const num = (k: string) => (url.searchParams.get(k) ? Number(url.searchParams.get(k)) : undefined);
-        return SYNTH_INTERVAL_MS[iv] ? jsonRes(200, synthKlines(iv, { limit: num("limit"), startTime: num("startTime"), endTime: num("endTime") }, market.anchor, now())) : jsonRes(400, { code: -1120, msg: "Invalid interval." });
-      }
-      return jsonRes(404, { code: -1, msg: "not mocked" });
-    }
+    // market data is NOT this backend's: Binance, Bybit, OKX … (and the site's own relays `/api/binance/*`, `/api/v1/klines`) go to the
+    // real network, exactly as in the normal build
     if (host !== o.selfHost) return null;
     const p = url.pathname;
-    if (p.startsWith("/api/binance/")) return binanceRest(url, market) ?? { status: 200, contentType: "text/html", body: "<!doctype html><title>SPA</title>" };
-    if (!p.startsWith("/api/v1/")) return null;
+    if (!p.startsWith("/api/v1/") || p === "/api/v1/klines") return null;
     if (p.startsWith("/api/v1/billing/")) return billing.handle(req);
     if (p === "/api/v1/coach/ask") {
       if (req.method === "GET") return fnRes(200, { enabled: true });
       return sleep(COACH_DELAY_MS).then(() => fnRes(200, coachReply(req.body)));
     }
     if (p === "/api/v1/assistant/route") return fnRes(200, { enabled: false });
-    if (p === "/api/v1/klines") {
-      const iv = url.searchParams.get("interval") ?? "1h";
-      const num = (k: string) => (url.searchParams.get(k) ? Number(url.searchParams.get(k)) : undefined);
-      return SYNTH_INTERVAL_MS[iv] ? fnRes(200, synthKlines(iv, { limit: num("limit"), startTime: num("startTime"), endTime: num("endTime") }, market.anchor, now())) : fnRes(400, { error: { code: "bad_interval", message: "Ungültiges Intervall." } });
-    }
     return sb.handleFunctions(req);
   }
 
   return {
     sb,
     billing,
-    market,
     route,
     isSupabaseHost: SUPABASE_HOSTS,
     persisted: () => ({ v: 1, anchor: o.anchor, sb: sb.snapshot(), bill: billing.snapshot() }),
   };
 }
 
-export { wsFrame };

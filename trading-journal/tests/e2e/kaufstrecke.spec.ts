@@ -92,8 +92,8 @@ test.describe("Kaufstrecke", () => {
     await expect(sheet).toHaveAttribute("data-seats", "3");
     await expect(sheet.getByTestId("order-total")).toContainText("57 €");
     await expect(sheet.getByTestId("order-tax")).toContainText("Steuer wird im nächsten Schritt von Stripe berechnet.");
-    await expect(sheet.getByTestId("order-first")).toContainText("Heute 0 € (14 Tage kostenlos testen), danach 57 € pro Monat");
-    await expect(page.getByTestId("order-footer-total")).toContainText("Heute 0 €, danach 57 € pro Monat");
+    await expect(sheet.getByTestId("order-first")).toContainText("Tage kostenlos testen – heute zahlst du nichts");
+    await expect(sheet.getByTestId("order-first")).toContainText("57 € pro Monat");
     await expect(sheet.getByTestId("order-renewal")).toContainText("verlängert sich automatisch");
     const dialog = page.getByRole("dialog", { name: "Deine Bestellung" });
     const pay = dialog.getByRole("button", { name: "Zahlungspflichtig bestellen", exact: true });
@@ -119,60 +119,18 @@ test.describe("Kaufstrecke", () => {
     expect(errors).toEqual([]);
   });
 
-  test("Bestellfenster: die Kartengrafik folgt der Auswahl, dreht sich und ist KEINE Karteneingabe; Ablaufband; Summe am Knopf; Reduced Motion", async ({ page }) => {
+  test("Bestellfenster wie vor Paket B (Rücknahme R2): eine Spalte, keine Kartengrafik, kein Ablaufband, keine Summe am Knopf", async ({ page }) => {
     await setup(page);
     await openRoute(page, PREISE, "Preise", { timeout: 30_000 });
     await signInHeader(page);
     await page.getByTestId("cta-premium").click();
     const sheet = page.getByTestId("order-sheet");
     await expect(sheet).toBeVisible({ timeout: 20_000 });
-    const card = page.getByTestId("plan-card-art");
-    await expect(card).toContainText("240 €");
-    await expect(card).toContainText("pro Jahr");
-    await expect(page.getByTestId("order-footer-total")).toContainText("240 € pro Jahr");
-    // not a form: nothing to type into, and it says where the card number goes
-    expect(await card.locator("input, textarea, select, button").count()).toBe(0);
-    await expect(page.getByTestId("order-card-note")).toContainText("hier wird keine Karte eingegeben");
-    // follows the order live
+    for (const id of ["plan-card-art", "order-steps", "order-flip", "order-card-note", "order-footer-total"]) await expect(page.getByTestId(id), id).toHaveCount(0);
+    await expect(sheet.getByTestId("order-total")).toContainText("240 €");
     await page.getByRole("radio", { name: "Monatlich" }).click();
-    await expect(card).toContainText("24 €");
-    await expect(card).toContainText("pro Monat");
-    await expect(page.getByTestId("order-footer-total")).toContainText("24 € pro Monat");
-    // turns over: the back lists what is included
-    const flip = page.getByTestId("order-flip");
-    await flip.click();
-    await expect(flip).toHaveAttribute("aria-pressed", "true");
-    await expect(card).toHaveAttribute("data-flipped", "");
-    await expect(card.locator('[data-face="back"] li').first()).toBeAttached();
-    // the path band: step 1 is the current one, "Bestätigung" is not reached in this window
-    const steps = page.getByTestId("order-steps");
-    await expect(steps.locator('li[aria-current="step"]')).toHaveText(/Bestellung prüfen/);
+    await expect(sheet.getByTestId("order-total")).toContainText("24 €");
     await expectNoHorizontalScroll(page);
-  });
-
-  test("Bestellfenster · Reduced Motion: kein Halo-Verlauf, die Karte dreht sich sofort, das Ablaufband bleibt lesbar", async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await setup(page);
-    await page.route(/\/api\/v1\/billing\/checkout$/, async (route) => {
-      await new Promise((r) => setTimeout(r, 6000));
-      await route.fallback();
-    });
-    await openRoute(page, PREISE, "Preise", { timeout: 30_000 });
-    await signInHeader(page);
-    await page.getByTestId("cta-pro").click();
-    const sheet = page.getByTestId("order-sheet");
-    await expect(sheet).toBeVisible({ timeout: 20_000 });
-    await page.getByTestId("order-flip").click();
-    await expect(page.getByTestId("plan-card-art")).toHaveAttribute("data-flipped", "");
-    await tick(sheet);
-    await page.getByTestId("order-pay").click();
-    const stage = page.getByTestId("pay-stage");
-    await expect(stage).toBeVisible();
-    await expect(stage.getByTestId("plan-card-art")).toHaveAttribute("data-tone", "working");
-    // no running animation on the stage under reduced motion (the ring stands still, the halo is a still disc)
-    const running = await stage.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a.playState === "running" && (a.effect as KeyframeEffect | null)?.getComputedTiming().iterations === Infinity).length);
-    expect(running).toBe(0);
-    await page.waitForURL(/checkout\.stripe\.com/);
   });
 
   test("Ergebnisseite: in Bearbeitung, solange der Server nichts weiß – die Rückkehr-URL allein bestätigt nie", async ({ page }) => {
@@ -383,14 +341,10 @@ test.describe("Kaufstrecke", () => {
     expect(during!.width).toBeCloseTo(before!.width, 0);
     expect(during!.height).toBeCloseTo(before!.height, 0);
     await expect(pay.getByTestId("button-orbs")).toBeAttached();
-    // Paket B: the label says what happens (after the click), the stage covers the summary – and the window keeps its size
-    await expect(pay).toContainText(/Wird vorbereitet|Weiter zu Stripe/);
-    const stage = page.getByTestId("pay-stage");
-    await expect(stage).toBeVisible();
-    await expect(stage.getByTestId("pay-stage-total")).toContainText("120 €");
-    await expect(stage).not.toContainText(/bezahlt|Paid|Abo ist aktiv/i);
+    // the window keeps its size while the button works (no stage covers it any more – Rücknahme R2)
+    await expect(page.getByTestId("pay-stage")).toHaveCount(0);
     const panelDuring = await panel.boundingBox();
-    expect(Math.abs(panelDuring!.height - panelBefore!.height), "the order window does not change its height when the stage comes").toBeLessThanOrEqual(2);
+    expect(Math.abs(panelDuring!.height - panelBefore!.height), "the order window does not change its height while the order is sent").toBeLessThanOrEqual(2);
     expect(Math.abs(panelDuring!.width - panelBefore!.width)).toBeLessThanOrEqual(1);
     // a second click while it works sends no second request
     await pay.click({ force: true, timeout: 2000 }).catch(() => undefined);

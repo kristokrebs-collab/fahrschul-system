@@ -32,7 +32,7 @@ import { gzipSync } from "node:zlib";
  * Runde 10: `initialCss` 46 → 52 – the richer motion (keyframes, hover states, tokens) is CSS; the JS limits do not move (new
  * motion code goes into lazy chunks).
  * Runde 12 (Paket C): `initialCss` 52 → 52.5 – measured 51.9 → 52.1 KiB: the glass chips and the caption of the share fan are Tailwind utilities
- * (the sidebar's sequence reuses its keyframes, the voice ring is a canvas in a lazy chunk and needs no CSS). Limit for the three packages of
+ * (the sidebar's sequence reuses its keyframes; the voice ring of that package is gone again – Rücknahme R3). Limit for the three packages of
  * the round together: +6 KiB, at most +2 KiB each – this one uses +0.2 and leaves 0.3 of headroom.
  * Runde 12 (Paket P, Verhaltenspsychologie): `initialCss` stays 52.5 – measured 52.3 before and after: the new cards (Wochenabschluss, Erinnerung,
  * Rückmeldung, Einrichtung) use only utility classes the app had already (no new keyframes, no new stylesheet); first load JS 656.7 → 656.9.

@@ -170,7 +170,7 @@ export default function TraderNetCard() {
     >
       <div className="grid gap-3">
         <Suspense fallback={<div className={RESERVE_CLASS} style={reserveStyle(FLIP_RESERVE_PX)} aria-hidden="true" data-testid="flip-explainer-loading" />}>
-          <FlipExplainer state={state} points={all} gaps={wal.gaps} view={ok ? v : null} prov={prov} series={series} priceName={base} reason={net.detail} />
+          <FlipExplainer state={state} points={all} gaps={wal.gaps} view={ok ? v : null} prov={prov} series={series} reason={net.detail} />
         </Suspense>
         {/* the headline and the line under it keep their room as one block: three lines of headline and two of detail on a
             phone, two and one from sm up – the text starts at the top, the spare room is at the end of the block */}
@@ -225,7 +225,7 @@ export default function TraderNetCard() {
           <div className={cn(PLOT_BOX, "grid place-items-center px-6 text-center")} data-testid="trader-net-empty">
             {state === "loading" ? (
               <span className="grid place-items-center gap-3">
-                <ThinkingOrb variant="ring" mood="think" size={40} />
+                <ThinkingOrb variant="search" size={36} />
                 <span className="text-[12px] text-mute">{S.loading}</span>
               </span>
             ) : (

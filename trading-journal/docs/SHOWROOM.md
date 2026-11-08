@@ -1,13 +1,14 @@
 # Showroom (Paket S)
 
-Stand: 08.11.2026. **Zweck.** Die Netlify-Vorschau eines Pull Requests ist ein klickbarer Showroom: Anmeldung, Registrierung, Bestellfenster, Zahlungsbühne, Wizard,
-Voice-Ring, Wal-Karte mit Flip-Grafik, Wochenabschluss und Psychologie-Karten sind dort sichtbar und bedienbar – **ohne** echtes Supabase, Stripe, Binance oder
-Anthropic, mit einem Demo-Journal. Vorher lieferte die Vorschau den nackten Build (ohne die Dienste): „Keine Abos in dieser Version“, kein Anmelden, Binance 451,
-keine Daten.
+Stand: 08.11.2026 (nach der Rücknahme R5/R7). **Zweck.** Die Netlify-Vorschau eines Pull Requests ist ein klickbarer Showroom: Anmeldung, Registrierung,
+Bestellfenster, Demo-Zahlungsseite, Wizard, Top-Trader-Karte mit „Was ist ein Flip?“, Wochenabschluss und Psychologie-Karten sind dort sichtbar und bedienbar – **ohne** echtes
+Supabase, Stripe oder Anthropic, mit einem Demo-Journal. **Marktdaten sind echt** (Binance, Bybit … wie im normalen Build, Rücknahme R5): die erfundenen Sägezahn-Kurven
+der ersten Fassung hat der Nutzer zu Recht „irrational“ genannt. Vorher lieferte die Vorschau den nackten Build (ohne die Dienste): „Keine Abos in dieser Version“, kein Anmelden.
 
-**Ehrlichkeit zuerst.** Alles im Showroom ist ein Mock im Browser. **Nichts davon beweist etwas gegen echte Dienste** (kein Supabase-Auth, kein Stripe, keine
-Binance-Antwort, keine KI). Der Showroom stellt nichts als echt, live oder rechtskräftig dar: der feste Banner sagt es, Erfolgsmeldungen sagen „Demo“, die Zahlungsseite
-sagt „Demo-Karte – nichts wird gespeichert oder gesendet“.
+**Ehrlichkeit zuerst.** Konten, Zahlungen, Coach-KI und Mails sind ein Mock im Browser. **Nichts davon beweist etwas gegen echte Dienste** (kein Supabase-Auth, kein Stripe,
+keine KI). Der Showroom stellt nichts als echt, live oder rechtskräftig dar: der feste Banner sagt es, Erfolgsmeldungen sagen „Demo“, die Zahlungsseite
+sagt „Demo-Karte – nichts wird gespeichert oder gesendet“. Die Marktdaten sind die echten – was sie zeigen, hängt davon ab, wo der Browser steht (aus einer gesperrten Region
+antwortet Binance 451, dann zeigen die Karten ihren ehrlichen Leerzustand wie im normalen Build).
 
 ## Wie er gebaut und gestartet wird
 
@@ -33,16 +34,18 @@ Variante mit einer importierten Konstante ließ die Chunks als verwaiste Dateien
 ```
 src/showroom/
   flag.ts, install.ts, runtime.ts, seed.ts, banner.ts   Installer (läuft vor dem App-Start), Zustand, Speicher, fester Banner
-  mock/   http.ts supabaseCore.ts billingCore.ts marketCore.ts synth.ts demoJournal.ts backend.ts fakeSockets.ts
+  mock/   http.ts supabaseCore.ts billingCore.ts demoJournal.ts backend.ts fakeSockets.ts
   ui/     ShowroomHost.tsx (Panel, Mail-Knopf, Rückkehr-Hinweis) DemoCheckout.tsx jumps.ts showroom.css
 ```
 
 * **Installer.** `main.tsx` lädt (nur mit Schalter) `install.ts`, wartet darauf und startet dann die App wie immer. Er ersetzt `window.fetch` und `window.WebSocket`:
-  jede Anfrage der App wird im Browser beantwortet; die eigenen Dateien der Seite (Chunks, Schriften, OCR) kommen von der Seite selbst; **jeder andere Host schlägt fehl wie
-  bei fehlendem Netz** (`TypeError: Failed to fetch`) – es verlässt keine Anfrage die Seite (der e2e-Test fängt jede Anfrage an einen fremden Ursprung ab und erwartet null).
+  Konto-, Zahlungs-, Coach- und Mail-Anfragen der App werden im Browser beantwortet; ein Host eines gemockten Dienstes (Supabase, Stripe, Anthropic), auf den der Mock keine Antwort hat,
+  schlägt fehl wie bei fehlendem Netz (`TypeError: Failed to fetch`). **Alles andere geht ans echte Netz wie im normalen Build:** die eigenen Dateien der Seite (Chunks, Schriften, OCR,
+  die Relais `/api/binance/*` und `/api/v1/klines`) und die Marktdaten (Binance REST und der Strom `fstream.binance.com`, Bybit, OKX). Der e2e-Test fängt jede Anfrage an einen gemockten
+  Dienst ab und erwartet null.
 * **Gemeinsame Mock-Handler.** Die Logik der e2e-Mocks ist in transportfreie Module gewandert und wird von beiden Welten benutzt: `tests/e2e/mocks/supabase.ts` und
-  `billing.ts` sind nur noch Playwright-Adapter (Route → `MockReq` → `route.fulfill`), `tests/e2e/mocks/synth.ts` re-exportiert `src/showroom/mock/synth.ts`.
-  `supabaseCore.ts` = GoTrue (Passwort, Registrierung, Magic Link, Reset, Refresh, PKCE-Code), PostgREST (`journal_docs`, `profiles`, `my_sessions`), Realtime (Phoenix-Frames),
+  `billing.ts` sind nur noch Playwright-Adapter (Route → `MockReq` → `route.fulfill`). Der synthetische Markt der e2e-Specs liegt wieder nur in `tests/e2e/mocks/synth.ts` (der Showroom braucht ihn
+  nicht mehr). `supabaseCore.ts` = GoTrue (Passwort, Registrierung, Magic Link, Reset, Refresh, PKCE-Code), PostgREST (`journal_docs`, `profiles`, `my_sessions`), Realtime (Phoenix-Frames),
   die Functions unter `/api/v1/*`; `billingCore.ts` = Status, Checkout, Portal, Vertrag, Code, Empfehlung. Neu und nur für den Showroom (alles aus, solange es niemand verlangt, die
   e2e-Mocks verhalten sich wie vorher): Postfach (`mailbox`: die Mail, die das echte Projekt schickte, wird aufgezeichnet), PKCE-Austausch, Echtzeit-Stempel, Zustands-Schnappschuss.
 * **Konten.** Beim ersten Besuch ist das **Demo-Konto Premium** (`demo@showroom.test`, Passwort `demo-konto-1234` – ein öffentlicher Demo-Text, kein Geheimnis) schon
@@ -51,15 +54,16 @@ src/showroom/
 * **Mail-Schritt.** Statt einer Mail zeigt die Seite einen gut sichtbaren Demo-Knopf („**Bestätigungslink simulieren**“, bei Magic Link / Reset „Anmelde-Link / Reset-Link simulieren“): er
   öffnet den Link, den die Mail enthielte – mit `?code=` und, wenn die Registrierung eine Bestellung trug, mit `?order=…` (die Bestellübersicht kommt danach zurück). Die Seite lädt dabei
   neu, deshalb liegt der Zustand des Mocks in `localStorage` (`tj2-showroom`).
-* **Marktdaten.** Binance (direkt, `/api/binance`-Relais, Spot-Rückfall), Bybit und der Strom `fstream.binance.com` sind **erzeugt**, nicht aufgezeichnet: derselbe synthetische Kurs und
-  dieselben Verhältnis-Skripte wie die e2e-Specs (`synth.ts`). Skript `slide-account`: die Top-Trader-Positionen sind vor etwa 60 Stunden von netto Long auf netto Short gekippt
-  (innerhalb der letzten 14 Tage), die Konto-Reihe rutscht über denselben Zeitraum – Wal-Karte und Flip-Grafik zeigen Daten **und** die Flip-Marke.
-* **Coach.** `/api/v1/coach/ask` antwortet nach 2,6 s („denkt nach“, der Voice-Ring ist sichtbar) mit einer **Demo-Formulierung** aus den Fakten der Anfrage und dem Satz „Demo-Formulierung des
+* **Marktdaten.** Echt (Rücknahme R5): Binance (direkt, `/api/binance`-Relais, Spot-Rückfall), Bybit und der Strom `fstream.binance.com` gehen ans echte Netz wie im normalen Build. Der frühere
+  synthetische Markt (`marketCore.ts`, `synth.ts`, die Markt-Sockets) ist aus dem Showroom entfernt. Ob die Top-Trader-Karte einen Flip zeigt, entscheidet jetzt der echte Verlauf.
+* **Coach.** `/api/v1/coach/ask` antwortet nach 2,6 s („Coach denkt …“) mit einer **Demo-Formulierung** aus den Fakten der Anfrage und dem Satz „Demo-Formulierung des
   Showrooms – keine echte KI-Antwort“. Das Ausschreiben als Strom macht der Client (`CoachStream`); die Antwort selbst ist eine einzelne JSON-Antwort wie in der echten Function.
-* **Demo-Journal.** Beim ersten Besuch schreibt der Showroom ~44 **erfundene** Trades der letzten sechs Wochen ins Gerät (jeder trägt „Demo-Eintrag“ in den Notizen): Berichte und
-  Wochenabschluss haben Trades in der laufenden Woche, heute stehen zwei Scalp-Verluste, die den größten Teil des Tageslimits verbrauchen (Risiko-Hinweis), Coach und
-  Wachstum haben Muster. Die Zeilen des Demo-Kontos entstehen beim ersten Abgleich aus genau diesem Journal, deshalb fragt die Anmeldung nichts (kein „Daten aus diesem Browser“).
-  Ruhige Voreinstellungen: kein Rundgang, kein Rückblick-/Check-in-Fenster, „Bericht bereit“ als gemeldet, alle Falten offen.
+* **Demo-Journal.** Beim ersten Besuch schreibt der Showroom ~44 **erfundene** Trades der letzten sechs Wochen ins Gerät (jeder trägt „Demo-Eintrag“ in den Notizen). Seit R7 streuen sie wie ein
+  echtes Journal statt stetig zu steigen: Trefferquote unter der Hälfte, kleine Null-Trades, über den Stopp gerutschte Verluste, seltene große Gewinner und eine Verlustphase zwei bis drei
+  Wochen zurück – die Kapitalkurve geht in ungleichen Schritten auf und ab (`tests/unit/showroom.mock.test.ts` prüft Rückgang und Vorzeichenwechsel). Berichte und Wochenabschluss haben Trades
+  in der laufenden Woche, heute stehen zwei Scalp-Verluste, die den größten Teil des Tageslimits verbrauchen (Risiko-Hinweis), Coach und Wachstum haben Muster. Die Zeilen des Demo-Kontos
+  entstehen beim ersten Abgleich aus genau diesem Journal, deshalb fragt die Anmeldung nichts (kein „Daten aus diesem Browser“). Ruhige Voreinstellungen: kein Rundgang, kein
+  Rückblick-/Check-in-Fenster, „Bericht bereit“ als gemeldet, alle Falten offen.
 
 ## Der feste Banner
 
@@ -70,16 +74,16 @@ Banner), Aufbau von Startseite und Cockpit bleiben unberührt. Dialoge liegen ü
 
 ## „Neu in dieser Version“ (Panel)
 
-Schließbar (Pille holt es zurück; die Wahl bleibt gemerkt), mit einem Sprung je Neuerung. Jeder Knopf geht über die Routen der App, nicht über eine Kopie des Bildschirms, und klappt das
-Panel danach weg, damit das Ziel zu sehen ist (e2e auf Handy **und** Desktop):
+Öffnet sich **nicht von selbst** (Rücknahme R5): beim Besuch steht nur die Pille „Neu in dieser Version“, ein Klick öffnet das Panel (die Wahl bleibt gemerkt), es ist schließbar.
+Mit einem Sprung je Neuerung. Jeder Knopf geht über die Routen der App, nicht über eine Kopie des Bildschirms, und klappt das Panel danach weg, damit das Ziel zu sehen ist (e2e auf Handy **und** Desktop):
 
 | Knopf | Ziel (Beleg) |
 |---|---|
-| Anmelden | meldet ab, öffnet die Anmelde-Klinge mit der Demo-E-Mail; Anmelden mit dem Demo-Zugang, danach Passwort-Reset über den simulierten Link |
+| Anmelden | meldet ab, öffnet das Anmelde-Blatt mit der Demo-E-Mail; Anmelden mit dem Demo-Zugang, danach Passwort-Reset über den simulierten Link |
 | Registrieren | räumt das Journal auf diesem Gerät leer (ein Journal mit Trades ist ein „bestehender Trader“, dort öffnet sich kein Wizard) und setzt den Showroom zurück, lädt neu und öffnet „Konto erstellen“; Registrieren → „Bestätigungslink simulieren“ → Einrichtungs-Wizard |
-| Bezahlfenster · Premium jährlich | setzt das angemeldete Konto im Mock auf „Frei“, öffnet das Bestellfenster (Schrittband, Karte zum Umdrehen) → Zahlungsbühne → Demo-Zahlungsseite → „Tarif aktiv“ |
-| Markt › Flip-Grafik | `top-trader-netto-karte`: „Was ist ein Flip?“, Diagramm „Echte Daten“, Marke „Flip 06.11. · netto Short“ |
-| Coach › Voice-Ring | stellt die erste Vorschlagsfrage, drückt „Mit KI formulieren“: der Ring denkt, dann die Demo-Fassung |
+| Bezahlfenster · Premium jährlich | setzt das angemeldete Konto im Mock auf „Frei“, öffnet das Bestellfenster (wie vor Paket B: eine Spalte, Zusammenfassung, Kaufknopf) → Demo-Zahlungsseite → „Tarif aktiv“ |
+| Markt › Top-Trader-Karte | `top-trader-netto-karte`: die Karte mit „Was ist ein Flip?“ über ihrem Chart (nur Text, keine eigene Marke; echte Binance-Daten) |
+| Coach › Mit KI formulieren | stellt die erste Vorschlagsfrage, drückt „Mit KI formulieren“: „KI formuliert …“, dann die Demo-Fassung |
 | Berichte › Wochenabschluss | scrollt zur Karte „Wochenabschluss“ |
 | Einrichtungs-Wizard | `openWizard` |
 | Teilen-Fächer | `teilen-faecher` (Berichte › Export › Weitergeben) |
@@ -100,25 +104,21 @@ Schrift und unserem Look.
   (nur Demo): „Bank verlangt noch eine Bestätigung“, „Zahlung scheitert nach der Prüfung“, „Bestätigung kommt nicht an“. Der Ausgang landet erst im Mock-Server (Webhook-artig), dann liest die
   Ergebnisseite ihn – wie bei Stripe: die Rückkehr-Adresse bestätigt nie etwas. Zweispaltig ab 860 px, auf dem Handy Karte oben und Formular darunter. Reduzierte Bewegung: keine Drehung, kein
   Lader, das Ergebnis steht (e2e).
-* **Im echten Produkt** verarbeiten wir **keine Kartenziffern selbst**. Dort übergibt das Bestellfenster an Stripes gehostetes Checkout (später eventuell Stripe Elements); die Choreografie läuft nur mit dem, was
-  ohne Kartendaten möglich ist: das Bestellfenster hat schon das Schrittband („Bestellung prüfen · Zahlung bei Stripe · Bestätigung“) und die Plan-Karte zum Umdrehen („Karte umdrehen: Das ist enthalten“),
-  die Zahlungsbühne (`PayStage`) zeigt den Übergang an Stripe, und „aktiv“ steht erst nach der Bestätigung des Servers (Stripe-Webhook) auf der Ergebnisseite. **Nicht gebaut:** ein „Authorising →
-  Paid“-Leuchten im echten Produkt (es gäbe nichts Echtes zu zeigen, bevor der Server bestätigt hat) und ein Kartenformular in unserer Seite. Die Showroom-Seite ist **keine** Vorlage für ein
-  Kartenfeld.
+* **Im echten Produkt** verarbeiten wir **keine Kartenziffern selbst**. Dort übergibt das Bestellfenster an Stripes gehostetes Checkout (später eventuell Stripe Elements). Das Bestellfenster ist seit
+  der Rücknahme R2 wieder das von vor Paket B (eine Spalte, Zusammenfassung mit Preis, Verlängerung, Kündigung, Kaufknopf mit Orbs – kein Ablaufband, keine Plan-Karte, keine Zahlungsbühne);
+  „aktiv“ steht erst nach der Bestätigung des Servers (Stripe-Webhook) auf der Ergebnisseite. **Nicht gebaut:** ein „Authorising → Paid“-Leuchten im echten Produkt und ein Kartenformular in
+  unserer Seite. Die Showroom-Seite ist **keine** Vorlage für ein Kartenfeld.
 
-## Anmeldung: Abgleich mit der Bildschirmaufnahme „Login & Signup“
+## Anmeldung
 
-Die schon gebaute `AuthBlade` (`src/cloud/ui/AuthBlade.tsx`) deckt das Vorbild: ein **schräges Band** (−14°) fährt einmal quer über die ganze Karte, die Inhalte tauschen hinter ihm
-(Anmelden ↔ Registrieren ↔ Magic Link), der Fokus landet im ersten Feld, die Karte behält ihre Box (nur `transform`), unser Name in Punktschrift trägt je Schritt einen Satz („Willkommen zurück.“,
-„Dein Journal. Dein Start.“), „Neu hier? Jetzt registrieren“ / „Schon registriert? Zur Anmeldung“, „Passwort vergessen?“, Passwort-Hinweis. Bewusste Abweichungen: unsere Markenfläche liegt **oben** in
-der schmalen Karte statt als zweite Spalte rechts/links (die Anmeldung ist ein Blatt, auch für das Handy); die Seitenfolge des Vorbilds (Formular links ↔ Markenfläche rechts, beim Registrieren
-getauscht) wurde nicht nachgebaut; **„Keep me signed in“ gibt es nicht** (das Konto bleibt auf dem Gerät angemeldet, bis man sich abmeldet – ein Schalter wäre ein Versprechen, das der Dienst nicht
-einlöst); **kein Feld „Full name“** (das Konto kennt keinen Namen). Offen: die Klinge im Showroom gegen das Video Bild für Bild messen.
+Seit der Rücknahme R1 ist das Anmelde-Blatt wieder das von vor Paket B: ein Blatt, Moduswahl (Passwort · Magic Link · Neu hier), die Felder gleiten (`AuthMorph`), kein Markenstreifen, keine
+Klinge, keine Bestellkarte. Geblieben sind die unsichtbaren Fixes (neutrale Registrier-Antwort, `?order=` im Mail-Link, Offline-Hinweis, „E-Mail nicht bestätigt“). Der Demo-Knopf des Mail-Schritts
+(„Bestätigungslink simulieren“) gehört zum Showroom.
 
 ## Grenzen
 
-* **Alles Mock, nichts bewiesen.** Supabase-Auth, Stripe-Abläufe, Binance- und Bybit-Daten, Coach-KI: nachgebaut. Marktdaten sind erfunden (ein synthetischer Kurs um 84.000); die Quellenzeilen der
-  App („Binance Futures …“) beschreiben, wo die App im echten Betrieb liest – im Showroom steht der Banner darüber.
+* **Mock, nichts bewiesen.** Supabase-Auth, Stripe-Abläufe, Coach-KI: nachgebaut. Marktdaten: echt, aber abhängig vom Standort des Browsers (aus dem Sandbox-Netz antwortet Binance 451 und
+  Bybit 403 – dann zeigen die Karten ihren Leerzustand, wie im normalen Build).
 * **Mail-Knopf und Tastatur.** Der Demo-Knopf liegt außerhalb des Dialogs der Anmeldung (damit er nicht inert ist); wer nur die Tastatur benutzt, erreicht ihn nicht per Tab aus dem Dialog.
   Ein Screenreader liest ihn als Statusmeldung vor.
 * **Persistenz.** Der Zustand des Mocks liegt im Speicher der Seite und wird in `localStorage` gesichert; „Demo zurücksetzen“ (Panel) räumt alle `tj2*`-Schlüssel und lädt neu.
