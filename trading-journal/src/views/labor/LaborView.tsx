@@ -65,10 +65,11 @@ const TimeMachineSection = lazy(() => import("@/views/timemachine/LaborSection")
 
 export const LABOR_LEAD_FILL = { storageKey: storageKey("fill-labor"), highlight: LABOR.highlight } as const;
 
-function Section({ id, section, title, sub, children }: { id: string; section: string; title: string; sub: string; children: ReactNode }) {
+/** `quiet`: the heading stays (outline, „Inhalt“, assistive tech) but takes no room – the section shows its own display title (the search's Frost block). */
+function Section({ id, section, title, sub, quiet, children }: { id: string; section: string; title: string; sub: string; quiet?: boolean; children: ReactNode }) {
   return (
     <section aria-labelledby={id} className="contents">
-      <SectionTitle id={id} section={section} title={title} sub={sub} className="lg:col-span-12" />
+      <SectionTitle id={id} section={section} title={title} sub={sub} className={quiet ? "h-0 overflow-hidden lg:col-span-12" : "lg:col-span-12"} />
       {children}
     </section>
   );
@@ -168,9 +169,9 @@ export function LaborView({ className }: { className?: string }) {
           </Suspense>
         </Cell>
       </Section>
-      <Section id={ids.search} section="search" title={SEARCH_TITLE} sub={SEARCH_SUB}>
+      <Section id={ids.search} section="search" title={SEARCH_TITLE} sub={SEARCH_SUB} quiet>
         <Cell index={0} span="lg:col-span-12">
-          <Suspense fallback={<PendingBlock height={{ base: 860, lg: 700 }} />}>
+          <Suspense fallback={<PendingBlock height={{ base: 1180, lg: 980 }} />}>
             <StrategySearchSection />
           </Suspense>
         </Cell>

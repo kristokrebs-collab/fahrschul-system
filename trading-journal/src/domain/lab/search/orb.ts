@@ -15,6 +15,9 @@
  *   Ziel      R-Vielfaches des Abstands Einstieg–Stop
  *   Ausführung  je Kerze: zuerst eine Lücke über den Stop (Eröffnung jenseits des Stops → Füllung zur Eröffnung), dann der Stop (vor dem
  *             Ziel, auch wenn beides in einer Kerze liegt), dann das Ziel; Zeit-Stopp am Schluss der letzten Kerze der Sitzung
+ *   Stop-Führung  fest / Einstand / Nachziehen (`StopRule`): am Schluss jeder Kerze ab der Einstiegskerze; hat der beste Kurs seit dem
+ *             Einstieg +1 R erreicht, zieht „Einstand“ den Stop auf den Einstieg (nur wenn der Schluss schon darüber liegt), „Nachziehen“ auf
+ *             bester Kurs − 1 R. Gültig ab der nächsten Kerze, nur enger (wie die Engine des Labors).
  *   Kosten    Gebühr Taker auf Einstieg, Stop und Zeit-Stopp, Maker auf das Ziel (Standard Binance 5 / 2 bp), Slippage gegen den Trader auf
  *             Market-Füllungen (das Ziel ist ein Limit). Funding ist hier NICHT eingerechnet (Sitzung ≤ 6,5 h, aber 16:00 UTC liegt in New York).
  *
@@ -25,6 +28,7 @@ import { ema } from "@/domain/signals";
 import { atrSeries } from "@/domain/backtest/bars";
 import { slipped } from "@/domain/backtest/slippage";
 import type { Bar, SlippageModel } from "@/domain/backtest/types";
+import type { StopRule } from "./types";
 
 export type OrbSessionId = "ny" | "london";
 export type OrbStop = "range" | "mid" | "atr15";
@@ -60,6 +64,8 @@ export interface OrbParams {
   targetR: number;
   stop: OrbStop;
   trend: boolean;
+  /** Stop-Führung nach dem Einstieg (Standard: fest) */
+  manage?: StopRule;
 }
 
 export interface OrbCosts {
@@ -197,14 +203,15 @@ export type OrbTrade =
     };
 
 /** Einstieg zur Eröffnung der Folgekerze, Ausführung Kerze für Kerze. `null` = nicht handelbar (Stop auf der falschen Seite). */
-export function orbTrade(prep: OrbPrep, d: OrbDetect, stopRule: OrbStop, targetR: number, costs: OrbCosts): OrbTrade | null {
+export function orbTrade(prep: OrbPrep, d: OrbDetect, stopRule: OrbStop, targetR: number, costs: OrbCosts, manage: StopRule = "fixed"): OrbTrade | null {
   if (!d.signal) return null;
   const { j, dir } = d.signal;
   if (j + 1 >= prep.n) return { state: "pending" };
   const b = prep.bars;
   const e = b[j + 1]!.o;
-  const stop = stopRule === "range" ? (dir > 0 ? d.low : d.high) : stopRule === "mid" ? (d.high + d.low) / 2 : e - dir * 1.5 * prep.atr[j]!;
-  const risk = (e - stop) * dir;
+  const stop0 = stopRule === "range" ? (dir > 0 ? d.low : d.high) : stopRule === "mid" ? (d.high + d.low) / 2 : e - dir * 1.5 * prep.atr[j]!;
+  let stop = stop0;
+  const risk = (e - stop0) * dir;
   if (!(risk > 0)) return null;
   const target = e + dir * targetR * risk;
   const path: number[] = [];
@@ -215,6 +222,7 @@ export function orbTrade(prep: OrbPrep, d: OrbDetect, stopRule: OrbStop, targetR
   let exit = 0;
   let kind: OrbExit | null = null;
   let k = j + 1;
+  let peak = e;
   for (; k <= d.iEnd && k < prep.n; k++) {
     // Lücke über den Stop: die Kerze eröffnet jenseits des Stops – Füllung zur Eröffnung (auf der Einstiegskerze ist das der Einstieg selbst)
     if (k > j + 1 && (b[k]!.o - stop) * dir <= 0) {
@@ -235,6 +243,15 @@ export function orbTrade(prep: OrbPrep, d: OrbDetect, stopRule: OrbStop, targetR
       break;
     }
     path.push(((b[k]!.c - e) * dir) / risk);
+    // Stop-Führung am Schluss dieser Kerze, gültig ab der nächsten; der Stop wird nur enger
+    if (manage !== "fixed") {
+      peak = dir > 0 ? Math.max(peak, b[k]!.h) : Math.min(peak, b[k]!.l);
+      if ((peak - e) * dir >= risk) {
+        const lvl = manage === "be" ? e : peak - dir * risk;
+        const behindClose = (b[k]!.c - lvl) * dir > 0;
+        if ((lvl - stop) * dir > 0 && (manage === "trail" || behindClose)) stop = lvl;
+      }
+    }
   }
   if (!kind) {
     if (k > d.iEnd) {
@@ -250,7 +267,7 @@ export function orbTrade(prep: OrbPrep, d: OrbDetect, stopRule: OrbStop, targetR
   const costR = (fee + Math.abs(entryFill - e) + (kind === "target" ? 0 : Math.abs(exitFill - exit))) / risk;
   const net = ((exitFill - entryFill) * dir - fee) / risk;
   path.push(((exit - e) * dir) / risk);
-  return { state: "closed", dir, j, entry: e, stop, target, risk, exit, exitKind: kind, kExit: k, r: net, costR, path };
+  return { state: "closed", dir, j, entry: e, stop: stop0, target, risk, exit, exitKind: kind, kExit: k, r: net, costR, path };
 }
 
 /** Alles zu einer Sitzung auf einmal – für die Suche, den Kandidaten und ein späteres Replay. */
@@ -268,7 +285,7 @@ export function orbSession(prep: OrbPrep, day: number, p: OrbParams, costs: OrbC
   const vf = detect.volFactor ?? 0;
   const tr = detect.trendOk === true;
   const counts = vf >= p.volThr && (!p.trend || tr);
-  return { detect, counts, note: orbNote(vf, tr, p.volThr), trade: counts ? orbTrade(prep, detect, p.stop, p.targetR, costs) : null };
+  return { detect, counts, note: orbNote(vf, tr, p.volThr), trade: counts ? orbTrade(prep, detect, p.stop, p.targetR, costs, p.manage ?? "fixed") : null };
 }
 
 /** Kosten-Modell der Familie aus dem Engine-Modell des Labors (Gebühren und Slippage). */

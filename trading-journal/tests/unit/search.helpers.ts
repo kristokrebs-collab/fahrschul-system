@@ -12,8 +12,13 @@ const T0 = Date.UTC(2024, 0, 1) / 1000;
 const STEP = 4 * 3600;
 
 export interface MarketOpts {
-  /** Länge des eingebauten Musters (Kerzen) und Stärke (Drift je Kerze als Anteil der Streuung); 0 = reiner Zufallspfad */
-  edge?: { lookback: number; hold: number; drift: number };
+  /**
+   * Länge des eingebauten Musters (Kerzen) und Stärke (Drift je Kerze als Anteil der Streuung); 0 = reiner Zufallspfad. Mit `random` dauert
+   * jeder Impuls zufällig lang (exponentiell, Mittel `hold` Kerzen, höchstens 4 × `hold`), stürzt danach in 2 Kerzen bis 4 σ UNTER den
+   * Ausbruch ab und erholt sich über `2 × hold` Kerzen wieder auf den Zufallspfad (ohne Netto-Drift) – ein Lauf unbekannter Länge mit
+   * jähem Ende: ein fester Stop gibt alles zurück (und mehr), ein nachgezogener behält den größten Teil.
+   */
+  edge?: { lookback: number; hold: number; drift: number; random?: boolean };
   sigma?: number;
   /** wechselnde Schwankung (Regime): σ × (1 + 0,8 · sin) mit Periode 500 Kerzen, ohne Drift */
   volCycle?: boolean;
@@ -40,7 +45,10 @@ export function market(n: number, seed: number, o: MarketOpts = {}): Bar[] {
   let pulse = 0; // Impuls (log)
   let up = 0;
   let down = 0;
+  let downLen = 1;
   let peak = 0;
+  /** Abschnitte nach einem zufälligen Lauf: Absturz, dann Erholung (Kerzen, Änderung je Kerze) */
+  const segs: { left: number; dp: number }[] = [];
   for (let i = 0; i < n; i++) {
     const open = 30_000 * Math.exp(x + pulse);
     let dp = 0;
@@ -49,13 +57,22 @@ export function market(n: number, seed: number, o: MarketOpts = {}): Bar[] {
       up--;
       if (up === 0) {
         peak = pulse + dp;
-        down = 2 * o.edge.hold;
+        if (o.edge.random) {
+          const low = -4 * sigma;
+          segs.push({ left: 2, dp: (low - peak) / 2 }, { left: 2 * o.edge.hold, dp: -low / (2 * o.edge.hold) });
+        } else {
+          down = 2 * o.edge.hold;
+          downLen = down;
+        }
       }
+    } else if (segs.length) {
+      dp = segs[0]!.dp;
+      if (--segs[0]!.left === 0) segs.shift();
     } else if (o.edge && down > 0) {
-      dp = -peak / (2 * o.edge.hold);
+      dp = -peak / downLen;
       down--;
     }
-    const pulseEnd = down === 0 && up === 0 && dp !== 0 ? 0 : pulse + dp;
+    const pulseEnd = down === 0 && up === 0 && segs.length === 0 && dp !== 0 ? 0 : pulse + dp;
     let hi = open;
     let lo = open;
     for (let k = 0; k < SUB; k++) {
@@ -67,10 +84,12 @@ export function market(n: number, seed: number, o: MarketOpts = {}): Bar[] {
     pulse = pulseEnd;
     const bar: Bar = { t: T0 + i * STEP, o: open, h: hi, l: lo, c: 30_000 * Math.exp(x + pulse), v: 100 };
     out.push(bar);
-    if (o.edge && up === 0 && down === 0 && i >= o.edge.lookback) {
+    if (o.edge && up === 0 && down === 0 && segs.length === 0 && i >= o.edge.lookback) {
       let top = -Infinity;
       for (let k = i - o.edge.lookback; k < i; k++) top = Math.max(top, out[k]!.h);
-      if (bar.c > top) up = o.edge.hold;
+      if (bar.c > top) {
+        up = o.edge.random ? Math.min(4 * o.edge.hold, 1 + Math.floor(-Math.log(1 - r()) * o.edge.hold)) : o.edge.hold;
+      }
     }
   }
   return out;

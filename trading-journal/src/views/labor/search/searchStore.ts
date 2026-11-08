@@ -116,6 +116,8 @@ interface SearchState {
   candidateError: string | null;
   /** counts up per finished search (the animation plays once per run) */
   runSeq: number;
+  /** measured wall time of the last search's computation (worker, ms) – shown in the caption; `null` for a restored one */
+  computeMs: number | null;
   saved: SearchSummary[];
   setCfg(patch: Partial<SearchCfg>): void;
   show(id: string): void;
@@ -135,6 +137,7 @@ export const useSearch = create<SearchState>()((set, get) => ({
   candidateBusy: false,
   candidateError: null,
   runSeq: 0,
+  computeMs: null,
   saved: readSaved(),
   setCfg(patch) {
     const cfg = sanitizeCfg({ ...get().cfg, ...patch });
@@ -144,7 +147,7 @@ export const useSearch = create<SearchState>()((set, get) => ({
   show(id) {
     const s = get().saved.find((x) => x.id === id);
     if (!s) return;
-    set({ status: "done", result: null, summary: s, bars: [], candidate: null, candidateError: null, error: null, runSeq: get().runSeq + 1 });
+    set({ status: "done", result: null, summary: s, bars: [], candidate: null, candidateError: null, error: null, runSeq: get().runSeq + 1, computeMs: null });
   },
 }));
 
@@ -171,7 +174,7 @@ export function pagesNeeded(interval: SearchInterval, days: number, now = Date.n
   return estimatePages(interval as HistInterval, from, now);
 }
 
-function finish(result: SearchResult, bars: Partial<Record<SearchFamily, readonly Bar[]>>, period: string | null, nowMs: number | null): void {
+function finish(result: SearchResult, bars: Partial<Record<SearchFamily, readonly Bar[]>>, period: string | null, nowMs: number | null, computeMs: number): void {
   const summary = summaryOf(result, period);
   const saved = [summary, ...useSearch.getState().saved.filter((s) => s.id !== summary.id)].slice(0, SAVED_MAX);
   writeSaved(saved);
@@ -179,8 +182,8 @@ function finish(result: SearchResult, bars: Partial<Record<SearchFamily, readonl
   const wb = (w && bars[w.variant.family]) || [];
   const wd = result.datasets.find((d) => d.family === result.winnerFamily);
   // nur wer bestanden hat, bekommt einen Kandidaten – sonst gibt es nichts anzubieten
-  const candidate = result.verdict.passed && w && wd ? candidateOf(wb, wd.interval, w.variant, nowMs) : null;
-  useSearch.setState((s) => ({ status: "done", progress: 1, result, summary, bars: wb, candidate, candidateError: null, error: null, saved, runSeq: s.runSeq + 1 }));
+  const candidate = result.verdict.passed && w && wd ? candidateOf(wb, wd.interval, w.variant, nowMs, w.stop) : null;
+  useSearch.setState((s) => ({ status: "done", progress: 1, result, summary, bars: wb, candidate, candidateError: null, error: null, saved, runSeq: s.runSeq + 1, computeMs }));
 }
 
 const IS_ABORT = (e: unknown): boolean => isLabAbort(e) || (e instanceof Error && e.name === "AbortError");
@@ -254,6 +257,7 @@ export async function startSearch(opts: { fixture?: SearchFixture; now?: number 
       return;
     }
     useSearch.setState({ status: "running", progress: 0.1, checked: { phase: "prepare", done: 0, total: 1000 } });
+    const t0 = performance.now();
     const result = await runSearch({ ...input, engine, seed: cfg.seed } as SearchJobInput, {
       signal: mine.signal,
       onSearchProgress: (p) => {
@@ -265,7 +269,7 @@ export async function startSearch(opts: { fixture?: SearchFixture; now?: number 
       },
     });
     if (ctl !== mine) return;
-    finish(result, bars, period, nowForCandidate);
+    finish(result, bars, period, nowForCandidate, performance.now() - t0);
   } catch (e) {
     if (ctl !== mine) return;
     if (IS_ABORT(e)) {
@@ -313,7 +317,7 @@ export async function checkCandidate(): Promise<void> {
       const loaded = await loadLabData({ symbol: d.symbol, intervals: [interval as HistInterval], from: now - SEARCH_WARMUP_BARS * HIST_MS[interval as HistInterval], to: now, funding: false, fallback: true });
       bars = loaded.data[interval as HistInterval] ?? [];
     }
-    useSearch.setState({ bars, candidate: candidateOf(bars, d.interval, w.variant, now), candidateBusy: false });
+    useSearch.setState({ bars, candidate: candidateOf(bars, d.interval, w.variant, now, w.stop), candidateBusy: false });
   } catch (e) {
     useSearch.setState({ candidateBusy: false, candidateError: e instanceof OrbLoadError ? `${e.message} ${SEARCH.errors.noSubstitute}` : SEARCH.candidate.checkFailed });
   }
@@ -327,5 +331,5 @@ export function __resetSearch(): void {
   ctl?.abort();
   ctl = null;
   lastUi = 0;
-  useSearch.setState({ cfg: DEFAULT_SEARCH_CFG, status: "idle", progress: 0, load: { done: 0, total: 0 }, checked: { phase: "load", done: 0, total: 0 }, error: null, result: null, summary: null, bars: [], candidate: null, candidateBusy: false, candidateError: null, runSeq: 0, saved: [] });
+  useSearch.setState({ cfg: DEFAULT_SEARCH_CFG, status: "idle", progress: 0, load: { done: 0, total: 0 }, checked: { phase: "load", done: 0, total: 0 }, error: null, result: null, summary: null, bars: [], candidate: null, candidateBusy: false, candidateError: null, runSeq: 0, computeMs: null, saved: [] });
 }

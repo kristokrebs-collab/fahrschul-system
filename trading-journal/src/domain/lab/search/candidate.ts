@@ -13,7 +13,7 @@ import { HIST_MS, type Bar, type BtSide } from "@/domain/backtest/types";
 import { positionSize, type Sizing } from "@/domain/risk/sizing";
 import { condsOf, variantText } from "./space";
 import { orbDetect, orbNote, orbPrepare, ORB_BAR_MS, ORB_SESSIONS } from "./orb";
-import type { AnyVariant, OrbVariant, SearchInterval, SearchVariant } from "./types";
+import type { AnyVariant, OrbVariant, SearchInterval, SearchVariant, StopRule } from "./types";
 
 export type CandidateState = "long" | "short" | "none" | "stale" | "nodata";
 
@@ -63,8 +63,8 @@ const MAX_AGE_BARS = 2;
  * Das Signal der Variante auf der letzten geschlossenen Kerze von `bars`. `nowMs` null = Demo-/Fixture-Daten: dann wird das Alter der
  * Kerzen nicht gegen die Uhr gehalten (der Aufrufer beschriftet sie als Demo).
  */
-function trendCandidate(bars: readonly Bar[], interval: SearchInterval, v: SearchVariant, nowMs: number | null): Candidate {
-  const rules = variantText(v);
+function trendCandidate(bars: readonly Bar[], interval: SearchInterval, v: SearchVariant, nowMs: number | null, rule?: StopRule): Candidate {
+  const rules = variantText(v, rule);
   const n = bars.length;
   if (n < 2) return { state: "nodata", asOf: 0, lastClose: null, signal: null, holdsFor: null, text: "Keine Kerzen – es gibt nichts zu prüfen.", rules };
   const secLen = HIST_MS[interval] / 1000;
@@ -120,8 +120,8 @@ const hhmm = (ms: number): string => {
  * ihr zuletzt gelungen ist (die letzte geschlossene Kerze) und die Filter der Variante (Volumen, Trend) erfüllt sind. Kam das Signal früher am Tag,
  * ist der Einstieg (Eröffnung der Folgekerze) vorbei – dann steht es da, aber ohne Einstieg, und es wird nicht nachgestiegen.
  */
-function orbCandidate(bars: readonly Bar[], v: OrbVariant, nowMs: number | null): Candidate {
-  const rules = variantText(v);
+function orbCandidate(bars: readonly Bar[], v: OrbVariant, nowMs: number | null, rule?: StopRule): Candidate {
+  const rules = variantText(v, rule);
   const n = bars.length;
   const base = { family: "orb" as const, rules, signal: null, holdsFor: null };
   if (n < 2) return { ...base, state: "nodata", asOf: 0, lastClose: null, text: "Keine Kerzen – es gibt nichts zu prüfen." };
@@ -171,9 +171,9 @@ function orbCandidate(bars: readonly Bar[], v: OrbVariant, nowMs: number | null)
   };
 }
 
-/** Das Signal der Variante auf den aktuellen Kerzen (Familie nach `v.family`; ORB braucht 5-Minuten-Kerzen). */
-export function candidateOf(bars: readonly Bar[], interval: SearchInterval | "5m", v: AnyVariant, nowMs: number | null): Candidate {
-  return v.family === "orb" ? orbCandidate(bars, v, nowMs) : { ...trendCandidate(bars, interval as SearchInterval, v, nowMs), family: "trend" };
+/** Das Signal der Variante auf den aktuellen Kerzen (Familie nach `v.family`; ORB braucht 5-Minuten-Kerzen); `rule` = die Stop-Führung des Siegers (nur für den Regeltext). */
+export function candidateOf(bars: readonly Bar[], interval: SearchInterval | "5m", v: AnyVariant, nowMs: number | null, rule?: StopRule): Candidate {
+  return v.family === "orb" ? orbCandidate(bars, v, nowMs, rule) : { ...trendCandidate(bars, interval as SearchInterval, v, nowMs, rule), family: "trend" };
 }
 
 /** Die eigenen Risikoeinstellungen des Nutzers; `null` = nicht festgelegt (dann gibt die Karte keine Größe aus). */
