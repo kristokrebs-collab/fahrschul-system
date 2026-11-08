@@ -22,7 +22,7 @@
  * nothing moves when the data arrives, the series or range changes or the plot paints. The flip, the ring pulse and the draw-in live
  * in `TraderNetPlot`.
  */
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import type { WhaleMark } from "@/domain/alerts/replay";
 import { netTitle, type NetFlip, type NetPoint, type NetTitleSegment, type TraderNetView } from "@/domain/signals";
 import { NET_SERIES, NET_SERIES_IDS, netPointsToCsv, type NetSeriesId } from "@/domain/signals/netSeries";
@@ -37,11 +37,16 @@ import { Segmented } from "@/primitives/Segmented";
 import { download } from "@/store/download";
 import { TraderNetArchive } from "./TraderNetArchive";
 import TraderNetPlot from "./TraderNetPlot";
+import { RESERVE_CLASS, reserveStyle } from "@/primitives/Reserve";
+import { FLIP_RESERVE_PX } from "./flipExplainerReserve";
 import { flipIn, gapsInWindow, kpisOf, loadedLine, plotLabel, rangeChoices, windowPoints, type Kpi, type KpiTone } from "./traderNetCardModel";
 import { NETCARD as S } from "./traderNetStrings";
 import { archiveLine, buildWal, marksIn, marksRuleText, marksSummary, provenanceOf, walLine } from "./traderNetWal";
 
 export const TRADER_NET_CARD_ID = "markt-trader-net";
+
+// Paket W: "Was ist ein Flip?" (real data of this card + a three-step schema) – its own chunk, a reserved box meanwhile
+const FlipExplainer = lazy(() => import("./FlipExplainer"));
 
 const BADGE: Record<"long" | "short" | "neutral", { tone: BadgeTone; label: string }> = {
   long: { tone: "win", label: "Netto Long" },
@@ -164,6 +169,9 @@ export default function TraderNetCard() {
       data-series={series}
     >
       <div className="grid gap-3">
+        <Suspense fallback={<div className={RESERVE_CLASS} style={reserveStyle(FLIP_RESERVE_PX)} aria-hidden="true" data-testid="flip-explainer-loading" />}>
+          <FlipExplainer state={state} points={all} gaps={wal.gaps} view={ok ? v : null} prov={prov} series={series} priceName={base} reason={net.detail} />
+        </Suspense>
         {/* the headline and the line under it keep their room as one block: three lines of headline and two of detail on a
             phone, two and one from sm up – the text starts at the top, the spare room is at the end of the block */}
         <div className="grid min-h-[calc(3.9*clamp(16px,4.4vw,21px)+6px+33px)] content-start gap-1.5 sm:min-h-[77px]">
