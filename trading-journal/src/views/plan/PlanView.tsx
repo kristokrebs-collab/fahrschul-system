@@ -149,7 +149,7 @@ function LinkLine() {
       <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
         {notice.applied.length > 0 ? (
           <p data-testid="hplan-link-applied">
-            <span className="font-medium text-fg">Aus dem Link übernommen:</span> {notice.applied.join(" · ")}. Es wurde nichts gespeichert und nichts gesendet.
+            <span className="font-medium text-fg">{notice.source ?? "Aus dem Link übernommen:"}</span> {notice.applied.join(" · ")}. Es wurde nichts gespeichert und nichts gesendet.
           </p>
         ) : (
           <p data-testid="hplan-link-applied">Der Link enthielt nichts, was der Handelsplan übernehmen konnte. Es wurde nichts verändert.</p>

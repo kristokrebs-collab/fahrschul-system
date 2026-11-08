@@ -41,6 +41,7 @@ import { Cell, SectionTitle } from "./ui";
 import { DRAFTS } from "./draftStrings";
 import { FORWARD } from "./forward/strings";
 import { EVOLVE } from "@/views/evolve/strings";
+import { SEARCH_SUB, SEARCH_TITLE } from "./search/title";
 
 /** F20 / F18 / F17: its own chunk, fetched only when a finished run is on the page. */
 const ExtrasSection = lazy(() => import("./ExtrasSection"));
@@ -57,6 +58,8 @@ const DraftsSection = lazy(() => import("./DraftsSection"));
 const DiscoverySection = lazy(() => import("./DiscoverySection"));
 /** F66: the background optimiser – its own chunk (the panel, the worker and the search load with it). */
 const EvolveSection = lazy(() => import("@/views/evolve/EvolveSection"));
+/** Strategiesuche „1.000 Varianten. Eine bleibt.“: eigene Chunks (Suche, Canvas, Ergebnis); der Rechner läuft im Lab-Worker. */
+const StrategySearchSection = lazy(() => import("./search/StrategySearchSection"));
 /** Zeitmaschine: the plan form + the card (charts, worker) – its own chunks, fetched when the page is shown. */
 const TimeMachineSection = lazy(() => import("@/views/timemachine/LaborSection"));
 
@@ -80,7 +83,7 @@ export function LaborView({ className }: { className?: string }) {
   const custom = useLabor((s) => s.cfg.strategy === "custom");
   const hasIdea = useLabor((s) => s.idea != null);
   const busy = status === "loading" || status === "running";
-  const ids = { setup: useId(), run: useId(), diagnose: useId(), fit: useId(), extras: useId(), forward: useId(), robust: useId(), compare: useId(), tv: useId(), drafts: useId(), discovery: useId(), evolve: useId(), timemachine: useId() };
+  const ids = { setup: useId(), run: useId(), diagnose: useId(), fit: useId(), extras: useId(), forward: useId(), robust: useId(), compare: useId(), tv: useId(), drafts: useId(), discovery: useId(), evolve: useId(), search: useId(), timemachine: useId() };
   const T = LABOR.sections;
   // the sections that exist right now (the ones below a run only after a finished run), for the "Inhalt" strip
   const shown = hasResult && !busy;
@@ -90,6 +93,7 @@ export function LaborView({ className }: { className?: string }) {
     ...(shown ? [{ id: "diagnose", label: T.diagnose.title }, { id: "fit", label: T.fit.title }, { id: "extras", label: T.extras.title }] : []),
     { id: "forward", label: FORWARD.section.title },
     { id: "evolve", label: EVOLVE.section.title },
+    { id: "search", label: SEARCH_TITLE },
     ...(shown ? [{ id: "robust", label: T.robust.title }] : []),
     ...(hasResult || runs > 0 ? [{ id: "compare", label: T.compare.title }] : []),
     { id: "tv", label: T.tv.title },
@@ -161,6 +165,13 @@ export function LaborView({ className }: { className?: string }) {
         <Cell index={0} span="lg:col-span-12">
           <Suspense fallback={<PendingBlock height={{ base: 1375, lg: 935 }} />}>
             <EvolveSection />
+          </Suspense>
+        </Cell>
+      </Section>
+      <Section id={ids.search} section="search" title={SEARCH_TITLE} sub={SEARCH_SUB}>
+        <Cell index={0} span="lg:col-span-12">
+          <Suspense fallback={<PendingBlock height={{ base: 860, lg: 700 }} />}>
+            <StrategySearchSection />
           </Suspense>
         </Cell>
       </Section>

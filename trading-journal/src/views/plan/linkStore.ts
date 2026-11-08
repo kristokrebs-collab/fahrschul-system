@@ -14,6 +14,8 @@ export interface LinkNotice {
   applied: string[];
   /** what it could not use (German sentences) */
   ignored: string[];
+  /** who handed the values over, if not a link ("Aus deiner Strategiesuche übernommen:"); absent = „Aus dem Link übernommen:“ */
+  source?: string;
 }
 
 interface ActiveLink {
