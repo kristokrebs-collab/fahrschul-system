@@ -31,3 +31,5 @@ Reduced Motion = Endzustand. Ehrlich: Demo-Daten, "Simulation, keine Prognose", 
    -> Stop mit kleinem Schlupf (bis ca. 0,1 R), Ziel als Limit genau auf R; Beschriftung rechts.
 Gegenprobe: keine Skriptfehler; Ziehen rastet bei 0,5 R (Haptik-Tick); Reduced Motion zeigt Endzustand; Ergebnis bei Zufall
 ehrlich "Kein belastbarer Vorteil" bzw. "verliert im Schnitt".
+
+> Ersetzt durch prototypes/setup-labor/ (echte Kerzen statt Demo-Daten).
