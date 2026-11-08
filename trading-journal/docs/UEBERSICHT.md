@@ -248,7 +248,7 @@ _Limits, Exposure und Regeln, bevor es teuer wird._ · 13 Funktionen
 
 ### Strategie entwickeln & testen
 
-_Eine Idee bauen und gegen echte Historie prüfen._ · 23 Funktionen
+_Eine Idee bauen und gegen echte Historie prüfen._ · 24 Funktionen
 
 **Idee bauen**
 
@@ -275,6 +275,7 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 23 Funktionen
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
+| 1.000 Varianten prüfen und nur eine einzige gegen den Endtest laufen lassen | Strategiesuche (1.000 Varianten) | Labor › 1.000 Varianten. Eine bleibt. | fertig |
 | Prüfen, ob die Strategie höhere Kosten übersteht | Kosten- und Belastungstest | Labor › Kosten- und Belastungstest | fertig |
 | Den Test auf Ausreißer und Datenlücken prüfen | Strategie-Prüfbericht | Labor › Strategie-Prüfbericht | fertig |
 | Prüfen, ob die Strategie nur zur Vergangenheit passt (Overfitting) | Robustheit: Overfitting, Walk-forward, Heatmap | Labor › Overfitting-Check | fertig |

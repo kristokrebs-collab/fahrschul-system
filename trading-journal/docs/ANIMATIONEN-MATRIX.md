@@ -390,6 +390,19 @@ Spalten: Nr · Name · Quelle · Status · Stelle im Code · Entscheidung · Beg
 | 176 | Responsive Canvas Chart | V | wiederhergestellt/verbessert | `src/views/analyse/fanDraw.ts`, `src/views/markt/TraderNetPlot.tsx`, `src/views/aktien/branchen/charts.tsx` | bleibt | Canvas mit höchstens doppelter Pixeldichte, neu gemalt bei Größe und Theme; Runde 10 fügt zwei Flächen hinzu. |
 | 177 | Simulation Approval Button | V | vorhanden | `src/views/labor/SideCards.tsx` (`ReferenceCard`, `celebrateRecord`) | bleibt | Ohne Vorlage gedeutet: „Als Vergleich übernehmen“ nach einem Labor-Lauf feiert die Übernahme mit Konfetti und Toast. |
 
+## Frost F1 – „1.000 Varianten. Eine bleibt.“ (Zusatz, keiner der 177 Punkte)
+
+Die Frost-Kristallisation des Prototyps (`prototypes/trading-journal-frost`, nur Konzept, simulierte Daten) ist im Labor als echte Strategiesuche gebaut; die Zeilen oben bleiben unverändert.
+
+| Bewegung | Wo | Zustand |
+|---|---|---|
+| 1.000 Kurven werden gezeichnet, ein Scanner besucht jede Variante in ihrer echten Reihenfolge, der jeweils beste Score blitzt mint auf, der Rest tritt zurück (Eintritt ease-out, Austritt ease-in, nichts linear), die Siegerlinie wird dick und läuft gestrichelt in den Endtest-Bereich (20 %) | `src/views/labor/search/SearchCanvas.tsx`, `timeline.ts` (die Daten der Wiedergabe: `sceneOf`, `framePlan`, `flashSequence`) | neu eingebaut, Canvas ohne neue Abhängigkeit, eine endliche Wiedergabe von 7,2 s, kein Dauerloop |
+| Fortschritt mit echter Zahl („412 von 1.000 geprüft“) | `StrategySearchSection.tsx` (`Busy`), Zahl aus dem Lab-Worker (`search-progress`) | neu eingebaut, höchstens ~8 Aktualisierungen je Sekunde |
+| Ergebniskarte erscheint erst nach der Wiedergabe; Platz ist reserviert (Sichtbarkeit statt Einfügen, die Bühne hat feste Höhe) | `StrategySearchSection.tsx` | kein Layout-Sprung während der Wiedergabe |
+| Reduced Motion (`useReducedFx`) und „Überspringen“: Endzustand sofort | `SearchCanvas.tsx` | geprüft in `tests/unit/views.labor.search.test.tsx` |
+
+Belege, dass nichts erfunden ist: `tests/unit/views.labor.search.test.tsx` (die Szene hält dieselben Arrays wie das Ergebnis, die Blitze sind die Wechsel des laufenden Bestwerts, die gezeichneten Punkte liegen auf den Werten der Kurven). Die Wiedergabe zeigt eine fertig gerechnete Suche; sie ist eine Darstellung, kein Live-Rechnen.
+
 ## Was nicht belegt werden konnte
 
 - **Die Originale der Quelle R** (46 Punkte, mit Port oder ohne): Die Dateien der Sammlung `pulse-motion` und der Kataloge (Uiverse, Magic UI, Hyper-Stack) liegen nicht im Bestand. Ein „vorhanden“ in R-Zeilen belegt nur, dass die App einen Port hat, nicht dass er der Vorlage gleicht.

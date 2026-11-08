@@ -8,15 +8,26 @@
  */
 import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
 import type { ExtraJobInput, ExtraResult } from "../lab/extras/job";
+import type { SearchJobInput, SearchPhase, SearchResult } from "../lab/search/types";
 import { createLabJob, type LabJobInput, type LabPhase, type LabResult } from "./job";
 import type { LabRequest, LabResponse } from "./labProtocol";
 
 export type LabRunMode = "auto" | "idle";
 
+/** Fortschritt der Strategiesuche: `done` von `total` Varianten der laufenden Phase. */
+export interface SearchProgress {
+  progress: number;
+  phase: SearchPhase;
+  done: number;
+  total: number;
+}
+
 export interface LabRunOptions {
   signal?: AbortSignal;
   mode?: LabRunMode;
   onProgress?: (progress: number, phase: LabPhase) => void;
+  /** Strategiesuche: Fortschritt mit der echten Zahl der geprüften Varianten */
+  onSearchProgress?: (p: SearchProgress) => void;
 }
 
 const FALLBACK_SLICE_MS = 8;
@@ -36,7 +47,7 @@ export function labWorkerAllowed(): boolean {
 class WorkerFailed extends Error {}
 
 /** The request without its id (the runner numbers the runs). */
-type LabRequestBody = { kind: "run"; input: LabJobInput } | { kind: "extra"; input: ExtraJobInput };
+type LabRequestBody = { kind: "run"; input: LabJobInput } | { kind: "extra"; input: ExtraJobInput } | { kind: "search"; input: SearchJobInput };
 
 async function viaWorker<R>(body: LabRequestBody, o: LabRunOptions): Promise<R> {
   let W: new (opts?: { name?: string }) => Worker;
@@ -82,7 +93,8 @@ async function viaWorker<R>(body: LabRequestBody, o: LabRunOptions): Promise<R> 
       if (m.id !== id) return;
       arm();
       if (m.kind === "progress") o.onProgress?.(m.progress, m.phase);
-      else if (m.kind === "done" || m.kind === "extra-done") done(() => resolve(m.result as R));
+      else if (m.kind === "search-progress") o.onSearchProgress?.({ progress: m.progress, phase: m.phase, done: m.done, total: m.total });
+      else if (m.kind === "done" || m.kind === "extra-done" || m.kind === "search-done") done(() => resolve(m.result as R));
       else done(() => reject(new Error(m.message)));
     };
     w.onerror = () => {
@@ -168,6 +180,37 @@ export function runExtra(input: ExtraJobInput, o: LabRunOptions = {}): Promise<E
     async () => {
       const { createExtraJob } = await import("../lab/extras/job");
       return runIdleJob(createExtraJob(input), o);
+    },
+    o,
+  );
+}
+
+/**
+ * Runs the strategy search („1.000 Varianten. Eine bleibt.“) the same way: the lab worker with real progress messages
+ * (`onSearchProgress`: „412 von 1.000 geprüft“), else idle chunks; cancelling terminates the worker / stops the chunks.
+ * The search module is loaded on demand (the idle path) – a page that never opens the search never pays for it.
+ */
+export function runSearch(input: SearchJobInput, o: LabRunOptions = {}): Promise<SearchResult> {
+  return execute<SearchResult>(
+    { kind: "search", input },
+    async () => {
+      const { createSearchJob } = await import("../lab/search/job");
+      const job = createSearchJob(input);
+      return runIdleJob(
+        {
+          step: (d) => job.step(d),
+          progress: () => job.progress(),
+          phase: () => "overfit" as LabPhase,
+          result: () => job.result(),
+        },
+        {
+          ...o,
+          onProgress: () => {
+            const c = job.checked();
+            o.onSearchProgress?.({ progress: job.progress(), phase: c.phase, done: c.done, total: c.total });
+          },
+        },
+      );
     },
     o,
   );
