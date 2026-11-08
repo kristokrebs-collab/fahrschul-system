@@ -218,7 +218,8 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
                 {CTA.manage}
               </Button>
             )}
-            {paid && (
+            {/* mode "off" (no cloud, e.g. the plain preview): the purchase host is never mounted (`BillingHost` is inert), so the button would do nothing */}
+            {paid && mode !== "off" && (
               <Button variant="ghost" size="sm" className="w-full" onClick={() => openDetail(plan as PaidPlanId)} data-testid={`details-${plan}`}>
                 {PREISE.details}
               </Button>

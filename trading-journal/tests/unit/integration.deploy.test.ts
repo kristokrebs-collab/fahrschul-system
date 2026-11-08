@@ -53,7 +53,9 @@ describe("netlify.toml", () => {
     // Stripe / Bitunix / Anthropic are server-side only
     expect(csp).not.toMatch(/stripe|bitunix|anthropic/i);
     expect(toml).toMatch(/Strict-Transport-Security = "max-age=63072000; includeSubDomains"/);
-    expect(toml).toMatch(/Permissions-Policy = "camera=\(\), microphone=\(\), geolocation=\(\)"/);
+    // the microphone is allowed for the app itself only: the assistant's voice input (F74) and the voice note (F31) need it, and
+    // `microphone=()` would switch it off for the whole page (Launch-Audit D1); camera and location stay off
+    expect(toml).toMatch(/Permissions-Policy = "camera=\(\), microphone=\(self\), geolocation=\(\)"/);
   });
 
   it("the self-hosted OCR files are cached for good (their version is in the path) and never come from a third party", () => {

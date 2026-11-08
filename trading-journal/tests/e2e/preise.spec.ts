@@ -302,6 +302,9 @@ test.describe("Preise & Abo", () => {
     await expect(page.getByTestId("billing-closed")).toContainText("Keine Abos in dieser Version");
     await expect(page.getByTestId("plan-pro")).toBeVisible();
     await expect(page.getByTestId("legal-cancel")).toHaveCount(0);
+    // Launch-Audit D1: no card carries a button that does nothing – „Tarif im Detail“ needs the purchase host, which a build without cloud never mounts
+    for (const plan of ["pro", "premium", "team"]) await expect(page.getByTestId(`details-${plan}`)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Tarif im Detail" })).toHaveCount(0);
     await expectNoHorizontalScroll(page);
     await shot(page, info, "off");
     expect(errors).toEqual([]);

@@ -115,7 +115,8 @@ export function EntryStep({ vm }: { vm: PlanVm }) {
               wrapperClassName="w-44"
               data-testid="hplan-symbol-input"
             />
-            <Button size="sm" onClick={addCustom} data-testid="hplan-symbol-add">
+            {/* empty field: `addCustom` would silently do nothing – so the button says "not yet" instead (Launch-Audit D1) */}
+            <Button size="sm" onClick={addCustom} disabled={custom.trim() === ""} data-testid="hplan-symbol-add">
               Übernehmen
             </Button>
           </div>
