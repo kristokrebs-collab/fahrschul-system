@@ -153,17 +153,20 @@ export const TrendStructureCard = memo(function TrendStructureCard() {
               );
             })}
           </div>
-          {blocked.length > 0 ? (
-            <ul className="grid gap-0.5 text-[11px] text-faint" aria-label={TREND.blocked} data-testid="trend-blocked">
-              {blocked.map((b) => (
-                <li key={b.tf}>
-                  <span className="num font-mono text-mute">{tfLabel(b.tf)}</span> – {b.avail.reason}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <span className="text-[11px] text-faint">{TREND.tfsHelp}</span>
-          )}
+          {/* the blocked list and the help line trade places when the candles have loaded: the place (3 lines at 390 px) is held either way */}
+          <div className="grid min-h-[50px] content-start sm:min-h-0">
+            {blocked.length > 0 ? (
+              <ul className="grid gap-0.5 text-[11px] text-faint" aria-label={TREND.blocked} data-testid="trend-blocked">
+                {blocked.map((b) => (
+                  <li key={b.tf}>
+                    <span className="num font-mono text-mute">{tfLabel(b.tf)}</span> – {b.avail.reason}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <span className="text-[11px] text-faint">{TREND.tfsHelp}</span>
+            )}
+          </div>
           {failed && (
             <span role="alert" className="text-[11px] text-loss">
               {TREND.saveFailed}
