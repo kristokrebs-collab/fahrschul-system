@@ -91,3 +91,14 @@ Der Nutzer hat WhatsApp-Business, ein Kapso-Konto und ein ElevenLabs-Konto. Neu 
 Schlüssel gehören **nie in den Chat**. Zwei sichere Wege: (1) lokal in deinem Terminal oder deiner `.env` (nicht ins Repo), (2) für diese Cloud-Sitzung gibt es ein sicheres Formular: ich frage den Schlüssel dann gezielt an, du fügst ihn nur dort ein, ich sehe den Wert nie. Das mache ich erst, wenn ein echter Test nötig ist und du zustimmst.
 
 Reihenfolge zum Testen (ohne Risiko): 1) ElevenLabs-Key setzen, `elevenlabs-text-to-speech` mit einem kurzen Testsatz; 2) Kapso-Key setzen, Verbindung nur lesend prüfen; 3) Testnachricht nur an deine eigene Nummer; 4) erst danach echte Kunden, mit Einwilligung und Freigabe. Telefonaufzeichnung und KI-Hinweis vorher juristisch prüfen.
+
+### MCP-Verbindung zu ElevenLabs und Kapso (Stand 2026-11-08)
+
+**Ein Befehl pro Server.** `claude mcp add` nimmt genau einen Namen und eine Adresse; zwei Adressen in einem Aufruf funktionieren nicht.
+
+| Server | Befehl (im eigenen Claude Code) | Anmeldung | Quelle / Stand |
+|---|---|---|---|
+| ElevenLabs (gehostet) | `claude mcp add --transport http elevenlabs https://api.elevenlabs.io/v1/mcp` | **OAuth, kein API-Key nötig**: danach in Claude Code `/mcp` öffnen, `elevenlabs` wählen und im Browser anmelden | Adresse und OAuth stehen in der README des offiziellen Repos `elevenlabs/elevenlabs-mcp` (das lokale `uvx`-Paket ist dort als veraltet markiert). Doku-Seite: elevenlabs.io/docs/agents-platform/operate/hosted-mcp (nicht geöffnet) |
+| Kapso | `claude mcp add --transport http kapso https://app.kapso.ai/mcp --header "X-API-Key: $KAPSO_API_KEY"` | API-Key aus der Kapso-Web-App im Header `X-API-Key` (oder `Authorization: Bearer`) | **Adresse `app.kapso.ai/mcp`, nicht `api.kapso.ai/mcp`, laut einer Drittquelle (mcpservers.org); nur Streamable HTTP, nicht SSE; Alpha.** In der offiziellen Kapso-Doku nicht bestätigt: bitte in app.kapso.ai oder docs.kapso.ai gegenprüfen |
+
+Hinweise: `$KAPSO_API_KEY` wird von deiner Shell eingesetzt, der Schlüssel landet dann im Klartext in der Claude-Konfiguration. Sicherer ist die Projektdatei `.mcp.json` nach Vorlage `.claude/setup/mcp.example.json`: dort steht nur `${KAPSO_API_KEY}`, der Wert bleibt in deiner Umgebung. Prüfen mit `claude mcp list` (soll „Connected“ zeigen). Wenn Kapso „client must accept text/event-stream“ meldet, läuft der Client über SSE statt Streamable HTTP.

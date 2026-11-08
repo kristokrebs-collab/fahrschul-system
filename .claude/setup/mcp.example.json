@@ -31,6 +31,17 @@
         "repomix@1.18.1",
         "--mcp"
       ]
+    },
+    "elevenlabs": {
+      "type": "http",
+      "url": "https://api.elevenlabs.io/v1/mcp"
+    },
+    "kapso": {
+      "type": "http",
+      "url": "https://app.kapso.ai/mcp",
+      "headers": {
+        "X-API-Key": "${KAPSO_API_KEY}"
+      }
     }
   }
 }
