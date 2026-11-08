@@ -4,7 +4,8 @@
  * Everything in a `VITE_*` variable is copied as TEXT into the public JavaScript. Two checks keep a server secret out of it:
  *
  * 1. `configResolved`: every `VITE_*` variable the build sees is checked – `VITE_SUPABASE_PUBLISHABLE_KEY` must be a
- *    publishable or `anon` key (`src/cloud/publicKey.ts`), no variable may be NAMED like a secret (`…SECRET…`,
+ *    publishable or `anon` key (`src/cloud/publicKey.ts`), `VITE_STRIPE_PUBLISHABLE_KEY` a `pk_test_` / `pk_live_` key, no variable may
+ *    be NAMED like a secret (`…SECRET…`,
  *    `…SERVICE_ROLE…`, `…PRIVATE…`, `…PASSWORD…`), and no value may LOOK like one (`sb_secret_…`, a `service_role` JWT, Stripe
  *    `sk_`/`rk_`/`whsec_`, a PEM private key, an Anthropic key).
  * 2. `generateBundle`: every emitted chunk and asset is scanned for the same value shapes – a secret that reached the bundle by
@@ -55,6 +56,9 @@ export function checkViteEnv(env: Readonly<Record<string, unknown>>): string[] {
     else if (name === "VITE_SUPABASE_PUBLISHABLE_KEY" && value.trim()) {
       const verdict = checkPublicKey(value);
       if (!verdict.ok) problems.push(`${name}: ${verdict.reason}`);
+    } else if (name === "VITE_STRIPE_PUBLISHABLE_KEY" && value.trim()) {
+      // Paket V: only Stripe's publishable key may go into the bundle (pk_test_ / pk_live_); a secret or restricted key never
+      if (!/^pk_(test|live)_[A-Za-z0-9]{10,}$/.test(value.trim())) problems.push(`${name}: das ist kein veröffentlichbarer Stripe-Schlüssel (pk_test_… / pk_live_…)`);
     } else if (value) {
       const hits = findSecrets(value);
       if (hits.length) problems.push(`${name}: der Wert sieht aus wie ${hits.join(", ")}`);

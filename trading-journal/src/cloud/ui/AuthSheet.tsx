@@ -1,38 +1,34 @@
 import { legalShown } from "@/legal/config";
-import { ConsentCheck } from "@/legal/ConsentCheck";
 import { LegalLink } from "@/legal/LegalLinks";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { cn } from "@/lib/cn";
 import { armWizard } from "@/onboarding/wizard/wizardStore";
 import { celebrateFrom } from "@/motion/Celebrate";
 import { DotMatrix } from "@/motion/DotMatrix";
 import { HoldConfirm } from "@/motion/HoldConfirm";
 import { AsciiCascade } from "@/motion/pulse/AsciiCascade";
 import { RollingDigits } from "@/motion/RollingDigits";
-import { Sheet } from "@/motion/Sheet";
-import { StaggerItem } from "@/motion/Stagger";
 import { StatusPill } from "@/motion/StatusPill";
-import { TextRoll } from "@/motion/TextRoll";
 import { TextScramble } from "@/motion/TextScramble";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
-import { Field } from "@/primitives/Field";
-import { Input } from "@/primitives/Input";
-import { Segmented } from "@/primitives/Segmented";
 import { pendingOrderParam } from "@/store/returnTo";
 import { pushToast } from "@/store/uiStore";
-import { emailProblem, isSendLimit, passwordProblem, passwordStrength, type AuthField } from "../authErrors";
+import { emailProblem, isSendLimit, passwordProblem, type AuthField } from "../authErrors";
 import { oauthProviders, type OAuthProvider } from "../env";
+import { setIdleMinutes, useIdlePref } from "../idle";
 import { ensureCloud } from "../runtime";
 import { closeAuthSheet, setAuthEmail, setAuthView, useCloudSession } from "../session";
 import { useSyncStatus } from "../sync/status";
 import type { AuthView } from "../types";
-import { AuthMorph, MorphItem, slideDir } from "./AuthMorph";
+import { at, CheckBox, ConsentLine, IconMail, IconPerson, LineField, PasswordLine, PillButton, StrengthHint } from "./AuthFields";
+import { AuthWindow, bandRunning } from "./AuthWindow";
 import { CODE_LENGTH, CodeSlots } from "./CodeSlots";
-import { AUTH_LAYOUT_ID, syncPill } from "./pill";
+import { syncPill } from "./pill";
 import { AUTH } from "./strings";
+
+export { NewPasswordForm } from "./NewPasswordForm";
 
 export interface AuthSheetProps {
   /** Opens the Konto page (the integrator passes `() => navigate("konto")`); hidden when absent. */
@@ -40,70 +36,44 @@ export interface AuthSheetProps {
 }
 
 /**
- * Login sheet (P09, all German): password, magic link, registration (strength meter, e-mail confirmation), reset,
- * new password after the reset link, the 2FA step-up after a password login, the signed-in account panel and the
- * welcome with the first sync. One `Sheet` (540 px; bottom sheet on phones); opened from the header pill it morphs out
- * of it (`layoutId="auth-sheet"`), from anywhere else it slides in.
+ * Login window (P09, Paket V – all German): password, magic link, registration (strength hint, e-mail confirmation), reset, new
+ * password after the reset link, the 2FA step-up after a password login, the signed-in account panel and the welcome with the first
+ * sync. ONE landscape card (`AuthWindow`): Anmelden on the left with the dark band on the right, Registrieren mirrored; the switch
+ * runs the band once across the card (1:1 after the reference recording, `docs/audit/V-VORBILD.md`). The other steps show in the
+ * form half of the side the card is on; their rows come in with the same stagger. Reduced motion: one short cross-fade.
  *
- * Motion (`AuthMorph.tsx`): the card is ONE card – Anmelden · Link · Registrieren keep one mounted form whose fields glide and
- * whose mode-only blocks slide in / out (the card's height springs, no jump); the other steps (2FA, sent, reset …) cross over
- * inside the same height-following box (x ±16 → 0 on `spring.enter`, exits on `tween.exit`), sections cascade
- * (`StaggerItem`), a wrong field shakes with its loss ring and takes the focus (`Field invalidKey`), the
- * submit label morphs (`TextRoll`), the 2FA code rolls in per slot (`CodeSlots`). Success: the `AsciiCascade`
- * wordmark decodes, a `DotMatrix` wave runs while the first sync uploads (progress on `RollingDigits`), a drawn ✓ and a
- * confetti burst (`celebrateFrom`) when it is live. Reduced motion: static end states.
+ * Kept from before: no account enumeration (AUTH-03: the same "check your mail" step for every address), the pre-selected order in
+ * every mail link (AUTH-06), the password rules, the AGB / privacy consent at registration, errors at their field (the field shakes and
+ * takes the focus), offline said before anything is sent, Escape / close, the focus trap.
  */
 export function AuthSheet({ onOpenAccount }: AuthSheetProps) {
   const sheet = useCloudSession((s) => s.sheet);
-  const dir = slideDir(sheet.view, sheet.prev);
   // warm the Supabase chunk while the user types (idempotent)
   useEffect(() => {
     void ensureCloud().catch(() => undefined);
   }, []);
-  return (
-    <Sheet
-      open={sheet.open}
-      onClose={closeAuthSheet}
-      title={AUTH.titles[sheet.view]}
-      size="md"
-      layoutId={sheet.source === "pill" ? AUTH_LAYOUT_ID : undefined}
-      dismissGuard={false}
-    >
-      <div className="grid gap-4" data-auth-view={sheet.view}>
-        {sheet.notice && (
-          <StaggerItem>
-            <p className="rounded-xl border border-line bg-ink-950/50 px-3 py-2 text-[12.5px] text-mute" data-testid="auth-notice" role="status">
-              {sheet.notice}
-            </p>
-          </StaggerItem>
-        )}
-        {/* R11: one card that morphs – the modes of the entry step keep their form (AuthMorph), the other steps cross over in one height-following box */}
-        <AuthMorph view={sheet.view} dir={dir}>
-          <ViewBody view={sheet.view} onOpenAccount={onOpenAccount} />
-        </AuthMorph>
-      </div>
-    </Sheet>
-  );
+  return <AuthWindow open={sheet.open} view={sheet.view} onClose={closeAuthSheet} renderView={(view, titleId) => <ViewBody view={view} titleId={titleId} onOpenAccount={onOpenAccount} />} />;
 }
 
-function ViewBody({ view, onOpenAccount }: { view: AuthView; onOpenAccount?: () => void }) {
+function ViewBody({ view, titleId, onOpenAccount }: { view: AuthView; titleId: string; onOpenAccount?: () => void }) {
   switch (view) {
     case "signin":
     case "magic":
+      return <SignInForm mode={view} titleId={titleId} />;
     case "signup":
-      return <EntryView mode={view} />;
+      return <SignUpForm titleId={titleId} />;
     case "reset":
-      return <ResetView />;
+      return <ResetView titleId={titleId} />;
     case "sent":
-      return <SentView />;
+      return <SentView titleId={titleId} />;
     case "mfa":
-      return <MfaView />;
+      return <MfaView titleId={titleId} />;
     case "newPassword":
-      return <NewPasswordView />;
+      return <NewPasswordView titleId={titleId} />;
     case "account":
-      return <AccountView onOpenAccount={onOpenAccount} />;
+      return <AccountView titleId={titleId} onOpenAccount={onOpenAccount} />;
     case "welcome":
-      return <WelcomeView />;
+      return <WelcomeView titleId={titleId} />;
   }
 }
 
@@ -118,79 +88,6 @@ interface FieldError {
 let errorSeq = 0;
 const errorOf = (field: AuthField, message: string): FieldError => ({ field, message, key: ++errorSeq });
 
-/** Password input with a show / hide toggle. */
-function PasswordInput({ id, name = "password", value, onChange, autoComplete, invalid, describedBy }: { id: string; name?: string; value: string; onChange: (v: string) => void; autoComplete: string; invalid?: boolean; describedBy?: string }) {
-  const [show, setShow] = useState(false);
-  return (
-    <span className="relative grid">
-      <Input
-        id={id}
-        name={name}
-        type={show ? "text" : "password"}
-        autoComplete={autoComplete}
-        value={value}
-        invalid={invalid}
-        aria-describedby={describedBy}
-        onChange={(e) => onChange(e.target.value)}
-        className="pr-11"
-      />
-      <button
-        type="button"
-        onClick={() => setShow((v) => !v)}
-        aria-label={show ? AUTH.hide : AUTH.show}
-        aria-pressed={show}
-        className="touch-hit absolute inset-y-0 right-1.5 my-auto grid size-8 place-items-center rounded-lg text-faint transition-colors hover:bg-white/[0.06] hover:text-fg"
-      >
-        <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
-          <circle cx="12" cy="12" r="3" />
-          {show && <path d="M4 4l16 16" />}
-        </svg>
-      </button>
-    </span>
-  );
-}
-
-/** Four bars that grow (scaleX) and tint with the password strength. */
-function StrengthMeter({ password }: { password: string }) {
-  const reduced = useReducedFx();
-  const s = passwordStrength(password);
-  const tone = s <= 1 ? "bg-loss" : s === 2 ? "bg-warn" : "bg-win";
-  return (
-    <div className="flex items-center gap-2" aria-live="off">
-      <div aria-hidden="true" className="grid flex-1 grid-cols-4 gap-1">
-        {[1, 2, 3, 4].map((i) => (
-          <span key={i} className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
-            <motion.span
-              className={cn("block h-full origin-left rounded-full", tone)}
-              initial={false}
-              animate={{ scaleX: s >= i ? 1 : 0 }}
-              transition={reduced ? { duration: 0 } : { ...spring.bar, delay: (i - 1) * stagger.cards }}
-            />
-          </span>
-        ))}
-      </div>
-      <span className="w-20 text-right text-[11px] text-faint">{password ? AUTH.strength[s] : ""}</span>
-    </div>
-  );
-}
-
-function SubmitButton({ busy, idle, busyLabel, disabled }: { busy: boolean; idle: string; busyLabel: string; disabled?: boolean }) {
-  return (
-    <Button type="submit" variant="primary" className="w-full sm:w-auto sm:min-w-[11rem]" disabled={busy || disabled} aria-busy={busy || undefined}>
-      <TextRoll mode="roll" text={busy ? busyLabel : idle} />
-    </Button>
-  );
-}
-
-function LinkButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} className="touch-hit rounded-md text-[12.5px] text-mute underline-offset-4 transition-colors hover:text-fg hover:underline">
-      {children}
-    </button>
-  );
-}
-
 async function cloudOrError(): Promise<Awaited<ReturnType<typeof ensureCloud>> | null> {
   try {
     return await ensureCloud();
@@ -199,13 +96,49 @@ async function cloudOrError(): Promise<Awaited<ReturnType<typeof ensureCloud>> |
   }
 }
 
-/* ------------------------------------------------------------------ entry: password / magic link / signup */
+/** Title + accent stroke of a form (one row of the entrance). */
+function Head({ titleId, title, top }: { titleId: string; title: string; top?: number }) {
+  return (
+    <div className={top === undefined ? "grid gap-[1.05cqh]" : "aw-abs"} style={at(top)} data-aw-row="">
+      <h2 id={titleId} className="aw-title">
+        {title}
+      </h2>
+      <span className="aw-accent" style={top === undefined ? undefined : { marginTop: "1.05cqh" }} aria-hidden="true" />
+    </div>
+  );
+}
 
-const MODE_OPTIONS = [
-  { v: "signin" as const, label: AUTH.modes.signin },
-  { v: "magic" as const, label: AUTH.modes.magic },
-  { v: "signup" as const, label: AUTH.modes.signup },
-];
+/** The flowing layout of the steps after the entry (title, accent, the notice of the sheet, the body). */
+function Step({ titleId, title, children }: { titleId: string; title: string; children: ReactNode }) {
+  const notice = useCloudSession((s) => s.sheet.notice);
+  return (
+    <div className="aw-step">
+      <Head titleId={titleId} title={title} />
+      {notice && (
+        <p className="aw-notice" data-aw-row="" data-testid="auth-notice" role="status">
+          {notice}
+        </p>
+      )}
+      {children}
+    </div>
+  );
+}
+
+/** A small text link of the card (switches, back). Ignored while the band runs (it runs exactly once). */
+function CardLink({ children, onClick, testId }: { children: ReactNode; onClick: () => void; testId?: string }) {
+  return (
+    <button
+      type="button"
+      className="aw-link"
+      data-testid={testId}
+      onClick={() => {
+        if (!bandRunning()) onClick();
+      }}
+    >
+      {children}
+    </button>
+  );
+}
 
 /** Consent at registration (the operator's own documents are linked – Review F07). */
 export const AUTH_LEGAL = {
@@ -219,11 +152,17 @@ export const AUTH_LEGAL = {
   notePost: " des Betreibers.",
 } as const;
 
-function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
-  const consentNeeded = legalShown();
-  const [consent, setConsent] = useState(false);
-  const [consentMissing, setConsentMissing] = useState(false);
+/* ------------------------------------------------------------------ Anmelden (+ Link per E-Mail): form half A */
+
+/** Row tops of the landscape card, share of the card height (measured, `V-VORBILD.md` § 1.2). */
+const A_ROWS = { head: 17.3, field1: 28.2, field2: 44.9, line: 61.8, lead: 47.2, button: 68.4, foot: 81.9, error: 86.3, alt: 90.2, legal: 94.4 } as const;
+/** … of the registration (§ 1.3). */
+const B_ROWS = { head: 9.5, field1: 20.1, field2: 37.2, field3: 53.9, hint: 66.3, consent: 70.1, button: 76.2, error: 86.75, foot: 89.8 } as const;
+
+function SignInForm({ mode, titleId }: { mode: "signin" | "magic"; titleId: string }) {
   const stored = useCloudSession((s) => s.sheet.email);
+  const idleNever = useIdlePref((s) => s.minutes === 0);
+  const [remember, setRemember] = useState(idleNever);
   const [email, setEmail] = useState(stored);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -232,24 +171,22 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
   const providers = oauthProviders();
   const emailId = `${ids}-email`;
   const pwId = `${ids}-pw`;
-  const form = useRef<HTMLFormElement>(null);
+  const rememberHint = `${ids}-remember`;
 
-  /** Shows the error at its field AND moves the focus there (the field that needs the next keystroke), then the screen reader hears it by the field's `aria-describedby`. */
+  /** Shows the error at its field AND moves the focus there; the screen reader hears it by the field's `aria-describedby`. */
   const fail = (e: FieldError) => {
     setErr(e);
     const target = e.field === "email" ? emailId : e.field === "password" ? pwId : null;
     if (target) requestAnimationFrame(() => document.getElementById(target)?.focus());
   };
 
-  // the mode changes while the form stays mounted: a stale error of the other mode goes, and a focus that sat in a field the
-  // new mode no longer has (the password in "Link per E-Mail") moves to the e-mail field instead of falling out of the card
+  // Anmelden ↔ Link per E-Mail keep this form: a stale error goes, a focus in the password field (gone in "Link") moves to the e-mail
   const modeSeen = useRef(mode);
   useEffect(() => {
     if (modeSeen.current === mode) return;
     modeSeen.current = mode;
     setErr(null);
-    setConsentMissing(false);
-    if (mode === "magic" && document.activeElement === document.getElementById(pwId)) document.getElementById(emailId)?.focus({ preventScroll: true });
+    if (mode === "magic" && (document.activeElement === document.getElementById(pwId) || !document.activeElement || document.activeElement === document.body)) document.getElementById(emailId)?.focus({ preventScroll: true });
   }, [mode, pwId, emailId]);
 
   async function submit(e: FormEvent) {
@@ -258,16 +195,7 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
     setAuthEmail(email.trim());
     const ep = emailProblem(email);
     if (ep) return fail(errorOf("email", ep));
-    if (mode !== "magic") {
-      const pp = mode === "signup" ? passwordProblem(password) : password ? null : "Bitte gib dein Passwort ein.";
-      if (pp) return fail(errorOf("password", pp));
-    }
-    // registration: the operator's AGB and privacy policy first (Review F07)
-    if (mode === "signup" && consentNeeded && !consent) {
-      setConsentMissing(true);
-      return setErr(errorOf(null, AUTH_LEGAL.missing));
-    }
-    // offline: say so before anything is sent (the typed values stay)
+    if (mode === "signin" && !password) return fail(errorOf("password", "Bitte gib dein Passwort ein."));
     if (typeof navigator !== "undefined" && navigator.onLine === false) return setErr(errorOf(null, AUTH.offline));
     setErr(null);
     setBusy(true);
@@ -284,29 +212,19 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
         if (r.code === "email_not_confirmed") return setAuthView("sent", { sent: "confirm", resendNow: true, notice: AUTH.sent.notConfirmed });
         return fail(errorOf(r.field, r.message));
       }
+      // "Angemeldet bleiben": off = signed out after 30 minutes without activity on this device (the Konto setting, changed only when ticked differently)
+      if (remember !== idleNever) setIdleMinutes(remember ? 0 : 30);
       setAuthView(r.value.mfa ? "mfa" : "welcome");
-    } else if (mode === "magic") {
+    } else {
       const order = pendingOrderParam();
       const r = order ? await m.sendMagicLink(email, order) : await m.sendMagicLink(email);
       setBusy(false);
       if (!r.ok) return fail(errorOf(r.field, r.message));
       setAuthView("sent", { notice: null, sent: "magic" });
-    } else {
-      const order = pendingOrderParam();
-      const r = order ? await m.signUp(email, password, order) : await m.signUp(email, password);
-      setBusy(false);
-      if (!r.ok) return fail(errorOf(r.field, r.message));
-      // a registration arms the setup wizard (once; it opens after the sign-in, when nothing else owns the screen)
-      armWizard();
-      setAuthView(r.value.confirm ? "sent" : "welcome", { sent: "confirm" });
     }
   }
 
   async function oauth(p: OAuthProvider) {
-    if (mode === "signup" && consentNeeded && !consent) {
-      setConsentMissing(true);
-      return setErr(errorOf(null, AUTH_LEGAL.missing));
-    }
     setBusy(true);
     const m = await cloudOrError();
     const r = m ? await m.signInOAuth(p) : null;
@@ -316,127 +234,238 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
     }
   }
 
+  const toSignup = () => {
+    setAuthEmail(email.trim());
+    setAuthView("signup");
+  };
+
   return (
-    // `relative`: a block that leaves (`MorphItem`, popLayout) is taken out of the flow at once, the others glide up (`layout="position"`)
-    <form ref={form} className="relative grid gap-4" noValidate method="post" onSubmit={(e) => void submit(e)} data-auth-mode={mode}>
-      <StaggerItem layout="position">
-        <Segmented options={MODE_OPTIONS} value={mode} onChange={(v) => setAuthView(v)} aria-label="Anmeldeart" className="w-full" />
-      </StaggerItem>
-      <MorphItem itemKey={`lead-${mode}`}>
-        <p className="text-[13px] leading-relaxed text-mute">{AUTH.lead[mode]}</p>
-      </MorphItem>
-      {providers.length > 0 && (
-        <MorphItem show={mode !== "magic"} itemKey="oauth" className="grid gap-2">
-          {providers.map((p) => (
-            <Button key={p} onClick={() => void oauth(p)} disabled={busy} className="w-full">
-              {AUTH.oauth(AUTH.oauthNames[p] ?? p)}
-            </Button>
-          ))}
-          <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-faint" aria-hidden="true">
-            <span className="h-px flex-1 bg-line" />
-            {AUTH.or}
-            <span className="h-px flex-1 bg-line" />
-          </div>
-        </MorphItem>
+    <form className="contents" noValidate method="post" onSubmit={(e) => void submit(e)} data-auth-mode={mode}>
+      <Head titleId={titleId} title={mode === "magic" ? AUTH.titles.magic : AUTH.titles.signin} top={A_ROWS.head} />
+      <LineField
+        id={emailId}
+        name="email"
+        type="email"
+        label={AUTH.email}
+        // the password manager reads the pair: the identifier of a login is the "username"
+        autoComplete="username"
+        inputMode="email"
+        spellCheck={false}
+        icon={<IconPerson />}
+        value={email}
+        onChange={(v) => {
+          setEmail(v);
+          if (err?.field === "email" && !emailProblem(v)) setErr(null);
+        }}
+        error={err?.field === "email" ? err.message : undefined}
+        errorKey={err?.field === "email" ? err.key : null}
+        top={A_ROWS.field1}
+        first
+      />
+      {mode === "signin" ? (
+        <PasswordLine
+          id={pwId}
+          label={AUTH.password}
+          autoComplete="current-password"
+          value={password}
+          onChange={(v) => {
+            setPassword(v);
+            if (err?.field === "password" && v) setErr(null);
+          }}
+          error={err?.field === "password" ? err.message : undefined}
+          errorKey={err?.field === "password" ? err.key : null}
+          top={A_ROWS.field2}
+        />
+      ) : (
+        <p className="aw-lead aw-abs" style={at(A_ROWS.lead)} data-aw-row="">
+          {AUTH.card.magicLead}
+        </p>
       )}
-      <StaggerItem layout="position">
-        <Field label={AUTH.email} htmlFor={emailId} error={err?.field === "email" ? err.message : undefined} invalidKey={err?.field === "email" ? err.key : null}>
-          <Input
-            id={emailId}
-            name="email"
-            type="email"
-            // the password manager reads the pair: the identifier of a login is the "username", of a registration the "email"
-            autoComplete={mode === "signin" ? "username" : "email"}
-            inputMode="email"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            value={email}
-            invalid={err?.field === "email"}
-            aria-describedby={err?.field === "email" ? `${emailId}-error` : undefined}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              // a shown e-mail error goes the moment the address is valid (no waiting for the next submit)
-              if (err?.field === "email" && !emailProblem(e.target.value)) setErr(null);
-            }}
-          />
-        </Field>
-      </StaggerItem>
-      <MorphItem show={mode !== "magic"} itemKey="password" className="relative grid gap-2">
-        <Field label={AUTH.password} htmlFor={pwId} error={err?.field === "password" ? err.message : undefined} invalidKey={err?.field === "password" ? err.key : null}>
-          <PasswordInput
-            id={pwId}
-            value={password}
-            onChange={(v) => {
-              setPassword(v);
-              if (err?.field === "password" && mode === "signup" && !passwordProblem(v)) setErr(null);
-            }}
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            invalid={err?.field === "password"}
-            describedBy={err?.field === "password" ? `${pwId}-error` : undefined}
-          />
-        </Field>
-        <MorphItem show={mode === "signup"} itemKey="strength">
-          <StrengthMeter password={password} />
-        </MorphItem>
-      </MorphItem>
-      {consentNeeded && (
-        <MorphItem show={mode === "signup"} itemKey="consent">
-          <ConsentCheck
-            checked={consent}
-            onChange={(v) => {
-              setConsent(v);
-              if (v) {
-                setConsentMissing(false);
-                if (err?.message === AUTH_LEGAL.missing) setErr(null);
-              }
-            }}
-            invalid={consentMissing}
-            testId="signup-consent"
-          >
-            {AUTH_LEGAL.consentPre}
-            <LegalLink doc="agb" />
-            {AUTH_LEGAL.consentMid}
-            <LegalLink doc="datenschutz">{AUTH_LEGAL.datenschutz}</LegalLink>
-            {AUTH_LEGAL.consentPost}
-          </ConsentCheck>
-        </MorphItem>
+      {mode === "signin" ? (
+        <div className="aw-line aw-abs" style={at(A_ROWS.line)} data-aw-row="">
+          <CheckBox checked={remember} onChange={setRemember} label={AUTH.card.remember} describedBy={rememberHint} testId="auth-remember" />
+          <span id={rememberHint} className="sr-only">
+            {AUTH.card.rememberHint}
+          </span>
+          <CardLink onClick={() => setAuthView("reset")}>{AUTH.forgot}</CardLink>
+        </div>
+      ) : (
+        <span className="aw-abs" style={at(A_ROWS.line)} data-aw-row="" aria-hidden="true" />
       )}
+      <PillButton label={AUTH.submit[mode]} busyLabel={AUTH.busy[mode]} busy={busy} top={A_ROWS.button} />
+      <p className="aw-foot aw-abs" style={at(A_ROWS.foot)} data-aw-foot="">
+        <span>{AUTH.card.newHere}</span>
+        <CardLink onClick={toSignup} testId="auth-to-signup">
+          {AUTH.card.create}
+        </CardLink>
+      </p>
       {err && err.field === null && (
-        <motion.p role="alert" layout="position" className="text-[12.5px] text-loss" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} transition={tween.fade} key={err.key}>
+        <p role="alert" className="aw-msg aw-abs" style={at(A_ROWS.error)}>
           {err.message}
-        </motion.p>
+        </p>
       )}
-      <StaggerItem layout="position" className="flex flex-wrap items-center justify-between gap-3">
-        {/* the "forgot" link keeps its place and fades with the mode, so the submit button never moves sideways */}
-        <span className={cn("transition-opacity duration-200", mode !== "signin" && "pointer-events-none opacity-0")} aria-hidden={mode !== "signin" || undefined} inert={mode !== "signin" || undefined}>
-          <LinkButton onClick={() => setAuthView("reset")}>{AUTH.forgot}</LinkButton>
-        </span>
-        <SubmitButton busy={busy} idle={AUTH.submit[mode]} busyLabel={AUTH.busy[mode]} />
-      </StaggerItem>
-      <MorphItem show={mode === "signup"} itemKey="eu">
-        <p className="text-[11.5px] leading-relaxed text-faint">{AUTH.euNote}</p>
-      </MorphItem>
+      <p className="aw-foot aw-foot-small aw-abs" style={at(A_ROWS.alt)} data-aw-foot="">
+        <span>{mode === "magic" ? AUTH.card.passwordAsk : AUTH.card.magicAsk}</span>
+        <CardLink onClick={() => setAuthView(mode === "magic" ? "signin" : "magic")} testId="auth-magic-toggle">
+          {mode === "magic" ? AUTH.card.passwordLink : AUTH.card.magicLink}
+        </CardLink>
+        {providers.map((p) => (
+          <CardLink key={p} onClick={() => void oauth(p)}>
+            {AUTH.oauthNames[p] ?? p}
+          </CardLink>
+        ))}
+      </p>
+      {legalShown() && (
+        // signing in: the operator's documents as a note, no box (Review F07; the box is the registration's)
+        <p className="aw-legal aw-abs" style={at(A_ROWS.legal)} data-aw-foot="" data-testid="auth-legal-note">
+          {AUTH_LEGAL.notePre}
+          <LegalLink doc="agb" />
+          {AUTH_LEGAL.noteMid}
+          <LegalLink doc="datenschutz">{AUTH_LEGAL.datenschutz}</LegalLink>
+          {AUTH_LEGAL.notePost}
+        </p>
+      )}
+    </form>
+  );
+}
+
+/* ------------------------------------------------------------------ Registrieren: form half B */
+
+function SignUpForm({ titleId }: { titleId: string }) {
+  const consentNeeded = legalShown();
+  const stored = useCloudSession((s) => s.sheet.email);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState(stored);
+  const [password, setPassword] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [consentMissing, setConsentMissing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<FieldError | null>(null);
+  const ids = useId();
+  const emailId = `${ids}-email`;
+  const pwId = `${ids}-pw`;
+
+  const fail = (e: FieldError) => {
+    setErr(e);
+    const target = e.field === "email" ? emailId : e.field === "password" ? pwId : null;
+    if (target) requestAnimationFrame(() => document.getElementById(target)?.focus());
+  };
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setAuthEmail(email.trim());
+    const ep = emailProblem(email);
+    if (ep) return fail(errorOf("email", ep));
+    const pp = passwordProblem(password);
+    if (pp) return fail(errorOf("password", pp));
+    // registration: the operator's AGB and privacy policy first (Review F07)
+    if (consentNeeded && !consent) {
+      setConsentMissing(true);
+      return setErr(errorOf(null, AUTH_LEGAL.missing));
+    }
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return setErr(errorOf(null, AUTH.offline));
+    setErr(null);
+    setBusy(true);
+    const m = await cloudOrError();
+    if (!m) {
+      setBusy(false);
+      return setErr(errorOf(null, AUTH.unavailable));
+    }
+    const order = pendingOrderParam();
+    const given = name.trim();
+    const r = given ? await m.signUp(email, password, order ?? null, given) : order ? await m.signUp(email, password, order) : await m.signUp(email, password);
+    setBusy(false);
+    if (!r.ok) return fail(errorOf(r.field, r.message));
+    // a registration arms the setup wizard (once; it opens after the sign-in, when nothing else owns the screen)
+    armWizard();
+    setAuthView(r.value.confirm ? "sent" : "welcome", { sent: "confirm" });
+  }
+
+  return (
+    <form className="contents" noValidate method="post" onSubmit={(e) => void submit(e)} data-auth-mode="signup">
+      <Head titleId={titleId} title={AUTH.titles.signup} top={B_ROWS.head} />
+      <LineField id={`${ids}-name`} name="name" label={AUTH.card.name} autoComplete="name" icon={<IconPerson />} value={name} onChange={setName} top={B_ROWS.field1} first describedBy={`${ids}-name-hint`} />
+      <span id={`${ids}-name-hint`} className="sr-only">
+        {AUTH.card.nameHint}
+      </span>
+      <LineField
+        id={emailId}
+        name="email"
+        type="email"
+        label={AUTH.email}
+        autoComplete="email"
+        inputMode="email"
+        spellCheck={false}
+        icon={<IconMail />}
+        value={email}
+        onChange={(v) => {
+          setEmail(v);
+          if (err?.field === "email" && !emailProblem(v)) setErr(null);
+        }}
+        error={err?.field === "email" ? err.message : undefined}
+        errorKey={err?.field === "email" ? err.key : null}
+        top={B_ROWS.field2}
+      />
+      <PasswordLine
+        id={pwId}
+        label={AUTH.password}
+        autoComplete="new-password"
+        value={password}
+        onChange={(v) => {
+          setPassword(v);
+          if (err?.field === "password" && !passwordProblem(v)) setErr(null);
+        }}
+        error={err?.field === "password" ? err.message : undefined}
+        errorKey={err?.field === "password" ? err.key : null}
+        top={B_ROWS.field3}
+      />
+      <StrengthHint password={password} top={B_ROWS.hint} />
       {consentNeeded && (
-        <MorphItem show={mode !== "signup"} itemKey="legal">
-          <p className="text-[11.5px] leading-relaxed text-faint" data-testid="auth-legal-note">
-            {AUTH_LEGAL.notePre}
-            <LegalLink doc="agb" className="text-mute underline" />
-            {AUTH_LEGAL.noteMid}
-            <LegalLink doc="datenschutz" className="text-mute underline">
-              {AUTH_LEGAL.datenschutz}
-            </LegalLink>
-            {AUTH_LEGAL.notePost}
-          </p>
-        </MorphItem>
+        <ConsentLine
+          checked={consent}
+          onChange={(v) => {
+            setConsent(v);
+            if (v) {
+              setConsentMissing(false);
+              if (err?.message === AUTH_LEGAL.missing) setErr(null);
+            }
+          }}
+          invalid={consentMissing}
+          top={B_ROWS.consent}
+        >
+          {AUTH_LEGAL.consentPre}
+          <LegalLink doc="agb" />
+          {AUTH_LEGAL.consentMid}
+          <LegalLink doc="datenschutz">{AUTH_LEGAL.datenschutz}</LegalLink>
+          {AUTH_LEGAL.consentPost}
+        </ConsentLine>
       )}
+      <PillButton label={AUTH.submit.signup} busyLabel={AUTH.busy.signup} busy={busy} top={B_ROWS.button} />
+      {err && err.field === null && (
+        <p role="alert" className="aw-msg aw-abs" style={at(B_ROWS.error)}>
+          {err.message}
+        </p>
+      )}
+      <p className="aw-foot aw-abs" style={at(B_ROWS.foot)} data-aw-foot="">
+        <span>{AUTH.card.haveAccount}</span>
+        <CardLink
+          onClick={() => {
+            setAuthEmail(email.trim());
+            setAuthView("signin");
+          }}
+          testId="auth-to-signin"
+        >
+          {AUTH.card.signin}
+        </CardLink>
+      </p>
     </form>
   );
 }
 
 /* ------------------------------------------------------------------ reset / sent */
 
-function ResetView() {
+function ResetView({ titleId }: { titleId: string }) {
   const stored = useCloudSession((s) => s.sheet.email);
   const [email, setEmail] = useState(stored);
   const [busy, setBusy] = useState(false);
@@ -458,25 +487,23 @@ function ResetView() {
     setAuthView("sent", { sent: "reset" });
   }
   return (
-    <form className="grid gap-4" noValidate onSubmit={(e) => void submit(e)}>
-      <StaggerItem>
-        <p className="text-[13px] leading-relaxed text-mute">{AUTH.lead.reset}</p>
-      </StaggerItem>
-      <StaggerItem>
-        <Field label={AUTH.email} htmlFor={id} error={err?.field === "email" ? err.message : undefined} invalidKey={err?.field === "email" ? err.key : null}>
-          <Input id={id} type="email" autoComplete="email" inputMode="email" value={email} invalid={err?.field === "email"} onChange={(e) => setEmail(e.target.value)} />
-        </Field>
-      </StaggerItem>
-      {err && err.field === null && (
-        <p role="alert" className="text-[12.5px] text-loss">
-          {err.message}
+    <Step titleId={titleId} title={AUTH.titles.reset}>
+      <form className="contents" noValidate onSubmit={(e) => void submit(e)}>
+        <p className="aw-lead" data-aw-row="">
+          {AUTH.lead.reset}
         </p>
-      )}
-      <StaggerItem className="flex flex-wrap items-center justify-between gap-3">
-        <LinkButton onClick={() => setAuthView("signin")}>{AUTH.back}</LinkButton>
-        <SubmitButton busy={busy} idle={AUTH.submit.reset} busyLabel={AUTH.busy.reset} />
-      </StaggerItem>
-    </form>
+        <LineField id={id} type="email" label={AUTH.email} autoComplete="email" inputMode="email" icon={<IconMail />} value={email} onChange={setEmail} error={err?.field === "email" ? err.message : undefined} errorKey={err?.field === "email" ? err.key : null} first />
+        {err && err.field === null && (
+          <p role="alert" className="aw-msg">
+            {err.message}
+          </p>
+        )}
+        <PillButton label={AUTH.submit.reset} busyLabel={AUTH.busy.reset} busy={busy} />
+        <p className="aw-foot" data-aw-foot="">
+          <CardLink onClick={() => setAuthView("signin")}>{AUTH.back}</CardLink>
+        </p>
+      </form>
+    </Step>
   );
 }
 
@@ -486,7 +513,7 @@ export const RESEND_S = 60;
 export const RESEND_LIMIT_S = 120;
 
 /** Envelope drawn line by line, then a resend with a rolling countdown. */
-function SentView() {
+function SentView({ titleId }: { titleId: string }) {
   const email = useCloudSession((s) => s.sheet.email);
   const sentKind = useCloudSession((s) => s.sheet.sent);
   const resendNow = useCloudSession((s) => s.sheet.resendNow);
@@ -518,21 +545,21 @@ function SentView() {
   }
   const draw = (i: number) => (reduced ? { duration: 0 } : { ...tween.draw, delay: i * stagger.lead });
   return (
-    <div className="grid justify-items-center gap-4 py-2 text-center">
-      <StaggerItem>
-        <svg viewBox="0 0 64 48" className="h-16 w-20 text-fg" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+    <Step titleId={titleId} title={AUTH.titles.sent}>
+      <div data-aw-row="">
+        <svg viewBox="0 0 64 48" className="h-[8cqh] min-h-11 w-auto text-fg" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
           <motion.rect x="4" y="6" width="56" height="36" rx="5" initial={{ pathLength: reduced ? 1 : 0 }} animate={{ pathLength: 1 }} transition={draw(0)} />
           <motion.path d="M6 9l26 19L58 9" initial={{ pathLength: reduced ? 1 : 0 }} animate={{ pathLength: 1 }} transition={draw(1)} />
           <motion.circle cx="54" cy="10" r="4" className="fill-signal stroke-none" initial={reduced ? false : { scale: 0 }} animate={{ scale: 1 }} transition={{ ...spring.pop, delay: reduced ? 0 : 0.6 }} />
         </svg>
-      </StaggerItem>
-      <StaggerItem>
-        <p className="max-w-[26rem] text-[13.5px] leading-relaxed text-fg" data-testid="auth-sent-text">
+      </div>
+      <div data-aw-row="">
+        <p className="aw-lead !text-fg" data-testid="auth-sent-text">
           {text}
         </p>
-        <p className="mt-1.5 text-[12px] text-faint">{AUTH.sent.sameBrowser}</p>
-      </StaggerItem>
-      <StaggerItem className="flex flex-wrap items-center justify-center gap-3">
+        <p className="aw-lead mt-1">{AUTH.sent.sameBrowser}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-4" data-aw-btn="">
         <Button onClick={() => void resend()} disabled={left > 0 || busy} aria-busy={busy || undefined} data-testid="auth-resend">
           {left > 0 ? (
             <span className="inline-flex items-center gap-1">
@@ -542,9 +569,11 @@ function SentView() {
             AUTH.sent.resend
           )}
         </Button>
-        <LinkButton onClick={() => setAuthView("signin")}>{AUTH.back}</LinkButton>
-      </StaggerItem>
-    </div>
+        <span className="aw-foot">
+          <CardLink onClick={() => setAuthView("signin")}>{AUTH.back}</CardLink>
+        </span>
+      </div>
+    </Step>
   );
 }
 
@@ -571,30 +600,25 @@ function RecoveryForm({ onBack }: { onBack: () => void }) {
     setAuthView("welcome");
   }
   return (
-    <form className="grid gap-4" noValidate onSubmit={(e) => void submit(e)} data-testid="recovery-form">
-      <StaggerItem>
-        <p className="text-[13px] leading-relaxed text-mute">{AUTH.recoveryLead}</p>
-      </StaggerItem>
-      <StaggerItem>
-        <Field label={AUTH.recoveryLabel} htmlFor={`${id}-rc`} error={err?.message} invalidKey={err?.key ?? null}>
-          <Input id={`${id}-rc`} value={code} autoComplete="off" spellCheck={false} autoFocus onChange={(e) => setCode(e.target.value)} placeholder="ABCDE-FGHJK" className="font-mono uppercase tracking-[0.12em]" />
-        </Field>
-      </StaggerItem>
-      <StaggerItem>
-        <p className="text-[11.5px] leading-relaxed text-faint">{AUTH.recoveryNoCodes}</p>
-      </StaggerItem>
-      <StaggerItem className="flex flex-wrap items-center justify-between gap-3">
-        <LinkButton onClick={onBack}>{AUTH.recoveryBack}</LinkButton>
-        <SubmitButton busy={busy} idle={AUTH.recoverySubmit} busyLabel={AUTH.recoveryBusy} disabled={!code.trim()} />
-      </StaggerItem>
+    <form className="contents" noValidate onSubmit={(e) => void submit(e)} data-testid="recovery-form">
+      <p className="aw-lead" data-aw-row="">
+        {AUTH.recoveryLead}
+      </p>
+      <LineField id={`${id}-rc`} label={AUTH.recoveryLabel} value={code} autoComplete="off" spellCheck={false} autoFocus onChange={setCode} error={err?.message} errorKey={err?.key ?? null} className="[&_input]:font-mono [&_input]:uppercase [&_input]:tracking-[0.12em]" first />
+      <p className="aw-lead" data-aw-row="">
+        {AUTH.recoveryNoCodes}
+      </p>
+      <PillButton label={AUTH.recoverySubmit} busyLabel={AUTH.recoveryBusy} busy={busy} disabled={!code.trim()} />
+      <p className="aw-foot" data-aw-foot="">
+        <CardLink onClick={onBack}>{AUTH.recoveryBack}</CardLink>
+      </p>
     </form>
   );
 }
 
-function MfaView() {
+function MfaView({ titleId }: { titleId: string }) {
   const [recovery, setRecovery] = useState(false);
-  if (recovery) return <RecoveryForm onBack={() => setRecovery(false)} />;
-  return <MfaCodeForm onLost={() => setRecovery(true)} />;
+  return <Step titleId={titleId} title={AUTH.titles.mfa}>{recovery ? <RecoveryForm onBack={() => setRecovery(false)} /> : <MfaCodeForm onLost={() => setRecovery(true)} />}</Step>;
 }
 
 function MfaCodeForm({ onLost }: { onLost: () => void }) {
@@ -618,17 +642,17 @@ function MfaCodeForm({ onLost }: { onLost: () => void }) {
   }
   return (
     <form
-      className="grid gap-4"
+      className="contents"
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
         void verify(code);
       }}
     >
-      <StaggerItem>
-        <p className="text-[13px] leading-relaxed text-mute">{AUTH.lead.mfa}</p>
-      </StaggerItem>
-      <StaggerItem>
+      <p className="aw-lead" data-aw-row="">
+        {AUTH.lead.mfa}
+      </p>
+      <div data-aw-row="">
         <CodeSlots
           value={code}
           onChange={(c) => {
@@ -636,15 +660,21 @@ function MfaCodeForm({ onLost }: { onLost: () => void }) {
             if (c) setErr(null);
           }}
           onComplete={(c) => void verify(c)}
-          label="2FA-Code" disabled={busy || accepted} invalidKey={err?.key ?? null} accepted={accepted} autoFocus />
-      </StaggerItem>
+          label="2FA-Code"
+          disabled={busy || accepted}
+          invalidKey={err?.key ?? null}
+          accepted={accepted}
+          autoFocus
+        />
+      </div>
       {err && (
-        <motion.p key={err.key} role="alert" className="text-center text-[12.5px] text-loss" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} transition={tween.fade}>
+        <p key={err.key} role="alert" className="aw-msg">
           {err.message}
-        </motion.p>
+        </p>
       )}
-      <StaggerItem className="flex flex-wrap items-center justify-between gap-3">
-        <LinkButton
+      <PillButton label="Bestätigen" busyLabel={AUTH.busy.mfa} busy={busy} disabled={code.length !== CODE_LENGTH} />
+      <p className="aw-foot flex-wrap" data-aw-foot="">
+        <CardLink
           onClick={() =>
             void (async () => {
               const m = await cloudOrError();
@@ -654,19 +684,16 @@ function MfaCodeForm({ onLost }: { onLost: () => void }) {
           }
         >
           {AUTH.mfaSignOut}
-        </LinkButton>
-        <SubmitButton busy={busy} idle="Bestätigen" busyLabel={AUTH.busy.mfa} disabled={code.length !== CODE_LENGTH} />
-      </StaggerItem>
-      <StaggerItem>
-        <LinkButton onClick={onLost}>{AUTH.lostDevice}</LinkButton>
-      </StaggerItem>
+        </CardLink>
+        <CardLink onClick={onLost}>{AUTH.lostDevice}</CardLink>
+      </p>
     </form>
   );
 }
 
 /* ------------------------------------------------------------------ new password (reset link) */
 
-export function NewPasswordForm({ reason, onDone }: { reason: "reset" | "change"; onDone: () => void }) {
+function NewPasswordView({ titleId }: { titleId: string }) {
   const [pw, setPw] = useState("");
   const [repeat, setRepeat] = useState("");
   const [busy, setBusy] = useState(false);
@@ -679,51 +706,35 @@ export function NewPasswordForm({ reason, onDone }: { reason: "reset" | "change"
     if (pw !== repeat) return setErr(errorOf("code", AUTH.mismatch));
     setBusy(true);
     const m = await cloudOrError();
-    const r = m ? await m.updatePassword(pw, reason) : null;
+    const r = m ? await m.updatePassword(pw, "reset") : null;
     setBusy(false);
     if (!r || !r.ok) return setErr(errorOf(r && !r.ok && r.field === "password" ? "password" : null, r && !r.ok ? r.message : AUTH.unavailable));
     pushToast({ kind: "success", title: AUTH.passwordSaved, detail: r.value.othersSignedOut ? AUTH.passwordOthersOut : AUTH.passwordOthersKept });
-    onDone();
+    setAuthView("account");
   }
   return (
-    <form className="grid gap-4" noValidate onSubmit={(e) => void submit(e)}>
-      <StaggerItem className="grid gap-2">
-        <Field label={AUTH.newPassword} htmlFor={`${ids}-pw`} error={err?.field === "password" ? err.message : undefined} invalidKey={err?.field === "password" ? err.key : null}>
-          <PasswordInput id={`${ids}-pw`} value={pw} onChange={setPw} autoComplete="new-password" invalid={err?.field === "password"} />
-        </Field>
-        <StrengthMeter password={pw} />
-      </StaggerItem>
-      <StaggerItem>
-        <Field label={AUTH.repeat} htmlFor={`${ids}-rep`} error={err?.field === "code" ? err.message : undefined} invalidKey={err?.field === "code" ? err.key : null}>
-          <PasswordInput id={`${ids}-rep`} value={repeat} onChange={setRepeat} autoComplete="new-password" invalid={err?.field === "code"} />
-        </Field>
-      </StaggerItem>
-      {err && err.field === null && (
-        <p role="alert" className="text-[12.5px] text-loss">
-          {err.message}
+    <Step titleId={titleId} title={AUTH.titles.newPassword}>
+      <form className="contents" noValidate onSubmit={(e) => void submit(e)}>
+        <p className="aw-lead" data-aw-row="">
+          {AUTH.lead.newPassword}
         </p>
-      )}
-      <StaggerItem className="flex justify-end">
-        <SubmitButton busy={busy} idle={AUTH.submit.newPassword} busyLabel={AUTH.busy.newPassword} />
-      </StaggerItem>
-    </form>
-  );
-}
-
-function NewPasswordView() {
-  return (
-    <>
-      <StaggerItem>
-        <p className="text-[13px] leading-relaxed text-mute">{AUTH.lead.newPassword}</p>
-      </StaggerItem>
-      <NewPasswordForm reason="reset" onDone={() => setAuthView("account")} />
-    </>
+        <PasswordLine id={`${ids}-pw`} label={AUTH.newPassword} autoComplete="new-password" value={pw} onChange={setPw} error={err?.field === "password" ? err.message : undefined} errorKey={err?.field === "password" ? err.key : null} first />
+        <StrengthHint password={pw} />
+        <PasswordLine id={`${ids}-rep`} label={AUTH.repeat} autoComplete="new-password" value={repeat} onChange={setRepeat} error={err?.field === "code" ? err.message : undefined} errorKey={err?.field === "code" ? err.key : null} />
+        {err && err.field === null && (
+          <p role="alert" className="aw-msg">
+            {err.message}
+          </p>
+        )}
+        <PillButton label={AUTH.submit.newPassword} busyLabel={AUTH.busy.newPassword} busy={busy} />
+      </form>
+    </Step>
   );
 }
 
 /* ------------------------------------------------------------------ account panel */
 
-function AccountView({ onOpenAccount }: { onOpenAccount?: () => void }) {
+function AccountView({ titleId, onOpenAccount }: { titleId: string; onOpenAccount?: () => void }) {
   const user = useCloudSession((s) => s.user);
   const sync = useSyncStatus((s) => s.phase);
   const pings = useSyncStatus((s) => s.pings);
@@ -736,8 +747,8 @@ function AccountView({ onOpenAccount }: { onOpenAccount?: () => void }) {
     pushToast({ kind: "info", title: AUTH.signedOut, detail: AUTH.signedOutDetail });
   }
   return (
-    <div className="grid gap-4">
-      <StaggerItem className="flex items-center gap-3 rounded-2xl border border-line bg-ink-950/50 p-3.5">
+    <Step titleId={titleId} title={AUTH.titles.account}>
+      <div className="flex items-center gap-3 rounded-2xl border border-line bg-ink-950/50 p-3.5" data-aw-row="">
         <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-full border border-line-2 bg-gradient-to-br from-ink-700 to-ink-900 font-dot text-[20px] text-fg">
           {(user?.email ?? "?").slice(0, 1).toUpperCase()}
         </span>
@@ -746,8 +757,8 @@ function AccountView({ onOpenAccount }: { onOpenAccount?: () => void }) {
           <TextScramble className="block truncate text-[14px] font-medium text-fg" text={user?.email ?? "–"} />
         </span>
         <StatusPill tone={pill.tone} expanded label={pill.label} pingKey={pings} />
-      </StaggerItem>
-      <StaggerItem className="flex flex-wrap gap-2">
+      </div>
+      <div className="flex flex-wrap gap-2" data-aw-btn="">
         {onOpenAccount && (
           <Button
             variant="primary"
@@ -775,17 +786,17 @@ function AccountView({ onOpenAccount }: { onOpenAccount?: () => void }) {
             {AUTH.account.signOutAll}
           </HoldConfirm>
         )}
-      </StaggerItem>
-      <StaggerItem>
-        <p className="text-[11.5px] text-faint">{AUTH.account.signOutHint}</p>
-      </StaggerItem>
-    </div>
+      </div>
+      <p className="aw-lead" data-aw-foot="">
+        {AUTH.account.signOutHint}
+      </p>
+    </Step>
   );
 }
 
 /* ------------------------------------------------------------------ welcome + first sync */
 
-function WelcomeView() {
+function WelcomeView({ titleId }: { titleId: string }) {
   const reduced = useReducedFx();
   const phase = useSyncStatus((s) => s.phase);
   const progress = useSyncStatus((s) => s.progress);
@@ -801,12 +812,12 @@ function WelcomeView() {
   }, [done, reduced]);
   const text = done ? AUTH.welcome.done : phase === "paused" ? AUTH.welcome.paused : AUTH.welcome.syncing;
   return (
-    <div className="grid justify-items-center gap-5 py-2 text-center">
-      {/* the scramble glyphs are wider than the word: a phone-sized font + a clipping box keep the sheet at 390 px */}
-      <StaggerItem className="max-w-full overflow-hidden">
-        <AsciiCascade text={AUTH.welcome.word} as="p" className="font-dot text-[clamp(20px,6vw,40px)] leading-none tracking-[0.04em] text-fg" seed={9} scrambled />
-      </StaggerItem>
-      <StaggerItem className="grid justify-items-center gap-3">
+    <Step titleId={titleId} title={AUTH.titles.welcome}>
+      {/* the scramble glyphs are wider than the word: a clipping box keeps the card at 390 px */}
+      <div className="max-w-full overflow-hidden" data-aw-row="">
+        <AsciiCascade text={AUTH.welcome.word} as="p" className="font-dot text-[clamp(20px,5cqh,34px)] leading-none tracking-[0.04em] text-fg" seed={9} scrambled />
+      </div>
+      <div className="grid justify-items-start gap-3" data-aw-row="">
         <div className="relative grid h-[52px] place-items-center">
           <AnimatePresence mode="popLayout" initial={false}>
             {done ? (
@@ -835,15 +846,11 @@ function WelcomeView() {
           </p>
         )}
         {done && records > 0 && <p className="font-mono text-[12px] text-mute">{records} Einträge synchron</p>}
-      </StaggerItem>
-      <StaggerItem>
-        <p className="max-w-[26rem] text-[13.5px] leading-relaxed text-mute">{text}</p>
-      </StaggerItem>
-      <StaggerItem>
-        <Button variant="primary" onClick={closeAuthSheet}>
-          {AUTH.welcome.close}
-        </Button>
-      </StaggerItem>
-    </div>
+      </div>
+      <p className="aw-lead" data-aw-row="">
+        {text}
+      </p>
+      <PillButton type="button" label={AUTH.welcome.close} onClick={closeAuthSheet} />
+    </Step>
   );
 }

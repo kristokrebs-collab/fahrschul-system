@@ -104,15 +104,16 @@ Schrift und unserem Look.
   (nur Demo): „Bank verlangt noch eine Bestätigung“, „Zahlung scheitert nach der Prüfung“, „Bestätigung kommt nicht an“. Der Ausgang landet erst im Mock-Server (Webhook-artig), dann liest die
   Ergebnisseite ihn – wie bei Stripe: die Rückkehr-Adresse bestätigt nie etwas. Zweispaltig ab 860 px, auf dem Handy Karte oben und Formular darunter. Reduzierte Bewegung: keine Drehung, kein
   Lader, das Ergebnis steht (e2e).
-* **Im echten Produkt** verarbeiten wir **keine Kartenziffern selbst**. Dort übergibt das Bestellfenster an Stripes gehostetes Checkout (später eventuell Stripe Elements). Das Bestellfenster ist seit
-  der Rücknahme R2 wieder das von vor Paket B (eine Spalte, Zusammenfassung mit Preis, Verlängerung, Kündigung, Kaufknopf mit Orbs – kein Ablaufband, keine Plan-Karte, keine Zahlungsbühne);
-  „aktiv“ steht erst nach der Bestätigung des Servers (Stripe-Webhook) auf der Ergebnisseite. **Nicht gebaut:** ein „Authorising → Paid“-Leuchten im echten Produkt und ein Kartenformular in
-  unserer Seite. Die Showroom-Seite ist **keine** Vorlage für ein Kartenfeld.
+* **Im echten Produkt** verarbeiten wir **keine Kartenziffern selbst**. Seit Paket V ist das Bestellfenster das Bezahlfenster der Referenzaufnahme (`PayWindow.tsx`: Schrittband, Karte links,
+  Formular rechts). Mit `VITE_STRIPE_PUBLISHABLE_KEY` und ohne Stripe Tax liegen die Kartenfelder als **Stripe Elements** (Stripes iframes) im Fenster; ohne Schlüssel (oder mit Stripe Tax) übergibt
+  es an Stripes gehostetes Checkout. „Bezahlt“ steht erst nach der Bestätigung des Servers (Stripe-Webhook).
+* **Im Showroom** zeigt dasselbe Bezahlfenster **Demo-Felder** (Untertitel „Demo ohne Zahlung · Testkarte 4242 4242 4242 4242“, Marker `tj-demo-card`): die Eingabe bleibt im Browser, an den
+  Mock-Server geht nur das Urteil der Testkarte; der Mock-Webhook bestätigt erst nach einigen Status-Abfragen. Im Produktions-Build gibt es die Demo-Felder nicht (Showroom-Wächter).
 
 ## Anmeldung
 
-Seit der Rücknahme R1 ist das Anmelde-Blatt wieder das von vor Paket B: ein Blatt, Moduswahl (Passwort · Magic Link · Neu hier), die Felder gleiten (`AuthMorph`), kein Markenstreifen, keine
-Klinge, keine Bestellkarte. Geblieben sind die unsichtbaren Fixes (neutrale Registrier-Antwort, `?order=` im Mail-Link, Offline-Hinweis, „E-Mail nicht bestätigt“). Der Demo-Knopf des Mail-Schritts
+Seit Paket V ist die Anmeldung das Fenster der Referenzaufnahme (`AuthWindow.tsx`): Querkarte, links Anmelden, rechts Registrieren, ein dunkles Band mit schräger Kante läuft beim Wechsel
+einmal über die Karte; auf dem Handy eine Hochkarte, das Band läuft oben → unten. Keine Bestellkarte. Geblieben sind die unsichtbaren Fixes (neutrale Registrier-Antwort, `?order=` im Mail-Link, Offline-Hinweis, „E-Mail nicht bestätigt“). Der Demo-Knopf des Mail-Schritts
 („Bestätigungslink simulieren“) gehört zum Showroom.
 
 ## Grenzen

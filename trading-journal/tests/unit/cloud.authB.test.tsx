@@ -1,6 +1,6 @@
 /**
- * Paket B – Anmeldung / Registrierung, the fixes that stayed after the Rücknahme R1 (the sheet looks and moves as before Paket B again: no
- * brand strip, no blade, no order card, no extra links): no account enumeration (AUTH-03), the pre-selected order travels with every mail
+ * Paket B – Anmeldung / Registrierung, the fixes that stayed through the Rücknahme R1 and the login window of Paket V (`cloud.authWindow.test.tsx`
+ * has the card and its motion): no account enumeration (AUTH-03), the pre-selected order travels with every mail
  * (AUTH-06), the "mail sent" step with a resend that waits a minute and says the server's limit, offline said before anything is sent,
  * "e-mail not confirmed" leading to a new link, the armed setup wizard. The Supabase chunk is mocked: this proves the browser flow, not a mail.
  */
@@ -229,17 +229,15 @@ describe("fields: understandable errors, offline, show/hide", () => {
   });
 });
 
-describe("Rücknahme R1: the sheet of before Paket B", () => {
-  it("no order card, no brand strip, no blade, no switch link – the mode switch changes the view at once", async () => {
+describe("the login window keeps the choice out of sight (R1 stays), the switch is its footer link", () => {
+  it("a noted order is not shown in the login (no order card) – the footer link switches to the registration", async () => {
     setReturnTo({ kind: "order", order: "premium.year.1" }, { on: "signedIn" }, "Bestellung");
-    fx.reduced = false;
     openAuthSheet("signin", "card");
     mount();
     await dialog();
-    for (const id of ["auth-order", "auth-brand", "auth-stage", "auth-blade"]) expect(screen.queryByTestId(id), id).toBeNull();
-    expect(screen.queryByText("TRADE JOURNAL")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Neu hier? Jetzt registrieren" })).toBeNull();
-    fireEvent.click(screen.getByRole("radio", { name: "Neu hier" }));
+    for (const id of ["auth-order", "auth-stage", "auth-blade"]) expect(screen.queryByTestId(id), id).toBeNull();
+    expect(screen.queryByRole("radio")).toBeNull();
+    fireEvent.click(screen.getByTestId("auth-to-signup"));
     expect(useCloudSession.getState().sheet.view).toBe("signup");
   });
 });

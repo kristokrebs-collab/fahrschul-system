@@ -1,6 +1,7 @@
 /** Cloud UI barrel (P09). Cards for the Konto page, the header pill, the login sheet. */
 export { AccountPill, type AccountPillProps } from "./AccountPill";
-export { AuthSheet, NewPasswordForm, type AuthSheetProps } from "./AuthSheet";
+export { AuthSheet, type AuthSheetProps } from "./AuthSheet";
+export { NewPasswordForm } from "./NewPasswordForm";
 export { AuthCard } from "./AuthCard";
 export { SecurityCard } from "./SecurityCard";
 export { SyncStatusCard } from "./SyncStatusCard";

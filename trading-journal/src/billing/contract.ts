@@ -138,6 +138,28 @@ export interface CheckoutResponse {
   sessionId: string;
 }
 
+/**
+ * Paket V: the order paid INSIDE the app (Stripe Elements). `POST /billing/subscribe` with the same body as the checkout starts it;
+ * a second call with `setupIntent` (the trial path, after `confirmCardSetup`) asks the server to create the subscription. The card
+ * itself never reaches us: the browser hands it to Stripe, we only see the intent's id. "Aktiv" is still only what the webhook writes.
+ */
+export interface SubscribeRequest extends CheckoutRequest {
+  /** Second step of the trial path: the SetupIntent Stripe confirmed (`seti_…`). */
+  setupIntent?: string;
+}
+
+export interface SubscribeResponse {
+  /** `setup`: a trial – confirm the card with `confirmCardSetup`; `payment`: pay the first invoice with `confirmCardPayment`; `created`: the subscription exists (second step). */
+  kind: "setup" | "payment" | "created";
+  clientSecret?: string;
+  /** The subscription (payment path, and the second step of the trial path). */
+  subscriptionId?: string | null;
+  /** Trial days of this order (0 = the first payment is today). */
+  trialDays: number;
+  /** Shown after the payment: brand and last four of the card Stripe stored (never more). */
+  card?: { brand: string | null; last4: string | null } | null;
+}
+
 /* ------------------------------------------------------------------ cancel / withdraw without a login (§ 312k, § 356a BGB) */
 
 export const CONTRACT_KINDS = ["cancel", "withdraw"] as const;

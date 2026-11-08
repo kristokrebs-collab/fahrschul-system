@@ -18,8 +18,8 @@ export interface AccountPillProps {
 
 /**
  * Header pill of the cloud (P09) – mount it in the header next to the mode pill. Renders nothing without cloud.
- * - Signed out: `Anmelden` pill; the login sheet MORPHS out of it (`layoutId="auth-sheet"`, `spring.sheet`); the pill
- *   is `visibility: hidden` while its sheet is open (the morph contract).
+ * - Signed out: `Anmelden` pill; it opens the login window (Paket V: a landscape card over a dim – it no longer morphs out of
+ *   the pill, the pill stays where it is under the dim).
  * - Signed in: a `StatusPill` (`Sync · live`, `Offline`, `2FA-Code fehlt` …) that pings on every realtime patch /
  *   upload (`pingKey`, ≤ 4 pings/s); a tap opens the account panel (same morph).
  * Press: `usePressable` squash. Reduced motion: no morph (the sheet slides), no pings.
@@ -51,7 +51,7 @@ export function AccountPill({ className }: AccountPillProps) {
       data-cloud-pill={signedIn ? "account" : "signin"}
       {...press}
       transition={{ layout: spring.sheet, ...press.transition }}
-      style={{ borderRadius: radius.pill, visibility: sheetFromPill ? "hidden" : "visible" }}
+      style={{ borderRadius: radius.pill }}
       className={cn(
         "touch-hit inline-flex h-9 shrink-0 items-center gap-2 border px-1.5 text-[12.5px] font-medium transition-colors data-[morph]:after:hidden",
         signedIn ? "border-line bg-ink-900 text-mute hover:border-line-2 hover:text-fg" : "border-line-2 bg-white/[0.04] pl-3 pr-3.5 text-fg hover:bg-white/[0.08]",

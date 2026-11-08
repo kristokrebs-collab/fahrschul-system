@@ -11,6 +11,7 @@ import type { BillingStatus, SubscriptionSummary } from "@/billing/contract";
 import { closeContract, openContract } from "@/billing/contractStore";
 import type { OrderDraft } from "@/billing/purchase/order";
 import { resetOrderForm } from "@/billing/purchase/orderState";
+import { registerDemoFields } from "@/billing/purchase/pay/fields";
 import { openDetail, openManage, openOrder, resetBilling, setReturned, useBilling } from "@/billing/store";
 import { BillingHost } from "@/billing/ui";
 import { setCloudEnabledForTests } from "@/cloud/env";
@@ -62,6 +63,8 @@ beforeEach(() => {
   useCloudSession.setState({ phase: "signedIn", user: USER });
   resetBilling();
   setRedirectForTests((u) => redirects.push(u));
+  // the hand-over mode (no publishable key): the dev-only demo card fields are not part of this file (`billing.payWindow.test.tsx` has them)
+  registerDemoFields(null);
   answer = () => ({});
   vi.stubGlobal(
     "fetch",
@@ -168,8 +171,8 @@ describe("the two boxes and the button", () => {
     expect(sent[0]!.body).toMatchObject({ plan: "pro", interval: "year", consents: { terms: true, immediateStart: true } });
     expect(sent[0]!.body!.orderId).toMatch(/^[0-9a-f-]{36}$/);
     expect(sent[0]!.body!.consentHash).toMatch(/^[0-9a-f]{64}$/);
-    // the width of the button does not change while it works: both labels share one grid cell
-    expect(within(dialog).getByTestId("order-pay").querySelector(".pay-swap")).not.toBeNull();
+    // the width of the button does not change while it works: it spans the whole form column (Paket V), whatever its label says
+    expect(within(dialog).getByTestId("order-pay")).toHaveClass("pw-pay");
   });
 
   it("locked purchase flow: no boxes, no way to order, the reason in words", async () => {

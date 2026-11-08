@@ -9,6 +9,8 @@ export interface CloudUser {
   aal: Aal;
   /** At least one verified MFA factor exists. */
   mfaEnrolled: boolean;
+  /** The name given at the registration (Paket V, optional; it prefills the cardholder in the payment window). */
+  name?: string | null;
 }
 
 export interface MfaFactor {

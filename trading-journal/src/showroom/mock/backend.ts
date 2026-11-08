@@ -90,6 +90,8 @@ export function createBackend(o: BackendOptions): Backend {
   };
   const billing = createBillingCore({
     outcome: "active",
+    // Paket V: no Stripe Tax in the demo, so the payment window takes the (demo) card in the app instead of handing over to the simulated Checkout
+    automaticTax: false,
     userKey: fnUserKey,
     // the demo account has Premium (yearly) running; everyone else (new registrations) starts on Free
     initial: {

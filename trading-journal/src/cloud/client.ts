@@ -82,7 +82,7 @@ export async function refreshAuthState(opts: { factors?: boolean } = {}): Promis
   const verified = factors.some((f) => f.status === "verified");
   useCloudSession.setState({
     phase: "signedIn",
-    user: { id: user.id, email: user.email ?? null, aal, mfaEnrolled: verified },
+    user: { id: user.id, email: user.email ?? null, aal, mfaEnrolled: verified, name: nameOf(user.user_metadata) },
     needsMfa: verified && aal !== "aal2",
     factors,
     provider: typeof user.app_metadata?.provider === "string" ? user.app_metadata.provider : null,
@@ -260,9 +260,21 @@ export async function signInPassword(email: string, password: string): Promise<A
  * (Supabase hides the existing address itself when e-mail confirmation is on – an obfuscated user without identities –
  * and answers `user_already_exists` when it is off; both end in the same neutral step.)
  */
-export async function signUp(email: string, password: string, order?: string | null): Promise<ActionResult<{ confirm: boolean }>> {
+/** The optional name of the registration (Paket V): trimmed, at most 80 characters, nothing else is kept. */
+export function cleanName(raw: string | null | undefined): string | null {
+  const n = (raw ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+  return n || null;
+}
+
+function nameOf(meta: unknown): string | null {
+  const n = meta && typeof meta === "object" ? (meta as { name?: unknown }).name : null;
+  return typeof n === "string" ? cleanName(n) : null;
+}
+
+export async function signUp(email: string, password: string, order?: string | null, name?: string | null): Promise<ActionResult<{ confirm: boolean }>> {
   try {
-    const { data, error } = await getClient().auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: redirectUrl(order) } });
+    const given = cleanName(name);
+    const { data, error } = await getClient().auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: redirectUrl(order), ...(given ? { data: { name: given } } : {}) } });
     if (error) {
       const code = authErrorCodeOf(error);
       if (code === "user_already_exists" || code === "email_exists") return { ok: true, value: { confirm: true } };

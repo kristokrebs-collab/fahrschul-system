@@ -3,7 +3,8 @@
  * `STRIPE_WEBHOOK_SECRET` (`constructEventAsync`, 300 s tolerance) before anything is parsed; then the event runs once
  * (`stripe_events` idempotency) through `handleStripeEvent`:
  * checkout.session.completed · customer.subscription.created / updated / deleted / paused / resumed / trial_will_end ·
- * invoice.paid · invoice.payment_failed. Subscription events re-read the subscription from Stripe (order-safe) and
+ * invoice.paid · invoice.payment_failed · setup_intent.succeeded (Paket V: a trial ordered in the app – the subscription is
+ * created from the confirmed SetupIntent if `/billing/subscribe/complete` did not do it). Subscription events re-read the subscription from Stripe (order-safe) and
  * recompute `profiles.plan`. 2xx = done (also for ignored types), 4xx = bad signature, 5xx / 409 = Stripe retries.
  * Register: Stripe Dashboard → Webhooks → `https://<site>/api/v1/stripe/webhook` with exactly these events.
  */

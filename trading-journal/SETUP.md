@@ -181,6 +181,7 @@ Netlify → **Site configuration → Environment variables → Add a variable**.
 | `SUPABASE_SECRET_KEY` | `sb_secret_…` | Functions, secret |
 | `SITE_ORIGIN` | `https://<deine-site>.netlify.app` (ohne `/` am Ende) | Functions |
 | `STRIPE_SECRET_KEY` | `sk_test_…` (Schritt 4) | Functions, secret |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | optional `pk_test_…` / `pk_live_…` (Schritt 4, Punkt 3): das Bezahlfenster nimmt die Karte **in der App** (Stripe Elements, die Nummer geht vom Browser direkt zu Stripe). Leer = die Bestellung geht wie bisher zu Stripe Checkout. Öffentlich (landet im Bundle) – nie den geheimen Schlüssel; der Build bricht ab, wenn der Wert nicht mit `pk_` beginnt | Builds |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` (Schritt 4) | Functions, secret |
 | `STRIPE_PRICE_PRO_MONTHLY` / `_YEARLY` | `price_…` | Functions |
 | `STRIPE_PRICE_PREMIUM_MONTHLY` / `_YEARLY` | `price_…` | Functions |
@@ -249,7 +250,12 @@ Upgrade-Karte).
    | Team | 19 € **pro Platz** | 190 € **pro Platz** | `STRIPE_PRICE_TEAM_MONTHLY`, `STRIPE_PRICE_TEAM_YEARLY` |
 
    Team: Preismodell „pro Einheit“ (die App schickt die Anzahl Plätze, 2–50). Die sechs `price_…`-IDs kopieren.
-3. **Entwickler → API-Schlüssel**: geheimer Schlüssel `sk_test_…` → `STRIPE_SECRET_KEY`.
+3. **Entwickler → API-Schlüssel**: geheimer Schlüssel `sk_test_…` → `STRIPE_SECRET_KEY` (nur Netlify, Scope Functions, geheim).
+   Optional der **veröffentlichbare** Schlüssel `pk_test_…` → `VITE_STRIPE_PUBLISHABLE_KEY` (Scope Builds): dann zahlt man im
+   Bezahlfenster der App (Stripe Elements, 3-D Secure im Fenster von Stripe; Testphase → SetupIntent, ohne Testphase → Abo mit
+   `payment_behavior: default_incomplete`, Function `billing-subscribe`). Ohne ihn – und immer mit `STRIPE_AUTOMATIC_TAX=true`, weil nur
+   Stripe Checkout die Rechnungsadresse abfragt – geht die Bestellung wie bisher zu Stripe Checkout. „Aktiv“ schreibt in beiden Fällen
+   nur der Webhook.
 4. **Entwickler → Webhooks → Endpunkt hinzufügen**: URL `https://<deine-site>.netlify.app/api/v1/stripe/webhook`,
    Ereignisse:
    `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`,
@@ -257,6 +263,8 @@ Upgrade-Karte).
    `customer.subscription.trial_will_end`, `invoice.paid`, `invoice.payment_failed`,
    **neu (Runde 11):** `charge.refunded` und `charge.dispute.created` – eine volle Erstattung oder Rückbuchung nimmt die Empfehlungs-Gutschrift
    der ersten Zahlung zurück; ohne diese beiden Ereignisse bleibt die Gutschrift stehen.
+   **Neu (Paket V):** `setup_intent.succeeded` – die Testphase des Bezahlfensters: Stripe hat die Karte bestätigt, der Webhook legt das
+   Abo an, falls die Bestätigung der App nicht ankommt (beide Wege erzeugen dasselbe Abo, ein Schlüssel pro Bestellung).
    Signatur-Geheimnis `whsec_…` → `STRIPE_WEBHOOK_SECRET`.
 5. **Einstellungen → Billing → Kundenportal**: Kündigung erlauben (zum Periodenende, mit Gründen),
    Zahlungsmethode ändern, Rechnungsverlauf, **Abo wechseln zwischen den sechs Preisen** (der Knopf „Wechseln“ in der

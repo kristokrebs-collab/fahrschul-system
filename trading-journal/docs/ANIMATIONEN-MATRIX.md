@@ -163,7 +163,18 @@ Stand 2026-11-08. Der Nutzer hat in der Deploy-Vorschau fünf Stellen eingekreis
 
 Glättung (Zusatz R7): in den Paketen C, W, B, S, F1, F2 und P kam genau eine glättende Kurve dazu – die Catmull-Rom-Kurven der Flip-Schema-Spalte (`smoothPath`); sie ist mit R4 weg. Alle übrigen Charts zeichnen gerade Segmente (Recharts ohne `type="monotone"`, Canvas mit `lineTo`). Die „Parabeln“ der Vorschau kamen aus erfundenen Daten: der synthetische Markt des Showrooms (R5: jetzt echte Marktdaten) und das Demo-Journal mit stetigem Plus (R7: streut jetzt unregelmäßig, Verlustphase, Ausreißer, weiter als Demo markiert).
 
-## Frühere Animationen: Befund aus `git log`
+## Runde 13 – Paket V: Anmeldung und Bezahlfenster 1:1 nach der Referenzaufnahme
+
+Stand 2026-11-08. Der Nutzer verlangt einen 1:1-Nachbau von Aufbau und Bewegung zweier Aufnahmen (nur Schrift, Farben, Wortlaut eigen); gemessen in `docs/audit/V-VORBILD.md`, Tokens in `src/motion/vorbild.ts`.
+Ersetzt R1/R2 für diese beiden Fenster (`AuthMorph.tsx`, `OrderSheet.tsx`, `PayButton.tsx` entfernt).
+
+| Punkt | Bewegung | Werte |
+|---|---|---|
+| V1 Anmelden ↔ Registrieren | ein Lauf des dunklen Bands über die Karte, innere Ebene gegenläufig, harter Tausch im gedeckten Fenster, Einlauf gestaffelt | 900 ms `cubic-bezier(0.5,0.14,0.3,1)`; Tausch 342 / 387 ms; Text +20/+80/+140 ms, 14/12/10 px; Zeilen 45 ms; Fokuslinie +250; Knopf +270; Fuß +390; reduziert 150 ms Überblendung |
+| V2 Kartenwende | CVC-Fokus dreht die Karte, Verlassen dreht zurück | 290 ms `cubic-bezier(0.3,0,0.3,1)`, Perspektive 3,6 × Kartenbreite |
+| V2 Bestätigen | Formular aus, Karte in die Mitte, Ring, Glanz alle 500 ms, Puls; Erfolg erst nach Serverbestätigung | Formular 100 ms; Flug 300 ms `cubic-bezier(0.22,1,0.36,1)`, Skala 1,08; Ring 300 ms/Umdrehung; Fehler: Karte zurück 300 ms |
+
+
 
 Gesucht wurde im ganzen Verlauf des Projekts (613 Commits mit `trading-journal`, 2026-09-30 bis 2026-10-31) mit den Suchworten animation, motion, Physik/physics, Pulse, entfernt, vereinfacht
 (und englisch removed, dropped, simplif, no longer), außerdem nach gelöschten Dateien unter `src` und nach entfernten `@keyframes`-Zeilen. **Ergebnis: Keine Animation wurde ersatzlos gelöscht.**

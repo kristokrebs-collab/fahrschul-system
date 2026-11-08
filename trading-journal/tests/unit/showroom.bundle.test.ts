@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = join(__dirname, "..", "..");
 /** Things only the showroom's code, texts and styles contain. */
-const MARKERS = ["showroom.invalid", "tj2-showroom", "Bestätigungslink simulieren", "Demo-Zahlungsseite", "Demo-Karte – nichts wird gespeichert", "showroom-banner", "SHOWROOM · Demo-Daten", "demo@showroom.test", "Neu in dieser Version", "showroom-demo", "sr-pay", "slide-account"];
+const MARKERS = ["tj-demo-card", "showroom.invalid", "tj2-showroom", "Bestätigungslink simulieren", "Demo-Zahlungsseite", "Demo-Karte – nichts wird gespeichert", "showroom-banner", "SHOWROOM · Demo-Daten", "demo@showroom.test", "Neu in dieser Version", "showroom-demo", "sr-pay", "slide-account"];
 
 function files(dir: string, out: string[] = []): string[] {
   if (!existsSync(dir)) return out;

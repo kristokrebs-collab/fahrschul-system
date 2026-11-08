@@ -34,6 +34,7 @@ import {
   type CheckoutRequest,
   type CheckoutResponse,
   type CodeLookup,
+  type SubscribeResponse,
   type InvoiceSummary,
   type LedgerEntry,
   type PortalAction,
@@ -140,12 +141,19 @@ export interface StripeApi {
   checkout: { sessions: { create(params: Stripe.Checkout.SessionCreateParams, options?: Stripe.RequestOptions): Promise<{ id: string; url: string | null }> } };
   billingPortal: { sessions: { create(params: Stripe.BillingPortal.SessionCreateParams): Promise<{ url: string }> } };
   subscriptions: {
+    /** Paket V (embedded order) – optional, so the older test fakes stay valid; the SDK has it. */
+    create?(params: Stripe.SubscriptionCreateParams, options?: Stripe.RequestOptions): Promise<Stripe.Subscription>;
     retrieve(id: string): Promise<Stripe.Subscription>;
     update(id: string, params: Stripe.SubscriptionUpdateParams): Promise<Stripe.Subscription>;
     list(params: Stripe.SubscriptionListParams): Promise<{ data: Stripe.Subscription[] }>;
     cancel(id: string, params?: Stripe.SubscriptionCancelParams): Promise<Stripe.Subscription>;
   };
   invoices: { list(params: Stripe.InvoiceListParams): Promise<{ data: Stripe.Invoice[] }> };
+  /** Paket V: the card of a trial order is confirmed in the browser (`confirmCardSetup`) on this intent. Optional like `subscriptions.create`. */
+  setupIntents?: {
+    create(params: Stripe.SetupIntentCreateParams, options?: Stripe.RequestOptions): Promise<Stripe.SetupIntent>;
+    retrieve(id: string, params?: Stripe.SetupIntentRetrieveParams): Promise<Stripe.SetupIntent>;
+  };
   /** Which invoice a payment (PaymentIntent of a refunded / disputed charge) paid – the API 2025+ way (a charge no longer names its invoice). */
   invoicePayments: { list(params: Stripe.InvoicePaymentListParams): Promise<{ data: Stripe.InvoicePayment[] }> };
   promotionCodes: { list(params: Stripe.PromotionCodeListParams): Promise<{ data: Stripe.PromotionCode[] }> };
@@ -788,13 +796,23 @@ export function checkoutSubmitText(trialDays: number): string {
   return `Mit dem Klick auf den Button gibst du eine zahlungspflichtige Bestellung ab.${trial} Das Abo verlängert sich automatisch um die gewählte Laufzeit, bis du kündigst – jederzeit zum Ende der Laufzeit über „Verträge hier kündigen“ in der App.`;
 }
 
+/** What every order needs before Stripe sees it (checkout and embedded alike), in the order the checks have always run. */
+interface PreparedOrder {
+  priceId: string;
+  days: number;
+  promo: Stripe.PromotionCode | null;
+  seats: number;
+  team: boolean;
+  customer: string;
+  meta: Record<string, string>;
+}
+
 /**
- * Creates a Stripe Checkout session for the signed-in user (redirect URL). Order of the checks: the purchase flow is open
- * (Stripe + the operator's legal texts), no running subscription, BOTH consents ticked with the CURRENT wording, the evidence
- * is stored - only then the session is created, with an idempotency key per order (a double click or a retried request
- * returns the SAME session; the same order with other details is refused as `order_changed`).
+ * The checks and the evidence of an order: the purchase flow is open (Stripe + the operator's legal texts), no running
+ * subscription, BOTH consents ticked with the CURRENT wording (the evidence is stored before anything exists at Stripe), the trial
+ * (none after an earlier one), a referral, a pre-checked promotion code, the team seats, the Stripe customer.
  */
-export async function createCheckout(user: AuthUser, body: CheckoutRequest, origin: string): Promise<CheckoutResponse> {
+async function prepareOrder(user: AuthUser, body: CheckoutRequest): Promise<PreparedOrder> {
   assertPurchaseOpen();
   const priceId = priceIdFor(body.plan, body.interval);
   if (!billingConfigured() || !priceId) throw new HttpError(503, "billing_unavailable", OFF_MESSAGE);
@@ -808,19 +826,17 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
   const referrer = ref ? await referrerOf(ref) : null;
   if (!referrer || referrer === user.id) ref = null;
   const days = used ? 0 : ref ? referralTrialDays() : trialDays();
-  let discounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined;
+  let promo: Stripe.PromotionCode | null = null;
   if (body.code) {
     const code = normalizePromoCode(body.code);
-    const pc = code ? await findPromotionCode(code) : null;
-    if (!pc) throw new HttpError(422, "invalid_code", "Dieser Code ist ungültig oder abgelaufen.");
-    discounts = [{ promotion_code: pc.id }];
+    promo = code ? await findPromotionCode(code) : null;
+    if (!promo) throw new HttpError(422, "invalid_code", "Dieser Code ist ungültig oder abgelaufen.");
   }
   const team = body.plan === "team";
   const cat = PLAN_CATALOG.team;
   const seats = team ? Math.max(cat.minSeats ?? 2, Math.min(cat.maxSeats ?? 50, Math.round(body.seats ?? cat.minSeats ?? 2))) : 1;
   const consentAt = await storeConsents({ userId: user.id, orderId: body.orderId, plan: body.plan, interval: body.interval, seats });
   const customer = await ensureCustomer(user);
-  const urls = returnUrls(origin, body.returnTo);
   const meta: Record<string, string> = {
     supabase_user_id: user.id,
     plan: body.plan,
@@ -830,23 +846,37 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
     consent_hash: consentHash,
     ...(ref ? { ref } : {}),
   };
+  return { priceId, days, promo, seats, team, customer, meta };
+}
+
+/**
+ * Creates a Stripe Checkout session for the signed-in user (redirect URL). Order of the checks: `prepareOrder` (open, no running
+ * subscription, both consents with the current wording, evidence stored) – only then the session is created, with an idempotency key
+ * per order (a double click or a retried request returns the SAME session; the same order with other details is refused as
+ * `order_changed`).
+ */
+export async function createCheckout(user: AuthUser, body: CheckoutRequest, origin: string): Promise<CheckoutResponse> {
+  const o = await prepareOrder(user, body);
+  const cat = PLAN_CATALOG.team;
+  const urls = returnUrls(origin, body.returnTo);
   // a trial WITHOUT a card only for Pro: Premium and Team carry the telephone, SMS and AI the operator pays per use (Linse 1 #6)
-  const cardless = days > 0 && cardlessTrial() && body.plan === "pro";
+  const cardless = o.days > 0 && cardlessTrial() && body.plan === "pro";
   const tax = automaticTax();
+  const discounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined = o.promo ? [{ promotion_code: o.promo.id }] : undefined;
   const params: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
-    customer,
+    customer: o.customer,
     client_reference_id: user.id,
     locale: "de",
     line_items: [
-      { price: priceId, quantity: seats, ...(team ? { adjustable_quantity: { enabled: true, minimum: cat.minSeats ?? 2, maximum: cat.maxSeats ?? 50 } } : {}) },
+      { price: o.priceId, quantity: o.seats, ...(o.team ? { adjustable_quantity: { enabled: true, minimum: cat.minSeats ?? 2, maximum: cat.maxSeats ?? 50 } } : {}) },
     ],
     success_url: urls.success,
     cancel_url: urls.cancel,
-    metadata: meta,
+    metadata: o.meta,
     subscription_data: {
-      metadata: meta,
-      ...(days > 0 ? { trial_period_days: days } : {}),
+      metadata: o.meta,
+      ...(o.days > 0 ? { trial_period_days: o.days } : {}),
       ...(cardless ? { trial_settings: { end_behavior: { missing_payment_method: "cancel" } } } : {}),
     },
     ...(cardless ? { payment_method_collection: "if_required" as const } : {}),
@@ -854,7 +884,7 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
     ...(discounts ? { discounts } : { allow_promotion_codes: true }),
     // § 312j Abs. 3 BGB: Stripe's button cannot read "zahlungspflichtig bestellen" - `pay` + the text beside it say so
     submit_type: "pay",
-    custom_text: { submit: { message: checkoutSubmitText(days) } },
+    custom_text: { submit: { message: checkoutSubmitText(o.days) } },
     ...(tax
       ? { automatic_tax: { enabled: true }, customer_update: { address: "auto" as const, name: "auto" as const }, tax_id_collection: { enabled: true } }
       : {}),
@@ -864,6 +894,127 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
   if (!session.url) throw new HttpError(502, "billing_unavailable", STRIPE_DOWN);
   await linkConsentSession(user.id, body.orderId, session.id);
   return { url: session.url, sessionId: session.id };
+}
+
+/* ------------------------------------------------------------------ the order paid in the app (Paket V: Stripe Elements) */
+
+/** Marks a SetupIntent of the embedded trial path (the webhook and the second step find the order by it). */
+const EMBEDDED_KIND = "tj_subscription";
+
+type EmbeddedApi = StripeApi & { setupIntents: NonNullable<StripeApi["setupIntents"]>; subscriptions: StripeApi["subscriptions"] & { create: NonNullable<StripeApi["subscriptions"]["create"]> } };
+
+function embeddedApi(): EmbeddedApi {
+  const api = stripeApi();
+  if (!api.setupIntents || !api.subscriptions.create) throw new HttpError(503, "billing_unavailable", OFF_MESSAGE);
+  return api as EmbeddedApi;
+}
+
+/**
+ * Starts an order paid INSIDE the app – the card goes from the browser straight to Stripe (Elements), never through us. Same checks and
+ * the same evidence as the checkout (`prepareOrder`), one idempotency key per order.
+ * - Trial (days > 0): a SetupIntent (`usage: off_session`) – the browser confirms the card with `confirmCardSetup` (3-D Secure by Stripe);
+ *   the subscription is created only AFTER that (`completeEmbedded`, or the `setup_intent.succeeded` webhook), with the card as its
+ *   default payment method – a trial never starts without a confirmed card.
+ * - No trial: the subscription with `payment_behavior: default_incomplete` – the browser pays its first invoice with
+ *   `confirmCardPayment`; until then it is `incomplete` and grants nothing.
+ * Stripe Tax needs the billing address, which only Stripe's own Checkout asks for: with it on, the client is told to use the checkout
+ * (409 `embedded_unavailable`, before anything is stored).
+ */
+export async function createEmbedded(user: AuthUser, body: CheckoutRequest): Promise<SubscribeResponse> {
+  if (automaticTax()) throw new HttpError(409, "embedded_unavailable", "Mit Steuerberechnung geht die Bestellung über die Bezahlseite von Stripe.");
+  const api = embeddedApi();
+  const o = await prepareOrder(user, body);
+  if (o.days > 0) {
+    const si = await stripeCall("setup intent", () =>
+      api.setupIntents.create(
+        {
+          customer: o.customer,
+          usage: "off_session",
+          allowed_payment_method_types: ["card"],
+          metadata: { ...o.meta, tj_kind: EMBEDDED_KIND, price: o.priceId, seats: String(o.seats), trial_days: String(o.days), ...(o.promo ? { promotion_code: o.promo.id } : {}) },
+        },
+        { idempotencyKey: `tj-seti-${user.id}-${body.orderId}` },
+      ),
+    );
+    if (!si.client_secret) throw new HttpError(502, "billing_unavailable", STRIPE_DOWN);
+    await linkConsentSession(user.id, body.orderId, si.id);
+    return { kind: "setup", clientSecret: si.client_secret, subscriptionId: null, trialDays: o.days };
+  }
+  const sub = await stripeCall("subscription", () =>
+    api.subscriptions.create(
+      {
+        customer: o.customer,
+        items: [{ price: o.priceId, quantity: o.seats }],
+        payment_behavior: "default_incomplete",
+        payment_settings: { save_default_payment_method: "on_subscription", payment_method_types: ["card"] },
+        metadata: o.meta,
+        ...(o.promo ? { discounts: [{ promotion_code: o.promo.id }] } : {}),
+        expand: ["latest_invoice.confirmation_secret"],
+      },
+      { idempotencyKey: `tj-sub-${user.id}-${body.orderId}` },
+    ),
+  );
+  const inv = sub.latest_invoice && typeof sub.latest_invoice === "object" ? (sub.latest_invoice as Stripe.Invoice) : null;
+  const secret = inv?.confirmation_secret?.client_secret ?? null;
+  if (!secret) throw new HttpError(502, "billing_unavailable", STRIPE_DOWN);
+  await linkConsentSession(user.id, body.orderId, sub.id);
+  return { kind: "payment", clientSecret: secret, subscriptionId: sub.id, trialDays: 0 };
+}
+
+/** The subscription of a confirmed trial SetupIntent (idempotent per order: the second step and the webhook make the SAME one). */
+async function subscriptionFromSetup(si: Stripe.SetupIntent): Promise<{ id: string; card: SubscribeResponse["card"] }> {
+  const api = embeddedApi();
+  const m = si.metadata ?? {};
+  const userId = validUuid(m.supabase_user_id);
+  const customer = idOf(si.customer);
+  const pm = idOf(si.payment_method);
+  const price = m.price;
+  const order = m.order_id;
+  if (!userId || !customer || !pm || !price || !order) throw new HttpError(422, "invalid_body", "Ungültige Bestellung.");
+  const meta: Record<string, string> = {};
+  for (const [k, v] of Object.entries(m)) if (!["tj_kind", "price", "seats", "trial_days", "promotion_code"].includes(k)) meta[k] = v;
+  const sub = await stripeCall("subscription", () =>
+    api.subscriptions.create(
+      {
+        customer,
+        items: [{ price, quantity: Math.max(1, Number(m.seats) || 1) }],
+        default_payment_method: pm,
+        trial_period_days: Math.max(1, Number(m.trial_days) || 1),
+        metadata: meta,
+        ...(m.promotion_code ? { discounts: [{ promotion_code: m.promotion_code }] } : {}),
+      },
+      { idempotencyKey: `tj-sub-${userId}-${order}` },
+    ),
+  );
+  const card = si.payment_method && typeof si.payment_method === "object" ? (si.payment_method as Stripe.PaymentMethod).card : null;
+  return { id: sub.id, card: card ? { brand: card.brand ?? null, last4: card.last4 ?? null } : null };
+}
+
+/**
+ * Second step of the trial path: Stripe confirmed the card (`setupIntent`). The intent must belong to THIS user's customer and THIS order
+ * and be `succeeded`; then the subscription is created (trial, the card as default). Its state reaches the app through the webhook.
+ * A repeated call (lost answer) returns the same subscription; another running subscription refuses (409 `already_subscribed`).
+ */
+export async function completeEmbedded(user: AuthUser, body: { orderId: string; setupIntent: string }): Promise<SubscribeResponse> {
+  if (!/^seti_[A-Za-z0-9_]{6,80}$/.test(body.setupIntent)) throw new HttpError(422, "invalid_body", "Ungültige Bestellung.");
+  const api = embeddedApi();
+  const si = await stripeCall("setup intent", () => api.setupIntents.retrieve(body.setupIntent, { expand: ["payment_method"] }));
+  const mine = await customerIdOf(user.id);
+  if (si.metadata?.tj_kind !== EMBEDDED_KIND || si.metadata?.supabase_user_id !== user.id || si.metadata?.order_id !== body.orderId || !mine || idOf(si.customer) !== mine) {
+    throw new HttpError(404, "not_found", "Diese Bestellung gibt es nicht.");
+  }
+  if (si.status !== "succeeded") throw new HttpError(409, "card_unconfirmed", "Die Karte ist noch nicht bestätigt.");
+  const trialDays = Number(si.metadata?.trial_days) || 0;
+  const rows = await subscriptionRows(user.id);
+  if (rows.some((r) => grantsPlan(r.status) || r.status === "paused")) {
+    // the subscription of THIS order may already exist (the webhook came first, or an earlier answer got lost): that one is fine
+    const listed = await stripeCall("subscriptions", () => api.subscriptions.list({ customer: mine, status: "all", limit: 20 }));
+    const same = listed.data.find((x) => x.metadata?.order_id === body.orderId);
+    if (!same) throw new HttpError(409, "already_subscribed", "Du hast schon ein Abo. Tarif wechseln oder kündigen kannst du im Kundenportal.");
+    return { kind: "created", subscriptionId: same.id, trialDays, card: null };
+  }
+  const sub = await subscriptionFromSetup(si);
+  return { kind: "created", subscriptionId: sub.id, trialDays, card: sub.card };
 }
 
 /* ------------------------------------------------------------------ portal + in-app changes */
@@ -1251,6 +1402,14 @@ export async function freshSubscription(id: string): Promise<Stripe.Subscription
 
 /** Handles one verified Stripe event; returns what happened. Throws to make Stripe retry. */
 export async function handleStripeEvent(event: Stripe.Event): Promise<"processed" | "ignored"> {
+  if (event.type === "setup_intent.succeeded") {
+    // Paket V: the card of an embedded trial order is confirmed – the subscription is created here as well (same key as the app's
+    // second step, so whichever comes first makes it and the other gets the same one back)
+    const si = event.data.object as Stripe.SetupIntent;
+    if (si.metadata?.tj_kind !== EMBEDDED_KIND) return "ignored";
+    await subscriptionFromSetup(si);
+    return "processed";
+  }
   if (event.type === "checkout.session.completed") {
     const s = event.data.object as Stripe.Checkout.Session;
     if (s.mode !== "subscription") return "ignored";
