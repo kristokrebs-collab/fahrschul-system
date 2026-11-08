@@ -1,9 +1,11 @@
 import { themePaint } from "@/lib/themePaint";
 import { useMemo } from "react";
 import { cn } from "@/lib/cn";
-import { displayPrice } from "@/billing/format";
+import { planCta } from "@/billing/ctas";
+import { useCloudSession } from "@/cloud/session";
+import { displayPrice, formatMoney } from "@/billing/format";
 import { PLAN_CATALOG } from "@/billing/plans";
-import { requestOrder, useBilling, useBillingMode, useTrialDays } from "@/billing/store";
+import { openPortal, requestOrder, useBilling, useBillingMode, useEffectivePlan, usePurchaseGate, useTrialDays } from "@/billing/store";
 import { Mark, PriceDigits } from "@/billing/ui/parts";
 import { AsciiCascade } from "@/motion/pulse/AsciiCascade";
 import { LaunchGrid, LaunchSlot } from "@/motion/pulse/LaunchGrid";
@@ -49,6 +51,11 @@ export function PricingHero({ className }: { className?: string }) {
   const interval = useBilling((s) => s.interval);
   const config = useBilling((s) => s.config);
   const busy = useBilling((s) => s.busy);
+  const signedIn = useCloudSession((s) => s.phase === "signedIn");
+  const current = useEffectivePlan();
+  const subscription = useBilling((s) => s.account?.subscription ?? null);
+  const gate = usePurchaseGate();
+  const cta = planCta({ plan: "pro", signedIn, currentPlan: current.plan, hasSubscription: !!subscription, mode, purchaseOpen: gate.open, available: !config || config.available.includes("pro") });
   const trial = useTrialDays();
   const pro = PLAN_CATALOG.pro;
   const price = displayPrice("pro", interval, config?.prices);
@@ -78,9 +85,10 @@ export function PricingHero({ className }: { className?: string }) {
             {PREISE.heroAsideLabel}
           </span>
           <div className="grid gap-1.5">
-            <PriceDigits cents={price.perMonth} className="text-[64px]" />
+            {/* the amount that is DUE per payment: 120 € per year, not the 10 € a month it works out to */}
+            <PriceDigits cents={price.amount} className="text-[64px]" />
             <span className="text-[12.5px] text-mute">
-              {PREISE.perMonth} · {interval === "year" ? PREISE.yearly.toLowerCase() : PREISE.monthly.toLowerCase()} abgerechnet
+              {interval === "year" ? `${PREISE.perYear} · ${PREISE.perMonthEquiv(formatMoney(price.perMonth, price.currency))}` : `${PREISE.perMonth} · ${PREISE.monthlyNote}`}
             </span>
           </div>
           <ul className="grid gap-2.5 text-[13.5px]">
@@ -96,11 +104,17 @@ export function PricingHero({ className }: { className?: string }) {
       hud={
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-line bg-ink-900 px-5 py-4">
           <span className="text-[14px] text-fg/90">{mode === "open" ? PREISE.heroHud(trial) : PREISE.heroHud(0)}</span>
-          {mode === "open" && (
-            <Button variant="primary" fx={false} disabled={!!busy} onClick={() => requestOrder({ plan: "pro", interval })} data-testid="hero-cta">
-              {PREISE.heroCta()}
-            </Button>
-          )}
+          {/* the same words as the Pro card (`planCta`): a button only where it does something, the own plan is a status */}
+          {mode === "open" &&
+            (cta.clickable ? (
+              <Button variant="primary" fx={false} disabled={!!busy} onClick={() => (cta.kind === "switch" ? void openPortal("update") : requestOrder({ plan: "pro", interval }))} data-testid="hero-cta">
+                {cta.label}
+              </Button>
+            ) : (
+              <span className="text-[13px] text-mute" data-testid="hero-note">
+                {cta.label}
+              </span>
+            ))}
         </div>
       }
     >

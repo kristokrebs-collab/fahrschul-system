@@ -13,7 +13,7 @@ import { ApiError, FUNCTIONS_MISSING } from "@/cloud/api";
 import { cloudEnabled } from "@/cloud/env";
 import { hasStoredSession } from "@/cloud/hint";
 import { openAuthSheet, useCloudSession } from "@/cloud/session";
-import { setReturnTo } from "@/store/returnTo";
+import { clearReturnTo, peekReturnTo, setReturnTo } from "@/store/returnTo";
 import { hasClaudeRuntime } from "@/store/capability";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 import { pushToast } from "@/store/uiStore";
@@ -122,7 +122,8 @@ const INITIAL: BillingState = {
   manageOpen: false,
   returned: null,
   interval: "year",
-  seats: 3,
+  // the Team card starts at the MINIMUM (2 seats: 2 × 190 € = 380 € per year) – the amount shown is the smallest amount that can be ordered
+  seats: 2,
 };
 
 export const useBilling = create<BillingState>()(() => ({ ...INITIAL, cached: readCache() }));
@@ -361,6 +362,15 @@ export function requestOrder(intent: CheckoutIntent): void {
     return;
   }
   openOrder(draft);
+}
+
+/**
+ * "Kostenlos starten": the registration WITHOUT an order. A note of an earlier, abandoned order is dropped first – the
+ * sheet must not show (and the way back must not open) a purchase the person did not choose just now. No card, no payment.
+ */
+export function requestFree(): void {
+  if (peekReturnTo()?.target.kind === "order") clearReturnTo();
+  openAuthSheet("signup", "card");
 }
 
 /** Opens the Stripe Customer Portal (optionally deep-linked into a flow). */

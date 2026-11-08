@@ -14,6 +14,7 @@
  * | `PostTradeReviewHost` | P08 | review prompt for closed trades + the review sheet (gate `growth`) |
  * | `DailyCheckinHost` | F61 | the daily check-in dialog at the first open of the day + the check-in sheet (gate `growth`) |
  * | `ArrivalNote`, `ReturnHost` | A4 | the note a finder leaves where it landed (why a card is missing, the next step as a button); the return to the task after a login / plan change / connection (`src/store/returnTo.ts`) |
+ * | `WizardHost` | Paket B | the four-step setup wizard (Konto · Daten · Verbindung · erster Trade), opened ONCE after a fresh registration armed it (`src/onboarding/wizard/`), never by a reload; its sheet is its own chunk |
  * | `BillingHost` | P10 | upgrade / cancel sheets, Stripe return, `?ref=` (inert without billing) |
  * | `ExchangeHost` | P11 | connect / dry-run / CSV sheets, server pulls (CSV works without cloud) |
  * | `SocialHost` | P12 | the share sheet |
@@ -40,6 +41,7 @@ import { ArrivalNote } from "@/app/ArrivalNote";
 import { useCloudSession } from "@/cloud/session";
 import { installE2eHooks } from "@/app/e2eHooks";
 import { ReturnHost } from "@/app/ReturnHost";
+import { WizardHost } from "@/onboarding/wizard/WizardHost";
 import { HostSlot } from "@/app/HostSlot";
 import { useAssistantOpen } from "@/assistant/open";
 import { useConnectUi } from "@/connect/open";
@@ -225,6 +227,10 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Rückkehr">
         <ReturnHost />
+      </HostSlot>
+      {/* Paket B: the four-step setup wizard, once, after a fresh registration */}
+      <HostSlot name="Einrichtung">
+        <WizardHost />
       </HostSlot>
       <HostSlot name="Börse">
         <ExchangeHost />

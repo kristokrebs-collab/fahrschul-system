@@ -3330,7 +3330,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     sub: "Konto & Tarif",
     page: "preise",
     anchor: { testid: "hero-cta" },
-    place: "Pro wählen",
+    place: "Pro auswählen · Weiter zur Zahlung",
     keywords: ["Kaufen", "Kauf", "Zahlungspflichtig", "Tarif", "Abo", "Pro", "Premium", "Team", "Sitze", "Stripe", "Testphase"],
     intents: ["tarif kaufen", "abo kaufen", "pro kaufen", "bezahlen", "tarif buchen", "premium kaufen", "team sitze"],
     see: ["abo", "tarif-vergleich", "kuendigen-ohne-login"],

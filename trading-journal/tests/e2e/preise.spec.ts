@@ -91,11 +91,16 @@ test.describe("Preise & Abo", () => {
     await expectNoHorizontalScroll(page);
     await shot(page, info, "preise-top");
 
-    // yearly is the default (per-month equivalent), monthly rolls to the monthly price
-    await expect(srPrice(page, "pro")).toHaveText("10 €");
+    // yearly is the default and shows the amount that is DUE per year (not the monthly equivalent); monthly rolls to the monthly price
+    await expect(srPrice(page, "pro")).toHaveText("120 €");
+    await expect(srPrice(page, "premium")).toHaveText("240 €");
+    await expect(srPrice(page, "team")).toHaveText("190 €");
+    await expect(page.getByTestId("price-pro")).toContainText("pro Jahr · entspricht 10 € pro Monat");
+    await expect(page.getByTestId("team-total")).toHaveText("2 Sitze: 380 € pro Jahr");
     await page.getByRole("radio", { name: "Monatlich" }).click();
     await expect(srPrice(page, "pro")).toHaveText("12 €");
     await expect(srPrice(page, "premium")).toHaveText("24 €");
+    await expect(page.getByTestId("team-total")).toHaveText("2 Sitze: 38 € pro Monat");
 
     // a promotion code: invalid shakes with the reason, a valid one decodes the discounted price
     const code = page.getByLabel("Rabattcode");
@@ -232,7 +237,7 @@ test.describe("Preise & Abo", () => {
     expect(bill.portals.at(-1)).toMatchObject({ action: "resume" });
 
     // the Customer Portal is a redirect there and back
-    await card.getByRole("button", { name: "Abo verwalten" }).click();
+    await card.getByRole("button", { name: "Abo und Rechnungen verwalten" }).click();
     const manage = page.getByTestId("manage-sheet");
     await expect(manage).toBeVisible();
     await manage.getByTestId("manage-portal").click();
@@ -259,7 +264,7 @@ test.describe("Preise & Abo", () => {
     const sheet = page.getByRole("dialog", { name: "Freischalten" });
     await ready(sheet);
     await expect(sheet.getByTestId("upgrade-sheet")).toContainText("Enthalten in Pro");
-    await expect(sheet.getByTestId("upgrade-cta")).toHaveText("Weiter zur Bestellung");
+    await expect(sheet.getByTestId("upgrade-cta")).toHaveText("Pro auswählen");
     await shot(page, info, "upgrade-sheet");
     await sheet.getByRole("button", { name: "Schließen" }).first().click();
     await expect(sheet).toHaveCount(0);

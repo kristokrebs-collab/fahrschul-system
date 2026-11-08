@@ -13,7 +13,9 @@ import { ThinkingOrb } from "@/motion/ThinkingOrb";
 import { FullscreenWipe, WipeItem } from "@/motion/pulse/FullscreenWipe";
 import { Button } from "@/primitives/Button";
 import { formatDay } from "@/billing/format";
-import { PLAN_CATALOG } from "@/billing/plans";
+import { highlightsFor, PLAN_CATALOG } from "@/billing/plans";
+import { summarize } from "@/billing/purchase/order";
+import { PlanCardArt } from "@/billing/purchase/PlanCardArt";
 import { pollDelay, pollTimedOut, resultStateOf, RESULT_TEXT, type ResultState } from "@/billing/purchase/result";
 import { clearLastOrder, readLastOrder } from "@/billing/purchase/orderState";
 import { RESULT } from "@/billing/purchase/strings";
@@ -99,6 +101,14 @@ export function ResultView() {
           : RESULT_TEXT[state];
   const name = sub && state === "confirmed" ? PLAN_CATALOG[sub.plan].name : "";
 
+  // the plan card of the order window again: calm while the server has not heard yet, ONE success glow only when it says "aktiv"
+  const config = useBilling((s) => s.config);
+  const cardPlan = state === "confirmed" && sub && (sub.plan === "pro" || sub.plan === "premium" || sub.plan === "team") ? sub.plan : last?.draft.plan;
+  const cardInterval = (state === "confirmed" ? sub?.interval : null) ?? last?.draft.interval ?? "year";
+  const cardSeats = state === "confirmed" && sub ? Math.max(1, sub.seats) : (last?.draft.seats ?? 1);
+  const card = cardPlan && (state === "confirmed" || state === "pending" || state === "action") ? summarize({ plan: cardPlan, interval: cardInterval, seats: cardSeats }, { prices: config?.prices }) : null;
+  const cardCents = state === "confirmed" && sub?.amount != null ? sub.amount : (card?.totalCents ?? 0);
+
   return (
     <FullscreenWipe open={open} onClose={close} label={RESULT.label}>
       <div className="mx-auto grid min-h-full max-w-[880px] content-center gap-8 px-6 py-20" data-testid="order-result" data-state={state}>
@@ -132,7 +142,20 @@ export function ResultView() {
             {text.text}
           </p>
         </WipeItem>
-        <WipeItem index={3}>
+        {card && (
+          <WipeItem index={3}>
+            <PlanCardArt
+              plan={card.draft.plan}
+              interval={card.draft.interval}
+              seats={card.draft.seats}
+              totalCents={cardCents}
+              currency={card.currency}
+              highlights={highlightsFor(card.draft.plan, { coachAi: config?.coachAi === true })}
+              tone={state === "confirmed" ? "confirmed" : state === "pending" && !timedOut ? "working" : "idle"}
+            />
+          </WipeItem>
+        )}
+        <WipeItem index={4}>
           <div className="flex flex-wrap gap-2.5">
             {state === "confirmed" && (
               <Button ref={btn} variant="primary" fx={false} onClick={close} data-testid="result-close">

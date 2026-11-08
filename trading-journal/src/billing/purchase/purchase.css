@@ -40,6 +40,32 @@ html[data-safe-fx] .pay-glass {
   background: linear-gradient(155deg, rgb(var(--pg-hi) / 0.08), transparent 55%), var(--color-ink-850);
 }
 
+/* The plan "card" of the order window (PlanCardArt): the glass surface WITHOUT backdrop-filter (a blurred layer and
+   `backface-visibility` do not mix in every browser), a fine dot grid (the dot-matrix language) and a lit edge. Both faces. */
+.pay-card {
+  --pg-hi: 255 255 255;
+  --pg-lo: 0 0 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  overflow: hidden;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid rgb(var(--pg-hi) / 0.14);
+  background:
+    radial-gradient(circle, rgb(var(--pg-hi) / 0.1) 1px, transparent 1.4px) 0 0 / 9px 9px,
+    linear-gradient(150deg, rgb(var(--pg-hi) / 0.12), rgb(var(--pg-hi) / 0.02) 48%, rgb(var(--pg-lo) / 0.28)),
+    var(--color-ink-850);
+  box-shadow:
+    inset 1px 1px 0 rgb(var(--pg-hi) / 0.14),
+    0 18px 38px -22px rgb(var(--pg-lo) / 0.7);
+}
+:root[data-theme="light"] .pay-card:not(:where([data-theme-scope="dark"], [data-intro-stage]) *) {
+  --pg-hi: 15 23 42;
+  --pg-lo: 15 23 42;
+}
+
 /* The Sheet panel as glass: the same surface, a notch more opaque (94 %). Specificity (0,2,0) beats the panel's `bg-ink-850`. */
 .pay-sheet.pay-sheet {
   background:

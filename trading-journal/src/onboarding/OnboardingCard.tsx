@@ -5,11 +5,13 @@ import { openShortcutSheet } from "@/app/shortcuts";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { readOnboarding, startOnboarding, useOnboarding, type StoredOnboarding } from "./onboardingStore";
+import { openWizard, readWizard, useWizard, wizardStatusText } from "./wizard/wizardStore";
 
 export const ONBOARDING_CARD = {
   title: "Einführung & Hilfe",
   lead: "Die Tour durch Konten, Setups, Börse, die neueren Bereiche und dein erstes Ziel – jederzeit noch einmal.",
   news: { lead: "Neu in der App", label: "Neue Bereiche der App", items: [{ id: "handelsplan-einstieg", label: "Handelsplan" }, { id: "aktien-scanner", label: "Aktien" }, { id: "zeitmaschine", label: "Zeitmaschine" }, { id: "datenarchiv", label: "Datenarchiv" }] },
+  wizard: { lead: "Einrichtung in vier Schritten: Konto, Daten, Verbindung (optional), erster Trade.", open: "Einrichtung öffnen", resume: "Einrichtung fortsetzen" },
   start: "Einführung starten",
   keys: "Alle Tastenkürzel",
   demo: "Demo mit Beispieldaten",
@@ -42,13 +44,20 @@ export function onboardingStatusText(s: StoredOnboarding | null): string {
 
 /** Settings card (P13, mounted by the integrator next to "Darstellung"): restart the tour, open the cheat sheet. */
 export function OnboardingCard({ className }: { className?: string }) {
-  // re-read the stored outcome whenever the tour closes
+  // re-read the stored outcome whenever the tour (or the setup wizard) closes
   const open = useOnboarding((s) => s.open);
+  const wizardOpen = useWizard((s) => s.open);
   const [stored, setStored] = useState(readOnboarding);
+  const [wizard, setWizard] = useState(readWizard);
   const [wasOpen, setWasOpen] = useState(open);
+  const [wasWizardOpen, setWasWizardOpen] = useState(wizardOpen);
   if (wasOpen !== open) {
     setWasOpen(open);
     if (!open) setStored(readOnboarding());
+  }
+  if (wasWizardOpen !== wizardOpen) {
+    setWasWizardOpen(wizardOpen);
+    setWizard(readWizard());
   }
   return (
     <Card title={ONBOARDING_CARD.title} className={className}>
@@ -57,6 +66,18 @@ export function OnboardingCard({ className }: { className?: string }) {
         <p className="text-[12px] text-mute" data-testid="onboarding-status">
           {onboardingStatusText(stored)}
         </p>
+        {/* Paket B: the four-step setup wizard (Konto · Daten · Verbindung · erster Trade) – once after a registration, from here whenever */}
+        <div className="grid gap-2 border-t border-line pt-3" data-testid="wizard-card">
+          <p className="text-[12.5px] text-mute">{ONBOARDING_CARD.wizard.lead}</p>
+          <p className="text-[12px] text-mute" data-testid="wizard-status">
+            {wizardStatusText(wizard)}
+          </p>
+          <div>
+            <Button size="sm" onClick={() => openWizard(true)} data-testid="wizard-open">
+              {wizard?.status === "active" ? ONBOARDING_CARD.wizard.resume : ONBOARDING_CARD.wizard.open}
+            </Button>
+          </div>
+        </div>
         <ul className="grid gap-1.5 border-t border-line pt-3" aria-label="Wichtige Tastenkürzel">
           {ONBOARDING_CARD.quick.map((q) => (
             <li key={q.label} className="flex items-center justify-between gap-3 text-[12.5px] text-mute">

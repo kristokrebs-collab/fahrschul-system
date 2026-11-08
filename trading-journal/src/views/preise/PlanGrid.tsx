@@ -4,11 +4,12 @@ import { cn } from "@/lib/cn";
 import { themePaint } from "@/lib/themePaint";
 import { planSaving, savingLabel } from "@/billing/purchase/order";
 import "@/billing/purchase/purchase.css";
-import { openAuthSheet, useCloudSession } from "@/cloud/session";
+import { useCloudSession } from "@/cloud/session";
+import { CTA, planCta } from "@/billing/ctas";
 import type { CodeLookup } from "@/billing/contract";
 import { displayPrice, formatMoney, priceDigits, withCoupon, type DisplayPrice } from "@/billing/format";
 import { highlightsFor, PLAN_CATALOG, type PaidPlanId } from "@/billing/plans";
-import { openDetail, openPortal, requestOrder, setSeats, useBilling, useBillingMode, useEffectivePlan, useOffer, usePurchaseGate } from "@/billing/store";
+import { openDetail, openManage, openPortal, requestFree, requestOrder, setSeats, useBilling, useBillingMode, useEffectivePlan, useOffer, usePurchaseGate } from "@/billing/store";
 import { Mark, PriceDigits } from "@/billing/ui/parts";
 import type { PlanId } from "@/billing/types";
 import { Float } from "@/motion/rich/Float";
@@ -33,16 +34,20 @@ function PriceBlock({ plan, price, base, promo }: { plan: PaidPlanId; price: Dis
   const cat = PLAN_CATALOG[plan];
   const interval = price.interval;
   const yearly = interval === "year";
+  const seats = useBilling((s) => s.seats);
   const saving = planSaving(plan, useBilling.getState().config?.prices);
   const months = saving.monthsFree ?? 0;
   const discounted = price.amount !== base.amount;
-  const digits = priceDigits(price.perMonth);
+  const digits = priceDigits(price.amount);
+  const per = cat.perSeat ? (yearly ? PREISE.perSeatYear : PREISE.perSeatMonth) : yearly ? PREISE.perYear : PREISE.perMonth;
+  const perWord = yearly ? PREISE.perYear : PREISE.perMonth;
+  const teamSeats = cat.perSeat ? Math.max(cat.minSeats ?? 2, seats) : 0;
   return (
-    <div className="grid gap-1.5" data-testid={`price-${plan}`}>
+    <div className="grid gap-1.5" data-testid={`price-${plan}`} data-interval={interval}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         {discounted ? (
           // the code decodes the new price; a lower price flashes green (ValueFlash on the negated price)
-          <ValueFlash value={-price.perMonth} className="rounded-lg">
+          <ValueFlash value={-price.amount} className="rounded-lg">
             <span className="inline-flex items-baseline gap-1 leading-none">
               <TextScramble key={digits} text={digits} as="span" className="dot-num text-[48px] leading-none text-fg" />
               <span aria-hidden="true" className="font-sans text-[20px] font-semibold text-mute">
@@ -52,17 +57,24 @@ function PriceBlock({ plan, price, base, promo }: { plan: PaidPlanId; price: Dis
           </ValueFlash>
         ) : (
           <TextPrism className="-my-[0.12em] py-[0.12em]">
-            <PriceDigits cents={price.perMonth} className="text-[48px]" />
+            <PriceDigits cents={price.amount} className="text-[48px]" />
           </TextPrism>
         )}
-        {discounted && <span className="num font-mono text-[14px] text-faint line-through">{formatMoney(base.perMonth, base.currency)}</span>}
+        {discounted && <span className="num font-mono text-[14px] text-faint line-through">{formatMoney(base.amount, base.currency)}</span>}
       </div>
+      {/* the big number is what is DUE per payment (120 € per year); the monthly value of a yearly price is only a comparison line */}
       <span className="text-[12px] text-mute">
-        {cat.perSeat ? PREISE.perSeatMonth : PREISE.perMonth}
+        {per}
         {" · "}
-        {yearly ? PREISE.yearlyNote(formatMoney(price.amount, price.currency), months) : PREISE.monthlyNote}
+        {yearly ? PREISE.perMonthEquiv(formatMoney(price.perMonth, price.currency)) : PREISE.monthlyNote}
+        {yearly && months > 0 ? ` · ${PREISE.yearlyNote(months)}` : ""}
         {yearly && saving.cents > 0 ? ` · spart ${formatMoney(saving.cents, price.currency)} gegenüber 12 Monatszahlungen${savingLabel(saving) ? ` (${savingLabel(saving)})` : ""}` : ""}
       </span>
+      {cat.perSeat && (
+        <span className="text-[12.5px] font-semibold text-fg" data-testid="team-total">
+          {PREISE.seatsTotal(teamSeats, formatMoney(price.amount * teamSeats, price.currency), perWord)}
+        </span>
+      )}
       {discounted && promo?.message && (
         <span className="text-[12px] font-semibold text-win">
           {promo.code}: {promo.message}
@@ -107,26 +119,18 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
   const seen = useFirstInView(ref, !reduced);
 
   // what the bottom of the card offers – a real action or an honest line, never a dead button
-  let cta: { label: string; run: () => void; variant: "primary" | "secondary"; testId: string } | null = null;
-  let note: string | null = null;
-  if (mode !== "open") note = paid ? PREISE.ctaSoon : PREISE.closedCta;
-  else if (paid && !gate.open && !isCurrent && !(subscription && current.plan !== "free")) note = PREISE.ctaLocked;
-  else if (!paid) {
-    if (!signedIn) cta = { label: PREISE.ctaFree, run: () => openAuthSheet("signup", "card"), variant: "secondary", testId: "cta-free" };
-    else note = isCurrent ? PREISE.current : PREISE.ctaFreeSignedIn;
-  } else if (isCurrent) {
-    if (subscription) cta = { label: PREISE.ctaManage, run: () => void openPortal("manage"), variant: "secondary", testId: `cta-${plan}` };
-    else note = PREISE.current;
-  } else if (subscription && current.plan !== "free")
-    cta = { label: PREISE.ctaSwitch, run: () => void openPortal("update"), variant: "secondary", testId: `cta-${plan}` };
-  else if (!available) note = PREISE.ctaSoon;
-  else
-    cta = {
-      label: PREISE.ctaOrder,
-      run: () => requestOrder({ plan: plan as PaidPlanId, interval, ...(plan === "team" ? { seats } : {}) }),
-      variant: cat.recommended ? "primary" : "secondary",
-      testId: `cta-${plan}`,
-    };
+  // (`planCta` is the one place that decides it – the same words in the cards, the detail and the upgrade sheet; a plan that is
+  // the person's own is a STATUS, never a button that looks clickable and is not)
+  const decided = planCta({ plan, signedIn, currentPlan: current.plan, hasSubscription: !!subscription, mode, purchaseOpen: gate.open, available });
+  const run = (): void => {
+    if (decided.kind === "free-start") requestFree();
+    else if (decided.kind === "switch") void openPortal("update");
+    else requestOrder({ plan: plan as PaidPlanId, interval, ...(plan === "team" ? { seats } : {}) });
+  };
+  const cta = decided.clickable ? { label: decided.label, run, variant: cat.recommended && decided.kind !== "switch" ? ("primary" as const) : ("secondary" as const), testId: `cta-${plan}` } : null;
+  const note = decided.clickable ? null : decided.label;
+  /** the own plan with a running subscription: a quiet way to the management, in the account's words */
+  const manageLink = decided.kind === "current" && paid && !!subscription;
 
   return (
     <article ref={ref} className="relative h-full" aria-labelledby={`plan-${plan}-name`} data-testid={`plan-${plan}`} data-current={isCurrent ? "" : undefined}>
@@ -205,10 +209,15 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
                 {cta.label}
               </Button>
             ) : note ? (
-              <span className="inline-flex h-9 items-center text-[13px] text-mute" data-testid={`note-${plan}`}>
+              <span className="inline-flex h-9 items-center text-[13px] text-mute" data-testid={`note-${plan}`} data-state={decided.kind}>
                 {note}
               </span>
             ) : null}
+            {manageLink && (
+              <Button variant="secondary" size="sm" className="w-full" onClick={() => openManage()} data-testid={`manage-${plan}`} disabled={!!busy}>
+                {CTA.manage}
+              </Button>
+            )}
             {paid && (
               <Button variant="ghost" size="sm" className="w-full" onClick={() => openDetail(plan as PaidPlanId)} data-testid={`details-${plan}`}>
                 {PREISE.details}

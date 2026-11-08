@@ -5,9 +5,11 @@
  * "geplant") is not shown at all (it would read as a promise). The way on is the order sheet (`requestOrder`).
  */
 import { useMemo } from "react";
+import { useCloudSession } from "@/cloud/session";
 import { Sheet, StaggerItem } from "@/motion/Sheet";
 import { Button } from "@/primitives/Button";
 import { PRICE_TAX_NOTE } from "./strings";
+import { orderStepLabel } from "../ctas";
 import { displayPrice, formatMoney } from "../format";
 import { FEATURE_INFO, featureOffered, GOAL_NAME, LIMIT_INFO, LIMIT_ORDER, PLAN_CATALOG, PLAN_LIMITS, PLAN_FEATURES, limitOffered, type PaidPlanId } from "../plans";
 import { closeDetail, requestOrder, useBilling, useOffer } from "../store";
@@ -25,6 +27,7 @@ export function TariffDetailSheet({ onNavigate }: { onNavigate?: (page: "preise"
   const interval = useBilling((s) => s.interval);
   const config = useBilling((s) => s.config);
   const seats = useBilling((s) => s.seats);
+  const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const offer = useOffer();
   const plan: PaidPlanId = detail.plan ?? "pro";
   const cat = PLAN_CATALOG[plan];
@@ -73,7 +76,7 @@ export function TariffDetailSheet({ onNavigate }: { onNavigate?: (page: "preise"
             }}
             data-testid="detail-order"
           >
-            {DETAIL.order}
+            {orderStepLabel(signedIn, plan)}
           </Button>
         </>
       }

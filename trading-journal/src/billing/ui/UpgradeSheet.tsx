@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useCloudSession } from "@/cloud/session";
 import { TactileHighlight } from "@/motion/pulse/TactileHighlight";
 import { Sheet } from "@/motion/Sheet";
 import { StaggerItem } from "@/motion/Stagger";
 import { stagger } from "@/motion/tokens";
 import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
+import { orderStepLabel } from "../ctas";
 import { displayPrice, formatMoney } from "../format";
 import { featureOffered, FEATURE_INFO, featuresGained, PAID_PLANS, PLAN_CATALOG, planIncludes, upgradePlanFor, yearlySavingsPct, type PaidPlanId } from "../plans";
 import { closeUpgrade, requestOrder, setBillingInterval, useBilling, useBillingMode, useEffectivePlan, useOffer, useTrialDays } from "../store";
@@ -30,6 +32,7 @@ export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
   const busy = useBilling((s) => s.busy);
   const mode = useBillingMode();
   const current = useEffectivePlan();
+  const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const trial = useTrialDays();
   const [landed, setLanded] = useState(false);
   const feature = upgrade.feature;
@@ -81,7 +84,7 @@ export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
           )}
           <span className="flex-1" />
           <Button variant="primary" disabled={mode !== "open" || !!busy} onClick={go} data-testid="upgrade-cta">
-            {UPGRADE.cta}
+            {orderStepLabel(signedIn, plan)}
           </Button>
         </>
       }

@@ -23,7 +23,7 @@ export const PLAN_CARD = {
   title: "Abo",
   freeLine: "Kostenlos – ohne Laufzeit.",
   upgrade: "Tarife ansehen",
-  manage: "Abo verwalten",
+  manage: "Abo und Rechnungen verwalten",
   change: "Tarif wechseln",
   cancel: "Verträge hier kündigen",
   resume: "Kündigung zurücknehmen",

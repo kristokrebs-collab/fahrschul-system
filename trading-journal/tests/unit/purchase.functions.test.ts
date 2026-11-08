@@ -770,3 +770,30 @@ describe("the contract mails", () => {
     expect(buildContractMail({ kind: "cancel", step: "verify", receivedAt: at, link: "https://x.example/?kuendigen=abc" }).subject).toBe("Bitte bestätige deine Kündigung");
   });
 });
+
+describe("Paket B: a preselection that came with a link is only a SUGGESTION – the server validates plan, interval and seats again", () => {
+  it("Team seats are clamped to 2…50 whatever the link said; the price is the configured one, never a number from the browser", async () => {
+    for (const [asked, quantity] of [
+      [1, 2],
+      [2, 2],
+      [3, 3],
+      [500, 50],
+    ] as const) {
+      const res = await checkout({ ...order({ plan: "team", interval: "month", seats: asked }), price: "price_evil", amount: 1, unit_amount: 1 });
+      expect(res.status, `seats ${asked}`).toBe(200);
+      const params = stripe.sessions.at(-1)!.params;
+      expect(params.line_items?.[0]?.quantity, `seats ${asked}`).toBe(quantity);
+      expect(params.line_items?.[0]?.price).toBe("price_team_m");
+      expect(JSON.stringify(params)).not.toContain("price_evil");
+    }
+  });
+
+  it("an unknown or free plan, an unknown interval and absurd seat counts are refused before anything is stored or created", async () => {
+    const before = stripe.sessions.length;
+    for (const bad of [{ plan: "enterprise" }, { plan: "free" }, { plan: "pro", interval: "week" }, { plan: "team", interval: "month", seats: 100_000 }, { plan: "team", interval: "month", seats: -3 }, { plan: "pro", interval: "month", seats: 1.5 }]) {
+      const res = await checkout(order(bad));
+      expect([400, 422], JSON.stringify(bad)).toContain(res.status);
+    }
+    expect(stripe.sessions).toHaveLength(before);
+  });
+});

@@ -75,3 +75,19 @@ Wer schon Trades hat, sieht die Tour nie von selbst. Für sie gibt es drei ruhig
 das kleine „Neu“ an Handelsplan, Aktien und Strategie-Studio in der Navigation (verschwindet, sobald die Seite einmal geöffnet war; nur in diesem Browser,
 `storageKey("visited-pages")`, `src/app/CommandNav.tsx`), die Zeile „Neu in der App“ in der Karte „Einführung & Hilfe“ (Handelsplan, Aktien, Zeitmaschine, Datenarchiv
 als Direktlinks über das Funktionsregister) und der Knopf „Demo mit Beispieldaten“ ebendort sowie auf der Seite „Funktionen“.
+
+## Einrichtungs-Assistent (Paket B, Runde 12) – `wizard/`
+
+Vier Schritte statt einer Tour: **Konto → Demo oder eigene Daten → Verbindung (optional) → erster Trade / erste Analyse**. Er ist die ruhige Fortsetzung der Registrierung, kein Ersatz der Tour
+oben (die bleibt unter Einstellungen › Einführung & Hilfe).
+
+- **Einmalig, nie bei jedem Reload.** `armWizard()` (aufgerufen von der Registrierung im `AuthSheet`, nie von einer Anmeldung) legt `tj2-setup-wizard` = `{ status: "pending" }` an – nur wenn noch
+  nichts gespeichert ist. `WizardHost` (in `DeferredHosts`) öffnet ihn genau einmal, wenn `wizardDecision` „open“ sagt: angemeldet, Journal geladen und **leer**, Intro vorbei und nichts anderes auf
+  dem Schirm (Anmelde-Blatt samt Willkommen, Übernahme-Frage, Bestellung / Rückweg zur Bestellung / Ergebnisseite, Editor, Teilen-Link). Ein Journal mit Trades → `skipped` (bestehende Trader werden
+  nicht gefragt). Danach steht der Status auf `active` / `done` / `skipped`: ein Reload bringt ihn nie von selbst zurück.
+- **Fortschritt gespeichert** (`step`, `data` = „demo“ / „own“). „Später fortsetzen“ schließt ohne Verlust; „Einrichtung öffnen / fortsetzen“ in der Karte „Einführung & Hilfe“ nimmt den Faden wieder
+  auf; „Überspringen“ beendet ihn für immer. Pflicht ist nur die eine Entscheidung (Demo oder eigene Daten); die Verbindung hat ihr eigenes „Später verbinden“.
+- **Ehrlich.** Der Konto-Schritt behauptet nichts (E-Mail „bestätigt“ nur, wenn Supabase es sagt; ohne Cloud steht dort, dass es kein Konto gibt); „Verbindung optional – zunächst Demo ausprobieren“
+  ist der Leerzustand der Verbindung (auch in der Börsen-Karte unter Konto); die Demo ist die abgegrenzte Beispiel-Sitzung, nicht das Journal.
+- Dateien: `wizardStore.ts` (Zustand + reine Entscheidung, in der Karte und im Anmelde-Blatt geladen), `WizardHost.tsx` (Auslöser), `SetupWizard.tsx` (das Blatt, eigener Chunk). Tests:
+  `tests/unit/onboarding.wizard.test.tsx`, `tests/e2e/auth-b.spec.ts`.

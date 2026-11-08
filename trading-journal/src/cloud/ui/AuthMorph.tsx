@@ -59,6 +59,12 @@ export interface AuthMorphProps {
   dir: number;
   /** The body of the current view (`AuthSheet`'s `ViewBody`). */
   children: ReactNode;
+  /**
+   * What sits ABOVE the steps and may change its height with the view (Paket B: the brand strip, whose claim is one or two lines).
+   * It lives inside the height-following box: a height change outside it would reach the sheet's panel un-pinned and make the panel
+   * run its own FLIP on top of the card's spring – two animations on one edge (the card then overshoots under a slow frame).
+   */
+  lead?: ReactNode;
 }
 
 /**
@@ -73,14 +79,17 @@ function MorphHeight({ trigger, className, children }: { trigger: string; classN
   const reduced = useReducedFx();
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
+  /** The box's own height (border box) when it last rested = content + `extra`. */
   const known = useRef(0);
+  /** What the box adds around its content (its padding): the pinned height is a BORDER-box height, so it must include it – 8 px short and the panel runs its own FLIP at every switch. */
+  const extra = useRef(0);
   const run = useRef<AnimationPlaybackControls | null>(null);
   useLayoutEffect(() => {
     const box = outer.current;
     const content = inner.current;
     // the mount commit reads nothing (a layout read there would force layout inside the click that opens the sheet): the observer below sets the baseline
     if (!box || !content || !known.current) return;
-    const next = content.offsetHeight;
+    const next = content.offsetHeight + extra.current;
     const prev = run.current ? (parseFloat(box.style.height) || known.current) : known.current;
     known.current = next;
     if (!prev || reduced || Math.abs(next - prev) < 1) return;
@@ -102,9 +111,12 @@ function MorphHeight({ trigger, className, children }: { trigger: string; classN
   // the baseline for the first switch, and any change that is not a switch (kept current only while nothing animates)
   useEffect(() => {
     const content = inner.current;
-    if (!content || typeof ResizeObserver !== "function") return;
+    const box = outer.current;
+    if (!content || !box || typeof ResizeObserver !== "function") return;
     const ro = new ResizeObserver(() => {
-      if (!run.current) known.current = content.offsetHeight;
+      if (run.current) return;
+      extra.current = box.offsetHeight - content.offsetHeight;
+      known.current = box.offsetHeight;
     });
     ro.observe(content);
     return () => {
@@ -122,7 +134,7 @@ function MorphHeight({ trigger, className, children }: { trigger: string; classN
 }
 
 /** The morphing card: one height-following box, the steps cross over inside it. */
-export function AuthMorph({ view, dir, children }: AuthMorphProps) {
+export function AuthMorph({ view, dir, children, lead }: AuthMorphProps) {
   const reduced = useReducedFx();
   const step = stepOf(view);
   const box = useRef<HTMLDivElement>(null);
@@ -145,6 +157,7 @@ export function AuthMorph({ view, dir, children }: AuthMorphProps) {
 
   return (
     <MorphHeight trigger={view} className="-m-1 p-1">
+      {lead}
       <div ref={box} className="relative" data-auth-morph={step}>
         {/* variant LABELS (not objects): the sheet body's hidden → shown reaches this step's `StaggerItem`s, also for a step that mounts later */}
         <AnimatePresence initial={false} mode="popLayout" custom={dir}>

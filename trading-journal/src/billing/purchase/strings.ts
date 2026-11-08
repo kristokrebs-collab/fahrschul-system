@@ -30,7 +30,9 @@ export const ORDER = {
   totalNote: (per: string) => `${per} – Preis des Tarifs, Endbetrag mit Steuer im nächsten Schritt`,
   /** The price AFTER the trial is named, never only "gratis". */
   trial: (days: number, date: string, amount: string, per: string) =>
-    `${days} Tage kostenlos testen – heute zahlst du nichts. Am ${date} beginnt die Zahlung: ${amount} ${per}.`,
+    `Heute 0 € (${days} Tage kostenlos testen), danach ${amount} ${per} – die erste Zahlung ist am ${date}.`,
+  /** The amount next to the order button and on the stage: with a trial it says what is due TODAY and what follows – never only the plan price. */
+  due: (trialDays: number, amount: string, per: string) => (trialDays > 0 ? `Heute 0 €, danach ${amount} ${per}` : `${amount} ${per}`),
   noTrial: (amount: string, per: string) => `Heute: ${amount} ${per}. Die Zahlung erfolgt im nächsten Schritt bei Stripe.`,
   couponNote: (code: string) => `Mit Code ${code}: der Rabatt gilt, wie bei Stripe angegeben, nicht dauerhaft – danach gilt der volle Preis.`,
   /** § 312j Abs. 2 BGB: term, automatic renewal, notice – in plain words. */
@@ -55,6 +57,20 @@ export const ORDER = {
   closedStripe: "Der Betreiber hat Stripe noch nicht verbunden. Bis dahin sind alle Funktionen freigeschaltet.",
   closedLegal: "Impressum, AGB und Datenschutz des Betreibers fehlen noch – ohne sie wird nichts verkauft.",
   redirecting: "Weiter zu Stripe …",
+  /** The order button while the order goes to the server – AFTER the click; the idle label stays `BUTTON_LABELS.order`. */
+  preparing: "Wird vorbereitet …",
+  stage: {
+    preparing: "Wir bereiten deine Zahlung bei Stripe vor …",
+    handover: "Weiter zu Stripe – dort zahlst du.",
+    note: "Gebucht ist erst, wenn Stripe die Zahlung bestätigt hat. Bitte lass dieses Fenster offen.",
+  },
+  /** The path of the order, quiet: step 3 is only reached on the result page (the server's confirmation). */
+  steps: { label: "Ablauf der Bestellung", items: ["Bestellung prüfen", "Zahlung bei Stripe", "Bestätigung"] },
+  cardNote: "Darstellung deiner Auswahl – hier wird keine Karte eingegeben. Gezahlt wird auf der Seite von Stripe.",
+  /** One constant name for the turn button (`aria-pressed` carries the state): front = your choice, back = what is included. */
+  flip: "Karte umdrehen: Das ist enthalten",
+  retry: "Nichts wurde bestellt oder berechnet, deine Auswahl ist unverändert. Du kannst es mit demselben Button noch einmal versuchen.",
+  footerTotal: "Gesamt",
   back: "Zurück",
   close: "Abbrechen",
   outdated: "Die Bestelltexte wurden aktualisiert. Lade die Seite neu und bestätige noch einmal.",

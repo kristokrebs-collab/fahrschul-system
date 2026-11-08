@@ -20,6 +20,9 @@ export const EX = {
   connect: "Börse verbinden",
   csv: "CSV importieren",
   otherVenues: "Binance, Bybit, OKX & Co., Wallets und DEX: per CSV-Export.",
+  /** The empty start state of a connection: nothing is missing – the journal works without it. */
+  optionalLine: "Verbindung optional – zunächst Demo ausprobieren.",
+  demo: "Demo mit Beispieldaten",
   upgradeLine: "Der automatische Börsen-Sync ist ab Pro dabei.",
   upgrade: "Pro freischalten",
   /** Free: one read-only connection, synced by hand; the automatic sync belongs to Pro (tariff contract A1) */

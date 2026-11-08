@@ -160,8 +160,10 @@ describe("gates", () => {
     const sheet = await screen.findByTestId("upgrade-sheet");
     expect(sheet).toHaveTextContent("Enthalten in Premium");
     expect(sheet).toHaveTextContent("KI-Coach");
-    // the way to the order summary – the order button itself says "Zahlungspflichtig bestellen" (B4)
-    expect(screen.getByTestId("upgrade-cta")).toHaveTextContent("Weiter zur Bestellung");
+    // the way to the order summary – the order button itself says "Zahlungspflichtig bestellen" (B4); Paket B: signed out
+    // "<Plan> auswählen", signed in "Weiter zur Zahlung" (the same two words as the cards)
+    expect(screen.getByTestId("upgrade-cta")).toHaveTextContent("Premium auswählen");
+    expect(screen.getByTestId("upgrade-cta")).not.toHaveTextContent(/zahlungspflichtig|bestellen/i);
   });
 
   it("LimitMeter: usage against the plan's limit, unlimited without payments", () => {
@@ -236,8 +238,61 @@ describe("PreiseView", () => {
     expect(screen.getByTestId("plan-premium")).toHaveTextContent("KI-Coach mit Wochenanalyse");
     expect(screen.getByTestId("legal-cancel")).toHaveTextContent("Verträge hier kündigen");
     // never "N Tage gratis testen" on the way to the order (§ 312j Abs. 3 BGB): the button leads to the summary
-    expect(screen.getByTestId("cta-pro")).toHaveTextContent("Weiter zur Bestellung");
+    expect(screen.getByTestId("cta-pro")).toHaveTextContent("Pro auswählen");
+    expect(screen.getByTestId("cta-premium")).toHaveTextContent("Premium auswählen");
+    expect(screen.getByTestId("cta-free")).toHaveTextContent("Kostenlos starten");
+    // the yearly cards show the amount that is DUE per year (default = yearly), Team its seats × price
+    expect(screen.getByTestId("price-pro")).toHaveTextContent("120 €");
+    expect(screen.getByTestId("price-pro")).toHaveTextContent("pro Jahr · entspricht 10 € pro Monat");
+    expect(screen.getByTestId("price-premium")).toHaveTextContent("240 €");
+    expect(screen.getByTestId("price-team")).toHaveTextContent("190 €");
+    expect(screen.getByTestId("price-team")).toHaveTextContent("pro Sitz und Jahr");
+    expect(screen.getByTestId("team-total")).toHaveTextContent("2 Sitze: 380 € pro Jahr");
     expect(screen.getByTestId("preise-view")).not.toHaveTextContent(/Tage gratis testen\s*$/);
+  });
+
+  it("Paket B – signed in without a subscription: 'Weiter zur Zahlung' on the paid cards, the own Free plan is a status", () => {
+    useCloudSession.setState({ phase: "signedIn", user: USER });
+    useBilling.setState({ config: CONFIG, account: ACCOUNT(null) });
+    wrap(<PreiseView />);
+    for (const p of ["pro", "premium", "team"]) expect(screen.getByTestId(`cta-${p}`)).toHaveTextContent("Weiter zur Zahlung");
+    expect(screen.queryByTestId("cta-free")).toBeNull();
+    expect(screen.getByTestId("note-free")).toHaveTextContent("Dein aktueller Tarif");
+    expect(screen.getByTestId("hero-cta")).toHaveTextContent("Weiter zur Zahlung");
+  });
+
+  it("Paket B – a running Pro subscription: 'Dein aktueller Tarif' is NOT a button, managing is named as in the account, others 'Zu Premium wechseln' / 'Tarif ändern'", () => {
+    useCloudSession.setState({ phase: "signedIn", user: USER });
+    useBilling.setState({ config: CONFIG, account: ACCOUNT(SUB) });
+    wrap(<PreiseView />);
+    const own = screen.getByTestId("note-pro");
+    expect(own).toHaveTextContent("Dein aktueller Tarif");
+    expect(own.tagName).not.toBe("BUTTON");
+    expect(screen.queryByTestId("cta-pro")).toBeNull();
+    expect(screen.getByTestId("manage-pro")).toHaveTextContent("Abo und Rechnungen verwalten");
+    expect(screen.getByTestId("cta-premium")).toHaveTextContent("Zu Premium wechseln");
+    expect(screen.getByTestId("cta-team")).toHaveTextContent("Zu Team wechseln");
+    expect(screen.getByTestId("note-free")).toHaveTextContent("Gilt nach einer Kündigung");
+  });
+
+  it("Paket B – a Premium subscriber sees 'Tarif ändern' on Pro; the Konto card says 'Abo und Rechnungen verwalten'", () => {
+    useCloudSession.setState({ phase: "signedIn", user: USER });
+    useBilling.setState({ config: CONFIG, account: ACCOUNT({ ...SUB, plan: "premium", amount: 2400 }) });
+    wrap(<PreiseView />);
+    expect(screen.getByTestId("cta-pro")).toHaveTextContent("Tarif ändern");
+    expect(screen.getByTestId("note-premium")).toHaveTextContent("Dein aktueller Tarif");
+  });
+
+  it("Paket B – Monat ↔ Jahr: the big number is the amount DUE (Pro 120 / 12, Premium 240 / 24, Team 190 / 19 per seat), Team shows seats × price", async () => {
+    useBilling.setState({ config: CONFIG });
+    wrap(<PreiseView />);
+    expect(screen.getByTestId("team-total")).toHaveTextContent("2 Sitze: 380 € pro Jahr");
+    fireEvent.click(screen.getByRole("radio", { name: "Monatlich" }));
+    await waitFor(() => expect(screen.getByTestId("price-pro")).toHaveAttribute("data-interval", "month"));
+    expect(screen.getByTestId("price-pro")).toHaveTextContent("12 €");
+    expect(screen.getByTestId("price-pro")).toHaveTextContent("pro Monat · monatlich abgerechnet");
+    expect(screen.getByTestId("price-team")).toHaveTextContent("19 €");
+    expect(screen.getByTestId("team-total")).toHaveTextContent("2 Sitze: 38 € pro Monat");
   });
 
   it("without an AI key on the server the page never sells the KI-Coach (Review F06)", () => {

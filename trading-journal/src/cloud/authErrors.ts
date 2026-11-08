@@ -11,11 +11,16 @@ export interface AuthErrorText {
   field: AuthField;
 }
 
+/** The one sentence for "this address may already have an account": it names neither case. */
+export const AUTH_NEUTRAL = "Wenn die Adresse frei ist, schicken wir dir eine Bestätigung. Hast du schon ein Konto, melde dich an oder setze dein Passwort zurück.";
+
 const BY_CODE: Record<string, AuthErrorText> = {
   invalid_credentials: { message: "E-Mail oder Passwort stimmt nicht.", field: "password" },
   email_not_confirmed: { message: "Bitte bestätige zuerst deine E-Mail. Wir können den Link erneut senden.", field: "email" },
-  user_already_exists: { message: "Zu dieser E-Mail gibt es schon ein Konto. Melde dich an.", field: "email" },
-  email_exists: { message: "Zu dieser E-Mail gibt es schon ein Konto. Melde dich an.", field: "email" },
+  // NO ACCOUNT ENUMERATION: whatever reaches the screen for an address that may or may not have an account is the same sentence as for a new
+  // one (`signUp` does not even surface these two any more; this is the net under it, pinned by a test over every code)
+  user_already_exists: { message: AUTH_NEUTRAL, field: null },
+  email_exists: { message: AUTH_NEUTRAL, field: null },
   weak_password: { message: "Das Passwort ist zu schwach. Nimm mindestens 10 Zeichen, gern mit Zahlen und Zeichen.", field: "password" },
   same_password: { message: "Das neue Passwort muss sich vom alten unterscheiden.", field: "password" },
   email_address_invalid: { message: "Diese E-Mail-Adresse sieht nicht gültig aus.", field: "email" },
@@ -66,6 +71,20 @@ export function authErrorText(e: unknown): AuthErrorText {
   if (err.status === 429) return BY_CODE.over_request_rate_limit!;
   return GENERIC_ERROR;
 }
+
+/** The Supabase error code behind a failure (`""` when none is known): the sheet branches on a few of them (`email_not_confirmed`, the send limit). */
+export function authErrorCodeOf(e: unknown): string {
+  const err = (e && typeof e === "object" ? e : {}) as { code?: unknown; message?: unknown; name?: unknown; status?: unknown };
+  const code = typeof err.code === "string" ? err.code : "";
+  if (code && BY_CODE[code]) return code;
+  const message = typeof err.message === "string" ? err.message : typeof e === "string" ? e : "";
+  if (err.name === "AuthRetryableFetchError" || /failed to fetch|networkerror|load failed|network request failed/i.test(message)) return "network";
+  for (const [re, c] of BY_MESSAGE) if (re.test(message)) return c;
+  return err.status === 429 ? "over_request_rate_limit" : "";
+}
+
+/** Codes that mean "too many mails / attempts right now": the resend button then waits longer and says why (never retried in a loop). */
+export const isSendLimit = (code: string | undefined): boolean => code === "over_email_send_rate_limit" || code === "over_request_rate_limit";
 
 /** Simple client-side checks before a request (the server decides in the end). */
 export function emailProblem(email: string): string | null {

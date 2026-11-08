@@ -10,10 +10,12 @@
  * - The access token getter is registered for `apiFetch` (`setAccessTokenProvider`).
  */
 import { createClient, type AuthChangeEvent, type Factor, type Session, type SupabaseClient } from "@supabase/supabase-js";
+import { parseOrderParam } from "@/billing/purchase/order";
+import { ORDER_QUERY } from "@/store/returnTo";
 import { pushToast } from "@/store/uiStore";
 import { KEYS } from "@/store/storage";
 import { ApiError, apiFetch, setAccessTokenProvider } from "./api";
-import { authErrorText, type AuthErrorText } from "./authErrors";
+import { authErrorCodeOf, authErrorText, type AuthErrorText } from "./authErrors";
 import { cloudConfig, type OAuthProvider } from "./env";
 import { primeOpsFlags } from "./flags";
 import { ACCOUNT_PRIVACY_KEYS, onPrivacyChange, parsePrivacy, setPrivacy, usePrivacy, type PrivacyPrefs } from "./privacy";
@@ -98,6 +100,8 @@ export function auditEvent(action: string, meta?: Record<string, string | boolea
 }
 
 let lastSignedInUser: string | null = null;
+/** This page load came from an e-mail / OAuth link (`?code=` in the address, read BEFORE Supabase takes it out): the sign-in it brings gets a welcome. */
+let arrivedByLink = false;
 
 async function onAuthEvent(event: AuthChangeEvent): Promise<void> {
   const session = await refreshAuthState({ factors: event === "SIGNED_IN" || event === "MFA_CHALLENGE_VERIFIED" || event === "USER_UPDATED" });
@@ -113,6 +117,8 @@ async function onAuthEvent(event: AuthChangeEvent): Promise<void> {
     if (s.sheet.open && ["signin", "magic", "signup", "sent"].includes(s.sheet.view)) {
       useCloudSession.setState({ sheet: { ...s.sheet, view: s.needsMfa ? "mfa" : "welcome" } });
     } else if (s.needsMfa) openAuthSheet("mfa", "callback");
+    else if (arrivedByLink && !s.sheet.open) openAuthSheet("welcome", "callback"); // the confirmation / magic link opened this tab: say so
+    arrivedByLink = false;
   }
   if (event === "SIGNED_OUT") lastSignedInUser = null;
 }
@@ -139,6 +145,11 @@ function cleanCallbackUrl(): { error: AuthErrorText | null } {
 /** One-time setup: token provider, auth listener, session restore (incl. a callback in the URL), sync controller. */
 export function initClient(): Promise<void> {
   return (initialized ??= (async () => {
+    try {
+      arrivedByLink = new URL(location.href).searchParams.has("code");
+    } catch {
+      arrivedByLink = false;
+    }
     const st = useCloudSession.getState();
     if (st.phase === "idle" || st.phase === "off") useCloudSession.setState({ phase: "loading" });
     const sb = getClient();
@@ -152,7 +163,14 @@ export function initClient(): Promise<void> {
       return null;
     });
     const { error } = cleanCallbackUrl();
-    if (error) pushToast({ kind: "error", title: "Anmeldung nicht möglich", detail: error.message });
+    if (error) {
+      // an expired or foreign link (AUTH-05): not only a toast – the sheet opens on a sign-in with the reason and the way on (a new link)
+      pushToast({ kind: "error", title: "Anmeldung nicht möglich", detail: error.message });
+      openAuthSheet("magic", "callback");
+      const cur = useCloudSession.getState().sheet;
+      useCloudSession.setState({ sheet: { ...cur, notice: error.message } });
+      arrivedByLink = false;
+    }
     if (session) {
       lastSignedInUser = session.user.id;
       void adoptProfilePrivacy();
@@ -202,15 +220,25 @@ async function pushProfilePrivacy(next: PrivacyPrefs, changed: (keyof PrivacyPre
 
 /* ------------------------------------------------------------------ auth actions */
 
-export type ActionResult<T = undefined> = ({ ok: true } & (T extends undefined ? object : { value: T })) | ({ ok: false } & AuthErrorText);
+export type ActionResult<T = undefined> = ({ ok: true } & (T extends undefined ? object : { value: T })) | ({ ok: false; code?: string } & AuthErrorText);
 
-function fail(e: unknown): { ok: false } & AuthErrorText {
-  return { ok: false, ...authErrorText(e) };
+function fail(e: unknown): { ok: false; code?: string } & AuthErrorText {
+  const code = authErrorCodeOf(e);
+  return { ok: false, ...authErrorText(e), ...(code ? { code } : {}) };
 }
 
-/** Where e-mail links and OAuth return to: this edition's root (personal `/`, share `/teilen/`). */
-export function redirectUrl(): string {
-  return `${location.origin}${import.meta.env.BASE_URL || "/"}`;
+/**
+ * Where e-mail links and OAuth return to: this edition's root (personal `/`, share `/teilen/`).
+ *
+ * `order` (Paket B, AUTH-06): the pre-selected order (`premium.year.1`) rides along as `?order=…`, so the confirmation survives
+ * another tab, another device and a later click. Only a value that passes the order grammar is sent (plan, interval, seats – never a
+ * price); the page that opens re-validates it (`captureOrderQuery`) and the server validates it a third time at the checkout.
+ * Supabase accepts the address only if the redirect allow-list matches it: `https://<site>/**` (SETUP.md §2.2) – otherwise it falls
+ * back to the Site URL and the note in `localStorage` (60 minutes) still brings the order back in the same browser.
+ */
+export function redirectUrl(order?: string | null): string {
+  const base = `${location.origin}${import.meta.env.BASE_URL || "/"}`;
+  return order && parseOrderParam(order) ? `${base}?${ORDER_QUERY}=${encodeURIComponent(order)}` : base;
 }
 
 export async function signInPassword(email: string, password: string): Promise<ActionResult<{ mfa: boolean }>> {
@@ -224,13 +252,23 @@ export async function signInPassword(email: string, password: string): Promise<A
   }
 }
 
-/** Register; `confirm` = the project wants the e-mail confirmed first (no session yet). */
-export async function signUp(email: string, password: string): Promise<ActionResult<{ confirm: boolean }>> {
+/**
+ * Register; `confirm` = the project wants the e-mail confirmed first (no session yet).
+ *
+ * NO ACCOUNT ENUMERATION: an address that already has an account is answered exactly like a new one ("check your mail",
+ * `confirm: true`) – never "this account exists". The sheet's text covers both cases and offers the login right there.
+ * (Supabase hides the existing address itself when e-mail confirmation is on – an obfuscated user without identities –
+ * and answers `user_already_exists` when it is off; both end in the same neutral step.)
+ */
+export async function signUp(email: string, password: string, order?: string | null): Promise<ActionResult<{ confirm: boolean }>> {
   try {
-    const { data, error } = await getClient().auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: redirectUrl() } });
-    if (error) return fail(error);
-    // an existing, confirmed address answers with an obfuscated user without identities
-    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) return fail({ code: "user_already_exists" });
+    const { data, error } = await getClient().auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: redirectUrl(order) } });
+    if (error) {
+      const code = authErrorCodeOf(error);
+      if (code === "user_already_exists" || code === "email_exists") return { ok: true, value: { confirm: true } };
+      return fail(error);
+    }
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) return { ok: true, value: { confirm: true } };
     if (data.session) await refreshAuthState({ factors: true });
     return { ok: true, value: { confirm: !data.session } };
   } catch (e) {
@@ -238,9 +276,9 @@ export async function signUp(email: string, password: string): Promise<ActionRes
   }
 }
 
-export async function sendMagicLink(email: string): Promise<ActionResult> {
+export async function sendMagicLink(email: string, order?: string | null): Promise<ActionResult> {
   try {
-    const { error } = await getClient().auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: redirectUrl(), shouldCreateUser: true } });
+    const { error } = await getClient().auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: redirectUrl(order), shouldCreateUser: true } });
     return error ? fail(error) : { ok: true };
   } catch (e) {
     return fail(e);
@@ -256,18 +294,18 @@ export async function signInOAuth(provider: OAuthProvider): Promise<ActionResult
   }
 }
 
-export async function sendPasswordReset(email: string): Promise<ActionResult> {
+export async function sendPasswordReset(email: string, order?: string | null): Promise<ActionResult> {
   try {
-    const { error } = await getClient().auth.resetPasswordForEmail(email.trim(), { redirectTo: redirectUrl() });
+    const { error } = await getClient().auth.resetPasswordForEmail(email.trim(), { redirectTo: redirectUrl(order) });
     return error ? fail(error) : { ok: true };
   } catch (e) {
     return fail(e);
   }
 }
 
-export async function resendConfirmation(email: string): Promise<ActionResult> {
+export async function resendConfirmation(email: string, order?: string | null): Promise<ActionResult> {
   try {
-    const { error } = await getClient().auth.resend({ type: "signup", email: email.trim(), options: { emailRedirectTo: redirectUrl() } });
+    const { error } = await getClient().auth.resend({ type: "signup", email: email.trim(), options: { emailRedirectTo: redirectUrl(order) } });
     return error ? fail(error) : { ok: true };
   } catch (e) {
     return fail(e);

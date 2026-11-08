@@ -114,6 +114,15 @@ supabase db push            # wendet supabase/migrations/* in Reihenfolge an
 - **Site URL**: `https://<deine-site>.netlify.app` (bzw. die eigene Domain)
 - **Redirect URLs**: `https://<deine-site>.netlify.app/`, `https://<deine-site>.netlify.app/teilen/` und für
   Deploy-Previews `https://*--<deine-site>.netlify.app/**`; für lokale Tests zusätzlich `http://localhost:5173/`.
+- **Vorgewählte Bestellung im Link (Paket B, AUTH-06):** Wer auf „Pro auswählen“ klickt und sich dann registriert, soll
+  nach dem Klick auf den Bestätigungs-Link wieder bei seiner Auswahl landen. Dafür hängt die App an den Link der Mail
+  `?order=<plan>.<intervall>.<sitze>` (z. B. `/?order=premium.year.1` – nie einen Preis). Supabase nimmt diese Adresse
+  nur an, wenn sie in der Redirect-Liste steht: trage deshalb **`https://<deine-site>.netlify.app/**`** (mit `/**`)
+  ein, nicht nur `https://<deine-site>.netlify.app/`. Fehlt der Eintrag, schickt Supabase auf die **Site URL** zurück,
+  die Auswahl im Link geht verloren und nur die Notiz im selben Browser (60 Minuten, `localStorage`) trägt sie noch.
+  Der Server verlässt sich nie auf diesen Wert: Plan, Intervall und Sitze (Team 2–50) werden beim Öffnen und beim
+  Bestellen erneut geprüft, der Preis kommt immer aus Stripe. Mit einem echten Supabase-Projekt ist das **noch nicht
+  geprüft** (die Tests laufen gegen Mocks).
 
 **Authentication → Sign In / Providers**
 

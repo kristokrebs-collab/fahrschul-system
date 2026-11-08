@@ -26,6 +26,8 @@ export interface AuthSheetState {
   prev: AuthView;
   /** What the `sent` view talks about. */
   sent: "magic" | "reset" | "confirm";
+  /** The `sent` view may send at once (no countdown): the person came from "e-mail not confirmed", the link they hold is old. */
+  resendNow: boolean;
 }
 
 export interface CloudSessionState {
@@ -43,7 +45,7 @@ export interface CloudSessionState {
   sheet: AuthSheetState;
 }
 
-const SHEET_CLOSED: AuthSheetState = { open: false, view: "signin", source: "card", email: "", notice: null, mounted: false, prev: "signin", sent: "magic" };
+const SHEET_CLOSED: AuthSheetState = { open: false, view: "signin", source: "card", email: "", notice: null, mounted: false, prev: "signin", sent: "magic", resendNow: false };
 
 export const SIGNED_OUT: Omit<CloudSessionState, "phase" | "sheet"> = {
   user: null,
@@ -80,9 +82,9 @@ export function closeAuthSheet(): void {
 }
 
 /** Switches the open sheet to another view (keeps the typed e-mail). */
-export function setAuthView(view: AuthView, patch: Partial<Pick<AuthSheetState, "email" | "notice" | "sent">> = {}): void {
+export function setAuthView(view: AuthView, patch: Partial<Pick<AuthSheetState, "email" | "notice" | "sent" | "resendNow">> = {}): void {
   const s = useCloudSession.getState();
-  useCloudSession.setState({ sheet: { ...s.sheet, ...patch, view, prev: s.sheet.view } });
+  useCloudSession.setState({ sheet: { ...s.sheet, resendNow: false, ...patch, view, prev: s.sheet.view } });
 }
 
 /** Remembers the e-mail typed in any view. */
