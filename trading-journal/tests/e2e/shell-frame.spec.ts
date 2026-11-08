@@ -2,7 +2,7 @@
  * Runde 11, A5 „Rahmen“ – the frame the way a reader meets it (mobile 390 + desktop 1440):
  *   - the sidebar is COMPACT at every width (no auto-open from 1,624 px); „Anheften“ keeps it open and the page makes room; the pin survives a reload;
  *   - the search sits on top (a combobox: pages and functions), ↑ ↓ Home End move between rows, Esc closes the peek;
- *   - the rows wave in from the top ONCE per page load (Runde 12; 45–60 ms apart, 260–340 ms, 8–12 px, opacity) – measured with the Animations API;
+ *   - the rows wave in from the top ONCE per page load (Runde 12, Paket S stronger; 70–90 ms apart, 380–460 ms, 12–16 px, a touch of blur, opacity) – measured with the Animations API;
  *   - the logo draws stroke after stroke STRICTLY one after the other, in ≤ 1.2 s, once per session, replayable from Einstellungen › Darstellung;
  *   - the motion setting (Wie das Gerät / Reduziert / Volles Profil) is kept and takes the motion away;
  *   - the plan's motion profile comes from the confirmed plan only (Free without payments – a browser flag changes nothing);
@@ -160,7 +160,7 @@ test.describe("Rahmen: Seitenleiste (Computer)", () => {
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
-  test("die Zeilen wellen einmal von oben nach unten ein: 45–60 ms Abstand, 260–340 ms, 8–12 px, Deckkraft – danach nie wieder in diesem Seitenaufruf", async ({ page }, info) => {
+  test("die Zeilen wellen einmal von oben nach unten ein: 70–90 ms Abstand, 380–460 ms, 12–16 px, Deckkraft – danach nie wieder in diesem Seitenaufruf", async ({ page }, info) => {
     test.skip(mobile(info.project.name), "from 768 px");
     await freshSession(page);
     await expect(page.locator(".sb")).not.toHaveAttribute("data-draw", /.+/, { timeout: 15_000 });
@@ -169,18 +169,18 @@ test.describe("Rahmen: Seitenleiste (Computer)", () => {
     expect(w[0]!.row).toBe(0);
     for (let i = 1; i < w.length; i++) {
       const step = w[i]!.delay - w[i - 1]!.delay;
-      expect(step, `row ${i}`).toBeGreaterThanOrEqual(45);
-      expect(step, `row ${i}`).toBeLessThanOrEqual(60);
+      expect(step, `row ${i}`).toBeGreaterThanOrEqual(70);
+      expect(step, `row ${i}`).toBeLessThanOrEqual(90);
     }
     for (const a of w) {
-      expect(a.duration).toBeGreaterThanOrEqual(260);
-      expect(a.duration).toBeLessThanOrEqual(340);
+      expect(a.duration).toBeGreaterThanOrEqual(380);
+      expect(a.duration).toBeLessThanOrEqual(460);
     }
-    // the keyframe: 8–12 px and opacity 0 → 1
+    // the keyframe: 12–16 px and opacity 0 → 1
     expect(Number(w[0]!.from.opacity)).toBe(0);
     const px = Math.abs(parseFloat(w[0]!.from.translate.split(" ")[1] ?? "0"));
-    expect(px).toBeGreaterThanOrEqual(8);
-    expect(px).toBeLessThanOrEqual(12);
+    expect(px).toBeGreaterThanOrEqual(12);
+    expect(px).toBeLessThanOrEqual(16);
     // Runde 12: once per PAGE LOAD (it used to be once per session – a reload showed nothing, so it could not be seen again). Hover (the peek) and a
     // route change never start it again …
     await resetFx(page);

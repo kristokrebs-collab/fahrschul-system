@@ -2,6 +2,7 @@ node_modules
 dist
 dist-single
 dist-e2e-cloud
+dist-showroom
 release
 .env
 .env.*

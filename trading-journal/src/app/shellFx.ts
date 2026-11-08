@@ -31,12 +31,12 @@ const SHAPES = "path, circle, rect, line, polyline, ellipse";
 /**
  * The first-load sequence of the sidebar (Runde 12), once per page load – not per session (a reload is a new opening of the site and the
  * only way to see it again), never on hover, a route change or a re-render:
- * - the ROWS wave in from the top, one every `rowStepMs` (45–60 ms), each taking `rowMs` (260–340 ms) – CSS `sb-wave`;
+ * - the ROWS wave in from the top, one every `rowStepMs` (70–90 ms), each taking `rowMs` (380–460 ms) – CSS `sb-wave`;
  * - the GLYPHS draw STRICTLY one after the other: glyph n has its own slot of `glyphMs`, its strokes share it back to back, and glyph n+1
  *   starts only when glyph n is finished (the spring of the active marker is not part of it and stays as it was);
  * - a short glint closes each glyph (`glintMs`).
  */
-export const SEQ = { rowStepMs: 52, rowMs: 300, glyphFromMs: 80, glyphMs: 72, glintMs: 600 } as const;
+export const SEQ = { rowStepMs: 80, rowMs: 420, glyphFromMs: 80, glyphMs: 80, glintMs: 600 } as const;
 /** The longest the sequence waits for the app to come into view (intro stage) before the rows simply show. */
 export const SEQ_WAIT_MAX_MS = 20_000;
 

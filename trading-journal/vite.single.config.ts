@@ -100,7 +100,7 @@ export default defineConfig(({ mode }) => {
     publicDir: false, // public/ only holds the NOTICE, which travels inside the file
     plugins: [react(), tailwindcss(), singleFile(edition), secretGuard(), ...(edition === "share" ? [privacyGuard()] : [])],
     resolve: { alias: { "@": here("./src") } },
-    define: { __TJ_EDITION__: JSON.stringify(edition), __TJ_TARGET__: JSON.stringify("file") },
+    define: { __TJ_EDITION__: JSON.stringify(edition), __TJ_TARGET__: JSON.stringify("file"), __TJ_SHOWROOM__: JSON.stringify(false) },
     build: {
       outDir: `dist-single/${edition}`,
       emptyOutDir: true,

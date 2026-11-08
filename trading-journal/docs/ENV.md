@@ -35,6 +35,7 @@ Hängt daran: Links in E-Mails, Weiterleitungen, Proxy-Rückfall. **Kern-Bereich
 | Name | Zweck | Pflicht? | Scope | Ohne sie → Verhalten |
 | --- | --- | --- | --- | --- |
 | `SITE_ORIGIN` | Öffentliche Adresse der Seite (https://…, ohne Schrägstrich am Ende): Links in E-Mails und Bestätigungs-Mails, Rücksprung-Adressen der Kaufstrecke (mit gesetzter Variable wird jeder andere Ursprung abgelehnt – kein offener Redirect), Binance-Proxy-Rückfall des Alarm-Crons, Zieladresse des TradingView-Assistenten, Rücksprung der TradingView-MCP-Verbindung (<SITE_ORIGIN>/api/v1/connections/tradingview/mcp/callback, bei TradingView genau so eintragen) und Ziel der Twilio-Status-Rückmeldung | Pflicht | Funktionen (Netlify, Scope Functions) | Rücksprung nach dem Bezahlen und Links in E-Mails nehmen den Ursprung der Anfrage; der Binance-Proxy-Rückfall des Alarm-Crons ist aus; der TradingView-Assistent nimmt die Adresse, unter der die Seite gerade geöffnet ist; die TradingView-MCP-Verbindung startet nicht; Anrufe gehen, der Status kommt nur über das Nachfragen bei Twilio (alle 5 Minuten). |
+| `VITE_SHOWROOM` | `1` = Showroom-Build (Paket S, docs/SHOWROOM.md): Mock-Backend im Browser, Demo-Banner, „Neu in dieser Version“. Setzen nur die npm-Skripte `build:showroom` und `build:showroom:deploy` (Netlify: nur Kontext deploy-preview) – nie in Produktion, nie im Netlify-Menü | Optional | Build | Normaler Build: kein Showroom-Code im Bundle (Test `showroom.bundle`). |
 
 ## Abos (Stripe)
 

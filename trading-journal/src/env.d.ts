@@ -31,3 +31,6 @@ declare module "*.md?raw" {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Showroom switch (Paket S): a Vite `define` (`vite.config.ts`), `false` in every build but the showroom build – see `src/showroom/flag.ts`. */
+declare const __TJ_SHOWROOM__: boolean;

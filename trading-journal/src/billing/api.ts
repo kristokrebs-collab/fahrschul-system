@@ -58,6 +58,9 @@ export function setRedirectForTests(fn: Navigate | null): void {
   navigate = fn ?? ((url) => window.location.assign(url));
 }
 
+/** The Showroom (Paket S) replaces the hand-over to Stripe with its simulated hosted page – same hook, a name that says what it is for. */
+export const setRedirectHandler = setRedirectForTests;
+
 /** Leaves the app for a Stripe page; anything else is refused (a compromised answer can never redirect elsewhere). */
 export function redirectToStripe(url: string): void {
   if (!isStripeUrl(url)) throw new ApiError(0, "bad_redirect", "Unerwartete Weiterleitung – abgebrochen.");

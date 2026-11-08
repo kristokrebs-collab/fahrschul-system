@@ -22,7 +22,7 @@
  *
  * Marker: one plate behind the active row glides from row to row (`spring.layout`, a transform written by `animate`, no layout
  * projection) and stretches a little while it travels; the red dot rides on it; Premium and Team plans get one border-beam lap on it whenever the
- * panel opens. First load (Runde 12): the rows wave in from the top, row by row (52 ms apart, 300 ms each, 10 px, opacity) and the icons
+ * panel opens. First load (Runde 12): the rows wave in from the top, row by row (80 ms apart, 420 ms each, 14 px, a touch of blur, opacity) and the icons
  * draw themselves STRICTLY one after the other (`stroke-dashoffset`, `sidebarSequence` in `shellFx.ts`) – once per page load, only once the
  * intro's stage has lifted (it used to run under the stage, unseen), never on hover, a route change or a re-render; reduced motion: all at once.
  * Keys: ↑ ↓ Home End move between rows, Esc closes the peek. Each row preloads its page chunk on intent. Rows are 44 px tall and never overlap.

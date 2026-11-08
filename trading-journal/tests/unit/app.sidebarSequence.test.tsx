@@ -1,5 +1,5 @@
 /**
- * Runde 12 – the sidebar's first-load sequence: the rows wave in from the top (52 ms apart, 300 ms each), the glyphs draw STRICTLY one after
+ * Runde 12 – the sidebar's first-load sequence: the rows wave in from the top (80 ms apart, 420 ms each), the glyphs draw STRICTLY one after
  * the other, once per page load, only after the intro's stage has lifted (it used to start at mount, played under the stage and was used up),
  * never on hover / route change / re-render, never under reduced motion, and nothing stays invisible.
  * Frames are measured in the real browser (`tests/e2e/sidebar-sequenz.spec.ts`); here the pure timeline and the markup contracts.
@@ -61,18 +61,18 @@ const SHAPE = ".sb-ico :is(path, circle, rect, line, polyline, ellipse)";
 describe("sidebarSequence (pure timeline)", () => {
   const counts = [1, 3, 2, 4, 1, 2, 2, 3, 1, 2, 2, 1, 3, 2, 2, 1, 2, 4, 1];
 
-  it("the rows wave in 45–60 ms apart, top to bottom, each taking 260–340 ms", () => {
+  it("the rows wave in 70–90 ms apart, top to bottom, each taking 380–460 ms", () => {
     const { rows } = sidebarSequence(counts);
     expect(rows).toHaveLength(counts.length);
     expect(rows[0]!.start).toBe(0);
     for (let i = 1; i < rows.length; i++) {
       const step = rows[i]!.start - rows[i - 1]!.start;
-      expect(step).toBeGreaterThanOrEqual(45);
-      expect(step).toBeLessThanOrEqual(60);
+      expect(step).toBeGreaterThanOrEqual(70);
+      expect(step).toBeLessThanOrEqual(90);
     }
     for (const r of rows) {
-      expect(r.duration).toBeGreaterThanOrEqual(260);
-      expect(r.duration).toBeLessThanOrEqual(340);
+      expect(r.duration).toBeGreaterThanOrEqual(380);
+      expect(r.duration).toBeLessThanOrEqual(460);
     }
   });
 

@@ -1,6 +1,6 @@
 /**
  * Runde 12 – the sidebar's first-load sequence, measured in the real browser (frames, not just end states):
- *   - the rows wave in from the top, one after the other (≈ 52 ms apart, 300 ms each);
+ *   - the rows wave in from the top, one after the other (≈ 80 ms apart, 420 ms each, Paket S: a bit stronger);
  *   - the glyphs draw STRICTLY one after the other: a glyph is finished before the next one starts (declared timing of the running animations
  *     AND the order the frames really show);
  *   - it waits while the intro's stage covers the app (it used to run under the stage, unseen) and starts when the app is in view;
@@ -96,16 +96,16 @@ async function expectSequence(page: Page): Promise<SeqRec> {
   // the declared timing of the running animations (read in the first frame of the run): strokes in DOM order never overlap …
   expect(rec.strokes.length).toBeGreaterThan(19);
   for (let i = 1; i < rec.strokes.length; i++) expect(rec.strokes[i]!.delay, `stroke ${i} starts after stroke ${i - 1} ended`).toBeGreaterThanOrEqual(rec.strokes[i - 1]!.delay + rec.strokes[i - 1]!.duration - 0.05);
-  // … and the rows follow 45–60 ms apart, 260–340 ms each
+  // … and the rows follow 70–90 ms apart, 380–460 ms each
   expect(rec.waves.length).toBe(19);
   for (const w of rec.waves) {
-    expect(w.duration).toBeGreaterThanOrEqual(260);
-    expect(w.duration).toBeLessThanOrEqual(340);
+    expect(w.duration).toBeGreaterThanOrEqual(380);
+    expect(w.duration).toBeLessThanOrEqual(460);
   }
   const delays = rec.waves.map((w) => w.delay).sort((x, y) => x - y);
   for (let i = 1; i < delays.length; i++) {
-    expect(delays[i]! - delays[i - 1]!).toBeGreaterThanOrEqual(45);
-    expect(delays[i]! - delays[i - 1]!).toBeLessThanOrEqual(60);
+    expect(delays[i]! - delays[i - 1]!).toBeGreaterThanOrEqual(70);
+    expect(delays[i]! - delays[i - 1]!).toBeLessThanOrEqual(90);
   }
   // the frames show the same order: rows top to bottom …
   expect(rec.rowAt.length).toBe(19);

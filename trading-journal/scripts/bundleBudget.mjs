@@ -36,6 +36,9 @@ import { gzipSync } from "node:zlib";
  * the round together: +6 KiB, at most +2 KiB each – this one uses +0.2 and leaves 0.3 of headroom.
  * Runde 12 (Paket P, Verhaltenspsychologie): `initialCss` stays 52.5 – measured 52.3 before and after: the new cards (Wochenabschluss, Erinnerung,
  * Rückmeldung, Einrichtung) use only utility classes the app had already (no new keyframes, no new stylesheet); first load JS 656.7 → 656.9.
+ * Runde 12 (Paket S, Showroom): budgets unchanged – measured 52.3 CSS / 656.9 JS before and after. The showroom (`VITE_SHOWROOM=1`) is a separate build behind a
+ * compile-time flag: its chunks, its stylesheet and its mock backend are not emitted in this build at all (`tests/unit/showroom.bundle.test.ts`); this script keeps
+ * measuring the PRODUCTION build. The sidebar's stronger wave is a keyframe change of a few bytes.
  */
 export const BUDGETS = {
   initialJs: 800,

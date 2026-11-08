@@ -66,13 +66,13 @@ html[data-motion-tier="team"] {
       font-size: 14px;
     }
   }
-  /* First load: the rows wave in from the top, one after the other (45–60 ms apart, 300 ms each, 10 px, opacity); held back while the intro's stage covers
+  /* First load: the rows wave in from the top, one after the other (70–90 ms apart, 420 ms each, 14 px, a touch of blur, opacity); held back while the intro's stage covers
      the app. Fill `backwards` only: afterwards the rows' own rules (a folded group's hidden rows) apply again. */
   [data-draw="wait"] .sb-rows > li {
     opacity: 0;
   }
   [data-draw="run"] .sb-rows > li {
-    animation: sb-wave 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation: sb-wave 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
     animation-delay: var(--sq-d, 0ms);
   }
   /* The floating bar (phones): one glass pill, a plate with a soft glow under the active tab, and a step down while the keyboard is up */
@@ -256,7 +256,8 @@ html[data-motion-tier="team"] {
 @keyframes sb-wave {
   from {
     opacity: 0;
-    translate: 0 -10px;
+    translate: 0 -14px;
+    filter: blur(3px);
   }
 }
 @keyframes mt-in {

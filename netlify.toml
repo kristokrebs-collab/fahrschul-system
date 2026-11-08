@@ -10,6 +10,13 @@
   command = "npm ci && npm run build && npm run build:share"
   publish = "dist"
 
+# Deploy previews are the SHOWROOM (Paket S, docs/SHOWROOM.md): the personal edition built with VITE_SHOWROOM=1 – a demo of everything
+# (sign-in, registration, order window, market data, coach …) that runs against an in-app MOCK backend, so a preview works without
+# Supabase / Stripe / Binance / Anthropic. Production and branch deploys keep the build above, WITHOUT the flag (the showroom code is not in
+# their bundle at all). The share edition stays as it is. The env vars are set inside the npm script, so a site-wide value cannot override them.
+[context.deploy-preview]
+  command = "npm ci && npm run build:showroom:deploy && npm run build:share"
+
 [build.environment]
   # Node 22 LTS (Stripe SDK 23 and the Netlify Functions need ≥ 20)
   NODE_VERSION = "22"

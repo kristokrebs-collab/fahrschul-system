@@ -14,6 +14,8 @@
     "e2e": "playwright test",
     "build:share": "vite build --mode share",
     "build:e2e-cloud": "VITE_SUPABASE_URL=https://e2e-mock.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_e2e vite build --outDir dist-e2e-cloud --emptyOutDir",
+    "build:showroom": "tsc -b && VITE_SHOWROOM=1 VITE_SUPABASE_URL=https://showroom.invalid VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_showroom vite build --outDir dist-showroom --emptyOutDir",
+    "build:showroom:deploy": "tsc -b && VITE_SHOWROOM=1 VITE_SUPABASE_URL=https://showroom.invalid VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_showroom vite build",
     "build:single": "tsc -b && node scripts/build-single.mjs",
     "budget": "node scripts/bundleBudget.mjs",
     "release:check": "node scripts/releaseCheck.mjs",

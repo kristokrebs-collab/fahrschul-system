@@ -52,6 +52,9 @@ const SharedView = lazy(() => import("@/views/community/SharedView").then((m) =>
 /** P10 trial / payment banner – only in builds with billing (cloud configured, a web build). */
 const BillingBanner = lazy(() => import("@/billing/ui/BillingBanner").then((m) => ({ default: m.BillingBanner })));
 
+/** The Showroom's panel, simulated payment page and mail knob (Paket S): present only in a build with the flag – the import is folded away otherwise. */
+const ShowroomHost = __TJ_SHOWROOM__ ? lazy(() => import("@/showroom/ui/ShowroomHost")) : null;
+
 /** Leaf host of the layer diagnostics (renders nothing while closed – the app never pays for it). */
 function LayerDiagHost() {
   const open = useLayerDiagOpen();
@@ -349,6 +352,13 @@ function Shell() {
         <LegalHost />
       </HostSlot>
       <FeatureHosts />
+      {ShowroomHost && (
+        <HostSlot name="Showroom">
+          <Suspense fallback={null}>
+            <ShowroomHost />
+          </Suspense>
+        </HostSlot>
+      )}
       <Celebrate />
       <IntroHost />
       <LayerDiagHost />

@@ -30,20 +30,27 @@ try {
   /* no Font Loading API */
 }
 
-// Start sequence (Plan 1.5): migrate + hydrate synchronously, then probe claude.ai; the router needs the
-// setup ids for `#trades?setup=…`, the market provider needs `settings.market.symbol`.
-void bootJournal();
-installRouter();
-bootMarket();
-// opened on one of the tabs that are chunks of their own (a reload on #trades …): fetch it in parallel with the first render
-preloadPage(useUi.getState().page);
-// e2e only (flag set by the Playwright seed, `src/app/e2eHooks.ts`): the stores the specs read and write
-installE2eHooks({ __tjJournal: useJournal, __tjUi: useUi, __tjTheme: useTheme });
+function boot(): void {
+  // Start sequence (Plan 1.5): migrate + hydrate synchronously, then probe claude.ai; the router needs the
+  // setup ids for `#trades?setup=…`, the market provider needs `settings.market.symbol`.
+  void bootJournal();
+  installRouter();
+  bootMarket();
+  // opened on one of the tabs that are chunks of their own (a reload on #trades …): fetch it in parallel with the first render
+  preloadPage(useUi.getState().page);
+  // e2e only (flag set by the Playwright seed, `src/app/e2eHooks.ts`): the stores the specs read and write
+  installE2eHooks({ __tjJournal: useJournal, __tjUi: useUi, __tjTheme: useTheme });
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <MotionRoot>
-      <App />
-    </MotionRoot>
-  </StrictMode>,
-);
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <MotionRoot>
+        <App />
+      </MotionRoot>
+    </StrictMode>,
+  );
+}
+
+// Showroom (Paket S, Netlify deploy previews only): the mock backend and the banner come first, then the app boots as usual. Without the flag this
+// is `boot()` and nothing else – the branch and the chunk behind it are gone from the production bundle.
+if (__TJ_SHOWROOM__) void import("@/showroom/install").then((m) => m.installShowroom()).then(boot);
+else boot();

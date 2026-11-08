@@ -4,6 +4,8 @@
  *   npm run build         → dist/          personal edition at `/`        (`__TJ_EDITION__` "personal")
  *   npm run build:share   → dist/teilen/   share edition at `/teilen/`    (`vite build --mode share`, privacy guard)
  *   npm run build:e2e-cloud → dist-e2e-cloud/  personal edition against the Supabase mock of the e2e suite (P14)
+ *   npm run build:showroom  → dist-showroom/   Showroom (Paket S): personal edition + `VITE_SHOWROOM=1` – the in-app mock backend, the demo
+ *                                              banner and the "Neu in dieser Version" panel; Netlify builds it for deploy previews only
  * Run `build` BEFORE `build:share` (the personal build empties dist/). Dev / vitest use the personal edition;
  * `vite --mode share` serves the share edition at http://localhost:5173/teilen/.
  * The single-file builds live in `vite.single.config.ts`.
@@ -139,12 +141,16 @@ function shareAppName(): Plugin {
 
 export default defineConfig(({ mode }) => {
   const share = mode === "share";
+  // Showroom (Paket S): `VITE_SHOWROOM=1` (npm run build:showroom, Netlify deploy-preview only). Never in the share edition; a compile-time
+  // constant, so without the flag every `if (SHOWROOM)` branch – and the lazy chunks behind it – disappears from the bundle.
+  const showroom = !share && process.env.VITE_SHOWROOM === "1";
   return {
     base: share ? SHARE_BASE : "/",
     plugins: [offlineTolerantLazy(), react(), tailwindcss(), secretGuard(), ocrAssets(share), ...(share ? [privacyGuard(), shareAppName()] : [keepLegacyDashboard()])],
     define: {
       __TJ_EDITION__: JSON.stringify(share ? "share" : "personal"),
       __TJ_TARGET__: JSON.stringify("web"),
+      __TJ_SHOWROOM__: JSON.stringify(showroom),
     },
     resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
     build: {
