@@ -387,6 +387,40 @@ export async function touchKit(page: Page): Promise<TouchKit> {
 }
 
 /**
+ * Waits until the page's main thread has been quiet: no long task (> 50 ms) for `quietMs`. A page that is still mounting its lazy
+ * cards answers a touch late – the first `touchmove` reaches it more than lightweight-charts' 240 ms long-press after the
+ * `touchstart`, the chart switches to crosshair tracking and the page no longer scrolls under the finger. A fixed pause only
+ * covers a fast machine (here the last mount tasks end ≈ 4 s after the load; a runner at a quarter of the speed needs far longer).
+ */
+export async function waitForQuietMainThread(page: Page, quietMs = 600, timeout = 30_000): Promise<void> {
+  await page.evaluate(
+    ({ quiet, limit }) =>
+      new Promise<void>((resolve, reject) => {
+        let last = performance.now();
+        const obs = new PerformanceObserver((list) => {
+          for (const e of list.getEntries()) last = Math.max(last, e.startTime + e.duration);
+        });
+        obs.observe({ type: "longtask", buffered: true });
+        const began = performance.now();
+        const tick = () => {
+          const now = performance.now();
+          if (now - last >= quiet) {
+            obs.disconnect();
+            return resolve();
+          }
+          if (now - began > limit) {
+            obs.disconnect();
+            return reject(new Error("the page's main thread never went quiet"));
+          }
+          setTimeout(tick, 100);
+        };
+        tick();
+      }),
+    { quiet: quietMs, limit: timeout },
+  );
+}
+
+/**
  * The box of `locator` once it stopped moving (two reads 100 ms apart agree within 0.5 px). Content above it that is
  * still filling — the Einstiegs-Check's first evaluation adds ~1,500 px on a phone, the Lage panel its rows — pushes it
  * down, and a tap at a box read a moment earlier lands somewhere else (or below the viewport).

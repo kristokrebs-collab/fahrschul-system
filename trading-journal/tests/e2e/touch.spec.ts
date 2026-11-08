@@ -9,7 +9,7 @@
  * - the Disziplin heat map takes a fat-finger tap beside a traded day.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { centre, collectErrors, hasTouch, isMobile, isTouchTablet, navItem, screenshot, scrollUntilVisible, seed, settledBox, toast, touchKit } from "./helpers";
+import { centre, collectErrors, hasTouch, isMobile, isTouchTablet, navItem, screenshot, scrollUntilVisible, seed, settledBox, toast, touchKit, waitForQuietMainThread } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR, type HitBoxMiss } from "./hitbox";
 
 const dock = (page: Page) => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]');
@@ -264,6 +264,8 @@ test.describe("touch review fixes", () => {
     const canvas = card.locator("canvas").first();
     await expect(canvas).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(1200);
+    // the lazy cards of the page keep the main thread busy for a while: a touch answered late reads as a long press on the chart
+    await waitForQuietMainThread(page);
     const b = await settledBox(canvas);
     const kit = await touchKit(page);
     const at = { x: b.x + b.width * 0.45, y: b.y + b.height * 0.6 };
