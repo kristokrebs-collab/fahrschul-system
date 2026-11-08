@@ -62,3 +62,16 @@ Eigene Arbeiten nach veröffentlichten Beschreibungen, **kein Fremdcode übernom
 | `trading-lab/references/harvey-muster.md`, `trading-lab/scripts/outbox.py` | Bauweisen aus https://github.com/ethanplusai/harvey (README, `gate.py`) | gelesen 2026-10-30 | MIT; **kein Code kopiert**, kein Outreach-Teil übernommen |
 | `pulse-motion/assets/motion-graphics.html`, `references/motion-graphics.md` | Titelliste eines Instagram-Karussells (Charlie Hills, „16 premium animations“) | nur Titel gesehen | eigener Code, keine Vorlage-Werte |
 | `pulse-motion/assets/styles/{fintech-glass,relay-lime}.css` + Specs | Beobachtung zweier Fallstudien/Reels (rondesignlab, KI-gebaute Relay-Site) | Screenshots 2026-10 | eigener Look, kein Marken- oder Layout-Material |
+
+## Skill-Suite und freigegebene Drittanbieter-Skills (2026-11-07/08)
+
+Die 20 Skills der Skill-Suite stammen aus dem Paket des Nutzers (`Claude_Master_Skillpaket_20_Skills_v2.zip`, eigene Anleitungen, kein Fremdcode). Prüfung und Status: `.claude/setup/Skill-Suite-Status.md`.
+
+Nach ausdrücklicher Freigabe des Nutzers (2026-11-08) als reine Skill-Ordner kopiert; **ohne** `npx`, ohne npm-Installation, ohne Konten. Vorher gelesen: nur Markdown, keine Skripte. Lizenzdatei liegt jeweils im Skill-Ordner.
+
+| Skill-Ordner | Quelle | Commit | Lizenz | Änderung |
+|---|---|---|---|---|
+| `gsap-core`, `gsap-frameworks`, `gsap-performance`, `gsap-plugins`, `gsap-react`, `gsap-scrolltrigger`, `gsap-timeline`, `gsap-utils` | https://github.com/greensock/gsap-skills | aed9cfd | MIT | keine |
+| `playwright-cli` | https://github.com/microsoft/playwright-cli | 4bc00fb | Apache-2.0 | Zeile `allowed-tools` (vorab erteilte Bash-Rechte) entfernt; das npm-Paket `@playwright/cli` ist **nicht** installiert |
+| `extract-design` | https://github.com/Manavarya09/design-extract | 6050fdb | MIT | keine; das npm-Paket `designlang` ist **nicht** installiert, Aufruf per `npx` nur nach Freigabe je Lauf, Rechte an fremden Websites beachten |
+| `silent-ugc` | https://github.com/jasonlee-breadcrumb/silent-ugc | b9278da | MIT | keine; **braucht Arcads-MCP (Konto, Credits), yt-dlp, ffmpeg, nicht verbunden**. Nur mit eigener Darstellerin/Einwilligung, Kennzeichnung als KI/Werbung, Medienrechten; kein Download fremder Videos gegen Plattformregeln. Der eigene Skill `silent-ugc-workflow` bleibt getrennt |
