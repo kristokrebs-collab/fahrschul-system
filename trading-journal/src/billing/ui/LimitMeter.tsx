@@ -63,7 +63,7 @@ export function LimitMeter({ limitKey, used, className }: LimitMeterProps) {
           className="touch-hit justify-self-start text-[12px] font-semibold text-fg underline decoration-line-2 underline-offset-4 hover:decoration-fg"
           onClick={() => openUpgrade(null, next)}
         >
-          {UPGRADE.limitReached} · {UPGRADE.more(PLAN_CATALOG[next].name)}
+          {UPGRADE.limitReached} · {UPGRADE.limitBelongs(PLAN_CATALOG[next].name)}
         </button>
       )}
     </div>

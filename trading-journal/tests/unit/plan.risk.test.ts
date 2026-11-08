@@ -22,7 +22,8 @@ let seq = 0;
 const closedLoss = (date: string, pnl: number): Trade => mkTrade({ id: `c${++seq}`, date, pnlManual: pnl, stop: 1, entry: 100, size: 1000 });
 const openTrade = (date: string, extra: Partial<Trade> = {}): Trade => mkTrade({ id: `o${++seq}`, date, status: "open", exit: null, entry: 100, stop: 98, size: 1000, ...extra });
 
-const settings: Settings = settingsWith({ capital: { makro: 20_000, scalp: 5000 } });
+// the pause is opt-in (Paket P, `cooldownMin` 0 by default): the pause line is tested with it switched on
+const settings: Settings = settingsWith({ capital: { makro: 20_000, scalp: 5000 }, risk: { cooldownMin: 30 } } as Partial<Settings>);
 const limits = riskLimits(settings);
 const report = (trades: Trade[] = []): LimitReport => limitStatus({ trades: enrich(trades, settings), settings, scope: "scalp", now: NOW });
 

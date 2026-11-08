@@ -11,7 +11,7 @@ export const ONBOARDING_CARD = {
   title: "Einführung & Hilfe",
   lead: "Die Tour durch Konten, Setups, Börse, die neueren Bereiche und dein erstes Ziel – jederzeit noch einmal.",
   news: { lead: "Neu in der App", label: "Neue Bereiche der App", items: [{ id: "handelsplan-einstieg", label: "Handelsplan" }, { id: "aktien-scanner", label: "Aktien" }, { id: "zeitmaschine", label: "Zeitmaschine" }, { id: "datenarchiv", label: "Datenarchiv" }] },
-  wizard: { lead: "Einrichtung in vier Schritten: Konto, Daten, Verbindung (optional), erster Trade.", open: "Einrichtung öffnen", resume: "Einrichtung fortsetzen" },
+  wizard: { lead: "Einrichtung in vier Schritten: Konto, Daten, Verbindung (optional), erster Trade.", open: "Einrichtung öffnen", resume: "Weiter, wo du aufgehört hast", again: "Einrichtung noch einmal öffnen" },
   start: "Einführung starten",
   keys: "Alle Tastenkürzel",
   demo: "Demo mit Beispieldaten",
@@ -74,7 +74,7 @@ export function OnboardingCard({ className }: { className?: string }) {
           </p>
           <div>
             <Button size="sm" onClick={() => openWizard(true)} data-testid="wizard-open">
-              {wizard?.status === "active" ? ONBOARDING_CARD.wizard.resume : ONBOARDING_CARD.wizard.open}
+              {wizard?.status === "active" ? ONBOARDING_CARD.wizard.resume : wizard?.status === "done" ? ONBOARDING_CARD.wizard.again : ONBOARDING_CARD.wizard.open}
             </Button>
           </div>
         </div>

@@ -3,7 +3,6 @@ import { useMemo, useRef, useState, type DragEvent } from "react";
 import { deriveTrade } from "@/domain/derive";
 import type { Trade } from "@/domain/types";
 import { cn } from "@/lib/cn";
-import { celebrateFrom } from "@/motion/Celebrate";
 import { NumberCascade } from "@/motion/fx/NumberCascade";
 import { MorphSelect } from "@/motion/pulse/MorphSelect";
 import { Sheet } from "@/motion/Sheet";
@@ -198,7 +197,7 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
       title: res.added > 0 || res.updated === 0 ? CSV_STRINGS.done(res.added) : CSV_STRINGS.updatedOnly(res.updated),
       detail: CSV_STRINGS.doneDetail(res.added > 0 ? res.updated : 0, res.unchanged),
     });
-    if (res.added > 0 && stats.net > 0 && runRef.current) celebrateFrom(runRef.current, { kind: "win", tone: "win" });
+    // Paket P: no burst for imported trades – and never one that depends on whether they were profitable (docs/PSYCHOLOGIE.md)
     closeCsvImport();
   }
 

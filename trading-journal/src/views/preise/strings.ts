@@ -30,7 +30,8 @@ export const PREISE = {
   seatsTotal: (n: number, amount: string, per: string) => `${n} Sitze: ${amount} ${per}`,
   free: "0 €",
   freeNote: "für immer",
-  recommended: "Beliebt",
+  // Paket P: "Beliebt" would claim a popularity nobody measured – the badge says what it is: our recommendation
+  recommended: "Empfohlen",
   current: "Dein Tarif",
   /** the own column's pill on a phone (a 44-px column) */
   currentShort: "Du",

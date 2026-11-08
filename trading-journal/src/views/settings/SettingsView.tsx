@@ -125,9 +125,11 @@ const SIZE = {
   limits: { base: 314, sm: 250, lg: 266 },
   data: { base: 949, sm: 665, lg: 647 },
   storage: { base: 499, sm: 369, lg: 336 },
-  // + „Bewegung“ (Runde 11): measured 661 / 598 / 574–595 px at 390 / 700 / 1024–1440
-  theme: { base: 661, sm: 580, lg: 574 },
-  tour: { base: 499, sm: 415, lg: 436 },
+  // + „Bewegung“ (Runde 11): measured 661 / 598 / 574–595 px at 390 / 700 / 1024–1440; + „Rückmeldung bei geschafften Schritten“ (Paket P,
+  // two switches): measured 836 / 766 / 752–759 px
+  theme: { base: 836, sm: 766, lg: 755 },
+  // the card grew with the setup-wizard row (Paket B): measured 659 / 506 px at 390 / 820
+  tour: { base: 659, sm: 506, lg: 436 },
   more: { base: 361, sm: 266, lg: 266 },
   connect: { base: 972, sm: 842, lg: 654 },
 } as const satisfies Record<string, ReserveHeight>;

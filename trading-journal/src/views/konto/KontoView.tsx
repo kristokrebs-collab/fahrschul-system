@@ -10,6 +10,7 @@ import { SecurityCard } from "@/cloud/ui/SecurityCard";
 import { KONTO } from "@/cloud/ui/strings";
 import { SyncStatusCard } from "@/cloud/ui/SyncStatusCard";
 import { Reveal } from "@/motion/Reveal";
+import { WizardResumeNote } from "@/onboarding/wizard/WizardResumeNote";
 import { RESERVE_CLASS, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 import { hasClaudeRuntime } from "@/store/capability";
 import { storageKey } from "@/store/storage";
@@ -60,6 +61,8 @@ export function KontoView({ extraCards, nav, className }: KontoViewProps) {
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="konto-view">
       <PageHeader ghost="Sicher" className="lg:col-span-12" title={KONTO.title} lead={KONTO.lead} leadFill={KONTO_LEAD_FILL} />
+      {/* Paket P: only for a setup that was left half-way – the real progress and the way back, no deadline */}
+      {enabled && signedIn && <WizardResumeNote className="lg:col-span-12" />}
       {enabled && signedIn && nav}
       {!enabled ? (
         <Cell index={0} span="lg:col-span-12">

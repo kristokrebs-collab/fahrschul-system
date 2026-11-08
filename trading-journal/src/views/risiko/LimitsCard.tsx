@@ -9,7 +9,7 @@ import { DotUnit } from "@/primitives/DotUnit";
 import { themePaint } from "@/lib/themePaint";
 import { AnimatePresence, motion, useTransform } from "motion/react";
 import { useEffect, useState } from "react";
-import { clockText, type LimitReport, type LimitRow, type RiskWarning } from "@/domain/risk";
+import { clockText, limitsSetByUser, type LimitReport, type LimitRow, type RiskWarning } from "@/domain/risk";
 import { cn } from "@/lib/cn";
 import { useNowMv } from "@/motion/clock";
 import { HoldConfirm, useConfirmFocus } from "@/motion/HoldConfirm";
@@ -19,6 +19,7 @@ import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { RingGauge } from "@/primitives/RingGauge";
+import { useJournal } from "@/store/journalStore";
 import { useRiskGuardStore } from "./guard";
 import { RISIKO } from "./strings";
 import { RiskCard, money, pct } from "./ui";
@@ -85,6 +86,7 @@ export function LimitsCard({ report, now, warnings: all }: { report: LimitReport
   const overrideUntil = useRiskGuardStore((s) => s.overrideUntil);
   const clearOverride = useRiskGuardStore((s) => s.clearOverride);
   const [asking, setAsking] = useState(false);
+  const ownLimits = useJournal((s) => limitsSetByUser(s.settings));
   const { trigger, no } = useConfirmFocus(asking);
   const coolLive = useActiveUntil(report.cooldown && report.cooldown.endsAt > now ? report.cooldown.endsAt : null);
   const cool = coolLive ? report.cooldown : null;
@@ -143,6 +145,12 @@ export function LimitsCard({ report, now, warnings: all }: { report: LimitReport
       </div>
 
       <div className="mt-4 grid gap-2">
+        {report.worst === "breach" && (
+          <p className="text-[12.5px] leading-relaxed text-mute" data-testid="risk-own-limit" data-own={ownLimits ? "1" : "0"}>
+            {ownLimits ? S.ownLimit : S.defaultLimit}
+            {!(report.limits.cooldownMin > 0) && <span className="mt-1 block text-[11.5px] text-faint">{S.pauseOptIn}</span>}
+          </p>
+        )}
         {cool && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-loss/30 bg-loss/[0.07] px-3 py-2.5" data-testid="risk-cooldown">
             <span className="text-[12.5px] text-fg">{cool.reason === "day" ? "Tageslimit erreicht – für heute ist Schluss." : `${cool.losses} Verluste in Folge. Kurz raus, Plan lesen.`}</span>

@@ -16,7 +16,8 @@ const closed = (date: string, pnl: number, extra: Partial<Trade> = {}): Trade =>
 const open = (date: string, extra: Partial<Trade> = {}): Trade => mkTrade({ id: `o${++seq}`, date, status: "open", exit: null, entry: 100, stop: 98, size: 1000, ...extra });
 
 // scalp capital 1000 (limits: day 4 % = 40, week 8 % = 80, open risk 3 % = 30, 5 trades/day, leverage rule ED)
-const settings: Settings = settingsWith({ capital: { makro: 10_000, scalp: 1000 } });
+// the pause is opt-in (Paket P, `cooldownMin` 0 by default): these tests are about the pause, so they switch it on
+const settings: Settings = settingsWith({ capital: { makro: 10_000, scalp: 1000 }, risk: { cooldownMin: 30 } } as Partial<Settings>);
 const run = (trades: Trade[], s: Settings = settings, scope: "all" | "scalp" | "makro" = "scalp", extra: Partial<Parameters<typeof limitStatus>[0]> = {}): LimitReport =>
   limitStatus({ trades: enrich(trades, s), settings: s, scope, now: NOW, ...extra });
 const row = (r: LimitReport, key: string) => r.rows.find((x) => x.key === key)!;

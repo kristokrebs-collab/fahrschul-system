@@ -94,7 +94,7 @@ const GROUPS: { title: string; fields: NumSpec[] }[] = [
     title: "Pause",
     fields: [
       { id: "rs-closs", label: "Verluste in Folge", suffix: "×", digits: 0, help: "starten die Pause · 0 = aus", get: (l) => l.cooldownLosses, put: (v) => (Number.isInteger(v) && v >= 0 && v <= 10 ? { risk: { cooldownLosses: v } } : null) },
-      { id: "rs-cmin", label: "Pausenlänge", suffix: "min", digits: 0, get: (l) => l.cooldownMin, put: (v) => (Number.isInteger(v) && v >= 0 && v <= 1440 ? { risk: { cooldownMin: v } } : null) },
+      { id: "rs-cmin", label: "Pausenlänge", suffix: "min", digits: 0, help: "0 = keine Pause (Voreinstellung)", get: (l) => l.cooldownMin, put: (v) => (Number.isInteger(v) && v >= 0 && v <= 1440 ? { risk: { cooldownMin: v } } : null) },
       {
         id: "rs-trades",
         label: "Trades/Tag Scalp",

@@ -6,6 +6,8 @@
 import { useEffect, useRef, useState } from "react";
 import { replayLogo } from "@/app/logoSeq";
 import { MOTION_MODES, MOTION_STRINGS, useMotionPref, type MotionMode } from "@/motion/profile";
+import { FEEDBACK_STRINGS, useFeedbackPref } from "@/motion/processFeedback";
+import { Switch } from "@/motion/Switch";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
@@ -61,6 +63,41 @@ export function MotionSection() {
         <Button size="sm" variant="ghost" onClick={replayLogo} data-testid="motion-logo">
           {MOTION_STRINGS.logo}
         </Button>
+      </div>
+      <FeedbackRows />
+    </div>
+  );
+}
+
+/**
+ * „Rückmeldung bei geschafften Schritten“ (Paket P): the optional second channel of the quiet process feedback – a short vibration and
+ * a soft tone. Both OFF by default; they only ever follow a finished process step (`@/motion/processFeedback`), never a profit,
+ * a loss or a trade.
+ */
+function FeedbackRows() {
+  const sound = useFeedbackPref((s) => s.sound);
+  const haptic = useFeedbackPref((s) => s.haptic);
+  const set = useFeedbackPref((s) => s.set);
+  const canVibrate = typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+  return (
+    <div className="grid gap-2.5 border-t border-line pt-4" data-testid="feedback-section">
+      <span id="feedback-label" className="label">
+        {FEEDBACK_STRINGS.title}
+      </span>
+      <p className="text-[12px] text-mute">{FEEDBACK_STRINGS.lead}</p>
+      {canVibrate && (
+        <div className="flex items-center justify-between gap-4">
+          <label htmlFor="fb-haptic" className="cursor-pointer text-[13px] text-fg">
+            {FEEDBACK_STRINGS.haptic}
+          </label>
+          <Switch id="fb-haptic" className="touch-hit shrink-0" checked={haptic} onCheckedChange={(on) => set({ haptic: on })} data-testid="feedback-haptic" />
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-4">
+        <label htmlFor="fb-sound" className="cursor-pointer text-[13px] text-fg">
+          {FEEDBACK_STRINGS.sound}
+        </label>
+        <Switch id="fb-sound" className="touch-hit shrink-0" checked={sound} onCheckedChange={(on) => set({ sound: on })} data-testid="feedback-sound" />
       </div>
     </div>
   );

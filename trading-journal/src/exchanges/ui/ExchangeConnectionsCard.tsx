@@ -5,7 +5,6 @@ import { cn } from "@/lib/cn";
 import { openAuthSheet, useCloudSession } from "@/cloud/session";
 import { useTick } from "@/cloud/ui/SyncStatusCard";
 import { agoLabel } from "@/cloud/device";
-import { celebrateFrom } from "@/motion/Celebrate";
 import { chevronFrames, DotMatrix } from "@/motion/DotMatrix";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
 import { ThinkingOrb } from "@/motion/ThinkingOrb";
@@ -300,16 +299,13 @@ function Connected({ conn, status }: { conn: ExchangeConnection; status: Exchang
   // Free syncs by hand only: the automatic switch is off and says "ab Pro" (the server refuses it as well)
   const noAuto = status.plan.autoSync === false;
 
-  // one beam lap + confetti per outcome that brought new trades (adjusting state while rendering)
+  // one quiet beam lap per outcome that brought new trades (adjusting state while rendering) – no confetti (Paket P)
   const [seenKey, setSeenKey] = useState(mine?.key ?? 0);
   const [fire, setFire] = useState(0);
   if (mine && mine.key !== seenKey) {
     setSeenKey(mine.key);
     if (mine.counts.inserted > 0) setFire((n) => n + 1);
   }
-  useEffect(() => {
-    if (fire > 0 && syncRef.current) celebrateFrom(syncRef.current, { kind: "win", tone: "win" });
-  }, [fire]);
 
   return (
     <div className="relative grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-x-7" data-testid="exchange-connected">

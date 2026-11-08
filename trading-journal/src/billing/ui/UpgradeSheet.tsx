@@ -83,6 +83,9 @@ export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
             </Button>
           )}
           <span className="flex-1" />
+          <Button size="sm" variant="ghost" onClick={close} data-testid="upgrade-decline">
+            {UPGRADE.decline}
+          </Button>
           <Button variant="primary" disabled={mode !== "open" || !!busy} onClick={go} data-testid="upgrade-cta">
             {orderStepLabel(signedIn, plan)}
           </Button>

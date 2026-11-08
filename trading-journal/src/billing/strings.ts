@@ -78,6 +78,10 @@ export const UPGRADE = {
   teaserLine: (plan: string) => `Ab ${plan}`,
   limitReached: "Limit erreicht",
   more: (plan: string) => `Mehr mit ${plan}`,
+  /** Paket P: said once, where the person ran into the limit – a fact, not a push. */
+  limitBelongs: (plan: string) => `Dieses Limit gehört zu ${plan}.`,
+  /** A plain way out, equal in weight to the way in – no shaming. */
+  decline: "Nein danke",
   closedNote: "Zahlungen sind noch nicht eingerichtet.",
 } as const;
 

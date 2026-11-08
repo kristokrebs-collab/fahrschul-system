@@ -6,7 +6,7 @@
  */
 import { act, fireEvent, render, renderHook, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Trade } from "@/domain/types";
+import type { Settings, Trade } from "@/domain/types";
 import { nowLocalInput } from "@/lib/dates";
 import { __resetMultiDaily } from "@/market/multiDaily";
 import type { BinanceRest } from "@/market/sources/binance";
@@ -49,9 +49,11 @@ function renderView() {
   );
 }
 
-async function load(trades: Trade[] = journal()) {
+/** `pause`: the pause is opt-in (Paket P, `cooldownMin` 0 by default) – most tests here are about it and switch it on. */
+async function load(trades: Trade[] = journal(), pause = true) {
   await act(async () => {
-    useJournal.setState({ trades });
+    const s = useJournal.getState().settings;
+    useJournal.setState({ trades, settings: pause ? ({ ...s, risk: { ...(s as unknown as { risk?: object }).risk, cooldownMin: 30 } } as unknown as Settings) : s });
   });
 }
 
@@ -84,6 +86,33 @@ describe("RisikoView", () => {
     expect(screen.getByTestId("risk-corr")).toHaveAttribute("data-state", "few");
     expect(screen.getByTestId("risk-streak")).toHaveAttribute("data-status", "zu wenig");
     expect(screen.getByTestId("risk-limits")).toHaveAttribute("data-worst", "ok");
+  });
+
+  it("Paket P: a breached limit without a pause opt-in shows no pause – and the calm note names who set the limit", async () => {
+    const now = Date.now();
+    const trades = [...journal(now), mkTrade({ id: "l3", date: local(now - 30 * MIN), exitDate: local(now - 2 * MIN), pnlManual: -80, entry: 100, stop: 99, size: 1000 })];
+    await load(trades, false);
+    const { unmount } = renderView();
+    let limits = screen.getByTestId("risk-limits");
+    expect(limits).toHaveAttribute("data-worst", "breach");
+    expect(limits).toHaveAttribute("data-cooldown", "off");
+    expect(within(limits).queryByTestId("risk-cooldown")).toBeNull();
+    expect(within(limits).queryByTestId("risk-override")).toBeNull();
+    const note = within(limits).getByTestId("risk-own-limit");
+    expect(note).toHaveAttribute("data-own", "0");
+    expect(note).toHaveTextContent("Die Standardgrenze ist erreicht");
+    expect(note).toHaveTextContent("Eine Pause nach Verlusten ist aus");
+    unmount();
+    // the trader sets the day limit himself (4 % → 4 %: any written value counts) – now it is his own limit
+    await act(async () => {
+      const s = useJournal.getState().settings;
+      useJournal.setState({ settings: { ...s, discipline: { maxLossDayPct: 0.04 } } as unknown as Settings });
+    });
+    renderView();
+    limits = screen.getByTestId("risk-limits");
+    expect(within(limits).getByTestId("risk-own-limit")).toHaveAttribute("data-own", "1");
+    expect(within(limits).getByTestId("risk-own-limit")).toHaveTextContent("Du hast dein eigenes Limit erreicht");
+    expect(within(limits).getByTestId("risk-own-limit")).toHaveTextContent("Nichts wird blockiert");
   });
 
   it("limits with the pause, exposure, liquidation, scenario legs, risk spread", async () => {
