@@ -2,7 +2,7 @@
  * Runde 11, A5 „Rahmen“ – the frame the way a reader meets it (mobile 390 + desktop 1440):
  *   - the sidebar is COMPACT at every width (no auto-open from 1,624 px); „Anheften“ keeps it open and the page makes room; the pin survives a reload;
  *   - the search sits on top (a combobox: pages and functions), ↑ ↓ Home End move between rows, Esc closes the peek;
- *   - the rows wave in from the top ONCE per session (45–60 ms apart, 260–340 ms, 8–12 px, opacity) – measured with the Animations API;
+ *   - the rows wave in from the top ONCE per page load (Runde 12; 45–60 ms apart, 260–340 ms, 8–12 px, opacity) – measured with the Animations API;
  *   - the logo draws stroke after stroke STRICTLY one after the other, in ≤ 1.2 s, once per session, replayable from Einstellungen › Darstellung;
  *   - the motion setting (Wie das Gerät / Reduziert / Volles Profil) is kept and takes the motion away;
  *   - the plan's motion profile comes from the confirmed plan only (Free without payments – a browser flag changes nothing);
@@ -160,7 +160,7 @@ test.describe("Rahmen: Seitenleiste (Computer)", () => {
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
-  test("die Zeilen wellen einmal von oben nach unten ein: 45–60 ms Abstand, 260–340 ms, 8–12 px, Deckkraft – danach nie wieder in dieser Sitzung", async ({ page }, info) => {
+  test("die Zeilen wellen einmal von oben nach unten ein: 45–60 ms Abstand, 260–340 ms, 8–12 px, Deckkraft – danach nie wieder in diesem Seitenaufruf", async ({ page }, info) => {
     test.skip(mobile(info.project.name), "from 768 px");
     await freshSession(page);
     await expect(page.locator(".sb")).not.toHaveAttribute("data-draw", /.+/, { timeout: 15_000 });
@@ -181,13 +181,21 @@ test.describe("Rahmen: Seitenleiste (Computer)", () => {
     const px = Math.abs(parseFloat(w[0]!.from.translate.split(" ")[1] ?? "0"));
     expect(px).toBeGreaterThanOrEqual(8);
     expect(px).toBeLessThanOrEqual(12);
-    // the same session: never again
+    // Runde 12: once per PAGE LOAD (it used to be once per session – a reload showed nothing, so it could not be seen again). Hover (the peek) and a
+    // route change never start it again …
     await resetFx(page);
-    await page.reload();
-    await expect(page.getByText("Netto-P&L").first()).toBeVisible();
+    await page.mouse.move(30, 300);
+    await expect(side(page)).toHaveAttribute("data-open", "", { timeout: 5000 });
+    await page.mouse.move(900, 500);
+    await side(page).getByRole("link", { name: "Markt", exact: true }).click();
+    await expect(page).toHaveURL(/#markt$/);
     await page.waitForTimeout(800);
-    // (the recorder is an init script: it runs again after the reload and records from its first frame)
     expect((await fxOf(page)).wave).toEqual([]);
+    // … a reload opens the site anew: it plays once more (the recorder is an init script: it records from the first frame of the new load), and ends again
+    await page.reload();
+    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.locator(".sb")).not.toHaveAttribute("data-draw", /.+/, { timeout: 15_000 });
+    expect((await fxOf(page)).wave.length).toBeGreaterThanOrEqual(19);
   });
 
   test("Bewegung „Reduziert“: nichts wellt, nichts zeichnet sich – die Wahl bleibt nach dem Neuladen", async ({ page }, info) => {

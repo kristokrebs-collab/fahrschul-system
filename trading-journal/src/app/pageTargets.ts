@@ -43,7 +43,7 @@ export const PAGE_WORDS: Record<Page, readonly string[]> = {
   preise: ["tarife", "was kostet", "kosten", "abo", "abonnement", "pläne", "upgrade", "bezahlen", "kaufen", "pro", "premium"],
   funktionen: ["alle funktionen", "was kann die app", "hilfe", "index", "verzeichnis", "wo finde ich", "übersicht der funktionen"],
   studio: ["strategie schreiben", "strategie in worten", "regeln aus text", "strategie-studio"],
-  plan: ["trade planen", "plan erstellen", "handelsplan", "vor dem trade", "ausstieg planen"],
+  plan: ["trade planen", "plan erstellen", "handelsplan", "vor dem trade planen", "ausstieg planen"],
   aktien: ["aktien", "aktien suchen", "aktienmarkt", "nachrichten zu aktien", "aktien scanner", "börse aktien"],
 };
 

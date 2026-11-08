@@ -258,6 +258,50 @@ test.describe("Radial Share", () => {
     await expect(page.getByRole("menu")).toHaveCount(0);
   });
 
+  test("Runde 12: Glas-Chips, die Beschriftung „Kanal wählen“ und das Kreuz im Auslöser; Pfeiltasten wechseln die Beschriftung, nichts liegt übereinander", async ({ page }, info) => {
+    only(info);
+    const errors = collectErrors(page);
+    await seed(page, {});
+    await openRoute(page, "/#berichte", "Berichte");
+    const trigger = page.getByTestId("report-share");
+    await trigger.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+    await expect(trigger.locator("[data-radial-icon]")).toHaveAttribute("data-radial-icon", "share");
+    await trigger.click();
+    const copy = page.getByRole("menuitem", { name: "Kopieren" });
+    await expect(copy).toBeVisible();
+    // the symbol turned into the cross, the button kept its width
+    await expect(trigger.locator("[data-radial-icon]")).toHaveAttribute("data-radial-icon", "close");
+    // a glass chip: a blur over a translucent ink
+    const glass = await copy.evaluate((el) => ({ blur: getComputedStyle(el).backdropFilter, bg: getComputedStyle(el).backgroundColor }));
+    expect(glass.blur).toMatch(/blur/);
+    expect(glass.bg).toMatch(/rgba?\(|color\(/);
+    // the caption: first the prompt, then what the active target does
+    const caption = page.getByTestId("radial-caption");
+    await expect(caption).toHaveText("Kanal wählen");
+    await page.mouse.move(1, 1);
+    await page.keyboard.press("ArrowRight");
+    await expect(caption).toHaveText("Markdown-Datei speichern");
+    await expect(page.getByTestId("radial-ring")).toBeVisible();
+    // it lies inside the screen, on the side away from the fan, and never over a chip or the trigger
+    const vp = page.viewportSize()!;
+    const cb = (await caption.locator("span").first().boundingBox())!;
+    expect(cb.x).toBeGreaterThanOrEqual(0);
+    expect(cb.x + cb.width).toBeLessThanOrEqual(vp.width);
+    expect(cb.y).toBeGreaterThanOrEqual(0);
+    expect(cb.y + cb.height).toBeLessThanOrEqual(vp.height);
+    const tb = (await trigger.boundingBox())!;
+    const hits = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+    expect(hits(cb, tb), "caption over the trigger").toBe(false);
+    for (const box of await page.getByRole("menuitem").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON() as { x: number; y: number; width: number; height: number }))) expect(hits(cb, box), "caption over a chip").toBe(false);
+    // the caption takes no pointer: a press on it would go to the layer below (and close the fan), never to the caption itself
+    await expect(caption).toHaveCSS("pointer-events", "none");
+    await axeClean(page, "[data-radial-share]", "Teilen-Fächer mit Beschriftung");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(caption).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
   test("Bericht: der Streifen der Seitenabschnitte, der seinen Chip ins Bild schiebt, nimmt den Fächer nicht weg", async ({ page }, info) => {
     only(info);
     await seed(page, {});

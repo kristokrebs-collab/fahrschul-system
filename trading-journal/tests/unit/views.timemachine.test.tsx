@@ -268,7 +268,9 @@ describe("Karte", { timeout: 60_000 }, () => {
     const busy = await screen.findByTestId("tm-busy", {}, { timeout: 30_000 });
     expect(within(busy).getByRole("progressbar")).toHaveAttribute("aria-valuemin", "0");
     expect(within(busy).getByRole("progressbar")).toHaveAttribute("aria-valuemax", "100");
-    expect(busy).toHaveTextContent(/Rechnet/);
+    // the honest status: the real number of paths of THIS run (options.runs = 20 000), and the ring beside it
+    expect(busy).toHaveTextContent(/20\.000 Szenarien werden berechnet/);
+    expect(busy.querySelector("[data-thinking-orb=\"ring\"]")).not.toBeNull();
     expect(screen.queryByTestId("tm-start")).toBeNull();
     fireEvent.click(screen.getByTestId("tm-cancel"));
     expect(await screen.findByTestId("tm-cancelled", {}, { timeout: 30_000 })).toHaveTextContent("Abgebrochen");

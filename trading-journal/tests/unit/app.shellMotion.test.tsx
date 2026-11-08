@@ -15,7 +15,7 @@ import { Dock } from "@/app/Dock";
 import { HeaderTicker } from "@/app/HeaderTicker";
 import { NAV_GROUPS } from "@/app/navGroups";
 import { pageDirection, pageShiftPx } from "@/app/PageHost";
-import { DRAW_KEY, DRAW_MS, prepareStrokes, redrawStrokes, useIdleCycle } from "@/app/shellFx";
+import { prepareStrokes, redrawStrokes, resetSequenceForTests, useIdleCycle } from "@/app/shellFx";
 import { Sidebar } from "@/app/Sidebar";
 import { peekOpen, PEEK } from "@/app/useSidebarPeek";
 import { priceMv } from "@/market/motionValues";
@@ -40,6 +40,7 @@ function screen_(width: number, { hover = true, reduce = false }: { hover?: bool
 
 afterEach(() => {
   fx.reduced = false;
+  resetSequenceForTests();
   vi.restoreAllMocks();
   window.matchMedia = realMatchMedia;
   document.documentElement.style.removeProperty("--sidebar-w");
@@ -194,45 +195,9 @@ describe("sidebar: the rail peeks over the page", () => {
   });
 });
 
-describe("icon draw-in: once per session, never under reduced motion", () => {
-  beforeEach(() => {
-    sessionStorage.clear();
-    useUi.setState({ page: "overview", sidebar: "auto", sidebarClosed: null, editor: { open: false, fromFab: false } });
-  });
-  const mount = () =>
-    render(
-      <MotionRoot>
-        <Sidebar />
-      </MotionRoot>,
-    );
-
-  it("plays on the first load (the strokes get their length), is flagged for the session and ends by itself", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    screen_(1024);
-    const { container, unmount } = mount();
-    const frame = container.querySelector<HTMLElement>(".sb")!;
-    expect(frame.getAttribute("data-draw")).toBe("run");
-    const shapes = container.querySelectorAll(".sb-ico :is(path, circle, rect, line, polyline)");
-    expect(shapes.length).toBeGreaterThan(19);
-    expect(Array.from(shapes).every((s) => s.getAttribute("pathLength") === "1")).toBe(true);
-    expect(sessionStorage.getItem(DRAW_KEY)).toBe("1");
-    act(() => {
-      vi.advanceTimersByTime(DRAW_MS + 50);
-    });
-    expect(frame.hasAttribute("data-draw")).toBe(false);
-    unmount();
-    // the same session: never again
-    const again = mount();
-    expect(again.container.querySelector(".sb")!.hasAttribute("data-draw")).toBe(false);
-  });
-
-  it("reduced motion: everything is simply there", () => {
-    screen_(1024, { reduce: true });
-    const { container } = mount();
-    expect(container.querySelector(".sb")!.hasAttribute("data-draw")).toBe(false);
-    expect(sessionStorage.getItem(DRAW_KEY)).toBeNull();
-  });
-
+/* the first-load sequence of the sidebar (once per page load, strictly one glyph after the other, only once the intro has lifted) lives in
+   `tests/unit/app.sidebarSequence.test.tsx` */
+describe("stroke helpers", () => {
   it("`prepareStrokes` is idempotent; `redrawStrokes` marks the icon for a moment and does nothing under reduced motion", async () => {
     const host = document.createElement("span");
     host.innerHTML = '<svg><path d="M0 0L5 5"/><circle r="2"/></svg>';

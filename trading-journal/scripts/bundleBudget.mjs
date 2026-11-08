@@ -31,10 +31,13 @@ import { gzipSync } from "node:zlib";
  * add ~12 KiB gz together; the first-load total (780 / 800 KiB) is the limit that matters and stays.
  * Runde 10: `initialCss` 46 → 52 – the richer motion (keyframes, hover states, tokens) is CSS; the JS limits do not move (new
  * motion code goes into lazy chunks).
+ * Runde 12 (Paket C): `initialCss` 52 → 52.5 – measured 51.9 → 52.1 KiB: the glass chips and the caption of the share fan are Tailwind utilities
+ * (the sidebar's sequence reuses its keyframes, the voice ring is a canvas in a lazy chunk and needs no CSS). Limit for the three packages of
+ * the round together: +6 KiB, at most +2 KiB each – this one uses +0.2 and leaves 0.3 of headroom.
  */
 export const BUDGETS = {
   initialJs: 800,
-  initialCss: 52,
+  initialCss: 52.5,
   chunk: 120,
   named: { index: 575, react: 72, motion: 58, recharts: 114, lwc: 62 },
 };

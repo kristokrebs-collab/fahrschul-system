@@ -93,3 +93,17 @@ export function stepIndex(from: number, dir: 1 | -1, disabled: readonly boolean[
   }
   return from;
 }
+
+/** Height the caption needs under / over the trigger (its pill plus the gap to the trigger). */
+export const CAPTION_ROOM = 40;
+
+/**
+ * Where the caption of the open fan goes (Runde 12): on the side of the trigger AWAY from the fan – below it when the fan opens upwards, above
+ * it when the fan turned downwards – so it never lies between a target and the trigger. `null` when that side has no room (a trigger at the
+ * screen's edge): the trigger's own word then says what is active, and the caption is simply left out.
+ */
+export function captionSide(fan: Pick<RadialFan, "centerAngle">, at: { y: number }, viewport: { h: number }, hubH: number, gap = 8): "below" | "above" | null {
+  const up = Math.sin(fan.centerAngle * RAD) < 0;
+  if (up) return at.y + hubH / 2 + 10 + CAPTION_ROOM <= viewport.h - gap ? "below" : null;
+  return at.y - hubH / 2 - 10 - CAPTION_ROOM >= gap ? "above" : null;
+}

@@ -45,16 +45,17 @@ function quartText(q: Quart | null, interval: TmResult["interval"]): string {
   return `Median ${durationText(q.p50, interval)} · 25–75 %: ${count(q.p25)}–${count(q.p75)} Kerzen`;
 }
 
-function Progress({ run }: { run: TimeMachineRun }) {
+function Progress({ run, runs }: { run: TimeMachineRun; runs: number }) {
   const reduced = useReducedFx();
   const pct = Math.round(run.progress * 100);
   return (
     <div className="grid gap-2 rounded-xl border border-line bg-ink-950/50 p-3.5" data-testid="tm-busy" data-phase={run.phase ?? "pool"}>
       <div className="flex items-center justify-between gap-3 text-[12.5px]">
         <span className="flex min-w-0 items-center gap-2 text-fg">
-          <ThinkingOrb variant="calc" size={20} className="text-mute" />
+          {/* the voice ring (Runde 12): the paths are being computed – it moves while the run does, the box never changes the layout */}
+          <ThinkingOrb variant="ring" mood="active" size={28} />
           <span className="min-w-0">
-            {TM.running} · {TM.phase[run.phase ?? "pool"]}
+            {TM.scenarios(count(runs))} · {TM.phase[run.phase ?? "pool"]}
           </span>
         </span>
         <span className="num font-mono text-mute">{pct} %</span>
@@ -436,7 +437,7 @@ export function TimeMachineCard(props: TimeMachineProps) {
         {run.reason}
       </div>
     );
-  else if (busy) status = <Progress run={run} />;
+  else if (busy) status = <Progress run={run} runs={props.options?.runs ?? TM_RUNS} />;
   else if (run.status === "error")
     status = (
       <div className="grid gap-2 rounded-xl border border-loss/30 bg-loss/[0.06] px-3.5 py-3 text-[12.5px]" role="alert" data-testid="tm-error">

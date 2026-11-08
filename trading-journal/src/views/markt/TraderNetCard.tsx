@@ -217,7 +217,7 @@ export default function TraderNetCard() {
           <div className={cn(PLOT_BOX, "grid place-items-center px-6 text-center")} data-testid="trader-net-empty">
             {state === "loading" ? (
               <span className="grid place-items-center gap-3">
-                <ThinkingOrb variant="search" size={36} />
+                <ThinkingOrb variant="ring" mood="think" size={40} />
                 <span className="text-[12px] text-mute">{S.loading}</span>
               </span>
             ) : (
