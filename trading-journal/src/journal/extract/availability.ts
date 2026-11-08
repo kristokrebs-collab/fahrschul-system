@@ -2,15 +2,15 @@
  * Whether "Aus Screenshot übernehmen" may be offered (F29) – deliberately tiny: this file is part of the editor's
  * chunk, everything that reads pictures (`client.ts`, the preview sheet) is loaded on demand.
  *
- * The button exists only when ALL hold – otherwise nothing hints at a missing feature in the editor (the settings card
- * `Screenshot-Import` explains what is needed, with the current state):
+ * The MODEL reads only when ALL hold – otherwise the editor's „Aus Screenshot übernehmen“ uses the local reader on the device
+ * (`ExtractButton.tsx`; the settings card `Screenshot-Import` explains what the model needs, with the current state):
  *   - this build has the cloud (`cloudEnabled()`: web build with Supabase env, not `file://`),
  *   - a user is signed in (the function needs a login and a plan check),
  *   - the plan includes `shotExtract` (always true while payments are not set up),
  *   - the server reports `enabled` (an `ANTHROPIC_API_KEY` is set) – asked once per session. A server that does not
  *     answer is NOT "off": it is its own state (`server-error`, asked again next time), so the settings card never claims
  *     a missing key it did not see. `enabled` only says a key is set, not that Anthropic accepts it – that shows on use.
- * Without any of it the journal is unchanged: pictures are stored as before and the values are typed by hand.
+ * Without any of it the pictures are stored as before and the local reader (`src/journal/ocr/`) fills the form on the device.
  */
 import { useEffect, useState } from "react";
 import { useEntitlement } from "@/billing/entitlements";
@@ -67,7 +67,7 @@ export const useShotExtractAvailable = (): boolean => useShotExtractState() === 
 /** German explanation of a state for the settings card. */
 export const SHOT_EXTRACT_STATE_TEXT: Record<ShotExtractState, string> = {
   checking: "Wird geprüft …",
-  ready: "Verfügbar: Auf dem Server ist ein KI-Schlüssel hinterlegt, im Trade-Formular unter „Screenshots“ erscheint „Aus Screenshot übernehmen“. Ob Anthropic den Schlüssel annimmt, zeigt sich erst beim Auslesen.",
+  ready: "Verfügbar: Auf dem Server ist ein KI-Schlüssel hinterlegt, „Aus Screenshot übernehmen“ im Trade-Formular (unter „Screenshots“) liest neue Trades mit der KI. Ob Anthropic den Schlüssel annimmt, zeigt sich erst beim Auslesen.",
   "no-cloud": "Nicht verfügbar in dieser Ausgabe: Der Import braucht die Web-App mit Konto.",
   "signed-out": "Melde dich an, dann steht der Import zur Verfügung.",
   plan: "Gehört nicht zu deinem Tarif (Premium).",

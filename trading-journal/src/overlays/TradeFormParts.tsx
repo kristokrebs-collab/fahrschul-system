@@ -164,10 +164,12 @@ export interface FormToolbarProps {
   /** The sentence after a duplicate ("Vom letzten Trade übernommen: …"), "" before. */
   note: string;
   onCustomize: () => void;
+  /** After „Aus Screenshot übernehmen“ (local reader): what was taken, what to check, what was not entered. */
+  shotNote?: string;
 }
 
 /** The slim bar above the core: duplicate the last trade, open the field customiser, one honest sentence below. */
-export function FormToolbar({ canDuplicate, onDuplicate, note, onCustomize }: FormToolbarProps) {
+export function FormToolbar({ canDuplicate, onDuplicate, note, onCustomize, shotNote }: FormToolbarProps) {
   return (
     <StaggerItem data-testid="form-toolbar" className="grid gap-2 pb-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -183,6 +185,11 @@ export function FormToolbar({ canDuplicate, onDuplicate, note, onCustomize }: Fo
       {canDuplicate && (
         <p role="status" data-testid="duplicate-note" className="m-0 text-xs text-faint">
           {note || DUPLICATE_HINT}
+        </p>
+      )}
+      {shotNote && (
+        <p role="status" data-testid="shot-fill-note" className="m-0 text-xs leading-relaxed text-mute">
+          {shotNote}
         </p>
       )}
     </StaggerItem>

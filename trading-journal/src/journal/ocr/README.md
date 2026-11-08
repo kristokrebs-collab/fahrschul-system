@@ -24,13 +24,28 @@ candidates.ts  Extraction → `Candidate[]` (pnlMode "shot"), duplicates, zone
 pipeline.ts    readPicture / readPictures: the whole chain for one or many pictures (Node and browser)
 preview.ts     the preview model: rows, cells, live checks after every edit, derived fees, typed times
 commit.ts      buildTrade / commitTrades / undoCommit (sequential saveTrade; undo removes exactly what was written)
+fill.ts        one read trade → the OPEN trade form (`@/journal/editor/shotFill`): draft + a mark per field (read / derived / prüfen)
 duplicates.ts  trades already in the journal (same market / side / prices / quantity, time offset ≤ 14 h whole hours)
 truth.ts       scoring a reading against a known truth (used by the tests and `scripts/ocrCheck.ts`)
-store.ts       open / close of the sheet (lazy host: `src/journal/extract/ShotImportHost.tsx`)
+store.ts       open / close of the sheet (lazy host: `src/journal/extract/ShotImportHost.tsx`); target `trades` or `editor`
 browser.ts     decode (createImageBitmap, HEIC where the browser can), PNG blob encode, crops, engine start, support check
 node/          io.ts (jpeg-js / pngjs decode, PNG encode, language data cache), cli.ts (the report of scripts/ocrCheck.ts)
 ui/            OcrImportSheet.tsx (pick / reading / preview), PreviewList.tsx (rows, cells, original crop)
 ```
+
+## From the trade form („Aus Screenshot übernehmen“)
+
+The editor's screenshot field always offers „Aus Screenshot übernehmen“ once a picture is attached: the model when it is
+available (`src/journal/extract/availability.ts`, new trades), otherwise THIS reader – the line beside the button says which
+(„Liest auf diesem Gerät, ohne KI …“). The sheet opens with target `editor`, reads the form's own pictures at once and:
+one complete trade → fills the open form right away; several → the preview list with „Für dieses Formular“ per trade,
+„Übernehmen“ (only the chosen one) or „Alle N übernehmen“ (the others through `commit.ts`, duplicate check and undo as on the
+trades page). Cut-off cards are named, never offered. Every filled field carries a mark under it („Aus Screenshot“,
+„abgeleitet“, or yellow „bitte prüfen“ for doubtful / implausible / missing cells) until the trader changes it; nothing is
+saved before „Speichern“.
+
+An ROI that contradicts result, position value and leverage by ONE typically confused digit (5/6/8/9/3/0) is replaced by the
+fitting value and marked „korrigiert“ (`plausibility.ts` `glyphFix`, `records.ts` `correctRoi`); anything else keeps the warning.
 
 ## Engine files (self-hosted, no CDN)
 
@@ -87,6 +102,8 @@ recognised words (the format of `tests/fixtures/ocr/words-*.json`).
 | `tests/unit/ocr.layout.test.ts` | parser tables on OCR word lists (cards, tables, EN / DE, cut-off, inferred labels) |
 | `tests/unit/ocr.import.test.ts` | records → trades, plausibility, derived fees, preview model, commit / undo, duplicates |
 | `tests/unit/ocr.sheet.test.tsx` | the sheet in the DOM on the real screenshot's word list (fix a cell, write all, undo, deselect, paste) |
+| `tests/unit/ocr.fill.test.tsx` | ROI glyph repair (SOL case), the sheet from the trade form on the Bitget word list, `applyShotDraft` |
+| `tests/e2e/shot-fill-local.spec.ts` | the real Bitget screenshot in „Trade eintragen“: choice list, TRUMP into the form, marks, „Alle übernehmen“ |
 | `tests/unit/ocr.engine.test.ts` | REAL recognition in Node on the real screenshot and four rendered mocks, hit rate per field (~3 min) |
 | `tests/e2e/screenshotImport.spec.ts` | pick the real screenshot in a built app under the production CSP (mobile + desktop) |
 

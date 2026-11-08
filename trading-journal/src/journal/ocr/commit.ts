@@ -10,7 +10,7 @@ import { newTradeId } from "@/lib/ids";
 import type { Candidate } from "@/journal/extract/candidate";
 import { IMPORT_TAG, toDraft } from "@/journal/extract/draft";
 import { useJournal } from "@/store/journalStore";
-import type { ReadRecord } from "./records";
+import { correctionTexts, type ReadRecord } from "./records";
 
 export interface CommitContext {
   account: AccountId;
@@ -33,6 +33,7 @@ export function importNotes(c: Candidate, recs: readonly ReadRecord[], ctx: Pick
   if (r?.maxQty != null && r.nums.qty?.value != null && r.nums.qty.value < r.maxQty * 0.999) lines.push(`Nur ein Teil der Position: ${r.nums.qty.text} von ${money(r.maxQty)} geschlossen.`);
   if (recs.some((x) => x.side.derived)) lines.push("Die Richtung wurde aus Preisen und Ergebnis abgeleitet, nicht gelesen.");
   if (recs.some((x) => x.nums.pnl?.derived)) lines.push("Das Minus des Ergebnisses wurde aus der roten Farbe ergänzt, nicht gelesen.");
+  lines.push(...correctionTexts(recs));
   return [...new Set(lines)];
 }
 

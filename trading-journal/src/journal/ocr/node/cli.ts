@@ -40,8 +40,8 @@ export function describe(res: PipelineResult, opts: { words?: boolean; zone?: st
       for (const l of p.parsed.lines) out.push(`    ${String(l.i).padStart(3)} y${Math.round(l.cy)} ${l.segs.map((s) => `[${s.text} |${Math.round(s.conf)}${s.ink && s.ink !== "light" && s.ink !== "dim" ? ` ${s.ink}` : ""}]`).join(" ")}`);
     for (const r of pp.records) {
       out.push(`  ▸ ${r.symbol.text} ${r.side.value ?? "?"}${r.leverage ? ` ${r.leverage.value}x` : ""}${r.marginMode ? ` ${r.marginMode}` : ""} [${r.kind}${r.status ? `, ${r.status}` : ""}] (${pct(r.symbol.conf)})`);
-      const row = (k: string, f: { text: string; conf: number; notes: string[]; derived?: boolean } | undefined): void => {
-        if (f) out.push(`      ${k.padEnd(10)} ${f.text.padEnd(22)} ${pct(f.conf).padStart(4)}${f.conf < 0.7 ? "  ⚠ unsicher" : ""}${f.derived ? "  (abgeleitet)" : ""}${f.notes.length ? `  – ${f.notes.join("; ")}` : ""}`);
+      const row = (k: string, f: { text: string; conf: number; notes: string[]; derived?: boolean; corrected?: unknown } | undefined): void => {
+        if (f) out.push(`      ${k.padEnd(10)} ${f.text.padEnd(22)} ${pct(f.conf).padStart(4)}${f.conf < 0.7 ? "  ⚠ unsicher" : ""}${f.derived ? "  (abgeleitet)" : ""}${f.corrected ? "  (korrigiert)" : ""}${f.notes.length ? `  – ${f.notes.join("; ")}` : ""}`);
       };
       for (const k of ["entry", "exit", "qty", "price", "orderPrice", "fee", "funding", "pnl", "roi"] as const) row(k, r.nums[k]);
       for (const k of ["openTime", "closeTime", "time"] as const) row(k, r.times[k]);

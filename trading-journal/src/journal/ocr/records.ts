@@ -7,7 +7,7 @@
 import type { Side } from "@/domain/types";
 import { detectNumberStyle, parseShotNumber, type NumberStyle } from "@/journal/extract/numbers";
 import type { RawCell, RawRecord, ParsedPage } from "./layout";
-import { checkRecord, leverageFromRoi, type Plausibility } from "./plausibility";
+import { checkRecord, glyphFix, leverageFromRoi, type Plausibility } from "./plausibility";
 import { cleanNumberText, cleanTimeText, hasSign, isFullTime } from "./text";
 import type { Box } from "./types";
 import { baseAsset, parseLeverageToken, type FieldId, type ViewId } from "./vocab";
@@ -24,6 +24,11 @@ export interface RField {
   notes: string[];
   /** The value does not come from a reading of this field (sign from colour, fees from the difference …). */
   derived?: boolean;
+  /**
+   * The reading contradicted the other numbers and ONE typically confused digit was replaced so it fits them (`glyphFix`):
+   * the text as read and the swapped digits. Shown as „korrigiert“, never silently.
+   */
+  corrected?: { read: string; from: string; to: string };
 }
 
 export type NumField = "entry" | "exit" | "qty" | "price" | "orderPrice" | "fee" | "funding" | "pnl" | "roi";
@@ -172,6 +177,35 @@ function timeField(cell: RawCell): RField {
   return { text: cleaned.text, conf, value: null, box: cell.box, notes };
 }
 
+const fmtPct = (v: number): string => new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(v);
+
+/**
+ * Repairs the ROI field in place when it contradicts the other numbers by ONE confused digit (`glyphFix`); returns whether it did.
+ * Only a plain mismatch is repaired – a contradicting SIGN is never a glyph confusion.
+ */
+export function correctRoi(roi: RField | undefined, p: Plausibility, style: NumberStyle | null): boolean {
+  if (!roi || roi.value == null || p.roiOk !== false || p.roiExpected == null || Math.sign(roi.value) !== Math.sign(p.roiExpected)) return false;
+  const fix = glyphFix(roi.text, p.roiExpected, (t) => parseShotNumber(cleanNumberText(t).text, style)?.value ?? null);
+  if (!fix) return false;
+  const read = roi.text;
+  roi.corrected = { read, from: fix.from, to: fix.to };
+  roi.text = fix.text;
+  roi.value = fix.value;
+  roi.conf = Math.max(roi.conf, 0.8);
+  roi.notes = [...roi.notes, `korrigiert: gelesen „${read}“, ${fmtPct(fix.value)} % passt zu Ergebnis, Positionswert und Hebel (eine Ziffer verwechselt: ${fix.from} → ${fix.to})`];
+  return true;
+}
+
+/** The repairs of a trade's records as sentences („ROI korrigiert: …“) – for the preview, the editor and the trade's notes. */
+export function correctionTexts(recs: readonly ReadRecord[]): string[] {
+  const out: string[] = [];
+  for (const r of recs) {
+    const roi = r.nums.roi;
+    if (roi?.corrected && roi.value != null) out.push(`ROI korrigiert: gelesen „${roi.corrected.read}“, ${fmtPct(roi.value)} % passt zu Ergebnis, Positionswert und Hebel (eine Ziffer verwechselt: ${roi.corrected.from} → ${roi.corrected.to}).`);
+  }
+  return [...new Set(out)];
+}
+
 const NUM_FIELDS: readonly NumField[] = ["entry", "exit", "qty", "price", "orderPrice", "fee", "funding", "pnl", "roi"];
 const TIME_FIELDS: readonly TimeField[] = ["openTime", "closeTime", "time"];
 
@@ -248,13 +282,18 @@ function readOne(raw: RawRecord, i: number, view: ViewId, style: NumberStyle | n
       plausibility = checkRecord({ side: s, entry: nums.entry.value, exit: nums.exit.value, qty: nums.qty?.value ?? null, pnl: nums.pnl.value, roi: nums.roi?.value ?? null, leverage: leverage?.value ?? null, fee: null });
     }
   }
-  // a result that sits where the others do, with an ROI that agrees with it, is confirmed by that
-  if (plausibility.roiOk === true && nums.pnl?.notes.some((n) => /Zeilenbezeichnung/.test(n))) {
+  // an ROI that contradicts result, position value and leverage while ONE typically confused digit (5/6/8/9/3/0) makes it fit:
+  // the fitting value is taken and marked „korrigiert“ (the engine read „-6.96 %“ for „-6.56 %“); anything else keeps the warning
+  const roiCorrected = correctRoi(nums.roi, plausibility, style);
+  if (roiCorrected) plausibility = checkRecord({ side: side.value, entry: nums.entry?.value ?? null, exit: nums.exit?.value ?? null, qty: nums.qty?.value ?? null, pnl: nums.pnl?.value ?? null, roi: nums.roi?.value ?? null, leverage: leverage?.value ?? null, fee: nums.fee?.value ?? null });
+  // a result that sits where the others do, with an ROI that agrees with it, is confirmed by that (not by an ROI that was
+  // itself repaired FROM the result – that would be circular)
+  if (!roiCorrected && plausibility.roiOk === true && nums.pnl?.notes.some((n) => /Zeilenbezeichnung/.test(n))) {
     nums.pnl.conf = Math.max(nums.pnl.conf, 0.85);
     nums.pnl.notes = ["Zeile nach den anderen Karten zugeordnet – durch den ROI bestätigt"];
   }
-  // the leverage the ROI proves confirms an uncertain reading
-  const proven = leverageFromRoi(plausibility);
+  // the leverage the ROI proves confirms an uncertain reading (again: not a repaired ROI)
+  const proven = roiCorrected ? null : leverageFromRoi(plausibility);
   if (leverage && proven != null && proven === leverage.value && leverage.conf < 0.85) {
     leverage.conf = 0.9;
     leverage.notes = [`durch ROI bestätigt (${proven}×)`];

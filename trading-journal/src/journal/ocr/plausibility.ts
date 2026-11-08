@@ -130,6 +130,43 @@ export function checkRecord(i: PlausibilityInput): Plausibility {
   return out;
 }
 
+/** Digits the engine typically confuses with each other (closed / half-closed round glyphs). */
+export const CONFUSABLE_DIGITS = "035689";
+
+export interface GlyphFix {
+  value: number;
+  /** The text with the one digit replaced. */
+  text: string;
+  /** The digit as read and the digit that fits. */
+  from: string;
+  to: string;
+}
+
+/**
+ * A number that does not fit the others, repaired by ONE typical glyph confusion – or `null`. Every single digit of `text`
+ * from `CONFUSABLE_DIGITS` is swapped for each of the others; the swap is taken only when exactly ONE of them lands on
+ * `expected` within the precision of the printed number (one unit of its last decimal, at least 0.4 % of the value). Two
+ * digits wrong, a different sign or several fitting swaps → no repair (the caller keeps its warning). Pure.
+ */
+export function glyphFix(text: string, expected: number, parse: (t: string) => number | null): GlyphFix | null {
+  if (!Number.isFinite(expected)) return null;
+  const decimals = /[.,](\d+)\D*$/.exec(text)?.[1]?.length ?? 0;
+  const tol = Math.max(10 ** -decimals, Math.abs(expected) * 0.004);
+  const hits: GlyphFix[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    if (!CONFUSABLE_DIGITS.includes(ch)) continue;
+    for (const alt of CONFUSABLE_DIGITS) {
+      if (alt === ch) continue;
+      const t = `${text.slice(0, i)}${alt}${text.slice(i + 1)}`;
+      const v = parse(t);
+      if (v == null || Math.sign(v) !== Math.sign(expected) || Math.abs(v - expected) > tol) continue;
+      hits.push({ value: v, text: t, from: ch, to: alt });
+    }
+  }
+  return hits.length === 1 ? hits[0]! : null;
+}
+
 /** Leverage the ROI proves: the integer that fits within rounding, or `null` – used to confirm a leverage reading. */
 export function leverageFromRoi(p: Pick<Plausibility, "leverageImplied">): number | null {
   const v = p.leverageImplied;

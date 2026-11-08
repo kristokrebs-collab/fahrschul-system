@@ -30,6 +30,7 @@ import { PsychSection } from "@/journal/editor/PsychSection";
 import { VoiceNote } from "@/journal/editor/LazyVoiceNote";
 import { JOURNAL_MESSAGES, dropEmptyJournalKeys, fillFix, journalDefaults, journalFromTrade, journalKey, journalRecord, journalReset, openRemainderMessage, statusAfterFills, validateJournal, type JournalForm } from "@/journal/editor/form";
 import { ShotsField } from "@/journal/screenshots/ShotsField";
+import { clearShotFill, markText, useShotFill, type FillKey, type FillMark } from "@/journal/editor/shotFill";
 import { RatingDots } from "@/journal/ui/RatingDots";
 import { TagInput, tagSuggestions } from "@/journal/ui/TagInput";
 import { winCelebration } from "./celebration";
@@ -295,6 +296,53 @@ export function draftExtras(draft: TradeDraft | undefined): Partial<Trade> {
   return out as Partial<Trade>;
 }
 
+/**
+ * „Aus Screenshot übernehmen“ (local reader) into the OPEN form: every field the draft carries is set, everything else the
+ * trader typed stays; the import notes are appended to the notes (a previous screenshot's block is replaced, not stacked),
+ * the import tag joins the tags. Pure.
+ */
+export function applyShotDraft(d: TradeFormStrings, t: TradeFormTyped, draft: TradeDraft, prevNotes = ""): { d: TradeFormStrings; t: TradeFormTyped } {
+  const nd = { ...d };
+  if (draft.date) nd.date = draft.date.slice(0, 16);
+  if (draft.pair) nd.pair = draft.pair;
+  for (const k of ["entry", "stop", "target", "exit", "size", "leverage", "fees", "pnlManual"] as const) if (draft[k] != null) nd[k] = toInputString(draft[k]);
+  if (draft.notes) {
+    const own = (prevNotes && nd.notes.includes(prevNotes) ? nd.notes.replace(prevNotes, "") : nd.notes).trim();
+    nd.notes = own ? `${own}\n${draft.notes}` : draft.notes;
+  }
+  const from = journalFromTrade(draft);
+  const j: JournalForm = { ...t.j };
+  if (draft.exitDate) j.exitDate = from.exitDate;
+  if (draft.qty != null) j.qty = from.qty;
+  if (draft.fundingFees != null) j.fundingFees = from.fundingFees;
+  if (draft.plannedEntry != null) j.plannedEntry = from.plannedEntry;
+  if (draft.market) j.market = from.market;
+  if (draft.marginMode) j.marginMode = from.marginMode;
+  if (draft.exchange) j.exchange = from.exchange;
+  if (draft.fills?.length) j.fills = from.fills;
+  if (draft.targets?.length) j.targets = from.targets;
+  if (draft.tags?.length) j.tags = [...new Set([...t.j.tags, ...draft.tags])];
+  return { d: nd, t: { ...t, side: draft.side ?? t.side, status: draft.status ?? t.status, j } };
+}
+
+/** The value a filled field shows (its mark stays while the field still shows it; a field the picture lacked: while it is empty). */
+export function shotFieldValue(d: TradeFormStrings, t: TradeFormTyped, k: FillKey): string {
+  switch (k) {
+    case "side":
+      return t.side;
+    case "exitDate":
+    case "qty":
+    case "market":
+    case "marginMode":
+      return t.j[k];
+    default:
+      return d[k];
+  }
+}
+
+/** Where a filled field lives in the form layout (the „Ausführung“ block holds four of them). */
+const FILL_FIELD: Record<FillKey, FieldId> = { pair: "pair", side: "side", date: "date", entry: "entry", exit: "exit", size: "size", leverage: "leverage", fees: "fees", pnlManual: "pnlManual", exitDate: "execution", qty: "execution", market: "execution", marginMode: "execution" };
+
 /** `Speichern & neu` reset (Plan 6.5): keeps date (renewed), pair, account, side, leverage, timeframe. */
 export function resetForNext(d: TradeFormStrings, t: TradeFormTyped): { d: TradeFormStrings; t: TradeFormTyped } {
   return {
@@ -548,6 +596,13 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   /** A jump to a field in a closed group: the group opens without animation first, then the field is focused. */
   const [reveal, setReveal] = useState<{ dom: string; nonce: number } | null>(null);
   const [snapGroup, setSnapGroup] = useState<GroupId | null>(null);
+  /**
+   * „Aus Screenshot übernehmen“ (local reader): what the last screenshot filled – marks per field, the value each field was
+   * given (a mark goes away once the trader changes that field), the sentence above the form and the notes block it added.
+   */
+  const [shot, setShot] = useState<{ marks: Partial<Record<FillKey, FillMark>>; values: Partial<Record<FillKey, string>>; note: string; notes: string } | null>(null);
+  const shotFill = useShotFill((s) => s.fill);
+  const shotSeq = useRef(0);
   const entryRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const alertRef = useRef<HTMLSpanElement>(null);
@@ -562,6 +617,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   useLayoutEffect(() => {
     if (session == null) {
       initialised.current = null;
+      clearShotFill();
       return;
     }
     if (initialised.current === session) return;
@@ -583,10 +639,45 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     setResetNote("");
     setReveal(null);
     setSnapGroup(null);
+    setShot(null);
+    shotSeq.current = useShotFill.getState().fill?.seq ?? 0;
     // a pre-filled draft (screenshot import, box setup …) opens the groups that hold its values, so nothing it filled is
     // hidden from the trader's check; a blank form and a stored trade start compact (the badges say what is inside)
     setOpenGroups(draft ? groupsWithValues(layout, filledOf(init.d, init.t, settings, true)) : []);
   }, [session, trade, draft, settings, acc, layout]);
+
+  // a screenshot read on this device fills the OPEN form (`ShotsField` → local reader → `fillEditorFromShot`): once per fill
+  useLayoutEffect(() => {
+    if (!shotFill || !editor.open || shotSeq.current === shotFill.seq) return;
+    shotSeq.current = shotFill.seq;
+    const next = applyShotDraft(d, t, shotFill.draft, shot?.notes ?? "");
+    setD(next.d);
+    setT(next.t);
+    const keys = Object.keys(shotFill.marks) as FillKey[];
+    setShot({ marks: shotFill.marks, values: Object.fromEntries(keys.map((k) => [k, shotFieldValue(next.d, next.t, k)])), note: shotFill.note, notes: shotFill.draft.notes ?? "" });
+    setInvalid(null);
+    setErr("");
+    // the groups holding a filled field open (as for a draft), nothing else moves
+    const ids = keys.map((k) => FILL_FIELD[k]);
+    setOpenGroups((o) => [...new Set([...o, ...groupsWithValues(layout, ids)])]);
+    clearShotFill();
+  }, [shotFill, editor.open, d, t, shot, layout]);
+  /** The mark of a filled field while it still shows the value the screenshot gave it. */
+  const shotMark = (k: FillKey): FillMark | null => {
+    const m = shot?.marks[k];
+    if (!m) return null;
+    return shotFieldValue(d, t, k) === (shot!.values[k] ?? "") ? m : null;
+  };
+  const shotHelp = (k: FillKey, fallback?: ReactNode): ReactNode => {
+    const m = shotMark(k);
+    if (!m) return fallback;
+    return (
+      <span data-testid={`shot-mark-${k}`} data-state={m.state} className={m.state === "review" ? "font-medium text-warn" : "text-mute"}>
+        {markText(m)}
+      </span>
+    );
+  };
+  const shotReview = (k: FillKey): boolean => shotMark(k)?.state === "review";
 
   const rec = useMemo(() => toRecord(d, t), [d, t]);
   const x = useMemo(() => deriveTrade(rec), [rec]);
@@ -973,7 +1064,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     const fixed = k === "entry" || k === "exit" ? fromFills(k) : null;
     const disabled = (k === "exit" && isOpen) || fixed != null;
     return (
-      <Field key={k} label={label} htmlFor={"f-" + k} help={fixed != null ? "Ø aus den Fills" : undefined}>
+      <Field key={k} label={label} htmlFor={"f-" + k} help={k === "entry" || k === "exit" ? shotHelp(k, fixed != null ? "Ø aus den Fills" : undefined) : fixed != null ? "Ø aus den Fills" : undefined}>
         <div className={cn(live && "grid gap-1.5")}>
           <Input
             id={"f-" + k}
@@ -983,6 +1074,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
             value={fixed ?? d[k]}
             onChange={setStr(k)}
             disabled={disabled}
+            className={cn((k === "entry" || k === "exit") && shotReview(k) && "border-warn/60")}
             {...(k === "entry" || k === "exit" ? fieldInvalid(k) : {})}
           />
           {live && <LivePriceButton price={livePrice} label={livePriceLabel} disabled={disabled} onApply={() => applyLive(k)} />}
@@ -1011,12 +1103,12 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   // ---- every movable unit of the form as a node; WHERE it is shown is decided by `layout` (core / accordion group)
   const blocks: Record<FieldId, ReactNode> = {
     pair: (
-      <Field label="Paar" htmlFor="f-pair">
-        <Input id="f-pair" value={d.pair} onChange={setStr("pair")} autoComplete="off" />
+      <Field label="Paar" htmlFor="f-pair" help={shotHelp("pair")}>
+        <Input id="f-pair" value={d.pair} onChange={setStr("pair")} autoComplete="off" className={cn(shotReview("pair") && "border-warn/60")} />
       </Field>
     ),
     side: (
-      <Field label="Richtung">
+      <Field label="Richtung" help={shotHelp("side")}>
         <Segmented<Side>
           aria-label="Richtung"
           value={t.side}
@@ -1030,8 +1122,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
       </Field>
     ),
     date: (
-      <Field label="Datum & Uhrzeit" htmlFor="f-date">
-        <Input id="f-date" type="datetime-local" value={d.date} onChange={setStr("date")} {...fieldInvalid("date")} />
+      <Field label="Datum & Uhrzeit" htmlFor="f-date" help={shotHelp("date")}>
+        <Input id="f-date" type="datetime-local" value={d.date} onChange={setStr("date")} className={cn(shotReview("date") && "border-warn/60")} {...fieldInvalid("date")} />
       </Field>
     ),
     account: (
@@ -1073,23 +1165,32 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     target: priceField("target", "Take-Profit"),
     exit: priceField("exit", "Ausstieg"),
     size: (
-      <Field label={`Größe (${cur})`} htmlFor="f-size" help={fix ? "Aus den Fills" : "Positionswert inkl. Hebel"}>
-        <Input id="f-size" numeric autoComplete="off" value={fromFills("size") ?? d.size} onChange={setStr("size")} disabled={fix != null} {...fieldInvalid("size")} />
+      <Field label={`Größe (${cur})`} htmlFor="f-size" help={fix ? "Aus den Fills" : shotHelp("size", "Positionswert inkl. Hebel")}>
+        <Input id="f-size" numeric autoComplete="off" value={fromFills("size") ?? d.size} onChange={setStr("size")} disabled={fix != null} className={cn(shotReview("size") && "border-warn/60")} {...fieldInvalid("size")} />
       </Field>
     ),
     leverage: (
-      <Field label="Hebel" htmlFor="f-lev" suffix="x" help={leverageOver ? <span className="font-medium text-warn">{LEVERAGE_WARNING[account]}</span> : LEVERAGE_HELP[account]}>
-        <Input id="f-lev" numeric autoComplete="off" value={d.leverage} onChange={setStr("leverage")} placeholder="z. B. 4" className={cn(leverageOver && "border-warn/60")} />
+      <Field label="Hebel" htmlFor="f-lev" suffix="x" help={
+          leverageOver ? (
+            <>
+              <span className="font-medium text-warn">{LEVERAGE_WARNING[account]}</span>
+              {shotMark("leverage") && <> · {shotHelp("leverage")}</>}
+            </>
+          ) : (
+            shotHelp("leverage", LEVERAGE_HELP[account])
+          )
+        }>
+        <Input id="f-lev" numeric autoComplete="off" value={d.leverage} onChange={setStr("leverage")} placeholder="z. B. 4" className={cn((leverageOver || shotReview("leverage")) && "border-warn/60")} />
       </Field>
     ),
     fees: (
-      <Field label={`Gebühren (${cur})`} htmlFor="f-fees">
-        <Input id="f-fees" numeric autoComplete="off" value={d.fees} onChange={setStr("fees")} placeholder="0" />
+      <Field label={`Gebühren (${cur})`} htmlFor="f-fees" help={shotHelp("fees")}>
+        <Input id="f-fees" numeric autoComplete="off" value={d.fees} onChange={setStr("fees")} placeholder="0" className={cn(shotReview("fees") && "border-warn/60")} />
       </Field>
     ),
     pnlManual: (
-      <Field label="P&L manuell" htmlFor="f-pnl" help="Leer = wird berechnet" suffix={cur}>
-        <Input id="f-pnl" numeric autoComplete="off" value={d.pnlManual} onChange={setStr("pnlManual")} placeholder="automatisch" />
+      <Field label="P&L manuell" htmlFor="f-pnl" help={shotHelp("pnlManual", "Leer = wird berechnet")} suffix={cur}>
+        <Input id="f-pnl" numeric autoComplete="off" value={d.pnlManual} onChange={setStr("pnlManual")} placeholder="automatisch" className={cn(shotReview("pnlManual") && "border-warn/60")} />
       </Field>
     ),
     signal: (
@@ -1101,7 +1202,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     execution: (
       <div id="fb-execution" tabIndex={-1} className="outline-none">
         <BlockHead title="Ausführung" sub="Fills, Teil-Exits, Funding, Margin – alles optional" />
-        <ExecutionSection j={t.j} onChange={patchJ} side={t.side} status={t.status} date={d.date} entry={rec.entry} stop={rec.stop} currency={cur} />
+        <ExecutionSection j={t.j} onChange={patchJ} side={t.side} status={t.status} date={d.date} entry={rec.entry} stop={rec.stop} currency={cur} marks={{ exitDate: shotMark("exitDate"), qty: shotMark("qty"), market: shotMark("market"), marginMode: shotMark("marginMode") }} />
       </div>
     ),
     setups: (
@@ -1280,7 +1381,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
       <form id="trade-form" ref={formRef} onSubmit={onSubmit} noValidate>
         {/* while `Felder anpassen` is open the form stays mounted (state, live check, validation) but hidden */}
         <div hidden={customizing}>
-          <FormToolbar canDuplicate={!trade && last != null} onDuplicate={duplicateLast} note={dupNote} onCustomize={() => setCustomizing(true)} />
+          <FormToolbar canDuplicate={!trade && last != null} onDuplicate={duplicateLast} note={dupNote} onCustomize={() => setCustomizing(true)} shotNote={shot?.note} />
 
           <CoreSection>
             {coreFields.length > 0 && <ZoneGrid fields={coreFields} render={render} />}

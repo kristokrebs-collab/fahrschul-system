@@ -302,7 +302,7 @@ test.describe("Screenshot-Import: Orderhistorie (2 Schließungen + 1 Eröffnung)
     await expect(page.getByTestId("extract-trade")).toHaveCount(0);
   });
 
-  test("Einstellungen: ohne KI-Schlüssel steht der Grund da, der Knopf fehlt im Editor", async ({ page }) => {
+  test("Einstellungen: ohne KI-Schlüssel steht der Grund da, der Knopf im Editor liest auf dem Gerät", async ({ page }) => {
     await start(page, { enabled: false });
     await page.goto(cloudUrl("settings"));
     const note = page.getByTestId("settings-shot-extract");
@@ -314,7 +314,8 @@ test.describe("Screenshot-Import: Orderhistorie (2 Schließungen + 1 Eröffnung)
     const editor = page.getByRole("dialog", { name: "Trade eintragen" });
     await editor.locator('input[type="file"]').setInputFiles({ name: "a.png", mimeType: "image/png", buffer: PNG });
     await expect(editor.getByRole("button", { name: "Screenshot 1 öffnen" })).toBeVisible();
-    await expect(editor.getByTestId("extract-open")).toHaveCount(0);
+    await expect(editor.getByTestId("extract-action")).toHaveAttribute("data-reader", "local");
+    await expect(editor.getByTestId("extract-reader")).toContainText("ohne KI");
   });
 
   test("Einstellungen: Server antwortet nicht → „Status unbekannt“ statt der Behauptung, es fehle ein Schlüssel", async ({ page }) => {

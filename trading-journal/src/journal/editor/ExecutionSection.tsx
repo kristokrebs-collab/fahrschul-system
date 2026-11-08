@@ -12,6 +12,7 @@ import { Field, Input, Segmented } from "@/primitives";
 import { AutoHeight } from "@/views/trades/AutoHeight";
 import { FillsBar } from "../ui/FillsBar";
 import { fillsOf, newFillRow, newStopRow, newTargetRow, originEditable, type FillRow, type JournalForm, type StopRow, type TargetRow } from "./form";
+import { markText, type FillMark } from "./shotFill";
 
 export interface ExecutionSectionProps {
   j: JournalForm;
@@ -23,6 +24,18 @@ export interface ExecutionSectionProps {
   entry: number | null;
   stop: number | null;
   currency: string;
+  /** „Aus Screenshot übernehmen“: the marks of the fields of this block that still show the screenshot's value. */
+  marks?: Partial<Record<"exitDate" | "qty" | "market" | "marginMode", FillMark | null>>;
+}
+
+/** The help line of a field: the screenshot mark while there is one, else the usual help. */
+function markHelp(m: FillMark | null | undefined, fallback: ReactNode, key: string): ReactNode {
+  if (!m) return fallback;
+  return (
+    <span data-testid={`shot-mark-${key}`} data-state={m.state} className={m.state === "review" ? "font-medium text-warn" : "text-mute"}>
+      {markText(m)}
+    </span>
+  );
 }
 
 type Tab = "fills" | "targets" | "stops";
@@ -87,7 +100,7 @@ const ROW: Variants = {
  * rows enter on `spring.enter`, the stats line counts), the take-profit ladder (with a mini ladder of entry, stop and the
  * rungs) and the stop history. Everything is optional; untouched it writes nothing.
  */
-export function ExecutionSection({ j, onChange, side, status, date, entry, stop, currency }: ExecutionSectionProps) {
+export function ExecutionSection({ j, onChange, side, status, date, entry, stop, currency, marks }: ExecutionSectionProps) {
   const [tab, setTab] = useState<Tab>(j.fills.length ? "fills" : j.targets.length ? "targets" : j.stops.length ? "stops" : "fills");
   const open = status === "open";
   const set = (k: keyof JournalForm) => (e: { target: { value: string } }) => onChange({ [k]: e.target.value } as Partial<JournalForm>);
@@ -96,16 +109,16 @@ export function ExecutionSection({ j, onChange, side, status, date, entry, stop,
   return (
     <div className="grid gap-3.5">
       <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
-        <Field label="Ausstiegszeit" htmlFor="f-exit-date" className="col-span-2" help={open ? "Erst beim Schließen" : "Für Haltedauer und MAE/MFE"}>
-          <Input id="f-exit-date" type="datetime-local" value={j.exitDate} onChange={set("exitDate")} disabled={open} />
+        <Field label="Ausstiegszeit" htmlFor="f-exit-date" className="col-span-2" help={markHelp(marks?.exitDate, open ? "Erst beim Schließen" : "Für Haltedauer und MAE/MFE", "exitDate")}>
+          <Input id="f-exit-date" type="datetime-local" value={j.exitDate} onChange={set("exitDate")} disabled={open} className={cn(marks?.exitDate?.state === "review" && "border-warn/60")} />
         </Field>
-        <Field label="Menge" htmlFor="f-qty" help="Stück / Kontrakte">
-          <Input id="f-qty" numeric autoComplete="off" value={j.qty} onChange={set("qty")} placeholder="aus Größe" />
+        <Field label="Menge" htmlFor="f-qty" help={markHelp(marks?.qty, "Stück / Kontrakte", "qty")}>
+          <Input id="f-qty" numeric autoComplete="off" value={j.qty} onChange={set("qty")} placeholder="aus Größe" className={cn(marks?.qty?.state === "review" && "border-warn/60")} />
         </Field>
         <Field label={`Funding (${currency})`} htmlFor="f-funding" help="+ bezahlt · − erhalten">
           <Input id="f-funding" numeric autoComplete="off" value={j.fundingFees} onChange={set("fundingFees")} placeholder="0" />
         </Field>
-        <Field label="Markt" className="col-span-2">
+        <Field label="Markt" className="col-span-2" help={markHelp(marks?.market, undefined, "market")}>
           <Segmented<MarketKind>
             aria-label="Markt"
             size="sm"
@@ -117,7 +130,7 @@ export function ExecutionSection({ j, onChange, side, status, date, entry, stop,
             ]}
           />
         </Field>
-        <Field label="Margin-Modus" className="col-span-2">
+        <Field label="Margin-Modus" className="col-span-2" help={markHelp(marks?.marginMode, undefined, "marginMode")}>
           <Segmented<MarginMode>
             aria-label="Margin-Modus"
             size="sm"

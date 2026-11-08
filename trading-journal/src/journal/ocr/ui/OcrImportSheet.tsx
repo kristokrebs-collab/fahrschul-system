@@ -22,6 +22,8 @@ import type { OcrEngine } from "../engine";
 import { combine, readPicture } from "../pipeline";
 import { applyOcrEdits, previewRows, type OcrEdit } from "../preview";
 import type { PageRecords } from "../records";
+import { fillEditorFromShot } from "@/journal/editor/shotFill";
+import { shotFillOf } from "../fill";
 import { closeScreenshotImport, useOcrImport } from "../store";
 import type { OcrExtraction } from "../toExtraction";
 import type { Raster } from "../types";
@@ -51,6 +53,7 @@ export const OCR_STRINGS = {
   zone: "Zeitzone der Screenshots",
   zoneAuto: "Wie in der Börsen-App – ich nehme deine Zeit an",
   account: "Konto",
+  accountOthers: "Konto der übrigen Trades",
   commit: (n: number) => (n === 1 ? "Trade eintragen" : `Alle ${n} Trades eintragen`),
   commitNone: "Keinen Trade ausgewählt",
   written: (n: number) => (n === 1 ? "1 Trade eingetragen" : `${n} Trades eingetragen`),
@@ -61,6 +64,17 @@ export const OCR_STRINGS = {
   engineOcr: "Auf diesem Gerät (nichts verlässt es)",
   engineLabel: "Lesen mit",
   advice: "Keine professionelle Finanzberatung.",
+  // opened from the trade form („Aus Screenshot übernehmen“ without the model)
+  formTitle: "Aus Screenshot übernehmen",
+  formLead: "Der Screenshot deines Trades wird auf diesem Gerät gelesen, ohne KI. Einstieg, Ausstieg, Menge, Hebel, Zeiten und Ergebnis kommen ins Formular – gespeichert wird erst, wenn du dort auf „Speichern“ drückst.",
+  formLoading: "Die Bilder des Formulars werden geladen …",
+  formNoPicture: "Die Bilder dieses Trades ließen sich nicht laden. Wähle den Screenshot hier noch einmal.",
+  formPickHint: (n: number) => `${n} Trades auf dem Screenshot – wähle den für dieses Formular. „Alle übernehmen“ trägt die übrigen direkt ins Journal ein (mit „Rückgängig“).`,
+  formFill: "Übernehmen",
+  formFillAll: (n: number) => `Alle ${n} übernehmen`,
+  formFilled: "Werte aus dem Screenshot eingetragen",
+  formFilledDetail: (review: number) => (review ? `${review === 1 ? "1 Feld ist" : `${review} Felder sind`} gelb markiert – bitte prüfen, dann „Speichern“.` : "Prüf die markierten Werte, dann „Speichern“."),
+  formOthers: (n: number) => (n === 1 ? "1 weiterer Trade eingetragen" : `${n} weitere Trades eingetragen`),
 } as const;
 const S = OCR_STRINGS;
 
@@ -83,6 +97,9 @@ export default function OcrImportSheet() {
   const open = useOcrImport((s) => s.open);
   const seq = useOcrImport((s) => s.seq);
   const handed = useOcrImport((s) => s.files);
+  const target = useOcrImport((s) => s.target);
+  const formShots = useOcrImport((s) => s.shots);
+  const forForm = target === "editor";
   const trades = useJournal((s) => s.trades);
   const currency = useJournal((s) => s.settings.currency);
   const acc = useUi((s) => s.acc);
@@ -105,6 +122,12 @@ export default function OcrImportSheet() {
   const [dragging, setDragging] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [busyWrite, setBusyWrite] = useState(false);
+  /** Target `editor`: the trade that fills the form (default: the first one that can be written). */
+  const [formId, setFormId] = useState<string | null>(null);
+  /** Target `editor`: one complete trade fills the form right after the reading, without a stop in the list. */
+  const autoFill = useRef(false);
+  /** Target `editor`: the form's pictures were handed in – the reading starts once they are in the slots. */
+  const [pendingRead, setPendingRead] = useState(false);
 
   const engine = useRef<OcrEngine | null>(null);
   const rasters = useRef(new Map<string, Raster>());
@@ -146,6 +169,9 @@ export default function OcrImportSheet() {
     setCrops({});
     setAccount(acc === "makro" ? "makro" : "scalp");
     setBusyWrite(false);
+    setFormId(null);
+    setPendingRead(false);
+    autoFill.current = false;
   }, [acc, releaseUrls, stopEngine]);
 
   const close = useCallback(() => {
@@ -187,7 +213,43 @@ export default function OcrImportSheet() {
     reset();
     cancelled.current = false;
     if (handed.length) void addFiles(handed);
-  }, [open, seq, handed, reset, addFiles]);
+    if (forForm && formShots.length) {
+      // the form's own pictures (original bytes from this device or the cloud copy), read at once
+      const mine = seq;
+      setProgress({ fraction: 0, text: S.formLoading });
+      setPhase("reading");
+      void (async () => {
+        const { blobOfShot } = await import("@/journal/extract/client");
+        const files: File[] = [];
+        for (const [i, ref] of formShots.entries()) {
+          const b = await blobOfShot(ref).catch(() => null);
+          if (b) files.push(new File([b], `screenshot-${i + 1}.${(b.type.split("/")[1] || "png").replace("jpeg", "jpg")}`, { type: b.type || "image/png" }));
+        }
+        if (lastSeq.current !== mine) return;
+        if (!files.length) {
+          setMessage(S.formNoPicture);
+          setPhase("error");
+          return;
+        }
+        await addFiles(files);
+        if (lastSeq.current !== mine || cancelled.current) return;
+        // read once the pictures are rendered into the slots (the effect below)
+        setPendingRead(true);
+      })();
+    }
+  }, [open, seq, handed, reset, addFiles, forForm, formShots]);
+
+  /* target `editor`: the form's pictures are in – read them right away (one complete trade then fills the form) */
+  useEffect(() => {
+    if (!pendingRead) return;
+    setPendingRead(false);
+    if (!support.ok || !slots.some((x) => x.picture)) {
+      setPhase("pick");
+      return;
+    }
+    autoFill.current = true;
+    void readRef.current();
+  }, [pendingRead, slots, support.ok]);
 
   useEffect(() => () => {
     cancelled.current = true;
@@ -366,6 +428,67 @@ export default function OcrImportSheet() {
       });
   };
 
+  /* target `editor`: one trade fills the open form, the others may be written as before */
+  const defaultFormId = rows.find((r) => !r.blocked && !r.duplicate)?.id ?? rows[0]?.id ?? null;
+  const chosenId = formId != null && rows.some((r) => r.id === formId) ? formId : defaultFormId;
+  const others = forForm ? writable.filter((r) => r.id !== chosenId) : [];
+
+  const fillForm = (id: string | null): number | null => {
+    const r = rows.find((x) => x.id === id);
+    const c = r ? cands.find((x) => x.id === r.id) : null;
+    if (!r || !c) return null;
+    const recs = built?.recordsOf.get(c.id) ?? [];
+    const fill = shotFillOf(c, r, recs, { zoneText: zone.text, viewLabel, currency, incomplete: (extraction?.incomplete ?? []).map((x) => `${x.known.join(" · ") || "eine Karte"} – im Bild abgeschnitten, bitte den nächsten Ausschnitt anhängen`) });
+    fillEditorFromShot(fill);
+    return Object.values(fill.marks).filter((m) => m.state === "review").length;
+  };
+
+  const takeIntoForm = async (all: boolean): Promise<void> => {
+    if (busyWrite) return;
+    const toWrite = all ? others : [];
+    let written: string[] = [];
+    if (toWrite.length) {
+      setBusyWrite(true);
+      const ctx = { account, now: new Date(), zoneText: zone.text, viewLabel };
+      const out = [];
+      for (const r of toWrite) {
+        const c = cands.find((x) => x.id === r.id);
+        const b = c ? buildTrade(c, built?.recordsOf.get(c.id) ?? [], ctx, currency) : null;
+        if (b?.ok) out.push(b.trade);
+      }
+      const res = await commitTrades(out);
+      setBusyWrite(false);
+      written = res.ids;
+      if (res.failed) pushToast({ kind: "error", title: S.partial(res.ids.length, out.length) });
+    }
+    const review = fillForm(chosenId);
+    closeScreenshotImport();
+    pushToast({
+      kind: "success",
+      title: review == null ? S.formOthers(written.length) : S.formFilled,
+      detail: [review == null ? null : S.formFilledDetail(review), written.length ? `${S.formOthers(written.length)} (direkt ins Journal).` : null].filter(Boolean).join(" "),
+      duration: written.length ? 9000 : undefined,
+      ...(written.length
+        ? {
+            action: {
+              label: S.undo,
+              onClick: () => {
+                void undoCommit(written).then((n) => pushToast({ kind: "info", title: S.undone(n) }));
+              },
+            },
+          }
+        : null),
+    });
+  };
+  const takeRef = useRef(takeIntoForm);
+  takeRef.current = takeIntoForm;
+  // one complete trade (nothing missing, not in the journal yet) goes into the form right after the reading
+  useEffect(() => {
+    if (!forForm || phase !== "preview" || !autoFill.current) return;
+    autoFill.current = false;
+    if (rows.length === 1 && !rows[0]!.blocked && !rows[0]!.duplicate) void takeRef.current(false);
+  }, [forForm, phase, rows]);
+
   const removeSlot = (id: string): void => {
     const s = slots.find((x) => x.id === id);
     s?.picture?.bitmap.close?.();
@@ -396,12 +519,13 @@ export default function OcrImportSheet() {
       open={open}
       onClose={close}
       size="lg"
-      title={S.title}
+      title={forForm ? S.formTitle : S.title}
       dismissGuard={false}
       footer={
         <>
-          <span className="flex-1" />
-          <Button variant="ghost" onClick={busy ? cancelReading : close} data-testid="ocr-cancel">
+          <span className={cn("flex-1", phase === "preview" && forForm && others.length > 0 && "max-sm:hidden")} />
+          {/* phone, two actions for the form: they share one row (closing stays on the header's × and the swipe) */}
+          <Button variant="ghost" onClick={busy ? cancelReading : close} data-testid="ocr-cancel" className={cn(phase === "preview" && forForm && others.length > 0 && "max-sm:hidden")}>
             {busy ? S.cancel : phase === "preview" || phase === "error" ? S.close : S.cancel}
           </Button>
           {(phase === "pick" || phase === "error") && (
@@ -409,22 +533,34 @@ export default function OcrImportSheet() {
               {phase === "error" ? S.retry : S.read}
             </Button>
           )}
-          {phase === "preview" && (
+          {phase === "preview" && !forForm && (
             <Button variant="primary" disabled={!writable.length || busyWrite} onClick={() => void writeAll()} data-testid="ocr-commit">
               {writable.length ? S.commit(writable.length) : S.commitNone}
             </Button>
+          )}
+          {phase === "preview" && forForm && (
+            <span className={cn("flex gap-2.5", others.length > 0 && "max-sm:grid max-sm:w-full max-sm:grid-cols-2")}>
+              {others.length > 0 && (
+                <Button disabled={!chosenId || busyWrite} onClick={() => void takeIntoForm(true)} data-testid="ocr-fill-all">
+                  {S.formFillAll(others.length + 1)}
+                </Button>
+              )}
+              <Button variant="primary" disabled={!chosenId || busyWrite} onClick={() => void takeIntoForm(false)} data-testid="ocr-fill">
+                {S.formFill}
+              </Button>
+            </span>
           )}
         </>
       }
     >
       <input ref={fileInput} type="file" accept={IMAGE_ACCEPT} multiple className="sr-only" aria-label="Screenshots auswählen" onChange={onFiles} data-testid="ocr-file" tabIndex={-1} />
-      <div className="grid gap-4" data-testid="ocr-sheet" data-phase={phase} data-mode={mode}>
+      <div className="grid gap-4" data-testid="ocr-sheet" data-phase={phase} data-mode={mode} data-target={target}>
         {(phase === "pick" || phase === "error") && (
           <>
             <StaggerItem>
-              <p className="text-[13px] leading-relaxed text-mute">{S.lead}</p>
+              <p className="text-[13px] leading-relaxed text-mute">{forForm ? S.formLead : S.lead}</p>
             </StaggerItem>
-            {ai && (
+            {ai && !forForm && (
               <StaggerItem className="grid gap-1.5">
                 <span className="label !text-mute">{S.engineLabel}</span>
                 <Segmented
@@ -539,6 +675,11 @@ export default function OcrImportSheet() {
                 )}
               </p>
               <p className="mt-1 text-[12px] leading-relaxed text-faint">{mode === "ai" ? "Die KI hat gelesen – prüfe jede Zahl." : S.honest}</p>
+              {forForm && rows.length > 1 && (
+                <p className="mt-1 text-[12.5px] leading-relaxed text-mute" data-testid="ocr-form-hint">
+                  {S.formPickHint(rows.length)}
+                </p>
+              )}
               {pages.length > 0 && (
                 <p className="mt-1 text-[12px] text-faint">
                   Erkannt: {viewLabel}
@@ -591,8 +732,9 @@ export default function OcrImportSheet() {
                       {zone.text}
                     </p>
                   </div>
+                  {(!forForm || others.length > 0) && (
                   <div className="grid content-start gap-1.5">
-                    <span className="label !text-mute">{S.account}</span>
+                    <span className="label !text-mute">{forForm ? S.accountOthers : S.account}</span>
                     <Segmented
                       aria-label={S.account}
                       size="sm"
@@ -604,6 +746,7 @@ export default function OcrImportSheet() {
                       ]}
                     />
                   </div>
+                  )}
                 </StaggerItem>
                 {rows.map((r, i) => (
                   <StaggerItem key={r.id}>
@@ -616,6 +759,7 @@ export default function OcrImportSheet() {
                       onToggleOpen={() => setOpenIds((m) => ({ ...m, [r.id]: !(m[r.id] ?? (rows.length <= 2 || r.attention > 0 || !!r.blocked)) }))}
                       onTake={(on) => setTaken((m) => ({ ...m, [r.id]: on }))}
                       onEdit={(e) => setEdits((list) => [...list.filter((x) => !(x.id === e.id && x.kind === e.kind && (x.kind !== "field" || (e.kind === "field" && x.key === e.key)) && (x.kind !== "time" || (e.kind === "time" && x.key === e.key)))), e])}
+                      {...(forForm ? { formPick: { chosen: r.id === chosenId, onChoose: () => setFormId(r.id) } } : null)}
                     />
                   </StaggerItem>
                 ))}

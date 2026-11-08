@@ -20,6 +20,9 @@ export const LIST_STRINGS = {
   blocked: (why: string) => `Kann so nicht eingetragen werden: ${why}.`,
   attention: (n: number) => (n === 1 ? "1 Feld prüfen" : `${n} Felder prüfen`),
   ok: "alles gelesen",
+  corrected: "korrigiert",
+  formPick: "Für dieses Formular",
+  formPickLabel: (title: string) => `${title} in dieses Formular übernehmen`,
 } as const;
 const S = LIST_STRINGS;
 
@@ -39,9 +42,11 @@ interface RowProps {
   onTake: (on: boolean) => void;
   onEdit: (e: OcrEdit) => void;
   index: number;
+  /** Opened from the trade form: this row can be the one that fills the form (the others are written by „Alle übernehmen“). */
+  formPick?: { chosen: boolean; onChoose: () => void };
 }
 
-export function PreviewRowCard({ row, taken, cropUrl, open, onToggleOpen, onTake, onEdit, index }: RowProps) {
+export function PreviewRowCard({ row, taken, cropUrl, open, onToggleOpen, onTake, onEdit, index, formPick }: RowProps) {
   const [zoom, setZoom] = useState(false);
   const blocked = row.blocked;
   const state = row.attention ? "attention" : "ok";
@@ -53,6 +58,7 @@ export function PreviewRowCard({ row, taken, cropUrl, open, onToggleOpen, onTake
       data-id={row.id}
       data-taken={taken ? "1" : "0"}
       data-state={blocked ? "blocked" : state}
+      data-form={formPick?.chosen ? "1" : undefined}
     >
       <header className="flex items-start gap-3 px-3.5 py-3">
         <button
@@ -74,6 +80,7 @@ export function PreviewRowCard({ row, taken, cropUrl, open, onToggleOpen, onTake
             {row.status === "open" && <Badge tone="teal">Offen</Badge>}
             {row.duplicate && <Badge tone="warn">{S.duplicate}</Badge>}
             {row.attention > 0 ? <Badge tone="warn">{S.attention(row.attention)}</Badge> : <Badge tone="win">{S.ok}</Badge>}
+            {row.infos.length > 0 && <Badge tone="mute">{S.corrected}</Badge>}
           </div>
           <p className="mt-1 break-words font-mono text-[12.5px] text-mute" data-testid="ocr-summary-line">
             {summaryOf(row) || "—"}
@@ -82,6 +89,24 @@ export function PreviewRowCard({ row, taken, cropUrl, open, onToggleOpen, onTake
             <p className="mt-1.5 text-[12px] text-warn" role="status">
               {S.blocked(blocked)}
             </p>
+          )}
+          {formPick && (
+            <button
+              type="button"
+              aria-pressed={formPick.chosen}
+              aria-label={S.formPickLabel(row.title)}
+              onClick={formPick.onChoose}
+              data-testid="ocr-form-pick"
+              className={cn(
+                "mt-2 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12px] transition-colors pointer-coarse:min-h-11",
+                formPick.chosen ? "border-fg/70 bg-white/[0.07] text-fg" : "border-line-2 text-mute hover:border-white/40 hover:text-fg",
+              )}
+            >
+              <span aria-hidden="true" className={cn("grid size-3.5 place-items-center rounded-full border", formPick.chosen ? "border-fg" : "border-line-2")}>
+                {formPick.chosen && <span className="size-1.5 rounded-full bg-fg" />}
+              </span>
+              {S.formPick}
+            </button>
           )}
         </div>
         <Expander open={open} onToggle={onToggleOpen} label={row.title} />
@@ -113,6 +138,15 @@ export function PreviewRowCard({ row, taken, cropUrl, open, onToggleOpen, onTake
               {row.warnings.map((w) => (
                 <li key={w} className="rounded-xl border border-warn/40 bg-warn/[0.06] px-3 py-2 text-[12.5px] leading-relaxed" data-testid="ocr-warning">
                   {w}
+                </li>
+              ))}
+            </ul>
+          )}
+          {row.infos.length > 0 && (
+            <ul className="grid gap-1.5 md:col-span-2" aria-label="Korrekturen">
+              {row.infos.map((t) => (
+                <li key={t} className="rounded-xl border border-line bg-ink-950/40 px-3 py-2 text-[12.5px] leading-relaxed text-mute" data-testid="ocr-info">
+                  {t}
                 </li>
               ))}
             </ul>

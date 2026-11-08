@@ -13,7 +13,7 @@ import { parseShotTime } from "@/journal/extract/time";
 import { toInputString } from "@/lib/parse";
 import { findDuplicateLoose } from "./duplicates";
 import { checkRecord, type PlauField } from "./plausibility";
-import type { ReadRecord, RField } from "./records";
+import { correctionTexts, type ReadRecord, type RField } from "./records";
 import type { Box } from "./types";
 
 export type CellKey = "pair" | "side" | "qty" | "entry" | "exit" | "pnl" | "date" | "exitDate" | "leverage" | "fees";
@@ -46,6 +46,8 @@ export interface PreviewRow {
   duplicate: { text: string; trade: Trade } | null;
   /** Warnings that are not about one cell (the prices vs. the result …). */
   warnings: string[];
+  /** What was repaired so the numbers fit (shown as „korrigiert“, not as a warning). */
+  infos: string[];
   /** Where in which picture the trade stands (for the crop). */
   crops: { page: number; box: Box }[];
   status: Candidate["status"];
@@ -231,6 +233,7 @@ export function previewRows(cands: readonly Candidate[], recordsOf: ReadonlyMap<
       blocked: blockedReason(cells),
       duplicate: dup ? { text: dup.text, trade: dup.duplicate.trade } : loose,
       warnings: [...new Set(warnings)],
+      infos: correctionTexts(recs),
       crops: recs.map((r) => ({ page: r.page, box: r.box })),
       status: c.status,
     };

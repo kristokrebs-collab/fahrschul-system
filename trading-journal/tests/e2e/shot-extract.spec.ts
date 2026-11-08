@@ -320,7 +320,7 @@ test.describe("Screenshot-Import", () => {
     await expect(page.getByTestId("extract-trade")).toHaveCount(0);
   });
 
-  test("ohne Anmeldung: kein Knopf, die Einstellungen erklären warum", async ({ page }) => {
+  test("ohne Anmeldung: keine KI – der Knopf liest auf dem Gerät, die Einstellungen erklären warum", async ({ page }) => {
     const { errors } = await start(page, {}, [], false);
     await page.goto(cloudUrl("settings"));
     const note = page.getByTestId("settings-shot-extract");
@@ -329,14 +329,15 @@ test.describe("Screenshot-Import", () => {
     await expect(note).toContainText("Melde dich an");
     await expect(note).toContainText("Ohne den Import trägst du die Werte wie gewohnt von Hand ein");
     const editor = await openEditorWithShots(page, 1);
-    await expect(editor.getByTestId("extract-open")).toHaveCount(0);
+    await expect(editor.getByTestId("extract-action")).toHaveAttribute("data-reader", "local");
+    await expect(editor.getByTestId("extract-reader")).toContainText("ohne KI");
     // manual entry is untouched
     await editor.locator("#f-entry").fill("100");
     await expect(editor.locator("#f-entry")).toHaveValue("100");
     expect(errors).toEqual([]);
   });
 
-  test("angemeldet, aber Server ohne KI-Schlüssel: kein Knopf, Hinweis in den Einstellungen", async ({ page }) => {
+  test("angemeldet, aber Server ohne KI-Schlüssel: der Knopf liest auf dem Gerät, Hinweis in den Einstellungen", async ({ page }) => {
     await start(page, { enabled: false });
     await page.goto(cloudUrl("settings"));
     const note = page.getByTestId("settings-shot-extract");
@@ -344,11 +345,12 @@ test.describe("Screenshot-Import", () => {
     await expect(note).toHaveAttribute("data-state", "server-off", { timeout: 15_000 });
     await expect(note).toContainText("kein KI-Schlüssel");
     const editor = await openEditorWithShots(page, 1);
-    await expect(editor.getByTestId("extract-open")).toHaveCount(0);
+    await expect(editor.getByTestId("extract-action")).toHaveAttribute("data-reader", "local");
+    await expect(editor.getByTestId("extract-reader")).toContainText("ohne KI");
   });
 });
 
-test("Standard-Build (ohne Cloud): kein Knopf, manuelle Eingabe voll nutzbar", async ({ page }, info) => {
+test("Standard-Build (ohne Cloud): der Knopf liest auf dem Gerät, manuelle Eingabe voll nutzbar", async ({ page }, info) => {
   test.skip(!PROJECTS.includes(info.project.name), "mobile + desktop only");
   const errors = collectErrors(page);
   await seed(page);
@@ -358,7 +360,8 @@ test("Standard-Build (ohne Cloud): kein Knopf, manuelle Eingabe voll nutzbar", a
   await expect(editor).toBeVisible();
   await editor.locator('input[type="file"]').setInputFiles({ name: "a.png", mimeType: "image/png", buffer: PNG });
   await expect(editor.getByRole("button", { name: "Screenshot 1 öffnen" })).toBeVisible();
-  await expect(editor.getByTestId("extract-open")).toHaveCount(0);
+  await expect(editor.getByTestId("extract-action")).toHaveAttribute("data-reader", "local");
+  await expect(editor.getByTestId("extract-reader")).toContainText("ohne KI");
   await editor.locator("#f-entry").fill("100");
   await expect(editor.locator("#f-entry")).toHaveValue("100");
   expect(errors).toEqual([]);
