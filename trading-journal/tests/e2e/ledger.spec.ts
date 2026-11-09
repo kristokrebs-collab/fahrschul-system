@@ -94,9 +94,20 @@ test.describe("Transaktionsbuch", () => {
     const first = card.getByTestId("ledger-row").first();
     const id = (await first.getAttribute("data-id"))!;
     const stamp = async (): Promise<string> => (await card.locator(`[data-testid="ledger-row"][data-id="${id}"]`).first().textContent())!.match(/\d\d\.\d\d\.\d{4} \d\d:\d\d/)![0];
+    // the select closes when its field moves under it (a scroll or a late card above on the long Berichte page): wait until the
+    // field stands still, and if the list closed between opening and the tap, open it again – the choice itself must land
+    const zone = page.getByTestId("ledger-zone");
+    const settled = async (): Promise<void> => {
+      let last = -1;
+      await expect.poll(async () => { const y = (await zone.boundingBox())?.y ?? -2; const same = y === last; last = y; return same; }, { intervals: [250], timeout: 15_000 }).toBe(true);
+    };
     const pick = async (name: string): Promise<void> => {
-      await page.getByTestId("ledger-zone").click();
-      await page.getByRole("listbox").getByRole("option", { name }).click();
+      await settled();
+      await expect(async () => {
+        if (!(await page.getByRole("listbox").isVisible())) await zone.click();
+        await page.getByRole("listbox").getByRole("option", { name }).click({ timeout: 3_000 });
+        await expect(zone).toContainText(name, { timeout: 2_000 });
+      }).toPass({ timeout: 30_000 });
     };
     await pick("UTC");
     const utc = await stamp();
