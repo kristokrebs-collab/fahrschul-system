@@ -293,7 +293,7 @@ stripe trigger checkout.session.completed
 Eigenen Zugang ohne Abo (z. B. für den Betreiber), im SQL-Editor:
 
 ```sql
-update profiles set plan = 'premium' where id = '<user-uuid>';   -- bleibt, bis ein Webhook für diesen Nutzer ihn neu setzt
+update profiles set plan = 'premium', plan_status = 'active' where id = '<user-uuid>';   -- plan_status muss Zugang geben (active/trialing/past_due); bleibt, bis ein Webhook für diesen Nutzer ihn neu setzt
 ```
 
 ### 4.1 Affiliates verwalten (SQL, es gibt dafür keine Admin-Seite in der App)
