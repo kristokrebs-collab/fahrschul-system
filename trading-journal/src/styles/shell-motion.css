@@ -135,18 +135,11 @@ html[data-motion-tier="team"] {
       var(--gl-glow),
       0 6px 16px color-mix(in srgb, var(--color-signal) 24%, transparent);
   }
-  /* the „Inhalt“ strip of a page: glass with a small blur only from 768 px (a full-width bar over a scrolling page costs on a phone);
+  /* the „Inhalt“ strip of a page: an opaque tint, no backdrop blur at any width (a full-width blurred bar over a scrolling page
+     made every open/close on the page repaint the blur – select taps went over 200 ms on 2-core machines without GPU);
      the plate behind the chip in view glides on an expo-out without overshoot */
   .sn-glass {
     background: color-mix(in srgb, var(--color-ink-900) 96%, transparent);
-  }
-  @media (min-width: 768px) {
-    @supports (backdrop-filter: blur(1px)) {
-      html:not([data-safe-fx]) .sn-glass {
-        background: var(--gl-tint);
-        backdrop-filter: var(--gl-blur);
-      }
-    }
   }
   .sn-plate[data-glide] {
     transition:
