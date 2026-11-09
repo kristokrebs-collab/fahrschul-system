@@ -4,9 +4,9 @@ Für den Betreiber: was du täglich ansiehst, was du bei einem Problem tust und 
 Stand: C4 (Release-Check, Betreiber-Status, Notfall-Schalter) und B1 (Konto produktiv). Nichts hier wurde gegen ein echtes
 Supabase-, Stripe-, Resend- oder Twilio-Konto ausgeführt – ausdrücklich getrennt je Abschnitt („geprüft mit Mock“ / „nicht geprüft“).
 
-> **Netlify deploy-preview = Showroom.** Vorschauen von Pull Requests laufen mit `VITE_SHOWROOM=1` gegen ein Mock-Backend im Browser (Banner „SHOWROOM · Demo-Daten …“,
-> Demo-Konto, simulierte Zahlungsseite). Sie sind **kein** Test deiner Supabase-, Stripe-, Binance- oder KI-Anbindung – dafür bleiben Release-Check und der Durchstich in
-> SETUP.md. Produktion und Branch-Deploys enthalten den Showroom-Code nicht (Test `tests/unit/showroom.bundle.test.ts`). Siehe [SHOWROOM.md](SHOWROOM.md).
+> **Netlify deploy-preview = die echte App.** Vorschauen von Pull Requests bauen wie die Produktion (`npm run build && npm run build:share`) gegen dein Supabase und
+> Stripe im Testmodus, mit Konto-Pflicht (SETUP.md, „Vorschau pro Pull Request“). Kein Deploy enthält Showroom-Code (Test `tests/unit/showroom.bundle.test.ts`); der
+> Showroom ist nur noch eine lokale Demo (`npm run build:showroom`, [SHOWROOM.md](SHOWROOM.md)).
 
 ## 1. Vor dem Deploy: Release-Check
 

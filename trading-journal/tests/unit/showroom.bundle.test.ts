@@ -68,15 +68,57 @@ describe("the sources reach the showroom only through the flag", () => {
     expect(readFileSync(join(ROOT, "src", "App.tsx"), "utf8")).toMatch(/__TJ_SHOWROOM__ \? lazy\(\(\) => import\("@\/showroom\/ui\/ShowroomHost"\)\) : null/);
   });
 
-  it("the production config never sets the flag (only the showroom scripts do)", () => {
+  it("the production config never sets the flag (only the local showroom script does)", () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { scripts: Record<string, string> };
     for (const [name, cmd] of Object.entries(pkg.scripts)) expect(/VITE_SHOWROOM=1/.test(cmd), name).toBe(name.startsWith("build:showroom"));
-    const toml = readFileSync(join(ROOT, "..", "netlify.toml"), "utf8");
-    const [before, after] = toml.split("[context.deploy-preview]");
-    const code = (before ?? "").split("\n").filter((l) => !l.trim().startsWith("#")).join("\n");
+    // the showroom build writes only into its own folder (never `dist/`, which Netlify publishes)
+    const showroomScripts = Object.entries(pkg.scripts).filter(([name]) => name.startsWith("build:showroom"));
+    expect(showroomScripts.map(([n]) => n)).toEqual(["build:showroom"]);
+    for (const [, cmd] of showroomScripts) expect(cmd).toMatch(/--outDir dist-showroom\b/);
+  });
+});
+
+/**
+ * Deploy previews build the real app (the operator's decision: everything must work in the app itself – no „Neu in dieser Version“ panel,
+ * no demo banner, no mock backend in anything Netlify publishes). Every build command of `netlify.toml` – production, branch deploys, deploy
+ * previews – is the production build; the showroom script stays for local demos only.
+ */
+describe("no deployed build is the showroom", () => {
+  const toml = readFileSync(join(ROOT, "..", "netlify.toml"), "utf8");
+  const code = toml
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("#"))
+    .join("\n");
+  const PROD = "npm ci && npm run build && npm run build:share";
+
+  it("netlify.toml names no showroom build and no VITE_SHOWROOM anywhere outside comments", () => {
     expect(code).not.toMatch(/showroom/i);
-    expect(after).toMatch(/build:showroom:deploy/);
-    // the production command is untouched
-    expect(before).toMatch(/command = "npm ci && npm run build && npm run build:share"/);
+    expect(code).not.toMatch(/VITE_SHOWROOM/);
+  });
+
+  it("production and deploy previews run the same command (incl. build:share)", () => {
+    const commands = [...code.matchAll(/^\s*command\s*=\s*"([^"]*)"/gm)].map((m) => m[1]);
+    expect(commands.length).toBeGreaterThanOrEqual(2);
+    for (const c of commands) expect(c).toBe(PROD);
+    const preview = code.split("[context.deploy-preview]")[1] ?? "";
+    expect(preview).toMatch(/command = "npm ci && npm run build && npm run build:share"/);
+    // the base command (production, branch deploys) is untouched
+    expect(code.split("[context.")[0]).toMatch(/command = "npm ci && npm run build && npm run build:share"/);
+  });
+
+  it("the scripts the deploy runs never switch the showroom on", () => {
+    const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { scripts: Record<string, string> };
+    for (const name of ["build", "build:share"]) {
+      const cmd = pkg.scripts[name] ?? "";
+      expect(cmd, name).not.toMatch(/SHOWROOM|showroom/);
+    }
+  });
+
+  it.skipIf(!prod)("the release panel „Neu in dieser Version“ is in no file of the published folder (personal and share edition)", () => {
+    const hits = files(join(ROOT, "dist")).filter((f) => {
+      const text = readFileSync(f, "utf8");
+      return text.includes("Neu in dieser Version") || text.includes("sr-panel") || text.includes("SHOWROOM · Demo-Daten");
+    });
+    expect(hits.map((f) => relative(ROOT, f))).toEqual([]);
   });
 });

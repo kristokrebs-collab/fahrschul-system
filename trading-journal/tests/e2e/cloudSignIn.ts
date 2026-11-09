@@ -52,12 +52,57 @@ export interface SignInOptions {
   choice?: "merge" | "local" | "cloud" | "keep";
 }
 
+/** The entry gate of the cloud build (Konto-Pflicht, `src/cloud/gate.ts`): a signed-out visitor sees the login window as the page. */
+export const entryGate = (page: Page): Locator => page.getByTestId("entry-gate");
+
+/**
+ * Waits for the entry gate and brings it to „Anmelden“ (a first visit opens on „Konto erstellen“: the switch link runs the band once).
+ * Returns the „Anmelden“ dialog.
+ */
+export async function gateToSignIn(page: Page): Promise<Locator> {
+  const gate = entryGate(page);
+  await expect(gate).toBeVisible({ timeout: 25_000 });
+  const sheet = gate.getByRole("dialog", { name: "Anmelden" });
+  const signup = gate.getByRole("dialog", { name: "Konto erstellen" });
+  await expect(sheet.or(signup)).toBeVisible({ timeout: 20_000 });
+  if (await signup.isVisible()) {
+    const link = signup.getByTestId("auth-to-signin");
+    await expectNotInert(link);
+    await link.click();
+  }
+  await expect(sheet).toBeVisible({ timeout: 20_000 });
+  await bandSettled(page);
+  return sheet;
+}
+
+/**
+ * Opens a route of the cloud build signed out: the entry gate stands in front of the app (the page itself is not mounted), on
+ * „Konto erstellen“ for a browser without an earlier session.
+ */
+export async function openGated(page: Page, url: string): Promise<void> {
+  const res = await page.goto(url);
+  expect(res?.ok(), `${url} answers`).toBe(true);
+  await expect(entryGate(page)).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("main h1")).toHaveCount(0);
+}
+
+/** Opens a route of the cloud build, signs in through the entry gate and waits for the page's own `h1`. */
+export async function openSignedIn(page: Page, url: string, h1: string, o: SignInOptions = {}): Promise<void> {
+  await openGated(page, url);
+  await signInViaSheet(page, o);
+  await expect(page.getByRole("heading", { level: 1, name: h1 }).first()).toBeVisible({ timeout: 30_000 });
+}
+
 export async function signInViaSheet(page: Page, o: SignInOptions = {}): Promise<void> {
   const email = o.email ?? SIGN_IN_EMAIL;
   const password = o.password ?? SIGN_IN_PASSWORD;
-  const sheet = page.getByRole("dialog", { name: "Anmelden" });
-  if (o.fromPill !== false) {
-    const pill = page.locator('[data-cloud-pill="signin"]');
+  let sheet = page.getByRole("dialog", { name: "Anmelden" });
+  const pill = page.locator('[data-cloud-pill="signin"]');
+  // Konto-Pflicht: signed out, the page is the entry gate (no header pill) – sign in right there
+  if (o.fromPill !== false) await expect(entryGate(page).or(pill).first()).toBeVisible({ timeout: 25_000 });
+  if (await entryGate(page).isVisible()) {
+    sheet = await gateToSignIn(page);
+  } else if (o.fromPill !== false) {
     await expect(pill).toBeVisible({ timeout: 20_000 });
     // the first click can land before the page's handlers are attached (loaded machine): click again until the sheet is there
     await expect(async () => {

@@ -15,7 +15,7 @@ import { clippedTexts, CLOUD_BASE, cloudUrl, collectErrors, expectNoHorizontalSc
 import { mockBilling } from "./mocks/billing";
 import { fig, mockSocial, mockTradePayload, type MockGroup, type MockSocialOptions } from "./mocks/social";
 import { mockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, entryGate, gateToSignIn, openGated, signInViaSheet } from "./cloudSignIn";
 
 const COMMUNITY_URL = process.env.PW_COMMUNITY_URL ?? cloudUrl("community");
 const TRADES_URL = process.env.PW_COMMUNITY_TRADES_URL ?? cloudUrl("trades");
@@ -31,8 +31,12 @@ async function shot(page: Page, info: TestInfo, name: string, fullPage = false):
   await page.screenshot({ path: `${SHOTS}/P12-social-${name}-${info.project.name === "mobile" ? "390" : "1440"}.png`, fullPage, animations: "disabled" });
 }
 
-/** Opens a page of the app and waits for its own `h1` (fails when it does not come up). */
+/**
+ * Opens a page of the app and waits for its own `h1` (fails when it does not come up). On the cloud build a signed-out visitor gets the
+ * entry gate instead (Konto-Pflicht) – `signIn` then lands on the page and waits for its `h1`.
+ */
 async function open(page: Page, url = COMMUNITY_URL): Promise<void> {
+  if (url.startsWith(CLOUD_BASE)) return openGated(page, url);
   const res = await page.goto(url);
   expect(res?.ok(), `${url} answers`).toBe(true);
   await expect(page.locator('[data-page-role="current"] h1').first()).toBeVisible({ timeout: 30_000 });
@@ -66,6 +70,7 @@ async function shareReady(sheet: Locator): Promise<void> {
  */
 async function signIn(page: Page, { expectNext = false }: { expectNext?: boolean } = {}): Promise<void> {
   await signInViaSheet(page, { synced: true, expectNext });
+  await expect(page.locator('[data-page-role="current"] h1').first()).toBeVisible({ timeout: 30_000 });
 }
 
 const member = (id: string, pseudonym: string, role: MockGroup["members"][number]["role"], stats = false) => ({ id, pseudonym, role, shareLevel: stats ? ("stats" as const) : ("none" as const), figures: stats ? fig(0.31, 74, 58) : null });
@@ -94,15 +99,18 @@ test.describe("Community", () => {
     expect(errors).toEqual([]);
   });
 
-  test("signed out: the pitch and the way in", async ({ page }, info) => {
+  test("signed out: the entry gate is the way in (Konto-Pflicht), the sign-in lands on Community", async ({ page }, info) => {
     const { errors } = await setup(page);
     await open(page);
-    await expect(page.getByTestId("community-signed-out")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Werde Teil der Community" })).toBeVisible();
+    // nothing of the page before the account – the gate opens on „Konto erstellen“ (first visit), „Anmelden“ is one link away
+    await expect(page.getByTestId("community-signed-out")).toHaveCount(0);
+    await expect(entryGate(page).getByRole("dialog", { name: "Konto erstellen" })).toBeVisible();
     await expectNoHorizontalScroll(page);
     await shot(page, info, "signed-out");
-    await page.getByTestId("community-signin").click();
-    await expect(page.getByRole("dialog", { name: "Anmelden" })).toBeVisible();
+    await gateToSignIn(page);
+    await signIn(page);
+    await expect(page.getByRole("heading", { level: 1, name: "Community" })).toBeVisible();
+    expect(new URL(page.url()).hash).toBe("#community");
     expect(errors).toEqual([]);
   });
 
@@ -263,9 +271,10 @@ test.describe("Community", () => {
     ];
     const { soc, errors } = await setup(page, { groups });
     await open(page, process.env.PW_COMMUNITY_URL ? `${COMMUNITY_URL}?invite=ABCDEFGH23` : cloudUrl("community?invite=ABCDEFGH23"));
-    await expect(page.getByTestId("community-invite-waiting")).toBeVisible();
-    expect(page.url()).not.toContain("invite=");
+    // Konto-Pflicht: the entry gate first – the invitation waits in the address until the page is there
+    await expect(page.getByTestId("community-invite-waiting")).toHaveCount(0);
     await signIn(page, { expectNext: true });
+    expect(page.url()).not.toContain("invite=");
     const sheet = page.getByRole("dialog", { name: "Gruppe beitreten" });
     await ready(sheet);
     await expect(sheet.getByTestId("join-preview")).toContainText("Einladung zu „Asia Open“");

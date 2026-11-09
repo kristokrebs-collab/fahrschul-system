@@ -9,9 +9,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, seed } from "./helpers";
 import { mockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, entryGate, openSignedIn, signInViaSheet } from "./cloudSignIn";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const TOKEN = `tj_${"S".repeat(43)}`;
@@ -123,8 +123,8 @@ async function openSettings(page: Page, configured: boolean, search = ""): Promi
   await mockSupabase(page, {});
   const m = await mockApi(page, { configured });
   await seed(page);
-  await openRoute(page, cloudUrl("settings", search), "Einstellungen", { timeout: 30_000 });
-  await signIn(page);
+  // Konto-Pflicht: the entry gate first, the settings page after the sign-in
+  await openSignedIn(page, cloudUrl("settings", search), "Einstellungen", { synced: true });
   return m;
 }
 
@@ -248,6 +248,9 @@ test.describe("TradingView-Signale und MCP-Karte (Cloud-Build gegen Mocks)", () 
  */
 async function signInIfAsked(page: Page): Promise<void> {
   const pill = page.locator('[data-cloud-pill="signin"]');
+  // without the session the entry gate comes first (Konto-Pflicht); the return's dialog opens once the app is there
+  await expect(dialog(page).first().or(entryGate(page))).toBeVisible({ timeout: 30_000 });
+  if (await entryGate(page).isVisible()) await signIn(page);
   await expect(dialog(page)).toBeVisible({ timeout: 30_000 });
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);

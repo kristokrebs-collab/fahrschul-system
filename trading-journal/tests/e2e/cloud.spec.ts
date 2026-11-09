@@ -12,7 +12,7 @@
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed, stored, toast } from "./helpers";
 import { mockSupabase, TOTP_CODE, type MockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, completeSignIn, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, completeSignIn, entryGate, gateToSignIn, openGated, signInViaSheet } from "./cloudSignIn";
 
 const KONTO_URL = process.env.PW_KONTO_URL ?? cloudUrl("konto");
 const SHOTS = process.env.P09_SHOTS_DIR;
@@ -29,8 +29,10 @@ async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
   await page.screenshot({ path: `${SHOTS}/P09-cloud-${name}-${info.project.name}.png`, animations: "disabled" });
 }
 
+/** The cloud build signed out: the entry gate stands in front of the Konto page (Konto-Pflicht); the default build (no cloud) opens the page. */
 async function open(page: Page, url = KONTO_URL): Promise<void> {
-  await openRoute(page, url, "Konto", { timeout: 30_000 });
+  if (url === KONTO_URL) await openGated(page, url);
+  else await openRoute(page, url, "Konto", { timeout: 30_000 });
 }
 
 /** The sheet body is inert while the panel still morphs out of the pill – wait until it takes input. */
@@ -43,6 +45,7 @@ async function ready(sheet: Locator): Promise<void> {
 async function signIn(page: Page, sb: MockSupabase, opts: { mfa?: boolean } = {}): Promise<void> {
   await signInViaSheet(page, { synced: true, stopAfterSubmit: opts.mfa });
   if (opts.mfa) return;
+  await expect(page.getByRole("heading", { level: 1, name: "Konto" })).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => [...sb.rows.values()].filter((r) => r.kind === "trade").length).toBe(FIXTURE_TRADES.length);
 }
 
@@ -71,17 +74,15 @@ test.describe("Konto & Cloud", () => {
     const sb = await mockSupabase(page);
     await seed(page);
     await open(page);
-    await expect(page.getByText("Ein Journal. Alle Geräte.")).toBeVisible();
-    // the local-mode hint is a badge now (Runde 9): a tap explains it, Escape puts it away again
-    await page.getByTestId("local-badge").click();
-    await expect(page.getByTestId("local-badge-panel").getByText("Melde dich an, dann ist dein Journal auf allen Geräten synchron.", { exact: false })).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByTestId("local-badge-panel")).toHaveCount(0);
+    // Konto-Pflicht: the entry gate instead of the page – first visit on „Konto erstellen“; the local journal is said to stay
+    const gate = entryGate(page);
+    await expect(gate.getByRole("dialog", { name: "Konto erstellen" })).toBeVisible();
+    await expect(gate.getByTestId("gate-local-note")).toContainText("Dein Journal in diesem Browser bleibt erhalten");
+    await expect(page.locator('[data-cloud-pill="signin"]')).toHaveCount(0);
     await expectNoHorizontalScroll(page);
     await shot(page, info, "signed-out");
 
-    await page.locator('[data-cloud-pill="signin"]').click();
-    const sheet = page.getByRole("dialog", { name: "Anmelden" });
+    const sheet = await gateToSignIn(page);
     await ready(sheet);
     await sheet.getByLabel("E-Mail").fill(EMAIL);
     await sheet.getByLabel("Passwort", { exact: true }).fill("falsch-falsch");
@@ -167,7 +168,8 @@ test.describe("Konto & Cloud", () => {
 
     // sign out, sign in again → the code is asked for; a wrong code shakes, the right one finishes the login
     await page.getByRole("button", { name: "Abmelden", exact: true }).first().click();
-    await expect(page.locator('[data-cloud-pill="signin"]')).toBeVisible();
+    // signed out → back at the gate, now on „Anmelden“ (this browser had a session)
+    await expect(entryGate(page).getByRole("dialog", { name: "Anmelden" })).toBeVisible();
     await signIn(page, sb, { mfa: true });
     const mfa = page.getByRole("dialog", { name: "Zwei-Faktor-Code" });
     await expect(mfa).toBeVisible();
@@ -199,7 +201,8 @@ test.describe("Konto & Cloud", () => {
     await hold(page, "Halten zum Löschen");
     await expect(toast(page).getByText("Konto gelöscht")).toBeVisible({ timeout: 10_000 });
     expect(sb.deletedAccounts).toHaveLength(1);
-    await expect(page.getByText("Ein Journal. Alle Geräte.")).toBeVisible();
+    // signed out → the entry gate again
+    await expect(entryGate(page)).toBeVisible();
     // local-first: nothing local was deleted
     expect(((await stored<unknown[]>(page, "tj2-trades")) ?? []).length).toBe(FIXTURE_TRADES.length);
     expect(errors).toEqual([]);

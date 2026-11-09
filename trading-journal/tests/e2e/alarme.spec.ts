@@ -12,8 +12,8 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route, type TestInfo } from "@playwright/test";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed, waitForStableLayout } from "./helpers";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, seed, waitForStableLayout } from "./helpers";
+import { blockExternalNetwork, openSignedIn } from "./cloudSignIn";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockBilling } from "./mocks/billing";
 import { mockSupabase } from "./mocks/supabase";
@@ -117,10 +117,6 @@ async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
   await page.screenshot({ path: `${SHOTS}/alarme-${name}-${info.project.name}.png`, animations: "disabled" });
 }
 
-async function signIn(page: Page): Promise<void> {
-  await signInViaSheet(page, { synced: true });
-}
-
 const card = (page: Page) => page.getByTestId("alerts-settings");
 const sw = (page: Page, channel: string, event: string) => page.getByTestId(`ev-${channel}-${event}`);
 
@@ -131,8 +127,8 @@ async function open(page: Page, s: Srv, opts: { foldsClosed?: boolean } = {}): P
   await mockBilling(page, { enabled: false });
   await mockAlertFns(page, s);
   await seed(page, { foldsClosed: opts.foldsClosed });
-  await openRoute(page, cloudUrl("settings"), "Einstellungen");
-  await signIn(page);
+  // Konto-Pflicht: the entry gate first, the settings page after the sign-in
+  await openSignedIn(page, cloudUrl("settings"), "Einstellungen", { synced: true });
   if (opts.foldsClosed) return;
   await card(page).scrollIntoViewIfNeeded();
   await expect(card(page)).toHaveAttribute("data-state", "ok", { timeout: 20_000 });

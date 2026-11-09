@@ -3,8 +3,8 @@
  *
  * | build                                            | `__TJ_SHOWROOM__` |
  * |--------------------------------------------------|-------------------|
- * | `npm run build` (Netlify production / branches), dev, tests, share, single file | `false` |
- * | `npm run build:showroom` (local), Netlify `deploy-preview` (`npm run build:showroom:deploy`) | `true`  |
+ * | `npm run build` (Netlify production, branches AND deploy previews), dev, tests, share, single file | `false` |
+ * | `npm run build:showroom` (local demo only – no Netlify context builds it) | `true`  |
  *
  * `if (__TJ_SHOWROOM__) …` folds at build time (the use sites in `main.tsx` and `App.tsx` name the define itself – an imported constant is not folded before the module graph is built, and the chunks stayed in the output): the lazy chunks behind it (mock backend, banner, panel) are never emitted in a build without the flag
  * (`tests/unit/showroom.bundle.test.ts` scans the production build for every marker).

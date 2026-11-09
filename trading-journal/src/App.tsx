@@ -29,6 +29,9 @@ import { useEntitlement } from "@/billing/entitlements";
 import { billingActive } from "@/billing/store";
 import type { Feature } from "@/billing/types";
 import { CloudSyncHost } from "@/cloud/CloudSyncHost";
+import { markKnownVisitor, useEntryGate } from "@/cloud/gate";
+import { bootCloud } from "@/cloud/runtime";
+import { useCloudSession } from "@/cloud/session";
 import { Celebrate, celebrateFrom } from "@/motion/Celebrate";
 import { IntroHost } from "@/intro/IntroHost";
 import { useIntroSettled } from "@/intro/introStore";
@@ -51,6 +54,9 @@ const LockedPage = lazy(() => import("@/app/LockedPage"));
 const SharedView = lazy(() => import("@/views/community/SharedView").then((m) => ({ default: m.SharedView })));
 /** P10 trial / payment banner – only in builds with billing (cloud configured, a web build). */
 const BillingBanner = lazy(() => import("@/billing/ui/BillingBanner").then((m) => ({ default: m.BillingBanner })));
+
+/** Konto-Pflicht: the entry gate and the public pricing page for a signed-out visitor (only in a build with the cloud, `src/cloud/gate.ts`). */
+const EntryGate = lazy(() => import("@/app/gate/EntryGate"));
 
 /** The Showroom's panel, simulated payment page and mail knob (Paket S): present only in a build with the flag – the import is folded away otherwise. */
 const ShowroomHost = __TJ_SHOWROOM__ ? lazy(() => import("@/showroom/ui/ShowroomHost")) : null;
@@ -366,11 +372,35 @@ function Shell() {
   );
 }
 
+/**
+ * Konto-Pflicht (`src/cloud/gate.ts`): with the cloud in this build a signed-out visitor gets the entry gate (its own chunk) instead of
+ * the shell – the shell and everything in it mount only with a session. Public: the share view (`#share/…`, the shell), `#preise` read
+ * only and, on top of the gate, the legal and contract pages. Without the cloud (local, dev, the default e2e build) this is `<Shell />`.
+ */
+function Gated() {
+  const gate = useEntryGate();
+  const enabled = gate !== "off";
+  // the shell's cloud host boots the cloud once it is mounted; before it, the gate needs the phase (restore a login or settle "signed out")
+  useEffect(() => {
+    if (enabled) bootCloud();
+  }, [enabled]);
+  useEffect(() => {
+    if (gate === "open" && useCloudSession.getState().phase === "signedIn") markKnownVisitor();
+  }, [gate]);
+  if (gate === "off" || gate === "open") return <Shell />;
+  if (gate === "pending") return <div className="min-h-dvh" aria-busy="true" data-testid="entry-pending" />;
+  return (
+    <Suspense fallback={<div className="min-h-dvh" aria-busy="true" data-testid="entry-pending" />}>
+      <EntryGate mode={gate} />
+    </Suspense>
+  );
+}
+
 /** The whole shell behind the app-level error boundary (P13 `app` variant: full-height stage, "Neu laden"). */
 export default function App() {
   return (
     <ErrorBoundary variant="app">
-      <Shell />
+      <Gated />
     </ErrorBoundary>
   );
 }

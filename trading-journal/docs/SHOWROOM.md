@@ -1,6 +1,12 @@
 # Showroom (Paket S)
 
-Stand: 08.11.2026 (nach der Rücknahme R5/R7). **Zweck.** Die Netlify-Vorschau eines Pull Requests ist ein klickbarer Showroom: Anmeldung, Registrierung,
+> **Seit der Konto-Pflicht (08.11.2026): nur noch lokal.** Der Betreiber hat entschieden: „Alles muss final in der App funktionieren – ohne so einen Button ‚Neu
+> dazugekommen‘ …“. Netlify-Deploy-Previews bauen deshalb die **echte App** wie die Produktion (`[context.deploy-preview]` in `netlify.toml`:
+> `npm ci && npm run build && npm run build:share`); das Skript `build:showroom:deploy` ist entfernt. `npm run build:showroom` und `src/showroom/` bleiben für lokale
+> Demos; nichts davon wird ausgeliefert – `tests/unit/showroom.bundle.test.ts` prüft, dass kein Netlify-Befehl den Showroom baut und dass weder `dist/` noch `dist/teilen/`
+> „Neu in dieser Version“, den Banner oder einen anderen Marker enthält. Was unten über „die Vorschau“ steht, gilt für den lokalen Showroom-Build.
+
+Stand: 08.11.2026 (nach der Rücknahme R5/R7). **Zweck.** Die Netlify-Vorschau eines Pull Requests war ein klickbarer Showroom (bis zur Konto-Pflicht): Anmeldung, Registrierung,
 Bestellfenster, Demo-Zahlungsseite, Wizard, Top-Trader-Karte mit „Was ist ein Flip?“, Wochenabschluss und Psychologie-Karten sind dort sichtbar und bedienbar – **ohne** echtes
 Supabase, Stripe oder Anthropic, mit einem Demo-Journal. **Marktdaten sind echt** (Binance, Bybit … wie im normalen Build, Rücknahme R5): die erfundenen Sägezahn-Kurven
 der ersten Fassung hat der Nutzer zu Recht „irrational“ genannt. Vorher lieferte die Vorschau den nackten Build (ohne die Dienste): „Keine Abos in dieser Version“, kein Anmelden.
@@ -16,7 +22,7 @@ antwortet Binance 451, dann zeigen die Karten ihren ehrlichen Leerzustand wie im
 |---|---|---|
 | lokal bauen | `npm run build:showroom` | `dist-showroom/` (`tsc -b`, dann `VITE_SHOWROOM=1` mit Platzhalter-Supabase-Adresse `https://showroom.invalid` und Platzhalter-Schlüssel) |
 | lokal ansehen | `npx vite preview --outDir dist-showroom --port 4470` | <http://127.0.0.1:4470/> |
-| Netlify | `[context.deploy-preview]` in `netlify.toml`: `npm ci && npm run build:showroom:deploy && npm run build:share` | nur Deploy-Previews; **Produktion und Branch-Deploys bleiben ohne Schalter** |
+| Netlify | – | **kein Kontext baut den Showroom** (Deploy-Previews bauen seit der Konto-Pflicht die echte App wie die Produktion) |
 | e2e | `PW_SHOWROOM_BASE_URL=http://127.0.0.1:4470 npx playwright test tests/e2e/showroom.spec.ts --project=mobile --project=desktop` | ohne die Variable überspringt sich die Datei |
 
 Der Schalter ist die Build-Konstante `__TJ_SHOWROOM__` (Vite `define`, wie `__TJ_EDITION__`). Die Variablen setzen die npm-Skripte **im Befehl selbst** – ein Wert im

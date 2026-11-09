@@ -709,3 +709,114 @@ button.aw-ficon:focus-visible {
     transition-duration: 0ms;
   }
 }
+
+/* ---------------------------------------------------------------- Konto-Pflicht (src/cloud/gate.ts): das Fenster als Seite vor der App.
+   Keine Abdunklung, kein Schließen; die Seite scrollt selbst (ein Handy erreicht die Links unter der Karte), Karte und Band bleiben, wie sie
+   sind. Unter den Blättern (Rechtliches, Verträge: z 60) und den Meldungen (z 95), damit sie über der Seite aufgehen. */
+.aw-overlay[data-gate] {
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+  background:
+    radial-gradient(110% 70% at 50% 0%, color-mix(in srgb, var(--color-ink-700) 55%, transparent) 0%, transparent 70%),
+    var(--color-ink-900);
+}
+.aw-overlay[data-gate] > .aw-frame {
+  flex: none;
+  margin-block: auto;
+}
+.aw-gate-head,
+.aw-gate-foot {
+  flex: none;
+  width: min(1030px, 100%);
+  color: var(--color-mute);
+}
+.aw-gate-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.aw-gate-word {
+  margin: 0;
+  font: 600 11.5px / 1.2 var(--font-mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-fg);
+}
+.aw-gate-lead {
+  margin: 0;
+  font-size: 12px;
+}
+.aw-gate-foot {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
+  font-size: 11.5px;
+}
+.aw-gate-foot nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.aw-gate-foot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 10px;
+  color: inherit;
+  text-underline-offset: 2px;
+}
+.aw-gate-foot a:hover {
+  color: var(--color-fg);
+  text-decoration: underline;
+}
+.aw-gate-foot a:focus-visible {
+  outline: 2px solid var(--color-fg);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.aw-gate-note {
+  margin: 0;
+  max-width: 62ch;
+}
+/* `#preise` ohne Anmeldung (nur lesen): schmale Leiste mit Anmelden / Konto erstellen, unten dieselben Links wie unter dem Fenster */
+.aw-pricing-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-ink-900) 92%, transparent);
+  backdrop-filter: blur(8px);
+}
+.aw-pricing-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 1320px;
+  margin-inline: auto;
+  padding: 10px 16px;
+}
+.aw-pricing-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.aw-pricing-foot {
+  display: flex;
+  justify-content: center;
+  padding: 0 16px 32px;
+}
+@media (min-width: 640px) {
+  .aw-pricing-row {
+    padding-inline: 24px;
+  }
+}

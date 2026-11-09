@@ -13,7 +13,7 @@ import { cloudUrl, collectErrors, expectNoHorizontalScroll, seed, toast } from "
 import { mockBilling } from "./mocks/billing";
 import { mockSocial, type MockGroup, type MockSocialOptions } from "./mocks/social";
 import { mockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, openGated, signInViaSheet } from "./cloudSignIn";
 
 const COMMUNITY_URL = cloudUrl("community");
 const ME = "00000001-1111-4111-8111-111111111111";
@@ -39,7 +39,9 @@ async function shot(page: Page, name: string, fullPage = false): Promise<void> {
   await page.screenshot({ path: `${SHOTS}/belege-${name}-${w < 600 ? 390 : 1440}.png`, fullPage, animations: "disabled" });
 }
 
-async function open(page: Page, url = COMMUNITY_URL): Promise<void> {
+/** Signed out the cloud build shows the entry gate (Konto-Pflicht); `signedIn`: a session is stored, the page itself comes up. */
+async function open(page: Page, url = COMMUNITY_URL, { signedIn = false }: { signedIn?: boolean } = {}): Promise<void> {
+  if (!signedIn) return openGated(page, url);
   const res = await page.goto(url);
   // a change of the hash alone is no new document (no response): reload, so the page starts on the new route
   if (res) expect(res.ok(), `${url} answers`).toBe(true);
@@ -60,6 +62,7 @@ async function setup(page: Page, social: MockSocialOptions = {}) {
 
 async function signIn(page: Page): Promise<void> {
   await signInViaSheet(page, { synced: true });
+  await expect(page.locator('[data-page-role="current"] h1').first()).toBeVisible({ timeout: 30_000 });
 }
 
 async function expectAccessible(page: Page, include: string, what: string): Promise<void> {
@@ -254,7 +257,7 @@ test.describe("Community: Belege, Rangliste, Chartfälle", () => {
     // the author's side: another member wrote one earlier; closing opens everyone's
     g.cases![0]!.hyps.unshift({ userId: OTHER, direction: "down", confidence: 60, reason: "Ich erwarte einen Rücksetzer", createdAt: new Date(Date.now() - 3600_000).toISOString() });
     g.cases![0]!.closed = true;
-    await open(page, COMMUNITY_URL);
+    await open(page, COMMUNITY_URL, { signedIn: true });
     const closed = page.getByTestId("case-card");
     await expect(closed).toHaveAttribute("data-phase", "closed", { timeout: 30_000 });
     const rows = closed.getByTestId("hypothesis-row");

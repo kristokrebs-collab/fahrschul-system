@@ -6,8 +6,9 @@
  * (`npm run build:e2e-cloud`), mobile and desktop. Launch-plan acceptance tests 1–8 (account) and 40 (operations) as far as a mock shows them.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, finishSignIn, fixture, openRoute, seed, stored, toast } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, finishSignIn, fixture, seed, stored, toast } from "./helpers";
 import { mockSupabase, TOTP_CODE, type MockSupabase } from "./mocks/supabase";
+import { entryGate, gateToSignIn, openGated } from "./cloudSignIn";
 
 const KONTO_URL = process.env.PW_KONTO_URL ?? cloudUrl("konto");
 const EMAIL = "trader@example.com";
@@ -16,7 +17,8 @@ const FIXTURE_TRADES = (typeof fixture["tj2-trades"] === "string" ? JSON.parse(f
 const N = FIXTURE_TRADES.length;
 const CLOUD_TRADE = { ...FIXTURE_TRADES[0]!, id: "t_cloud_1", date: "2026-09-01T10:00", notes: "nur im Konto", updatedAt: "2026-09-01T10:00:00.000Z", createdAt: "2026-09-01T10:00:00.000Z" };
 
-const open = (page: Page) => openRoute(page, KONTO_URL, "Konto", { timeout: 30_000 });
+/** Konto-Pflicht: signed out, the entry gate stands in front of the Konto page. */
+const open = (page: Page) => openGated(page, KONTO_URL);
 const liveTrades = (sb: MockSupabase) => [...sb.rows.values()].filter((r) => r.kind === "trade" && !r.deleted).length;
 
 async function ready(page: Page, name: string): Promise<ReturnType<Page["getByRole"]>> {
@@ -26,9 +28,9 @@ async function ready(page: Page, name: string): Promise<ReturnType<Page["getByRo
   return sheet;
 }
 
-/** Fills the sign-in sheet and sends it – the caller decides how the first-login flow ends. */
+/** Fills the sign-in window of the entry gate and sends it – the caller decides how the first-login flow ends. */
 async function sendSignIn(page: Page): Promise<void> {
-  await page.locator('[data-cloud-pill="signin"]').click();
+  await gateToSignIn(page);
   const sheet = await ready(page, "Anmelden");
   await sheet.getByLabel("E-Mail").fill(EMAIL);
   await sheet.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
@@ -199,7 +201,7 @@ test.describe("Konto produktiv (B1)", () => {
 
     // lost device: password sign-in → code step → recovery code
     await page.getByRole("button", { name: "Abmelden", exact: true }).first().click();
-    await expect(page.locator('[data-cloud-pill="signin"]')).toBeVisible();
+    await expect(entryGate(page).getByRole("dialog", { name: "Anmelden" })).toBeVisible();
     await sendSignIn(page);
     const mfa = page.getByRole("dialog", { name: "Zwei-Faktor-Code" });
     await expect(mfa).toBeVisible();

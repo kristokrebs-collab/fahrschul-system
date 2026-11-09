@@ -33,4 +33,4 @@ export type AuthView =
   | "welcome"; // success: wordmark + first sync
 
 /** Where the sheet morphed from (the header pill owns a `layoutId`, other entries slide in). */
-export type AuthSheetSource = "pill" | "card" | "banner" | "callback";
+export type AuthSheetSource = "pill" | "card" | "banner" | "callback" | "gate";

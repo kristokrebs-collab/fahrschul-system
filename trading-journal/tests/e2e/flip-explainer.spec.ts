@@ -12,8 +12,8 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { buildTraderNet, netDayText, type NetPriceBar } from "../../src/domain/signals";
 import { FLIP_RESERVE_PX } from "../../src/views/markt/flipExplainerReserve";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, pinClock, seed, utcToday } from "./helpers";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, pinClock, seed, utcToday } from "./helpers";
+import { blockExternalNetwork, openSignedIn } from "./cloudSignIn";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockBilling } from "./mocks/billing";
 import { mockSupabase } from "./mocks/supabase";
@@ -300,8 +300,8 @@ test.describe("Was ist ein Flip? – alert link in the cloud edition (mocks)", (
         return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
       });
       await seed(page, { synth: { ratios: "flip-short", anchor: at - 60_000 }, clock: clock.now });
-      await openRoute(page, cloudUrl("markt"), "Markt");
-      await signInViaSheet(page, { synced: true });
+      // Konto-Pflicht: the entry gate first, the Markt page after the sign-in
+      await openSignedIn(page, cloudUrl("markt"), "Markt", { synced: true });
       const box = page.getByTestId("flip-explainer");
       await box.scrollIntoViewIfNeeded();
       const alarmNote = box.getByTestId("flip-explainer-alarm-note");

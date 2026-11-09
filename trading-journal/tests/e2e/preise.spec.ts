@@ -14,7 +14,7 @@ import { expect, test, type Locator, type Page, type TestInfo } from "@playwrigh
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, seed, toast } from "./helpers";
 import { mockBilling, mockSubscription, type MockBillingOptions } from "./mocks/billing";
 import { mockSupabase, type MockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, entryGate, openGated, signInViaSheet } from "./cloudSignIn";
 
 const PREISE_URL = process.env.PW_PREISE_URL ?? cloudUrl("preise");
 const KONTO_URL = process.env.PW_KONTO_URL ?? cloudUrl("konto");
@@ -64,9 +64,10 @@ async function ready(sheet: Locator): Promise<void> {
   await expect(sheet.locator("[inert]")).toHaveCount(0);
 }
 
-/** Signs in through the header pill and closes the welcome sheet once the first sync is live. */
+/** Signs in (the header pill of the public pricing page, or the entry gate) and closes the welcome sheet once the first sync is live. */
 async function signIn(page: Page): Promise<void> {
   await signInViaSheet(page, { synced: true });
+  await expect(page.locator('[data-page-role="current"] h1').first()).toBeVisible({ timeout: 30_000 });
 }
 
 const srPrice = (page: Page, plan: string) => page.getByTestId(`price-${plan}`).locator(".sr-only").first();
@@ -195,8 +196,10 @@ test.describe("Preise & Abo", () => {
         },
       ],
     });
-    await openPage(page, KONTO_URL, "Konto");
+    // Konto-Pflicht: the Konto page is behind the entry gate
+    await openGated(page, KONTO_URL);
     await signIn(page);
+    await expect(page.getByRole("heading", { level: 1, name: "Konto" }).first()).toBeVisible();
     const card = page.getByTestId("plan-card");
     await expect(card.getByRole("heading", { name: "Pro" })).toBeVisible();
     await expect(card.getByText("Aktiv")).toBeVisible();
@@ -248,13 +251,14 @@ test.describe("Preise & Abo", () => {
     expect(errors).toEqual([]);
   });
 
-  test("a locked feature: UpgradeTeaser → UpgradeSheet; failed payment → dunning banner", async ({ page }, info) => {
-    const { errors } = await setup(page, {
-      subscription: mockSubscription({ status: "past_due", trialEnd: null }),
-      plan: { plan: "pro", status: "past_due", trialEnd: null },
-    });
-    await openPage(page, ANALYSE_URL, "Analyse");
-    // signed out on a shop with payments: Free → the Pro page is locked (its header + the teaser, no chunk loaded)
+  test("a locked feature: UpgradeTeaser → UpgradeSheet (Free account)", async ({ page }, info) => {
+    const { errors } = await setup(page);
+    // Konto-Pflicht: signed out the entry gate stands in front of the page – nothing of it (no chunk) before the account
+    await openGated(page, ANALYSE_URL);
+    await expect(page.getByTestId("analyse-view")).toHaveCount(0);
+    await signIn(page);
+    await expect(page.getByRole("heading", { level: 1, name: "Analyse" }).first()).toBeVisible();
+    // a Free account on a shop with payments: the Pro page is locked (its header + the teaser, no chunk loaded)
     const teaser = page.getByTestId("upgrade-teaser");
     await teaser.scrollIntoViewIfNeeded();
     await expect(teaser).toContainText("Profi-Statistik");
@@ -264,11 +268,20 @@ test.describe("Preise & Abo", () => {
     const sheet = page.getByRole("dialog", { name: "Freischalten" });
     await ready(sheet);
     await expect(sheet.getByTestId("upgrade-sheet")).toContainText("Enthalten in Pro");
-    await expect(sheet.getByTestId("upgrade-cta")).toHaveText("Pro auswählen");
+    // signed in, the sheet's button goes on to the payment (signed out it said „Pro auswählen“ – a sign-in came first)
+    await expect(sheet.getByTestId("upgrade-cta")).toHaveText("Weiter zur Zahlung");
     await shot(page, info, "upgrade-sheet");
     await sheet.getByRole("button", { name: "Schließen" }).first().click();
     await expect(sheet).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
 
+  test("failed payment → dunning banner, access kept during dunning", async ({ page }) => {
+    const { errors } = await setup(page, {
+      subscription: mockSubscription({ status: "past_due", trialEnd: null }),
+      plan: { plan: "pro", status: "past_due", trialEnd: null },
+    });
+    await openGated(page, ANALYSE_URL);
     // signed in with a failed payment: the banner asks for a new payment method
     await signIn(page);
     await expect(page.getByTestId("billing-banner")).toContainText("Die letzte Zahlung ist fehlgeschlagen.");
@@ -289,7 +302,13 @@ test.describe("Preise & Abo", () => {
     await expect(page.getByLabel("Rabattcode")).toBeDisabled();
     await expectNoHorizontalScroll(page);
     await shot(page, info, "closed");
-    await goTo(page, "#analyse", "Analyse");
+    // the pricing page is public; every other page is behind the entry gate (Konto-Pflicht) – signed in, nothing is locked
+    await page.evaluate(() => {
+      location.hash = "#analyse";
+    });
+    await expect(entryGate(page)).toBeVisible({ timeout: 20_000 });
+    await signIn(page);
+    await expect(page.locator('[data-page-role="current"] h1', { hasText: "Analyse" }).first()).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("ana-mc")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("upgrade-teaser")).toHaveCount(0);
     expect(errors).toEqual([]);

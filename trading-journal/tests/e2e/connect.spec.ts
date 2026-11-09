@@ -14,7 +14,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed } from "./helpers";
 import { mockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, openSignedIn } from "./cloudSignIn";
 
 const PROJECTS = ["mobile", "desktop"];
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -151,8 +151,8 @@ async function openCloud(page: Page, hash: string, h1: string, o: MockOptions = 
   await mockSupabase(page, {});
   const m = await mockConnections(page, o);
   await seed(page);
-  await openRoute(page, cloudUrl(hash), h1, { timeout: 30_000 });
-  await signInViaSheet(page);
+  // Konto-Pflicht: the entry gate first, the page after the sign-in
+  await openSignedIn(page, cloudUrl(hash), h1);
   return m;
 }
 
