@@ -17,7 +17,8 @@ import { Input, Textarea } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import { useEnriched, useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
-import { HoldConfirm, useConfirmFocus } from "@/motion/HoldConfirm";
+import { BinDelete, useBinDelete, useKept } from "@/motion/BinDelete";
+import { useConfirmFocus } from "@/motion/HoldConfirm";
 import { revealInvalid } from "@/primitives/fieldFx";
 import { extrasKey, extrasOf, strategyOf, withStrategy, type StrategyExtras } from "@/domain/strategy";
 import { StrategyFields } from "@/views/setups/StrategyFields";
@@ -125,7 +126,9 @@ export function SetupEditor(props: SetupEditorProps) {
   const fromTrade = props.fromTrade ?? store.fromTrade;
   const onClose = props.onClose ?? closeStore;
 
-  const existing = useMemo(() => (setupId ? settings.setups.find((s) => s.id === setupId) : undefined), [settings.setups, setupId]);
+  // the setup being edited; while its delete pill runs (the store drops it at the spinner, Runde 13) the editor keeps showing it until it closes
+  const found = useMemo(() => (setupId ? settings.setups.find((s) => s.id === setupId) : undefined), [settings.setups, setupId]);
+  const existing = useKept(found, open && !!setupId);
   const usedBy = useMemo(() => (existing ? trades.filter((t) => (t.setups || []).includes(existing.id)).length : 0), [trades, existing]);
   // P07: the strategy extras (passthrough keys on the setup) with their own baseline; examples come from this setup's closed trades
   const enriched = useEnriched();
@@ -189,19 +192,20 @@ export function SetupEditor(props: SetupEditorProps) {
     }
   }
 
-  async function remove() {
-    if (!existing) return;
-    setBusy(true);
-    try {
-      await saveSettings(removeSetup(useJournal.getState().settings, existing.id));
+  // „Löschen“ (Runde 13): the delete pill whose bin eats the word once the deletion was confirmed; its spinner is this very write
+  const bin = useBinDelete(async () => {
+    if (existing) await saveSettings(removeSetup(useJournal.getState().settings, existing.id));
+  }, {
+    done: () => {
       pushToast({ kind: "info", title: SETUP_EDITOR_STRINGS.toastDeleted });
       onClose();
-    } catch {
-      setError(SETUP_EDITOR_STRINGS.errDelete);
-    } finally {
-      setBusy(false);
-    }
-  }
+    },
+    failed: () => setError(SETUP_EDITOR_STRINGS.errDelete),
+  });
+  const remove = () => {
+    setConfirmDelete(false);
+    bin.start();
+  };
 
   const layoutId = existing && !fromTrade ? `setup-card-${existing.id}` : undefined;
   const checklistIds = form.checklist.map((c) => c.id).join();
@@ -250,7 +254,7 @@ export function SetupEditor(props: SetupEditorProps) {
                   transition={{ default: tween.fade, scale: spring.pop }}
                 >
                   {usedBy ? SETUP_EDITOR_STRINGS.delUsed(usedBy) : SETUP_EDITOR_STRINGS.delConfirm}
-                  <Button size="sm" variant="danger" onClick={remove} disabled={busy}>
+                  <Button size="sm" variant="danger" onClick={remove} disabled={busy || bin.busy}>
                     {SETUP_EDITOR_STRINGS.yes}
                   </Button>
                   <Button ref={deleteNo} size="sm" onClick={() => setConfirmDelete(false)}>
@@ -259,9 +263,9 @@ export function SetupEditor(props: SetupEditorProps) {
                 </motion.span>
               ) : (
                 // a setup that trades still use never goes on a hold alone: the hold opens the inline warning with the count
-                <HoldConfirm ref={deleteTrigger} disabled={busy} onAsk={() => setConfirmDelete(true)} onConfirm={() => (usedBy > 0 ? setConfirmDelete(true) : void remove())}>
+                <BinDelete ref={deleteTrigger} bin={bin} disabled={busy} onAsk={() => setConfirmDelete(true)} onHold={() => (usedBy > 0 ? setConfirmDelete(true) : bin.start())}>
                   {SETUP_EDITOR_STRINGS.del}
-                </HoldConfirm>
+                </BinDelete>
               ))}
             <span className="flex-1" />
             {error && (

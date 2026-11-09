@@ -79,7 +79,8 @@ describe("SetupEditor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
     fireEvent.click(screen.getByRole("button", { name: "Ja" }));
     await waitFor(() => expect(useJournal.getState().settings.setups.map((x) => x.id)).toEqual(["s_mtf"]));
-    expect(useUi.getState().toasts.map((t) => t.title)).toContain("Grundlage gelöscht");
+    // Runde 13: the delete pill says „gelöscht“ once its ring closed (right after the write here – no Web Animations in jsdom)
+    await waitFor(() => expect(useUi.getState().toasts.map((t) => t.title)).toContain("Grundlage gelöscht"));
     expect(onClose).toHaveBeenCalled();
   });
 

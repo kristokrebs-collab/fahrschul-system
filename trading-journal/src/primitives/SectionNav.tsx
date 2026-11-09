@@ -245,6 +245,28 @@ export function SectionNav({ items, label = "Inhalt", className }: { items: read
     chips[(next + chips.length) % chips.length]?.focus();
   };
 
+  // the glass plate behind the chip of the section in view glides to the next chip (transform + width of one small layer, no layout of the chips);
+  // the first placement, a resize and a font swap place it without travelling
+  const plate = useRef<HTMLLIElement>(null);
+  const shownKey = shown.map((i) => i.id).join();
+  useLayoutEffect(() => {
+    const list = strip.current;
+    const el = plate.current;
+    if (!list || !el) return;
+    const place = (glide: boolean): void => {
+      const chip = list.querySelector<HTMLElement>('[aria-current="location"]');
+      if (!chip) return;
+      el.toggleAttribute("data-glide", glide && !prefersReducedMotion());
+      el.style.transform = `translate(${chip.offsetLeft}px, ${chip.offsetTop}px)`;
+      el.style.width = `${chip.offsetWidth}px`;
+      el.style.height = `${chip.offsetHeight}px`;
+    };
+    place(el.style.width !== "");
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => place(false)) : null;
+    ro?.observe(list);
+    return () => ro?.disconnect();
+  }, [active, shownKey]);
+
   if (shown.length < 2) return null;
   return (
     <nav
@@ -252,13 +274,14 @@ export function SectionNav({ items, label = "Inhalt", className }: { items: read
       aria-label="Inhalt dieser Seite"
       data-testid="section-nav"
       style={{ top: SECTION_NAV_TOP }}
-      className={cn("sticky z-30 -mx-4 bg-ink-900 px-4 sm:-mx-6 sm:px-6", SECTION_NAV_BOX, className)}
+      className={cn("sn-glass sticky z-30 -mx-4 px-4 sm:-mx-6 sm:px-6", SECTION_NAV_BOX, className)}
     >
       <div className="relative flex items-center gap-3 border-b border-line py-2">
         {/* rich pages: a hairline in the signal red under the strip fills with the way down the page (scroll timeline, no script) */}
         <span aria-hidden="true" className="rich-progress" />
         <span className="label shrink-0 !text-mute">{label}</span>
-        <ul ref={strip} onKeyDown={onKeyDown} onPointerDown={onPress} className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overscroll-x-contain py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ul ref={strip} onKeyDown={onKeyDown} onPointerDown={onPress} className="relative flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overscroll-x-contain py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <li ref={plate} role="presentation" aria-hidden="true" data-section-plate="" className="sn-plate glass-on pointer-events-none absolute left-0 top-0 rounded-full" />
           {shown.map((it) => {
             const on = it.id === active;
             return (
@@ -269,8 +292,8 @@ export function SectionNav({ items, label = "Inhalt", className }: { items: read
                   aria-current={on ? "location" : undefined}
                   data-section-chip={it.id}
                   className={cn(
-                    "inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-full border px-3 text-[12.5px] transition-colors duration-200 pointer-coarse:min-h-11 pointer-coarse:min-w-11",
-                    on ? "border-white/40 bg-white/[0.07] text-fg" : "border-line-2 text-mute hover:border-white/30 hover:text-fg",
+                    "relative inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-full border px-3 text-[12.5px] transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg pointer-coarse:min-h-11 pointer-coarse:min-w-11",
+                    on ? "border-transparent text-fg" : "border-line-2 text-mute hover:border-white/30 hover:text-fg",
                   )}
                 >
                   {it.label}

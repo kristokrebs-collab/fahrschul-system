@@ -9,8 +9,8 @@ describe("Button", () => {
     expect(b).toHaveAttribute("type", "button");
     for (const cls of buttonBase.split(" ")) expect(b.className).toContain(cls);
     expect(b.className).toContain("px-4 py-2 text-[13px]");
-    // default = secondary: a whisper of a rim, the fill carries the shape, hover only brightens the fill
-    expect(b.className).toContain("border-line bg-white/[0.05] text-fg hover:bg-white/[0.09]");
+    // default = secondary, Runde 13: glass (`.glass` – a face lit from the top, a 1 px rim light above → dark below, a thin inner edge); hover brightens the fill
+    expect(b.className).toContain("glass bg-white/[0.02] text-fg hover:bg-white/[0.07]");
     expect(b.className).toContain("focus-visible:shadow-(--ring-glow-btn)");
   });
 
@@ -47,7 +47,8 @@ describe("Button", () => {
     );
     const primary = screen.getByRole("button", { name: "Trade eintragen" });
     // P13 theme tokens: dark values = the former literals (#d6d6d6, inset 0 1px 0 rgb(255 255 255 / 0.6), #ff8a90 – tokens.css)
-    expect(primary.className).toContain("border-transparent bg-gradient-to-b from-white to-(--color-primary-btn-to) text-ink-950 shadow-(--shadow-btn-sheen) hover:to-white");
+    // Runde 13: the sheen plus a soft glow under it in the veil ink
+    expect(primary.className).toContain("border-transparent bg-gradient-to-b from-white to-(--color-primary-btn-to) text-ink-950 shadow-[var(--shadow-btn-sheen),0_6px_22px_-10px_rgb(var(--veil-rgb,255_255_255)/0.45)] hover:to-white");
     expect(primary.className).toContain("focus-visible:shadow-[var(--shadow-btn-sheen),var(--ring-glow-btn)]");
     expect(primary.className).toContain("px-3 py-1.5 text-xs");
     const danger = screen.getByRole("button", { name: "Löschen" });

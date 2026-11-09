@@ -187,7 +187,7 @@ function MenuButton() {
       aria-expanded={open}
       aria-controls={open ? COMMAND_NAV_ID : undefined}
       title="Navigation (⌘K / Strg+K)"
-      className="tap group/menu relative inline-flex shrink-0 xl:px-3 items-center justify-center gap-2 rounded-xl border border-line-2 bg-ink-850 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg"
+      className="tap group/menu relative inline-flex shrink-0 xl:px-3 items-center justify-center gap-2 rounded-xl glass bg-ink-850 text-mute transition-colors duration-200 hover:bg-ink-750 hover:text-fg"
     >
       {/* three bars; while the navigation is open they are the cross (`Burger`, the navigation's close button carries the same mark) */}
       <Burger open={open} />

@@ -173,7 +173,9 @@ test.describe("Radial Share", () => {
     expect(names.slice(0, 3)).toEqual(["Kopieren", "Bild", "Link"]);
     await expect(items.first()).toBeFocused();
 
-    // every target is fully on screen and at least 44 px
+    // every target is fully on screen and at least 44 px – once the fan has settled (Runde 13: the discs leave the hub one after another,
+    // the last one rests ≈ 0.9 s after the click)
+    await expect.poll(() => items.evaluateAll((els) => Math.min(...els.map((e) => e.getBoundingClientRect().width))), { timeout: 3000 }).toBeGreaterThanOrEqual(47.5);
     const vp = page.viewportSize()!;
     for (const b of await items.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()))) {
       expect(b.width).toBeGreaterThanOrEqual(44);
@@ -203,7 +205,7 @@ test.describe("Radial Share", () => {
     expect(errors).toEqual([]);
   });
 
-  test("Kopieren legt die geschwärzte Kurzfassung in die Zwischenablage, Link öffnet das Teilen-Blatt", async ({ page, context }, info) => {
+  test("Kopieren legt die geschwärzte Kurzfassung in die Zwischenablage (der Fächer sagt es selbst, mit Haken), Link öffnet das Teilen-Blatt", async ({ page, context }, info) => {
     only(info);
     await context.grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => undefined);
     await openFirstTrade(page, info);
@@ -211,8 +213,10 @@ test.describe("Radial Share", () => {
     await detail.getByTestId("share-button").scrollIntoViewIfNeeded();
     await detail.getByTestId("share-button").click();
     await page.getByTestId("radial-copy").click();
-    await expect(page.getByRole("menu")).toHaveCount(0);
-    await expect(page.locator('[role="status"][aria-live="polite"]').getByText("Kurzfassung kopiert")).toBeVisible();
+    // Runde 13 (the reference „Share Button“): the choice plays to its end inside the fan – busy word, result, ✓ – then the fan closes
+    await expect(page.getByTestId("radial-copy")).toHaveAttribute("data-picked", "check");
+    await expect(page.locator('[role="status"][aria-live="polite"]').filter({ hasText: "Kurzfassung kopiert" }).first()).toBeAttached();
+    await expect(page.getByRole("menu")).toHaveCount(0, { timeout: 5000 });
     const text = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null);
     if (text !== null) expect(text).toMatch(/·/);
     // no money in what was copied
@@ -259,7 +263,7 @@ test.describe("Radial Share", () => {
     await expect(page.getByRole("menu")).toHaveCount(0);
   });
 
-  test("Runde 12: Glas-Chips, die Beschriftung „Kanal wählen“ und das Kreuz im Auslöser; Pfeiltasten wechseln die Beschriftung, nichts liegt übereinander", async ({ page }, info) => {
+  test("Runde 13: deckende Kanal-Scheiben, die Nabe mit ✕ an der Stelle des Auslösers, die Beschriftung „Kanal wählen“; Pfeiltasten wechseln die Beschriftung, nichts liegt übereinander", async ({ page }, info) => {
     only(info);
     const errors = collectErrors(page);
     await seed(page, {});
@@ -270,12 +274,17 @@ test.describe("Radial Share", () => {
     await trigger.click();
     const copy = page.getByRole("menuitem", { name: "Kopieren" });
     await expect(copy).toBeVisible();
-    // the symbol turned into the cross, the button kept its width
+    // the pill handed its place to the hub with the ✕ (the trigger keeps its box, hidden meanwhile)
     await expect(trigger.locator("[data-radial-icon]")).toHaveAttribute("data-radial-icon", "close");
-    // a glass chip: a blur over a translucent ink
-    const glass = await copy.evaluate((el) => ({ blur: getComputedStyle(el).backdropFilter, bg: getComputedStyle(el).backgroundColor }));
-    expect(glass.blur).toMatch(/blur/);
-    expect(glass.bg).toMatch(/rgba?\(|color\(/);
+    await expect(page.getByTestId("radial-hub")).toBeVisible();
+    // the reference's discs are opaque surfaces (no blur), 48 px
+    const disc = await copy.evaluate((el) => {
+      const face = el.firstElementChild as HTMLElement;
+      return { blur: getComputedStyle(face).backdropFilter, bg: getComputedStyle(face).backgroundColor, w: el.getBoundingClientRect().width };
+    });
+    expect(disc.blur === "none" || disc.blur === "").toBe(true);
+    expect(disc.bg).toMatch(/^rgb\(/);
+    expect(disc.w).toBeGreaterThanOrEqual(44);
     // the caption: first the prompt, then what the active target does
     const caption = page.getByTestId("radial-caption");
     await expect(caption).toHaveText("Kanal wählen");

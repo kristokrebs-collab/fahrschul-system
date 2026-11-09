@@ -58,7 +58,8 @@ describe("Segmented", () => {
     const makro = screen.getByRole("radio", { name: "Makro" });
     expect(makro).toHaveAttribute("aria-checked", "true");
     const thumb = makro.querySelector("span[aria-hidden]");
-    expect(thumb?.className).toContain("absolute inset-0 rounded-lg border border-line-2");
+    // Runde 13: the thumb is a glass plate (`.glass`: a 1 px rim light above → dark below, a thin inner edge)
+    expect(thumb?.className).toContain("glass absolute inset-0 rounded-lg");
     // tone overrides the default thumb background via tailwind-merge
     expect(thumb?.className).toContain("bg-win/15");
     expect(thumb?.className).not.toContain("bg-ink-750");

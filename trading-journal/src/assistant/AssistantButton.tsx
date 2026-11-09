@@ -15,7 +15,7 @@ export function AssistantButton({ className, label }: { className?: string; labe
       aria-haspopup="dialog"
       title="Assistent (A)"
       data-testid="assistant-button"
-      className={cn("tap group/ai relative inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-line-2 bg-ink-850 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg", className)}
+      className={cn("tap group/ai relative inline-flex shrink-0 items-center justify-center gap-2 rounded-xl glass bg-ink-850 text-mute transition-colors duration-200 hover:bg-ink-750 hover:text-fg", className)}
     >
       <GlyphSpark className="size-[18px] transition-transform duration-200 ease-out group-hover/ai:rotate-12 group-hover/ai:scale-110" />
       <span aria-hidden="true" className="absolute right-1 top-1 size-1 rounded-full bg-signal" />

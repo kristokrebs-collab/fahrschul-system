@@ -345,7 +345,7 @@ function SidebarPanel() {
           </div>
           <nav ref={nav} id={id} aria-label={SIDEBAR_LABEL} onKeyDown={onNavKey} className={cn("relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3", expanded ? "pt-3" : "pt-2.5")}>
             {/* the marker: one rounded plate behind the active row, travelling on `spring.layout` (transform only); the dot rides on it */}
-            <motion.span aria-hidden="true" data-sidebar-marker="" className="sb-mark pointer-events-none absolute left-2 top-0 h-11 rounded-xl bg-white/[0.07]" style={{ y, opacity: markerOpacity, scaleY: stretch }}>
+            <motion.span aria-hidden="true" data-sidebar-marker="" className="sb-mark glass-on pointer-events-none absolute left-2 top-0 h-11 rounded-xl" style={{ y, opacity: markerOpacity, scaleY: stretch }}>
               <span className="sb-dot absolute right-2.5 top-[19px] size-1.5 rounded-full bg-signal" />
               {/* Premium and Team: one border-beam lap on the plate each time the panel opens (the plan's motion profile, `motion/tier.ts`) */}
               {(tier === "premium" || tier === "team") && !reduced && <BorderBeam size={60} borderWidth={1} fire={open ? "open" : 0} />}

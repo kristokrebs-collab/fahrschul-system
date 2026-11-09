@@ -109,7 +109,7 @@ describe("Segmented hover ghost", () => {
     expect((ghost as HTMLElement).style.borderRadius).toBe("8px");
     // checked item: the thumb stays the first aria-hidden span
     fireEvent.pointerEnter(a, { pointerType: "mouse" });
-    expect(a.querySelector("span[aria-hidden]")?.className).toContain("border-line-2");
+    expect(a.querySelector("span[aria-hidden]")?.className).toContain("glass"); // the thumb (Runde 13: a glass plate)
   });
 
   it("shows no ghost for touch or under reduced motion", () => {

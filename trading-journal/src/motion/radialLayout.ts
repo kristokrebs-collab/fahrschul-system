@@ -1,10 +1,12 @@
 /**
- * Radial share (R11): where the targets of the fan sit. PURE – no DOM, so the clamp at the screen edge is testable.
+ * Radial share (R11, Runde 13 „Share Button“ 1:1): where the targets of the fan sit. PURE – no DOM, so the clamp at the screen edge is testable.
  *
- * The targets stand on an arc around the centre of the trigger. The arc prefers to open UPWARDS (−90°); when the trigger sits
- * at an edge the whole fan turns (in 12° steps, the smallest turn first) until every target is fully inside the viewport,
- * and the radius grows until no target touches the trigger itself. Targets never overlap each other (the angle between two
- * is chosen from their size), so each one keeps its own ≥ 44 px touch area.
+ * The targets stand on an arc around the centre of the hub (the trigger turned into a disc). Geometry of the reference, measured on its
+ * five channels: the disc is 0.92 × the hub, neighbours are 46° apart and the arc is the one whose chord between two neighbours is 1.5 discs
+ * (r = 1.5 · d / (2 · sin 23°) ≈ 1.92 · d) – the same pitch and radius for 3 or 4 targets. The arc prefers to open UPWARDS (−90°, five targets
+ * span 184°: the outer two sit a hair below the hub's centre); when the trigger sits at an edge the whole fan turns (in 12° steps, the smallest
+ * turn first) until every target is fully inside the viewport, and the radius grows until no target touches the hub. Targets never overlap
+ * each other, so each one keeps its own ≥ 44 px touch area.
  */
 
 export interface RadialInput {
@@ -38,7 +40,12 @@ export interface RadialFan {
 
 const RAD = Math.PI / 180;
 export const RADIAL_ITEM = 48;
-const MIN_RADIUS = 68;
+/** The hub the trigger turns into: the disc is 0.92 × the hub (0.89 / 0.96 of the reference's pill height). */
+export const RADIAL_HUB = 52;
+/** Angle between two neighbouring targets (measured: 182°, 136°, 90°, 44°, −2°). */
+export const RADIAL_PITCH = 46;
+/** Radius from the chord: two neighbours' centres are 1.5 discs apart (48 px discs → 92 px). */
+export const radialRadius = (item: number = RADIAL_ITEM): number => (1.5 * item) / (2 * Math.sin((RADIAL_PITCH / 2) * (Math.PI / 180)));
 const TURN = 12;
 
 const fitsView = (pts: { x: number; y: number }[], o: { x: number; y: number }, view: { w: number; h: number }, half: number, gap: number): boolean =>
@@ -51,12 +58,10 @@ const touchesHub = (p: { x: number; y: number }, hub: { w: number; h: number }, 
 export function fanLayout({ n, origin, viewport, hub, item = RADIAL_ITEM, gap = 8, prefer = -90 }: RadialInput): RadialFan {
   const count = Math.max(1, Math.min(6, Math.round(n)));
   const half = item / 2;
-  let radius = MIN_RADIUS;
-  // the angle between neighbours from the chord that keeps `item + gap` between their centres; the radius first grows until
-  // that is possible at all, then until no target touches the trigger
-  const stepAt = (r: number): number => (count === 1 ? 0 : (2 * Math.asin(Math.min(1, (item + gap) / (2 * r)))) / RAD);
+  let radius = radialRadius(item);
+  // the reference's pitch, whatever the radius (a radius that had to grow keeps the 46° and only gains room between the targets)
+  const step = count === 1 ? 0 : RADIAL_PITCH;
   const place = (centre: number, r: number): { x: number; y: number }[] => {
-    const step = stepAt(r);
     return Array.from({ length: count }, (_, i) => {
       const a = (centre + (i - (count - 1) / 2) * step) * RAD;
       return { x: Math.cos(a) * r, y: Math.sin(a) * r };
@@ -66,20 +71,20 @@ export function fanLayout({ n, origin, viewport, hub, item = RADIAL_ITEM, gap = 
   for (let d = TURN; d <= 180; d += TURN) centres.push(prefer + d, prefer - d);
 
   // grow the radius until, for the preferred direction, the fan is clear of the trigger (this also settles the size for every turn)
-  for (; radius < 200; radius += 4) if (!place(prefer, radius).some((p) => touchesHub(p, hub, item, gap / 2))) break;
+  for (; radius < 240; radius += 4) if (!place(prefer, radius).some((p) => touchesHub(p, hub, item, gap / 2))) break;
 
   for (const c of centres) {
     const pts = place(c, radius);
     if (!fitsView(pts, origin, viewport, half, gap)) continue;
     if (pts.some((p) => touchesHub(p, hub, item, gap / 2))) continue;
-    return { offsets: pts, centerAngle: c, step: stepAt(radius), radius, clamped: false };
+    return { offsets: pts, centerAngle: c, step, radius, clamped: false };
   }
   // nothing fits (a tiny window): the preferred fan, every target pushed inside the viewport on its own
   const pts = place(prefer, radius).map((p) => ({
     x: Math.min(viewport.w - gap - half, Math.max(gap + half, origin.x + p.x)) - origin.x,
     y: Math.min(viewport.h - gap - half, Math.max(gap + half, origin.y + p.y)) - origin.y,
   }));
-  return { offsets: pts, centerAngle: prefer, step: stepAt(radius), radius, clamped: true };
+  return { offsets: pts, centerAngle: prefer, step, radius, clamped: true };
 }
 
 /** The next enabled index in `dir` (+1 / −1), wrapping; `from` itself when nothing else is enabled; −1 when all are disabled. */

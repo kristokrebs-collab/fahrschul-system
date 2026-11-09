@@ -8,10 +8,37 @@
   --gl-hi: 255 255 255;
   --gl-ink: 255 255 255;
   --gl-lo: 0 0 0;
+  /* Glas-Rezept (Runde 13, Navigation + Bedienelemente): dunkle Tönung, 1-px-Rand hell oben → dunkel unten, dünne Innenkante,
+     Glühen nur am aktiven Element; Unschärfe nur auf kleinen Flächen (`--gl-blur`) */
+  --gl-tint: rgb(10 12 20 / 0.8);
+  --gl-rim: linear-gradient(rgb(255 255 255 / 0.2), rgb(255 255 255 / 0.03));
+  --gl-face: linear-gradient(rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.015));
+  --gl-on: linear-gradient(rgb(255 255 255 / 0.17), rgb(255 255 255 / 0.05));
+  --gl-in: inset 0 1px 0 rgb(255 255 255 / 0.1);
+  --gl-glow: 0 0 18px -3px color-mix(in srgb, var(--color-signal) 45%, transparent);
+  --gl-blur: blur(14px) saturate(1.4);
 }
 :root[data-theme="light"] {
   --gl-ink: 15 23 42;
   --gl-lo: 15 23 42;
+  --gl-tint: rgb(253 253 252 / 0.8);
+  --gl-rim: linear-gradient(rgb(15 23 42 / 0.08), rgb(15 23 42 / 0.22));
+  --gl-face: linear-gradient(#fff, rgb(255 255 255 / 0.5));
+  --gl-on: linear-gradient(rgb(15 23 42 / 0.1), rgb(15 23 42 / 0.04));
+  --gl-in: inset 0 1px 0 #fff;
+  --gl-glow: 0 0 16px -3px color-mix(in srgb, var(--color-signal) 35%, transparent);
+}
+@layer components {
+  .glass,
+  .glass-on {
+    border: 1px solid transparent;
+    background: var(--gl-face) padding-box, var(--gl-rim) border-box;
+    box-shadow: var(--gl-in);
+  }
+  .glass-on {
+    background: var(--gl-on) padding-box, var(--gl-rim) border-box;
+    box-shadow: var(--gl-in), var(--gl-glow);
+  }
 }
 html[data-motion-tier="pro"] {
   --mt-d: 1;
@@ -79,15 +106,16 @@ html[data-motion-tier="team"] {
   .dock-glass {
     border-radius: 9999px;
     background:
-      linear-gradient(180deg, rgb(var(--gl-hi) / calc(0.12 + var(--mt-d, 0) * 0.03)), rgb(var(--gl-hi) / 0.02)),
-      color-mix(in srgb, var(--color-ink-850) 90%, transparent);
-    border: 1px solid rgb(var(--gl-ink) / 0.14);
+      linear-gradient(rgb(var(--gl-hi) / calc(0.08 + var(--mt-d, 0) * 0.03)), transparent 60%) padding-box,
+      linear-gradient(var(--gl-tint), var(--gl-tint)) padding-box,
+      var(--gl-rim) border-box;
+    border: 1px solid transparent;
     box-shadow:
-      inset 0 1px 0 rgb(var(--gl-hi) / 0.16),
+      var(--gl-in),
       0 12px 32px rgb(var(--gl-lo) / calc(0.28 + var(--mt-d, 0) * 0.08)),
       0 2px 6px rgb(var(--gl-lo) / 0.2);
-    -webkit-backdrop-filter: blur(14px) saturate(1.5);
-    backdrop-filter: blur(14px) saturate(1.5);
+    -webkit-backdrop-filter: var(--gl-blur);
+    backdrop-filter: var(--gl-blur);
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .dock-glass {
@@ -100,11 +128,30 @@ html[data-motion-tier="team"] {
     background: linear-gradient(180deg, rgb(var(--gl-hi) / 0.1), transparent), var(--color-ink-850);
   }
   .dock-plate {
-    background: linear-gradient(160deg, rgb(var(--gl-ink) / 0.3), rgb(var(--gl-ink) / 0.08));
+    border: 1px solid transparent;
+    background: linear-gradient(160deg, rgb(var(--gl-ink) / 0.26), rgb(var(--gl-ink) / 0.07)) padding-box, var(--gl-rim) border-box;
     box-shadow:
-      inset 0 1px 0 rgb(var(--gl-hi) / 0.35),
-      0 0 0 1px rgb(var(--gl-ink) / 0.16),
-      0 6px 16px color-mix(in srgb, var(--color-signal) 30%, transparent);
+      inset 0 1px 0 rgb(var(--gl-hi) / 0.32),
+      var(--gl-glow),
+      0 6px 16px color-mix(in srgb, var(--color-signal) 24%, transparent);
+  }
+  /* the „Inhalt“ strip of a page: glass with a small blur only from 768 px (a full-width bar over a scrolling page costs on a phone);
+     the plate behind the chip in view glides on an expo-out without overshoot */
+  .sn-glass {
+    background: color-mix(in srgb, var(--color-ink-900) 96%, transparent);
+  }
+  @media (min-width: 768px) {
+    @supports (backdrop-filter: blur(1px)) {
+      html:not([data-safe-fx]) .sn-glass {
+        background: var(--gl-tint);
+        backdrop-filter: var(--gl-blur);
+      }
+    }
+  }
+  .sn-plate[data-glide] {
+    transition:
+      transform 420ms cubic-bezier(0.16, 1, 0.3, 1),
+      width 420ms cubic-bezier(0.16, 1, 0.3, 1);
   }
   .dock-kb {
     transition:

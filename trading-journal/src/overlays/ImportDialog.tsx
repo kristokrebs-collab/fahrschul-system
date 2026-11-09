@@ -15,7 +15,8 @@ import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
 import { pushToast } from "@/store/uiStore";
 import { importBackup, parseBackup, previewText, type ImportMode, type ImportPreview, type ImportResult } from "@/store/backup";
-import { HoldConfirm, useConfirmFocus } from "@/motion/HoldConfirm";
+import { BinDelete, useBinDelete } from "@/motion/BinDelete";
+import { useConfirmFocus } from "@/motion/HoldConfirm";
 
 export const IMPORT_STRINGS = {
   title: "Backup importieren",
@@ -151,8 +152,9 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
     }
   }
 
-  async function run() {
-    if (!parsed?.ok) return;
+  /** `close` false: the delete pill closes the dialog itself once its ring closed (`bin`). Resolves `false` when the import failed. */
+  async function run(close = true): Promise<boolean> {
+    if (!parsed?.ok) return false;
     setProgress(15);
     const tick = setInterval(() => setProgress((p) => (p == null ? p : Math.min(85, p + 10))), 120);
     try {
@@ -169,22 +171,41 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
       clearInterval(tick);
       setProgress(100);
       if (result.ok) {
-        onDone?.(result);
-        onClose();
-      } else {
-        setParsed({ ok: false, error: result.error ?? IMPORT_STRINGS.failed });
-        setProgress(null);
-        setConfirm(false);
+        if (close) {
+          onDone?.(result);
+          onClose();
+        } else imported.current = result;
+        return true;
       }
+      setParsed({ ok: false, error: result.error ?? IMPORT_STRINGS.failed });
+      setProgress(null);
+      setConfirm(false);
+      return false;
     } catch {
       clearInterval(tick);
       setProgress(null);
+      return false;
     }
   }
-
   const shots = parsed?.ok ? parsed.shots : { embedded: 0, missing: 0 };
   const busy = progress != null && progress < 100;
   const canRun = Boolean(parsed?.ok) && !busy;
+  // „Alles ersetzen“ (Runde 13): the delete pill – what is there now goes into the bin – plays once the replace was confirmed (a hold or „Ja“);
+  // its spinner is this very import, a failure brings the pill back (the dialog already says why)
+  const imported = useRef<Parameters<NonNullable<ImportDialogProps["onDone"]>>[0] | null>(null);
+  const bin = useBinDelete(
+    async () => {
+      if (!(await run(false))) throw new Error(IMPORT_STRINGS.failed);
+    },
+    {
+      done: () => {
+        const r = imported.current;
+        imported.current = null;
+        if (r) onDone?.(r);
+        onClose();
+      },
+    },
+  );
 
   return (
     <Sheet
@@ -209,7 +230,15 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
               transition={{ default: tween.fade, scale: spring.pop }}
             >
               {IMPORT_STRINGS.confirm}
-              <Button size="sm" variant="danger" onClick={run} disabled={!canRun}>
+              <Button
+                size="sm"
+                variant="danger"
+                onClick={() => {
+                  setConfirm(false);
+                  bin.start();
+                }}
+                disabled={!canRun}
+              >
                 {IMPORT_STRINGS.yes}
               </Button>
               <Button ref={confirmNo} size="sm" onClick={() => setConfirm(false)}>
@@ -217,9 +246,9 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
               </Button>
             </motion.span>
           ) : mode === "replace" ? (
-            <HoldConfirm ref={runTrigger} variant="primary" disabled={!canRun} onAsk={() => setConfirm(true)} onConfirm={() => void run()} aria-busy={busy || undefined}>
-              {busy ? IMPORT_STRINGS.running : IMPORT_STRINGS.run}
-            </HoldConfirm>
+            <BinDelete ref={runTrigger} bin={bin} disabled={!canRun && !bin.busy} onAsk={() => setConfirm(true)}>
+              {IMPORT_STRINGS.run}
+            </BinDelete>
           ) : (
             <Button variant="primary" disabled={!canRun} onClick={() => void run()} aria-busy={busy || undefined}>
               <TextRoll mode="roll" text={busy ? IMPORT_STRINGS.running : IMPORT_STRINGS.run} />

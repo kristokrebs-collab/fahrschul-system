@@ -3,8 +3,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { INERT_EXEMPT_SELECTOR } from "@/motion/a11y";
-import { captionSide, fanLayout, RADIAL_ITEM, stepIndex } from "@/motion/radialLayout";
-import { RadialShare, type RadialTarget } from "@/motion/RadialShare";
+import { captionSide, fanLayout, RADIAL_ITEM, RADIAL_PITCH, radialRadius, stepIndex } from "@/motion/radialLayout";
+import { RADIAL_FAILED, RadialShare, type RadialTarget } from "@/motion/RadialShare";
 
 const fx = vi.hoisted(() => ({ reduced: true }));
 vi.mock("@/motion/useReducedFx", () => ({ useReducedFx: () => fx.reduced }));
@@ -99,6 +99,20 @@ describe("fan geometry (pure)", () => {
       expect(60 + o.x).toBeGreaterThanOrEqual(RADIAL_ITEM / 2);
       expect(60 + o.x).toBeLessThanOrEqual(120 - RADIAL_ITEM / 2);
     }
+  });
+
+  it("Runde 13: the reference's geometry – neighbours 46° apart on r = 1.92 discs (the chord between two is 1.5 discs); five span 184°", () => {
+    expect(radialRadius(48)).toBeCloseTo(92.1, 0);
+    expect(radialRadius(48) / 48).toBeCloseTo(1.92, 2);
+    const f = fanLayout({ n: 5, origin: { x: 195, y: 500 }, viewport: view, hub: { w: 52, h: 52 } });
+    expect(f.step).toBe(RADIAL_PITCH);
+    expect(f.radius).toBeCloseTo(radialRadius(48), 6);
+    const deg = f.offsets.map((o) => Math.round((Math.atan2(-o.y, o.x) * 180) / Math.PI));
+    expect(deg).toEqual([-178, 136, 90, 44, -2].map((d) => (d === -178 ? 182 - 360 : d)));
+    expect(dist(f.offsets[0]!, f.offsets[1]!)).toBeCloseTo(1.5 * 48, 1);
+    // the outer two sit a hair below the hub's centre
+    expect(f.offsets[0]!.y).toBeGreaterThan(0);
+    expect(f.offsets[4]!.y).toBeGreaterThan(0);
   });
 
   it("is deterministic", () => {
@@ -296,18 +310,67 @@ describe("RadialShare", () => {
     expect(trigger.querySelector("[data-radial-icon]")).toHaveAttribute("data-radial-icon", "share");
   });
 
-  it("Runde 12: the targets are glass chips (a blur, the theme's ink at 80 %) of the same 48 px; the trigger keeps its label and its name", async () => {
+  it("Runde 13: the discs are opaque (the reference's surface, our glass rim on it) of the same 48 px; the trigger keeps its label and its name", async () => {
     render(<Harness onSelect={vi.fn()} />);
     fireEvent.click(screen.getByTestId("share-button"));
     await screen.findByRole("menu");
     for (const el of screen.getAllByRole("menuitem")) {
-      expect(el.className).toContain("backdrop-blur-md");
-      expect(el.className).toContain("color-mix");
+      const face = el.firstElementChild as HTMLElement;
+      expect(face.className).toContain("bg-ink-700");
+      expect(face.className).not.toContain("backdrop-blur");
       expect(el.style.width).toBe("48px");
     }
     expect(screen.getByTestId("share-button")).toHaveTextContent("Teilen");
     // the focus that moved in by itself is no pick: the trigger still says „Teilen“ until a key or the pointer chooses a target
     expect(screen.getByTestId("share-button")).not.toHaveAttribute("aria-label");
+  });
+
+  it("Runde 13: the pill hands its place to the hub (✕ closes the fan) and is back once the fan has gone", async () => {
+    render(<Harness onSelect={vi.fn()} />);
+    const trigger = screen.getByTestId("share-button");
+    fireEvent.click(trigger);
+    await screen.findByRole("menu");
+    expect(trigger.style.opacity).toBe("0");
+    const hub = screen.getByTestId("radial-hub");
+    expect(hub).toHaveAccessibleName("Teilen schließen");
+    fireEvent.click(hub);
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    await waitFor(() => expect(trigger.style.opacity).toBe(""));
+    expect(trigger).toHaveFocus();
+  });
+
+  it("Runde 13: a target with `done` plays to its end in the fan – busy word, then the result and the ✓ – and runs exactly once", async () => {
+    const copy = vi.fn(async () => true);
+    const targets: RadialTarget[] = [
+      { id: "copy", label: "Kopieren", icon: <i>c</i>, busy: "Kopiere …", done: "Kurzfassung kopiert", onSelect: copy },
+      { id: "link", label: "Link", icon: <i>l</i>, onSelect: vi.fn() },
+    ];
+    render(<RadialShare targets={targets} label="Teilen" />);
+    fireEvent.click(screen.getByTestId("share-button"));
+    await screen.findByRole("menu");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Kopieren" }));
+    // the fan stays and says the result itself (caption + the live region next to the trigger)
+    await waitFor(() => expect(screen.getByTestId("radial-caption")).toHaveTextContent("Kurzfassung kopiert"));
+    expect(screen.getByRole("status")).toHaveTextContent("Kurzfassung kopiert");
+    expect(screen.getByRole("menuitem", { name: "Kopieren" })).toHaveAttribute("data-picked");
+    expect(copy).toHaveBeenCalledTimes(1);
+    // … then it gives the trigger back
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull(), { timeout: 2500 });
+    expect(copy).toHaveBeenCalledTimes(1);
+  });
+
+  it("Runde 13: a target that answers `false` is said as a failure – never a ✓", async () => {
+    const targets: RadialTarget[] = [
+      { id: "copy", label: "Kopieren", icon: <i>c</i>, busy: "Kopiere …", done: "Kurzfassung kopiert", onSelect: async () => false },
+      { id: "link", label: "Link", icon: <i>l</i>, onSelect: vi.fn() },
+    ];
+    render(<RadialShare targets={targets} label="Teilen" />);
+    fireEvent.click(screen.getByTestId("share-button"));
+    await screen.findByRole("menu");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Kopieren" }));
+    await waitFor(() => expect(screen.getByTestId("radial-caption")).toHaveTextContent(RADIAL_FAILED));
+    expect(screen.getByRole("menuitem", { name: "Kopieren" }).getAttribute("data-picked")).not.toBe("check");
+    expect(screen.queryByText("Kurzfassung kopiert")).toBeNull();
   });
 
   it("Runde 12: a mouse that rests where the chips fly out picks nothing at first (the caption keeps asking); once they settled, hovering picks", async () => {

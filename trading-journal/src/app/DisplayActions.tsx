@@ -28,7 +28,7 @@ export function FullscreenButton({ className, showLabel = false }: { className?:
       aria-pressed={on}
       title={label}
       className={cn(
-        "tap inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-line-2 bg-ink-850 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg aria-pressed:text-fg",
+        "tap inline-flex shrink-0 items-center justify-center gap-2 rounded-xl glass bg-ink-850 text-mute transition-colors duration-200 hover:bg-ink-750 hover:text-fg aria-pressed:text-fg",
         className,
       )}
     >

@@ -1,5 +1,5 @@
 import { animate, motion, useMotionValue, useTransform, type AnimationPlaybackControls, type HTMLMotionProps } from "motion/react";
-import { useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type Ref, type RefObject } from "react";
 import { cn } from "@/lib/cn";
 import { dwell, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -56,51 +56,45 @@ const SHAKE_X = [0, -4, 4, -3, 3, 0];
 
 const FILL: Record<ButtonVariant, string> = { danger: "bg-signal/35", secondary: "bg-white/[0.12]", ghost: "bg-white/[0.12]", primary: "bg-ink-950/20" };
 
+export interface HoldPressOptions {
+  onConfirm: () => void;
+  onRelease?: (completed: boolean) => void;
+  disabled?: boolean;
+  /** Hold duration in seconds. */
+  duration: number;
+  /** See `HoldButtonProps.fallback`. */
+  fallback: boolean;
+  reduced: boolean;
+  /** The native button (the early-release shake). */
+  btnRef: RefObject<HTMLButtonElement | null>;
+  /** Called the moment a hold completes, before `onConfirm` (the HoldButton's flash). */
+  onComplete?: () => void;
+  /** How long the completed state (`done`) stays before the press resets (ms); 0 = at once (the delete pill plays its own ending). */
+  doneFor: number;
+}
+
 /**
- * Hold-to-confirm for destructive actions (21st.dev / motion.dev "Hold to Confirm"). Press and hold: a fill sweeps
- * left → right linearly (`tween.hold`) while the button eases to scale .97 and the label crossfades to `holdLabel`.
- * Releasing early springs the fill back (`spring.press`) and shakes once (`tween.shake`). Completion flashes the fill,
- * draws a check (`tween.check`), ticks the haptics and calls `onConfirm`.
- *
- * Keyboard: hold Enter or Space. Assistive tech: the `fallback` arms on the first activation and confirms on the
- * second. Reduced motion keeps the hold mechanic but drops the scale, shake and check draw.
+ * The hold mechanics of `HoldButton`, shared with the delete pill (`motion/BinDelete`): a pointer or Enter / Space hold drives `progress`
+ * 0 → 1 linearly over `duration`; reaching 1 confirms (`onConfirm`, then `onRelease(true)`); releasing early springs it back and shakes once
+ * (`onRelease(false)`), a cancel (pointer leaves, blur, Escape) just springs back. Assistive tech (a click without a hold): with `fallback` the
+ * first activation arms and a second one within 4 s confirms; without, it reports `onRelease(false)`.
  */
-export function HoldButton({
-  children,
-  onConfirm,
-  onRelease,
-  ref,
-  holdLabel = "Halten …",
-  armedLabel = "Zum Bestätigen erneut auslösen",
-  variant = "danger",
-  size = "md",
-  duration = tween.hold.duration,
-  fallback = true,
-  icon,
-  disabled,
-  className,
-  title = "Gedrückt halten zum Bestätigen",
-  ...rest
-}: HoldButtonProps) {
-  const reduced = useReducedFx();
+export function useHoldPress({ onConfirm, onRelease, disabled, duration, fallback, reduced, btnRef, onComplete, doneFor }: HoldPressOptions) {
   const [phase, setPhase] = useState<HoldPhase>("idle");
   const progress = useMotionValue(0);
-  const scale = useTransform(progress, [0, 1], [1, 0.97]);
-  const labelOpacity = useTransform(progress, [0, 0.12], [1, 0]);
-  const holdOpacity = useTransform(progress, [0.04, 0.18], [0, 1]);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const flashRef = useRef<HTMLSpanElement>(null);
   const confirmRef = useRef(onConfirm);
   const releaseRef = useRef(onRelease);
-  useImperativeHandle(ref, () => btnRef.current as HTMLButtonElement, []);
-  const m = useRef({ phase: "idle" as HoldPhase, controls: null as AnimationPlaybackControls | null, key: null as string | null, armTimer: 0, doneTimer: 0, reduced, duration });
+  const completeRef = useRef(onComplete);
+  const m = useRef({ phase: "idle" as HoldPhase, controls: null as AnimationPlaybackControls | null, key: null as string | null, armTimer: 0, doneTimer: 0, reduced, duration, doneFor });
 
   useEffect(() => {
     confirmRef.current = onConfirm;
     releaseRef.current = onRelease;
+    completeRef.current = onComplete;
     m.current.reduced = reduced;
     m.current.duration = duration;
-  }, [onConfirm, onRelease, reduced, duration]);
+    m.current.doneFor = doneFor;
+  }, [onConfirm, onRelease, onComplete, reduced, duration, doneFor]);
 
   useEffect(() => {
     const s = m.current;
@@ -125,11 +119,13 @@ export function HoldButton({
     progress.set(1);
     go("done");
     if (typeof navigator !== "undefined") navigator.vibrate?.(12);
-    if (flashRef.current) animate(flashRef.current, { opacity: [s.reduced ? 0.25 : 0.45, 0] }, tween.flash);
-    s.doneTimer = window.setTimeout(() => {
+    completeRef.current?.();
+    const reset = () => {
       go("idle");
       s.controls = animate(progress, 0, spring.press);
-    }, dwell.holdCheck * 1000);
+    };
+    if (s.doneFor > 0) s.doneTimer = window.setTimeout(reset, s.doneFor);
+    else reset();
     confirmRef.current();
     releaseRef.current?.(true);
   };
@@ -158,51 +154,104 @@ export function HoldButton({
   const releaseUp = () => release("up");
   const cancel = () => release("cancel");
 
-  const onPointerDown = (e: PointerEvent<HTMLButtonElement>) => {
-    if (e.button !== 0) return;
-    start();
-  };
-
-  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
-    const s = m.current;
-    if (e.key === "Escape") {
+  const handlers = {
+    onPointerDown: (e: PointerEvent<HTMLButtonElement>) => {
+      if (e.button !== 0) return;
+      start();
+    },
+    onPointerUp: releaseUp,
+    onPointerLeave: cancel,
+    onPointerCancel: cancel,
+    onBlur: cancel,
+    onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => {
+      const s = m.current;
+      if (e.key === "Escape") {
+        s.key = null;
+        cancel();
+        return;
+      }
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault(); // no native click: the hold decides
+      if (e.repeat || s.key) return;
+      s.key = e.key;
+      start();
+    },
+    onKeyUp: (e: KeyboardEvent<HTMLButtonElement>) => {
+      const s = m.current;
+      if (e.key !== s.key) return;
+      e.preventDefault();
       s.key = null;
-      cancel();
-      return;
-    }
-    if (e.key !== "Enter" && e.key !== " ") return;
-    e.preventDefault(); // no native click: the hold decides
-    if (e.repeat || s.key) return;
-    s.key = e.key;
-    start();
+      releaseUp();
+    },
+    onClick: (e: MouseEvent<HTMLButtonElement>) => {
+      // pointer clicks (detail ≥ 1) are handled by the hold; detail 0 = AT / programmatic activation
+      if (e.detail !== 0 || disabled) return;
+      if (!fallback) {
+        releaseRef.current?.(false);
+        return;
+      }
+      const s = m.current;
+      if (s.phase === "armed") {
+        complete();
+        return;
+      }
+      if (s.phase !== "idle") return;
+      go("armed");
+      s.armTimer = window.setTimeout(() => {
+        if (m.current.phase === "armed") go("idle");
+      }, dwell.armed * 1000);
+    },
+    onContextMenu: (e: MouseEvent<HTMLButtonElement>) => e.preventDefault(),
   };
+  return { phase, progress, handlers };
+}
 
-  const onKeyUp = (e: KeyboardEvent<HTMLButtonElement>) => {
-    const s = m.current;
-    if (e.key !== s.key) return;
-    e.preventDefault();
-    s.key = null;
-    releaseUp();
-  };
-
-  const onClick = (e: MouseEvent<HTMLButtonElement>) => {
-    // pointer clicks (detail ≥ 1) are handled by the hold; detail 0 = AT / programmatic activation
-    if (e.detail !== 0 || disabled) return;
-    if (!fallback) {
-      releaseRef.current?.(false);
-      return;
-    }
-    const s = m.current;
-    if (s.phase === "armed") {
-      complete();
-      return;
-    }
-    if (s.phase !== "idle") return;
-    go("armed");
-    s.armTimer = window.setTimeout(() => {
-      if (m.current.phase === "armed") go("idle");
-    }, dwell.armed * 1000);
-  };
+/**
+ * Hold-to-confirm for destructive actions (21st.dev / motion.dev "Hold to Confirm"). Press and hold: a fill sweeps
+ * left → right linearly (`tween.hold`) while the button eases to scale .97 and the label crossfades to `holdLabel`.
+ * Releasing early springs the fill back (`spring.press`) and shakes once (`tween.shake`). Completion flashes the fill,
+ * draws a check (`tween.check`), ticks the haptics and calls `onConfirm`.
+ *
+ * Keyboard: hold Enter or Space. Assistive tech: the `fallback` arms on the first activation and confirms on the
+ * second. Reduced motion keeps the hold mechanic but drops the scale, shake and check draw.
+ */
+export function HoldButton({
+  children,
+  onConfirm,
+  onRelease,
+  ref,
+  holdLabel = "Halten …",
+  armedLabel = "Zum Bestätigen erneut auslösen",
+  variant = "danger",
+  size = "md",
+  duration = tween.hold.duration,
+  fallback = true,
+  icon,
+  disabled,
+  className,
+  title = "Gedrückt halten zum Bestätigen",
+  ...rest
+}: HoldButtonProps) {
+  const reduced = useReducedFx();
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const flashRef = useRef<HTMLSpanElement>(null);
+  useImperativeHandle(ref, () => btnRef.current as HTMLButtonElement, []);
+  const { phase, progress, handlers } = useHoldPress({
+    onConfirm,
+    onRelease,
+    disabled,
+    duration,
+    fallback,
+    reduced,
+    btnRef,
+    doneFor: dwell.holdCheck * 1000,
+    onComplete: () => {
+      if (flashRef.current) animate(flashRef.current, { opacity: [reduced ? 0.25 : 0.45, 0] }, tween.flash);
+    },
+  });
+  const scale = useTransform(progress, [0, 1], [1, 0.97]);
+  const labelOpacity = useTransform(progress, [0, 0.12], [1, 0]);
+  const holdOpacity = useTransform(progress, [0.04, 0.18], [0, 1]);
 
   return (
     <motion.button
@@ -220,15 +269,7 @@ export function HoldButton({
         className,
       )}
       style={reduced ? undefined : { scale }}
-      onPointerDown={onPointerDown}
-      onPointerUp={releaseUp}
-      onPointerLeave={cancel}
-      onPointerCancel={cancel}
-      onBlur={cancel}
-      onKeyDown={onKeyDown}
-      onKeyUp={onKeyUp}
-      onClick={onClick}
-      onContextMenu={(e) => e.preventDefault()}
+      {...handlers}
       {...rest}
     >
       <motion.span aria-hidden="true" className={cn("pointer-events-none absolute inset-0 -z-10", FILL[variant])} style={{ scaleX: progress, originX: 0 }} />

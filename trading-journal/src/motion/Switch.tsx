@@ -60,7 +60,7 @@ export function Switch({ checked, onCheckedChange, size = "md", tone = "fg", dis
       whileTap={disabled || reduced ? undefined : "press"}
       className={cn(
         // `touch-hit`: coarse pointers get a 44 × 44 tap area (the track is 42 × 24) without a layout change
-        "touch-hit relative inline-flex shrink-0 cursor-pointer items-center rounded-full border border-line-2 bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50",
+        "glass touch-hit relative inline-flex shrink-0 cursor-pointer items-center rounded-full bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50",
         dim.track,
         className,
       )}
@@ -80,7 +80,7 @@ export function Switch({ checked, onCheckedChange, size = "md", tone = "fg", dis
           style={{ originX: checked ? 1 : 0 }}
           transition={spring.press}
         >
-          <motion.span className="absolute inset-0 rounded-full shadow-[0_1px_3px_rgb(0_0_0/calc(0.35*var(--shade,1)))]" style={reduced ? undefined : { scaleX: stretch }}>
+          <motion.span className="absolute inset-0 rounded-full shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_1px_3px_rgb(0_0_0/calc(0.35*var(--shade,1)))]" style={reduced ? undefined : { scaleX: stretch }}>
             <span className="absolute inset-0 rounded-full bg-mute" />
             <motion.span className={cn("absolute inset-0 rounded-full", THUMB_ON[tone])} initial={false} animate={{ opacity: checked ? 1 : 0 }} transition={fade} />
           </motion.span>

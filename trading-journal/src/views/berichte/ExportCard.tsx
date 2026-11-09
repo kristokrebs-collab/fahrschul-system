@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import { useEntitlement } from "@/billing/entitlements";
 import { openUpgrade } from "@/billing/store";
 import { reportFilename, reportToCsv, reportToJson, reportToMarkdown, type Report, type ReportFocus } from "@/domain/reports";
-import { RadialShare, type RadialTarget } from "@/motion/RadialShare";
+import { RADIAL_CHANNEL as CHANNEL, RadialShare, type RadialTarget } from "@/motion/RadialShare";
 import { Button } from "@/primitives/Button";
 import { copyToClipboard } from "@/primitives/CopyButton";
 import { Card } from "@/primitives/Card";
@@ -26,10 +26,13 @@ const LABEL: Readonly<Record<Fmt, string>> = { md: "Markdown", csv: "CSV", json:
 export function ExportCard({ report, focus, className }: { report: Report; focus: ReportFocus; className?: string }) {
   const pdf = useEntitlement("reportsPdf");
   const [printing, setPrinting] = useState(false);
-  const save = async (fmt: Fmt) => {
+  // `quiet`: the share fan says „Datei gespeichert“ itself – the buttons keep their toast
+  const save = async (fmt: Fmt, quiet = false): Promise<boolean> => {
     const data = fmt === "md" ? reportToMarkdown(report, focus) : fmt === "csv" ? reportToCsv(report, focus) : reportToJson(report, focus);
     const name = reportFilename(report, fmt, focus);
-    if (await download(name, data, MIME[fmt])) pushToast({ kind: "success", title: `${LABEL[fmt]} gespeichert`, detail: name });
+    const ok = await download(name, data, MIME[fmt]);
+    if (ok && !quiet) pushToast({ kind: "success", title: `${LABEL[fmt]} gespeichert`, detail: name });
+    return ok;
   };
   const empty = report.empty;
   // R11 radial share: only what the card already does - the Markdown as text (clipboard / system share sheet), the Markdown file, the PDF
@@ -42,16 +45,21 @@ export function ExportCard({ report, focus, className }: { report: Report; focus
         label: "Kopieren",
         detail: "Bericht als Markdown kopieren",
         icon: <Glyph name="copy" className="size-5" />,
+        color: CHANNEL.copy,
+        busy: "Kopiere …",
+        done: "Bericht kopiert",
         onSelect: async () => {
-          pushToast((await copyToClipboard(text())) ? { kind: "success", title: "Bericht kopiert", detail: "Als Markdown." } : { kind: "error", title: "Kopieren ging nicht." });
+          const ok = await copyToClipboard(text());
+          if (!ok) pushToast({ kind: "error", title: "Kopieren ging nicht." });
+          return ok;
         },
       },
-      { id: "file", label: "Datei", detail: "Markdown-Datei speichern", icon: <Glyph name="image" className="size-5" />, onSelect: () => save("md") },
+      { id: "file", label: "Datei", detail: "Markdown-Datei speichern", icon: <Glyph name="image" className="size-5" />, color: CHANNEL.file, busy: "Speichere …", done: "Datei gespeichert", onSelect: () => save("md", true) },
       pdf
-        ? { id: "pdf", label: "PDF", detail: "Drucken oder als PDF sichern", icon: <Glyph name="link" className="size-5" />, onSelect: () => setPrinting(true), disabled: printing }
-        : { id: "pdf", label: "PDF · Premium", detail: "PDF gibt es im Premium-Plan", icon: <Glyph name="lock" className="size-5" />, onSelect: () => openUpgrade("reportsPdf") },
+        ? { id: "pdf", label: "PDF", detail: "Drucken oder als PDF sichern", icon: <Glyph name="link" className="size-5" />, color: CHANNEL.pdf, onSelect: () => setPrinting(true), disabled: printing }
+        : { id: "pdf", label: "PDF · Premium", detail: "PDF gibt es im Premium-Plan", icon: <Glyph name="lock" className="size-5" />, color: CHANNEL.pdf, onSelect: () => openUpgrade("reportsPdf") },
     ];
-    if (native) list.push({ id: "native", label: "Weitergeben", detail: "Mit einer App teilen", icon: <Glyph name="send" className="size-5" />, onSelect: async () => void (await nativeShareText(report.title, text())) });
+    if (native) list.push({ id: "native", label: "Weitergeben", detail: "Mit einer App teilen", icon: <Glyph name="send" className="size-5" />, color: CHANNEL.native, onSelect: async () => void (await nativeShareText(report.title, text())) });
     return list.map((t) => (empty && t.id !== "pdf" ? { ...t, disabled: true, hint: "Keine Trades in diesem Zeitraum" } : t));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `save` only reads `report` / `focus`, both listed
   }, [report, focus, pdf, printing, native, empty]);

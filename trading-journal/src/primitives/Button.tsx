@@ -2,7 +2,7 @@ import { AnimatePresence, motion, type HTMLMotionProps } from "motion/react";
 import { useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { attachMagnet } from "@/motion/buttonMagnet";
-import { tween } from "@/motion/tokens";
+import { pressScale, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { BorderBeam } from "@/primitives/BorderBeam";
@@ -16,12 +16,13 @@ export type ButtonSize = "sm" | "md";
 export const buttonBase =
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border font-semibold transition-colors duration-200 focus-visible:outline-none! focus-visible:shadow-(--ring-glow-btn) disabled:cursor-not-allowed disabled:opacity-50";
 export const buttonVariant: Record<ButtonVariant, string> = {
-  // a whisper of a rim, the fill carries the shape; hover only brightens the fill
-  secondary: "border-line bg-white/[0.05] text-fg hover:bg-white/[0.09]",
-  // no rim, no fill until hover
-  ghost: "border-transparent text-mute hover:bg-white/[0.06] hover:text-fg",
+  // glass (Runde 13, `.glass` in shell-motion.css): a face lit from the top, a 1 px rim light above → dark below, a thin inner edge; hover brightens the fill
+  secondary: "glass bg-white/[0.02] text-fg hover:bg-white/[0.07]",
+  // no rim, no fill until hover – then the glass's inner edge
+  ghost: "border-transparent text-mute hover:bg-white/[0.06] hover:text-fg hover:shadow-(--gl-in)",
+  // the one main action of a card: its sheen and a soft glow under it in the veil ink (white on ink, ink on paper)
   primary:
-    "border-transparent bg-gradient-to-b from-white to-(--color-primary-btn-to) text-ink-950 shadow-(--shadow-btn-sheen) hover:to-white focus-visible:shadow-[var(--shadow-btn-sheen),var(--ring-glow-btn)]",
+    "border-transparent bg-gradient-to-b from-white to-(--color-primary-btn-to) text-ink-950 shadow-[var(--shadow-btn-sheen),0_6px_22px_-10px_rgb(var(--veil-rgb,255_255_255)/0.45)] hover:to-white focus-visible:shadow-[var(--shadow-btn-sheen),var(--ring-glow-btn)]",
   danger: "border-(--color-danger)/40 bg-(--color-danger)/10 text-(--color-danger-text) hover:bg-(--color-danger)/20 focus-visible:shadow-(--ring-glow-btn-danger)",
 };
 export const buttonSize: Record<ButtonSize, string> = { md: "px-4 py-2 text-[13px]", sm: "px-3 py-1.5 text-xs" };
@@ -125,7 +126,8 @@ export function Button({
   const state: ButtonStatus = loading ? "loading" : success ? "success" : error ? "error" : (status ?? "idle");
   const busy = state === "loading";
   const off = Boolean(disabled) || busy;
-  const press = usePressable({ disabled: off });
+  // press: a short squeeze to .97 and back on `spring.press` (Runde 13: the glass controls of the reference films)
+  const press = usePressable({ disabled: off, scale: pressScale.label });
   const reduced = useReducedFx();
   const host = useRef<HTMLSpanElement>(null);
   const inked = ripple && !reduced;

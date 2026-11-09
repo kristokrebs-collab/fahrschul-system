@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { EnrichedTrade } from "@/domain/types";
 import { downloadShareCard } from "@/journal/sharePng";
-import { RadialShare, type RadialTarget } from "@/motion/RadialShare";
+import { RADIAL_CHANNEL as CHANNEL, RadialShare, type RadialTarget } from "@/motion/RadialShare";
 import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
 import { shareTitle } from "../format";
@@ -34,8 +34,14 @@ export function RadialShareButton({ trade, className }: { trade: EnrichedTrade; 
         label: SHARE.copy,
         detail: "Kurzfassung ohne Geldbeträge kopieren",
         icon: <Glyph name="copy" className="size-5" />,
+        color: CHANNEL.copy,
+        // Runde 13: the fan says the result itself (busy word → done word + ✓); only a failure still comes as a toast
+        busy: "Kopiere …",
+        done: "Kurzfassung kopiert",
         onSelect: async () => {
-          pushToast((await copyText(text())) ? { kind: "success", title: "Kurzfassung kopiert", detail: text() } : { kind: "error", title: "Kopieren ging nicht – bitte die Zeile selbst markieren." });
+          const ok = await copyText(text());
+          if (!ok) pushToast({ kind: "error", title: "Kopieren ging nicht – bitte die Zeile selbst markieren." });
+          return ok;
         },
       },
       {
@@ -43,9 +49,13 @@ export function RadialShareButton({ trade, className }: { trade: EnrichedTrade; 
         label: "Bild",
         detail: "Teilen-Bild speichern (nur R und %)",
         icon: <Glyph name="image" className="size-5" />,
+        color: CHANNEL.image,
+        busy: "Speichere …",
+        done: S.imageSaved,
         onSelect: async () => {
           const ok = await downloadShareCard(trade, { privacy: "percent", currency, setups: [] });
-          pushToast(ok ? { kind: "success", title: S.imageSaved } : { kind: "error", title: S.failed });
+          if (!ok) pushToast({ kind: "error", title: S.failed });
+          return ok;
         },
       },
       {
@@ -53,6 +63,7 @@ export function RadialShareButton({ trade, className }: { trade: EnrichedTrade; 
         label: "Link",
         detail: "Teilen-Blatt mit Link öffnen",
         icon: <Glyph name="link" className="size-5" />,
+        color: CHANNEL.link,
         // the share sheet decides what is possible (cloud, login) and says so – a link is never promised here
         onSelect: () => import("../store").then((m) => m.openShare({ kind: "trade", tradeId: trade.id })),
       },
@@ -63,6 +74,7 @@ export function RadialShareButton({ trade, className }: { trade: EnrichedTrade; 
         label: "Weitergeben",
         detail: "Mit einer App teilen",
         icon: <Glyph name="send" className="size-5" />,
+        color: CHANNEL.native,
         onSelect: async () => void (await nativeShareText(text(), text())),
       });
     return list;

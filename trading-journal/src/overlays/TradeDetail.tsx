@@ -17,7 +17,8 @@ import { Button, Skeleton } from "@/primitives";
 import { useEnriched, useJournal } from "@/store/journalStore";
 import { persisted } from "@/store/persisted";
 import { pushToast, useUi } from "@/store/uiStore";
-import { HoldConfirm, confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
+import { BinDelete, useBinDelete, useKept, type BinDeleteControl } from "@/motion/BinDelete";
+import { confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
 import { useOverlayLane } from "@/primitives/toastStore";
 import { MistakeChips, SignalSummary, tradeSignal } from "./SignalSummary";
 import type { Annotation } from "@/domain/types";
@@ -101,7 +102,22 @@ function TradeDetailDialog({ candles, onEdit, className }: TradeDetailProps) {
   const editFromDetail = useUi((s) => s.editFromDetail);
   // the editor took over from this detail (exit variants read it through `AnimatePresence custom`)
   const handoff = useUi((s) => s.editor.open && s.editor.fromDetail === true);
-  const trade = detail.id ? enriched.find((t) => t.id === detail.id) : undefined;
+  // Runde 13: „Löschen“ is the delete pill whose bin eats the word (`motion/BinDelete`) – the store drops the trade while its spinner turns,
+  // the detail keeps showing it until the ring closed
+  // after a delete the row that opened the detail is gone: focus its neighbour (or the list heading) instead of <body>
+  const focusAfterDelete = useRef<HTMLElement | null>(null);
+  const bin = useBinDelete(async () => {
+    const id = detail.id;
+    if (!id) return;
+    focusAfterDelete.current = deleteNeighbour(id);
+    await deleteTradeWithShots(deleteTrade, useJournal.getState().trades.find((t) => t.id === id) ?? { id });
+  }, {
+    done: () => {
+      pushToast({ kind: "info", title: "Trade gelöscht" });
+      closeDetail();
+    },
+  });
+  const trade = useKept(detail.id ? enriched.find((t) => t.id === detail.id) : undefined, bin.busy && detail.id != null);
   const open = Boolean(trade);
   const panelRef = useRef<HTMLDivElement>(null);
   const columnRef = useRef<HTMLDivElement>(null);
@@ -118,8 +134,6 @@ function TradeDetailDialog({ candles, onEdit, className }: TradeDetailProps) {
     if (shownId && flung) setFlung(null);
   }
   const markSettled = (id: string) => setPhase((p) => (p.id === id && !p.settled ? { id, settled: true } : p));
-  // after a delete the row that opened the detail is gone: focus its neighbour (or the list heading) instead of <body>
-  const focusAfterDelete = useRef<HTMLElement | null>(null);
   const fallbackFocus = useCallback(() => {
     const el = focusAfterDelete.current;
     focusAfterDelete.current = null;
@@ -155,12 +169,6 @@ function TradeDetailDialog({ candles, onEdit, className }: TradeDetailProps) {
     else editFromDetail(id);
   };
 
-  const remove = async (id: string) => {
-    focusAfterDelete.current = deleteNeighbour(id);
-    await deleteTradeWithShots(deleteTrade, useJournal.getState().trades.find((t) => t.id === id) ?? { id });
-    pushToast({ kind: "info", title: "Trade gelöscht" });
-    closeDetail();
-  };
 
   return (
     <AnimatePresence
@@ -252,7 +260,7 @@ function TradeDetailDialog({ candles, onEdit, className }: TradeDetailProps) {
                   settled={phase.settled && phase.id === trade.id}
                   onClose={close}
                   onEdit={() => edit(trade.id)}
-                  onDelete={() => remove(trade.id)}
+                  bin={bin}
                   handle={swipe.handle}
                   handleRef={touchGuard}
                   reduced={reduced}
@@ -373,7 +381,8 @@ interface DetailContentProps {
   settled: boolean;
   onClose: () => void;
   onEdit: () => void;
-  onDelete: () => Promise<void>;
+  /** The delete pill's run (owned by the detail: the deletion, the toast, the close). */
+  bin: BinDeleteControl;
   /** Swipe handle props for the header row (touch / pen). */
   handle?: SwipeDismiss["handle"];
   /** Native touchmove guard of the handle (`useTouchMoveGuard`). */
@@ -381,7 +390,7 @@ interface DetailContentProps {
   reduced: boolean;
 }
 
-function DetailContent({ trade: e, setups, currency, candles, settled, onClose, onEdit, onDelete, handle, handleRef, reduced }: DetailContentProps) {
+function DetailContent({ trade: e, setups, currency, candles, settled, onClose, onEdit, bin, handle, handleRef, reduced }: DetailContentProps) {
   const [confirm, setConfirm] = useState(false);
   const saveTrade = useJournal((st) => st.saveTrade);
   // Speicher-Morph (R11): the drawings' autosave shows `Speichert …` → `Zeichnung gespeichert` only after the store resolved, or an honest failure with „Erneut versuchen“
@@ -404,20 +413,8 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
     },
     [runDrawings, saveTrade],
   );
-  const [err, setErr] = useState("");
+  const err = bin.error ? "Löschen fehlgeschlagen." : "";
   const { trigger: deleteTrigger, no: deleteNo } = useConfirmFocus(confirm);
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const pendingDelete = useRef<(() => void) | null>(null);
-  // a confirmed hold is never lost: closing the dialog during the check beat deletes right away
-  useEffect(
-    () => () => {
-      clearTimeout(holdTimer.current);
-      const run = pendingDelete.current;
-      pendingDelete.current = null;
-      run?.();
-    },
-    [],
-  );
   const used = setups.filter((s) => (e.setups || []).includes(s.id));
   const d = tradeTime(e);
   const ratio = e.items.length ? e.checked / e.items.length : 0;
@@ -441,22 +438,10 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
     ["CRV", e.rr == null ? "–" : `1 : ${n2(e.rr)}`],
   ];
 
-  const del = async () => {
-    try {
-      await onDelete();
-    } catch {
-      setErr("Löschen fehlgeschlagen.");
-      setConfirm(false);
-    }
-  };
-  // a completed hold lets the drawn check land before the dialog leaves
-  const deleteAfterHold = () => {
-    clearTimeout(holdTimer.current);
-    pendingDelete.current = () => void onDelete().catch(() => {});
-    holdTimer.current = setTimeout(() => {
-      pendingDelete.current = null;
-      void del();
-    }, reduced ? 0 : tween.check.duration * 1000);
+  // „Ja, löschen“: the question leaves, the pill comes back and its bin eats the word (a confirmed hold starts the same run from the pill)
+  const del = () => {
+    setConfirm(false);
+    bin.start();
   };
 
   return (
@@ -613,7 +598,7 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
               {confirm ? (
                 <motion.span key="confirm" className="flex flex-wrap items-center justify-end gap-2 text-[12.5px] text-(--color-danger-text)" {...confirmSwapMotion(reduced)}>
                   Wirklich löschen?
-                  <Button size="sm" variant="danger" className={COARSE} onClick={() => void del()}>
+                  <Button size="sm" variant="danger" className={COARSE} onClick={del}>
                     Ja, löschen
                   </Button>
                   <Button ref={deleteNo} size="sm" className={COARSE} onClick={() => setConfirm(false)}>
@@ -622,9 +607,9 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
                 </motion.span>
               ) : (
                 <motion.span key="actions" className="flex flex-wrap items-center justify-end gap-2" {...confirmSwapMotion(reduced)}>
-                  <HoldConfirm ref={deleteTrigger} size="sm" onAsk={() => setConfirm(true)} onConfirm={deleteAfterHold}>
+                  <BinDelete ref={deleteTrigger} size="sm" bin={bin} onAsk={() => setConfirm(true)}>
                     Löschen
-                  </HoldConfirm>
+                  </BinDelete>
                   <Button size="sm" className={COARSE} onClick={onClose}>
                     Schließen
                   </Button>

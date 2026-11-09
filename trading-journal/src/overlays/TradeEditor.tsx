@@ -35,7 +35,8 @@ import { RatingDots } from "@/journal/ui/RatingDots";
 import { TagInput, tagSuggestions } from "@/journal/ui/TagInput";
 import { winCelebration } from "./celebration";
 import { FAB_LABEL } from "@/app/navGroups";
-import { HoldConfirm, confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
+import { BinDelete, useBinDelete, useKept } from "@/motion/BinDelete";
+import { confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
 import { AutoHeight } from "@/views/trades/AutoHeight";
 import { DETAIL_DIM_HANDOFF } from "./TradeDetail";
 import { SAVE_CHECK_TIMEOUT_MS, SIGNAL_SECTION_TITLE, SignalSection, resolveTradeSignal, signalSectionSub, type MtfAuto } from "./SignalSection";
@@ -565,7 +566,9 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const deleteTrade = useJournal((s) => s.deleteTrade);
   const reduced = useReducedFx();
 
-  const trade = editor.tradeId ? trades.find((t) => t.id === editor.tradeId) : undefined;
+  // the trade being edited; should it leave the store while the editor is open on it (its delete pill: the store drops it while the spinner
+  // turns, Runde 13) the editor keeps showing it until it closes – never flips into an empty „new trade“
+  const trade = useKept(editor.tradeId ? trades.find((t) => t.id === editor.tradeId) : undefined, editor.open && !!editor.tradeId);
   // a pre-filled new trade (`openEditor({ draft })`, Journal v3); its sequence re-initialises an already open editor
   const draft = !editor.tradeId ? editor.draft : undefined;
   const session = editor.open ? `${editor.tradeId ?? ""}|${draft ? (editor.draftSeq ?? 0) : ""}` : null;
@@ -954,18 +957,19 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     void save("close");
   };
 
-  const onDelete = async () => {
-    if (!trade) return;
-    try {
-      await deleteTradeWithShots(deleteTrade, trade);
+  // „Löschen“ (Runde 13): the delete pill whose bin eats the word once the deletion was confirmed; its spinner is this very deletion
+  const bin = useBinDelete(async () => {
+    if (trade) await deleteTradeWithShots(deleteTrade, trade);
+  }, {
+    done: () => {
       pushToast({ kind: "info", title: "Trade gelöscht" });
       closeEditor();
-    } catch {
-      setConfirmDelete(false);
+    },
+    failed: () => {
       setErr(EDITOR_MESSAGES.deleteFailed);
       shakeField(alertRef.current, { reduced, self: true });
-    }
-  };
+    },
+  });
 
   const applyLive = (k: "entry" | "exit"): number | undefined => {
     if (!hasLive) return undefined;
@@ -999,7 +1003,15 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
             {confirmDelete ? (
               <motion.span key="confirm" className="flex flex-wrap items-center gap-2 text-[12.5px] text-(--color-danger-text)" {...confirmSwapMotion(reduced)}>
                 Wirklich löschen?
-                <Button size="sm" variant="danger" className="pointer-coarse:min-h-11" onClick={() => void onDelete()}>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  className="pointer-coarse:min-h-11"
+                  onClick={() => {
+                    setConfirmDelete(false);
+                    bin.start();
+                  }}
+                >
                   Ja, löschen
                 </Button>
                 <Button ref={deleteNo} size="sm" className="pointer-coarse:min-h-11" onClick={() => setConfirmDelete(false)}>
@@ -1008,9 +1020,9 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
               </motion.span>
             ) : (
               <motion.span key="ask" className="inline-flex" {...confirmSwapMotion(reduced)}>
-                <HoldConfirm ref={deleteTrigger} onAsk={() => setConfirmDelete(true)} onConfirm={() => void onDelete()}>
+                <BinDelete ref={deleteTrigger} bin={bin} onAsk={() => setConfirmDelete(true)}>
                   Löschen
-                </HoldConfirm>
+                </BinDelete>
               </motion.span>
             )}
           </AnimatePresence>
