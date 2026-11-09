@@ -1,0 +1,85 @@
+{
+ "at": "2026-11-08T06:25:11.989Z",
+ "out": [
+  {
+   "address": "/#unbekannt",
+   "result": "ok",
+   "note": "→ /#overview; h1 „Übersicht“; Dialog „“; Navigationen 2; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/#share/ungueltig-token",
+   "result": "ok",
+   "note": "→ /#share/ungueltig-token; h1 „Übersicht“; Dialog „“; Navigationen 1; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/?rechtliches=gibtsnicht",
+   "result": "ok",
+   "note": "→ /?rechtliches=gibtsnicht#overview; h1 „Übersicht“; Dialog „“; Navigationen 2; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/?rechtliches=datenschutz",
+   "result": "lücke",
+   "note": "→ /#overview; h1 „Übersicht“; Dialog „“; Navigationen 4; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/?kuendigen",
+   "result": "ok",
+   "note": "→ /#overview; h1 „Übersicht“; Dialog „“; Navigationen 3; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/?widerruf",
+   "result": "ok",
+   "note": "→ /#overview; h1 „Übersicht“; Dialog „“; Navigationen 3; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/#konto?returnTo=page:preise",
+   "result": "ok",
+   "note": "→ /#konto; h1 „Konto“; Dialog „“; Navigationen 3; Fehler keine; Hinweis (Toast/Alert): „ | “; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.206,1 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/#konto?returnTo=http://evil.example",
+   "result": "ok",
+   "note": "→ /#konto?returnTo=http://evil.example; h1 „Konto“; Dialog „“; Navigationen 1; Fehler keine; Hinweis (Toast/Alert): „ | “; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/#trades?result=win&side=long&q=%3Cscript%3E",
+   "result": "ok",
+   "note": "→ /#trades?result=win&side=long&q=%3Cscript%3E; h1 „Alle Trades“; Dialog „“; Navigationen 1; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/#analyse?dim=session",
+   "result": "ok",
+   "note": "→ /#analyse?dim=session; h1 „Analyse“; Dialog „“; Navigationen 1; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/#berichte?p=2026-W41",
+   "result": "ok",
+   "note": "→ /#berichte?p=2026-W41; h1 „Berichte“; Dialog „“; Navigationen 1; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/#community?invite=ABC123",
+   "result": "ok",
+   "note": "→ /#community?invite=ABC123; h1 „Community“; Dialog „“; Navigationen 1; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/gibtsnicht",
+   "result": "ok",
+   "note": "→ /gibtsnicht#overview; h1 „Übersicht“; Dialog „“; Navigationen 2; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/dashboard.html",
+   "result": "ok",
+   "note": "→ /dashboard.html; h1 „“; Dialog „“; Navigationen 1; Fehler keine; Hinweis (Toast/Alert): „“; Text: ⚡ Fahrschul-System Pro Schüler-Status-Zentrale · Enterprise-Steuerung 08.11.2026 M 🔍 Alle ● Kritisch ● Wartet auf Büro ● Prüfungsreif 3 Sch"
+  },
+  {
+   "address": "/?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired",
+   "result": "ok",
+   "note": "→ /#overview; h1 „Übersicht“; Dialog „“; Navigationen 3; Fehler keine; Hinweis (Toast/Alert): „Anmeldung nicht möglichDer Link ist abgelaufen. Fordere einfach einen neuen an.“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  },
+  {
+   "address": "/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired",
+   "result": "ok",
+   "note": "→ /#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired; h1 „Übersicht“; Dialog „“; Navigationen 1; Fehler keine; Hinweis (Toast/Alert): „“; Text: Trade Journal Trade Journal Makro & Scalp · Entscheidungen, Win-Rate, Backtest BTC 84.199,0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 "
+  }
+ ]
+}

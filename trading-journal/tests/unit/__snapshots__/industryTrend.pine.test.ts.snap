@@ -1,0 +1,77 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Pine-Skript der Basis (Snapshot) > bleibt, wie es ist – eine Änderung am Text ist eine bewusste 1`] = `
+"//@version=5
+// Branchen-Trend: Nachbau der Regel aus Zarattini & Antonacci (2024), „A Century of Profitable Industry Trends“.
+// Variante s-20-40-2.8-0.02-2.0: oberer Kanal 20 Tage, unterer Kanal 40 Tage, Keltner-Faktor 2.8.
+// Rückblick-Regel, keine Prognose und keine Anlageberatung. Das Skript sendet keine Orders; es markiert nur Signaltage.
+// NICHT in TradingView kompiliert oder geprüft – siehe die Hinweise der App. Nur Tageskerzen.
+//   - Nicht in TradingView kompiliert: Die App kann Pine weder ausführen noch prüfen. Meldet TradingView einen Fehler, steht er im Skript selbst.
+//   - Gerechnet wird auf den Schlusskursen des Charts (ETF oder Index), nicht auf den Branchenrenditen von Ken French. Kurse, Dividenden und Historie unterscheiden sich, Signaltage können abweichen.
+//   - Nur Tageskerzen. Auf anderen Zeitrahmen warnt das Skript und die Fenster (Tage) wären Balken.
+//   - Der gleitende Durchschnitt (EMA) startet mit dem ersten Kurs, wie im Labor-Skript – nicht wie ta.ema von TradingView, das mit einem einfachen Durchschnitt beginnt.
+//   - Ziel-Vola, Hebel und Kosten (5 bp) gehören zur Gewichtung des Portfolios und stehen nicht im Skript: Es markiert nur Signaltage.
+//   - Alarme: beim Anlegen „Einmal pro Balkenschluss“ wählen, sonst meldet TradingView ein Signal mitten am Tag, das der Schlusskurs wieder zurücknehmen kann.
+
+indicator("Branchen-Trend (Nachbau)", shorttitle = "Branchen-Trend", overlay = true, max_labels_count = 50)
+
+upLen = input.int(20, "Oberer Kanal: Fenster (Tage)", minval = 2)
+downLen = input.int(40, "Unterer Kanal und Stop: Fenster (Tage)", minval = 2)
+kelt = input.float(2.8, "Keltner-Faktor", minval = 0.0, step = 0.1)
+showLines = input.bool(true, "Kanäle und Stop zeigen")
+
+// EMA wie im Labor-Skript: Start mit dem ersten Wert
+f_ema(src, len) =>
+    float a = 2.0 / (len + 1)
+    float e = na
+    e := na(e[1]) ? src : a * src + (1 - a) * e[1]
+    e
+
+float absChg = math.abs(ta.change(close))
+float hi = ta.highest(close, upLen)
+float lo = ta.lowest(close, downLen)
+float madUp = ta.sma(absChg, upLen)
+float madDn = ta.sma(absChg, downLen)
+float emaUp = f_ema(close, upLen)
+float emaDn = f_ema(close, downLen)
+
+// Kanäle: erst definiert, wenn das Fenster voll ist (wie im Labor-Skript)
+float upper = bar_index >= upLen ? math.max(hi, emaUp + kelt * madUp) : na
+float lower = bar_index >= downLen ? math.min(lo, emaDn - kelt * madDn) : na
+
+// Zustand: 1 = im Markt (grün), 0 = Cash (rot). Einstieg: Schluss auf oder über dem oberen Kanal von gestern.
+// Stop: der untere Kanal beim Einstieg, danach nur nach oben nachgezogen; Ausstieg bei Schluss auf oder unter dem Stop.
+var int inTrade = 0
+var float stopLevel = na
+int prevOn = nz(inTrade[1])
+float prevUp = upper[1]
+float prevLo = lower[1]
+if bar_index == 0 or na(prevUp) or na(prevLo)
+    inTrade := 0
+else if inTrade == 1
+    if not na(lower)
+        stopLevel := na(stopLevel) ? lower : math.max(stopLevel, lower)
+    if close <= stopLevel
+        inTrade := 0
+else if close >= prevUp and prevUp > prevLo
+    inTrade := 1
+    stopLevel := lower
+
+bool buySig = inTrade == 1 and prevOn != 1
+bool sellSig = inTrade == 0 and prevOn == 1
+
+plot(showLines ? upper : na, "Oberer Kanal", color = color.new(color.green, 35), linewidth = 1)
+plot(showLines ? lower : na, "Unterer Kanal", color = color.new(color.red, 35), linewidth = 1)
+plot(showLines and inTrade == 1 ? stopLevel : na, "Stop (nur nach oben)", color = color.new(color.orange, 20), style = plot.style_linebr, linewidth = 1)
+plotshape(buySig, "Kauf", style = shape.circle, location = location.belowbar, color = color.green, size = size.small)
+plotshape(sellSig, "Verkauf", style = shape.circle, location = location.abovebar, color = color.red, size = size.small)
+bgcolor(inTrade == 1 ? color.new(color.green, 93) : na, title = "Im Markt")
+
+if barstate.islast and not timeframe.isdaily
+    label.new(bar_index, high, "Branchen-Trend ist für Tageskerzen gedacht (Zeitrahmen 1T).", style = label.style_label_down, color = color.new(color.orange, 15), textcolor = color.white)
+
+// Alarme mit JSON-Nachricht; TradingView ersetzt {{ticker}}, {{time}} und {{close}}.
+alertcondition(buySig, title = "Branchen-Trend: KAUF", message = '{"schema":"branchen-trend/1","strategie":"s-20-40-2.8-0.02-2.0","signal":"KAUF","symbol":"{{ticker}}","datum":"{{time}}","kurs":{{close}},"modus":"DEMO/PAPIER"}')
+alertcondition(sellSig, title = "Branchen-Trend: VERKAUF", message = '{"schema":"branchen-trend/1","strategie":"s-20-40-2.8-0.02-2.0","signal":"VERKAUF","symbol":"{{ticker}}","datum":"{{time}}","kurs":{{close}},"modus":"DEMO/PAPIER"}')
+"
+`;

@@ -1,0 +1,822 @@
+/* Anmelde-/Registrierfenster (Paket V, docs/audit/V-VORBILD.md § 1): eine Querformat-Karte 1030 : 621 mit Papier-Formularhälfte und
+   dunklem, schrägem Band. Alle Maße in Container-Einheiten der Karte (cqw = 1 % Breite, cqh = 1 % Höhe), damit die gemessenen Anteile bei
+   jeder Größe gelten. Farben nur aus unseren Tokens: die Formularhälfte trägt die Papier-Werte des hellen Themas (themes.css
+   `:root[data-theme="light"]`, hier wiederholt – synchron halten), das Band die Tinten-Werte (`data-theme-scope="dark"`, dunkle Insel).
+   So sieht die Karte in beiden Themen gleich aus: hell + dunkles Band, wie im Vorbild. Akzent = `--color-signal` (folgt der
+   Akzentwahl). Bewegt wird nur transform / opacity (Web Animations aus authBand.ts); Reduced Motion: ein kurzes Überblenden.
+   Nur im Lazy-Chunk des Anmeldefensters. */
+
+/* ---------------------------------------------------------------- Fenster */
+.aw-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 56px 24px 40px;
+}
+.aw-dim {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / calc(0.62 * var(--shade, 1)));
+}
+.aw-frame {
+  position: relative;
+  /* 1030 : 621 (gemessen); nie breiter als der Platz, nie höher als der Platz */
+  width: min(1030px, calc(100vw - 48px), calc((100dvh - 96px) * 1.6586));
+}
+.aw-card {
+  container-type: size;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1030 / 621;
+  overflow: hidden;
+  border-radius: 5.2cqw;
+  isolation: isolate;
+  background: linear-gradient(160deg, var(--color-ink-850) 0%, var(--color-ink-800) 100%);
+  box-shadow: 0 40px 90px rgb(0 0 0 / calc(0.45 * var(--shade, 1)));
+}
+/* Breite des Rahmens → Eckenradius der Karte (cqw gilt erst IN der Karte) */
+.aw-frame {
+  container-type: inline-size;
+}
+.aw-card {
+  border-radius: 5.2cqw;
+}
+.aw-close {
+  position: absolute;
+  top: -52px;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  color: #f2f2f2;
+  background: rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  transition: background-color 150ms ease-out;
+}
+.aw-close:hover {
+  background: rgb(255 255 255 / 0.2);
+}
+.aw-close:focus-visible {
+  outline: 2px solid #f2f2f2;
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- Band (Lage + Transform per Inline-Style aus authBand.ts) */
+.aw-band {
+  position: absolute;
+  z-index: 2;
+  will-change: transform;
+}
+.aw-band-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.aw-band-inner {
+  position: absolute;
+  will-change: transform;
+  background:
+    radial-gradient(70cqw 60cqh at 92% 0%, rgb(255 255 255 / 0.08), transparent 70%),
+    radial-gradient(circle, rgb(255 255 255 / 0.05) 1px, transparent 1.3px) 0 0 / 22px 22px,
+    linear-gradient(180deg, var(--color-ink-700) 0%, var(--color-ink-850) 48%, var(--color-ink-950) 100%);
+  color: var(--color-fg);
+}
+/* leuchtende Haarlinie in Akzentfarbe AUF der Kante, ≈ 3–4 px Verlauf in die Papierfläche */
+.aw-band::before,
+.aw-band::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+.aw-card[data-orient="landscape"] .aw-band::before,
+.aw-card[data-orient="landscape"] .aw-band::after {
+  top: 0;
+  bottom: 0;
+  width: max(3px, 0.4cqw);
+}
+.aw-card[data-orient="landscape"] .aw-band::before {
+  right: 100%;
+  background: linear-gradient(to left, var(--color-signal) 0 1px, color-mix(in srgb, var(--color-signal) 38%, transparent) 1px, transparent);
+}
+.aw-card[data-orient="landscape"] .aw-band::after {
+  left: 100%;
+  background: linear-gradient(to right, var(--color-signal) 0 1px, color-mix(in srgb, var(--color-signal) 38%, transparent) 1px, transparent);
+}
+.aw-card[data-orient="portrait"] .aw-band::before,
+.aw-card[data-orient="portrait"] .aw-band::after {
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+.aw-card[data-orient="portrait"] .aw-band::before {
+  bottom: 100%;
+  background: linear-gradient(to top, var(--color-signal) 0 1px, color-mix(in srgb, var(--color-signal) 38%, transparent) 1px, transparent);
+}
+.aw-card[data-orient="portrait"] .aw-band::after {
+  top: 100%;
+  background: linear-gradient(to bottom, var(--color-signal) 0 1px, color-mix(in srgb, var(--color-signal) 38%, transparent) 1px, transparent);
+}
+
+/* ---------------------------------------------------------------- Markentext (Kartenkoordinaten, im Band) */
+.aw-brand {
+  position: absolute;
+  left: 58.9%;
+  width: 34%;
+  top: 0;
+  bottom: 0;
+}
+.aw-brand[data-side="b"] {
+  left: 5%;
+}
+.aw-brand[data-active="false"] {
+  opacity: 0;
+}
+.aw-eyebrow {
+  position: absolute;
+  top: 34.4%;
+  margin: 0;
+  font: 600 2.1cqh/2.4cqh var(--font-mono);
+  letter-spacing: 0.34em;
+  color: var(--color-signal);
+}
+.aw-headline {
+  position: absolute;
+  top: 39.4%;
+  margin: 0;
+  display: grid;
+  font-weight: 400;
+  font-size: 7.4cqh;
+  line-height: 8.9cqh;
+  letter-spacing: -0.02em;
+  color: var(--color-fg);
+}
+.aw-headline em {
+  font-style: italic;
+  color: var(--color-signal);
+}
+.aw-brand-text {
+  position: absolute;
+  top: 60.2%;
+  margin: 0;
+  max-width: 100%;
+  font-size: 2.65cqh;
+  line-height: 4.2cqh;
+  color: var(--color-mute);
+}
+
+/* ---------------------------------------------------------------- Formularspalte */
+.aw-col {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: 4.6%;
+  width: 37%;
+}
+.aw-col[data-side="b"] {
+  left: 58.4%;
+}
+.aw-col[data-leaving] {
+  pointer-events: none;
+}
+.aw-abs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--aw-top) * 1cqh);
+}
+.aw-title {
+  height: 6.4cqh;
+  margin: 0;
+  font-size: 5cqh;
+  line-height: 6.4cqh;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--color-fg);
+}
+.aw-accent {
+  display: block;
+  width: 5.3cqw;
+  height: max(2px, 0.5cqh);
+  border-radius: 999px;
+  background: var(--color-signal);
+}
+
+/* Unterstrich-Feld: Platzhalter im Feld, fokussiert schwebt das Label (≈ 60 %), der Akzent-Strich wächst von links (≈ 120 ms). */
+.aw-field {
+  height: 10cqh;
+}
+.aw-input {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 7.4cqh;
+  padding: 0 4.6cqh 0 0;
+  border: 0;
+  background: transparent;
+  font: 400 max(16px, 3cqh) / 1 var(--font-sans);
+  color: var(--color-fg);
+  caret-color: var(--color-fg);
+  outline: none;
+}
+.aw-input::placeholder {
+  color: transparent;
+}
+.aw-input:-webkit-autofill {
+  -webkit-text-fill-color: var(--color-fg);
+  transition: background-color 9999s;
+}
+.aw-label {
+  position: absolute;
+  left: 0;
+  bottom: 3.7cqh;
+  translate: 0 50%;
+  font-size: max(16px, 3cqh);
+  line-height: 1;
+  color: var(--color-mute);
+  transform-origin: left center;
+  pointer-events: none;
+  transition:
+    transform 150ms cubic-bezier(0, 0, 0.2, 1),
+    color 150ms ease-out;
+}
+.aw-input:focus + .aw-label,
+.aw-input:not(:placeholder-shown) + .aw-label,
+.aw-input:-webkit-autofill + .aw-label {
+  transform: translateY(-4.4cqh) scale(0.64);
+  color: var(--color-signal);
+}
+.aw-input:not(:focus):not(:placeholder-shown) + .aw-label {
+  color: var(--color-mute);
+}
+.aw-fline,
+.aw-ffocus {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+.aw-fline {
+  height: 1px;
+  background: var(--color-line-2);
+}
+.aw-ffocus {
+  height: max(2px, 0.45cqh);
+  bottom: -0.15cqh;
+  border-radius: 999px;
+  background: var(--color-signal);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-signal) 45%, transparent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 120ms cubic-bezier(0, 0, 0.2, 1);
+}
+.aw-field:focus-within .aw-ffocus {
+  transform: scaleX(1);
+}
+.aw-field[data-invalid] .aw-fline {
+  background: var(--color-loss);
+}
+.aw-ficon {
+  position: absolute;
+  right: 0;
+  bottom: 3.7cqh;
+  translate: 0 50%;
+  display: grid;
+  place-items: center;
+  width: 4.4cqh;
+  height: 4.4cqh;
+  min-width: 24px;
+  min-height: 24px;
+  color: var(--color-mute);
+}
+.aw-ficon svg {
+  width: 2.7cqh;
+  height: 2.7cqh;
+  min-width: 15px;
+  min-height: 15px;
+}
+button.aw-ficon {
+  border-radius: 8px;
+  cursor: pointer;
+}
+button.aw-ficon:hover {
+  color: var(--color-fg);
+}
+button.aw-ficon:focus-visible {
+  outline: 2px solid var(--color-fg);
+}
+.aw-ferror {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.8cqh);
+  margin: 0;
+  font-size: max(11.5px, 2.05cqh);
+  line-height: 1.25;
+  color: var(--color-danger-text);
+}
+
+/* Haken-Zeile, Links, Fußzeile */
+.aw-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2cqh;
+  height: 4cqh;
+  font-size: max(12px, 2.5cqh);
+  color: var(--color-mute);
+}
+.aw-check {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 1.6cqh;
+  cursor: pointer;
+  min-height: 24px;
+}
+.aw-check input {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.aw-box {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: max(16px, 2.9cqh);
+  height: max(16px, 2.9cqh);
+  border-radius: 3px;
+  border: 1.5px solid var(--color-line-2);
+  color: var(--color-ink-850);
+  pointer-events: none;
+  transition:
+    background-color 120ms ease-out,
+    border-color 120ms ease-out;
+}
+.aw-check input:checked + .aw-box {
+  background: var(--color-fg);
+  border-color: var(--color-fg);
+}
+.aw-check input:focus-visible + .aw-box {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+}
+.aw-check svg {
+  width: 72%;
+  height: 72%;
+  opacity: 0;
+}
+.aw-check input:checked + .aw-box svg {
+  opacity: 1;
+}
+.aw-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--color-fg);
+  text-decoration: underline;
+  text-decoration-color: var(--color-signal);
+  text-decoration-thickness: max(1.5px, 0.3cqh);
+  text-underline-offset: 0.55em;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.aw-link:hover {
+  text-decoration-thickness: max(2px, 0.4cqh);
+}
+.aw-link:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 3px;
+}
+.aw-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  height: 3.6cqh;
+  font-size: max(12px, 2.6cqh);
+  color: var(--color-mute);
+}
+.aw-foot-small {
+  height: 3.2cqh;
+  font-size: max(11.5px, 2.2cqh);
+}
+.aw-foot-small .aw-link {
+  font-weight: 600;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.4em;
+}
+
+.aw-legal {
+  margin: 0;
+  font-size: max(10.5px, 1.85cqh);
+  line-height: 1.3;
+  color: var(--color-faint);
+}
+.aw-legal a {
+  color: var(--color-mute);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.aw-card[data-orient="portrait"] .aw-legal {
+  font-size: 11px;
+}
+
+/* Primärknopf: Pille über die ganze Spaltenbreite, dunkle Fläche mit Verlauf, weicher Schlagschatten */
+.aw-btn {
+  display: grid;
+  place-items: center;
+  height: 10.2cqh;
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2c2c2c 0%, var(--color-white) 100%);
+  color: #f2f2f2;
+  font: 700 max(14px, 2.9cqh) / 1 var(--font-sans);
+  letter-spacing: 0.005em;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 1.6cqh 3.2cqh -1.2cqh rgb(0 0 0 / 0.45);
+  cursor: pointer;
+}
+.aw-btn:hover {
+  background: linear-gradient(180deg, #363636 0%, var(--color-white) 100%);
+}
+.aw-btn:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 3px;
+}
+.aw-btn:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+/* Passwort-Hinweis: vier kurze Stärke-Segmente links, Regel rechts */
+.aw-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 3cqh;
+  font-size: max(11px, 1.95cqh);
+  color: var(--color-mute);
+}
+.aw-seg {
+  display: flex;
+  gap: 1cqw;
+}
+.aw-seg span {
+  display: block;
+  width: 4cqw;
+  height: max(2px, 0.35cqh);
+  border-radius: 999px;
+  background: var(--color-line-2);
+  transition: background-color 150ms ease-out;
+}
+.aw-seg[data-tone="loss"] span[data-on] {
+  background: var(--color-loss);
+}
+.aw-seg[data-tone="warn"] span[data-on] {
+  background: var(--color-warn);
+}
+.aw-seg[data-tone="win"] span[data-on] {
+  background: var(--color-win);
+}
+.aw-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.4cqh;
+  font-size: max(11px, 1.9cqh);
+  line-height: 1.32;
+  color: var(--color-mute);
+}
+.aw-consent .aw-box {
+  margin-top: 0.1em;
+  width: max(15px, 2.5cqh);
+  height: max(15px, 2.5cqh);
+}
+.aw-consent[data-invalid] .aw-box {
+  border-color: var(--color-loss);
+}
+.aw-consent a {
+  color: var(--color-fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.aw-msg {
+  margin: 0;
+  font-size: max(11.5px, 2.05cqh);
+  line-height: 1.3;
+  color: var(--color-danger-text);
+}
+
+/* Weitere Schritte (Passwort vergessen, Postfach, 2FA, neues Passwort, Konto, Willkommen): Fluss statt fester Lage */
+.aw-step {
+  position: absolute;
+  inset: 9cqh 0 6cqh;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4cqh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.aw-step .aw-title {
+  height: auto;
+}
+.aw-step .aw-field {
+  position: relative;
+  flex: none;
+}
+.aw-step .aw-btn {
+  flex: none;
+  min-height: 48px;
+  height: 8.6cqh;
+}
+.aw-lead {
+  margin: 0;
+  font-size: max(13px, 2.45cqh);
+  line-height: 1.5;
+  color: var(--color-mute);
+}
+.aw-notice {
+  margin: 0;
+  padding: 1.2cqh 1.6cqh;
+  border-radius: 10px;
+  border: 1px solid var(--color-line);
+  background: var(--color-ink-900);
+  font-size: max(12px, 2.2cqh);
+  color: var(--color-mute);
+}
+
+/* ---------------------------------------------------------------- Telefon (nicht im Vorbild, eigene Ableitung): Karte hochkant */
+.aw-card[data-orient="portrait"] {
+  aspect-ratio: auto;
+  height: min(calc(100dvh - 88px), 780px);
+  border-radius: 28px;
+}
+.aw-frame[data-orient="portrait"] {
+  width: min(440px, calc(100vw - 32px));
+}
+.aw-card[data-orient="portrait"] .aw-brand {
+  left: 7%;
+  right: 7%;
+  width: auto;
+  top: 0;
+  bottom: auto;
+  height: 30%;
+}
+.aw-card[data-orient="portrait"] .aw-brand[data-side="b"] {
+  top: 70%;
+}
+.aw-card[data-orient="portrait"] .aw-eyebrow {
+  top: 15%;
+  font-size: 2.9cqw;
+  line-height: 1.2;
+}
+.aw-card[data-orient="portrait"] .aw-brand[data-side="b"] .aw-eyebrow {
+  top: 24%;
+}
+.aw-card[data-orient="portrait"] .aw-headline {
+  top: 27%;
+  font-size: 8.6cqw;
+  line-height: 1.12;
+}
+.aw-card[data-orient="portrait"] .aw-brand[data-side="b"] .aw-headline {
+  top: 36%;
+}
+.aw-card[data-orient="portrait"] .aw-brand-text {
+  display: none;
+}
+.aw-card[data-orient="portrait"] .aw-col {
+  left: 7%;
+  width: 86%;
+  top: 33%;
+  bottom: 2.5%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+.aw-card[data-orient="portrait"] .aw-col[data-side="b"] {
+  top: 2.5%;
+  bottom: 31%;
+  gap: 11px;
+}
+.aw-card[data-orient="portrait"] .aw-abs {
+  position: relative;
+  top: auto;
+  flex: none;
+}
+.aw-card[data-orient="portrait"] .aw-title {
+  height: auto;
+  font-size: 7.4cqw;
+  line-height: 1.15;
+}
+.aw-card[data-orient="portrait"] .aw-accent {
+  width: 12cqw;
+  height: 3px;
+  margin-top: -4px;
+}
+.aw-card[data-orient="portrait"] .aw-field {
+  height: 52px;
+}
+.aw-card[data-orient="portrait"] .aw-input {
+  height: 38px;
+  padding-right: 30px;
+  font-size: 16px;
+}
+.aw-card[data-orient="portrait"] .aw-label {
+  bottom: 19px;
+  font-size: 16px;
+}
+.aw-card[data-orient="portrait"] .aw-input:focus + .aw-label,
+.aw-card[data-orient="portrait"] .aw-input:not(:placeholder-shown) + .aw-label,
+.aw-card[data-orient="portrait"] .aw-input:-webkit-autofill + .aw-label {
+  transform: translateY(-24px) scale(0.72);
+}
+.aw-card[data-orient="portrait"] .aw-ficon {
+  bottom: 19px;
+  width: 28px;
+  height: 28px;
+}
+.aw-card[data-orient="portrait"] .aw-ficon svg {
+  width: 17px;
+  height: 17px;
+}
+.aw-card[data-orient="portrait"] .aw-ferror {
+  top: calc(100% + 3px);
+  font-size: 11.5px;
+}
+.aw-card[data-orient="portrait"] .aw-line,
+.aw-card[data-orient="portrait"] .aw-foot {
+  height: auto;
+  min-height: 24px;
+  font-size: 13px;
+}
+.aw-card[data-orient="portrait"] .aw-foot-small {
+  font-size: 12px;
+}
+.aw-card[data-orient="portrait"] .aw-btn {
+  height: 50px;
+  font-size: 15px;
+}
+.aw-card[data-orient="portrait"] .aw-hint {
+  height: auto;
+  margin-top: -6px;
+  font-size: 11.5px;
+}
+.aw-card[data-orient="portrait"] .aw-seg span {
+  width: 9cqw;
+  height: 2px;
+}
+.aw-card[data-orient="portrait"] .aw-consent {
+  font-size: 11.5px;
+}
+.aw-card[data-orient="portrait"] .aw-step {
+  position: relative;
+  inset: auto;
+  max-height: 100%;
+  gap: 14px;
+}
+.aw-card[data-orient="portrait"] .aw-step .aw-btn {
+  height: 50px;
+}
+.aw-card[data-orient="portrait"] .aw-lead {
+  font-size: 13.5px;
+}
+.aw-card[data-orient="portrait"] .aw-notice {
+  font-size: 12.5px;
+}
+.aw-frame[data-orient="portrait"] .aw-close {
+  top: -46px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aw-label,
+  .aw-ffocus,
+  .aw-box,
+  .aw-seg span {
+    transition-duration: 0ms;
+  }
+}
+
+/* ---------------------------------------------------------------- Konto-Pflicht (src/cloud/gate.ts): das Fenster als Seite vor der App.
+   Keine Abdunklung, kein Schließen; die Seite scrollt selbst (ein Handy erreicht die Links unter der Karte), Karte und Band bleiben, wie sie
+   sind. Unter den Blättern (Rechtliches, Verträge: z 60) und den Meldungen (z 95), damit sie über der Seite aufgehen. */
+.aw-overlay[data-gate] {
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+  background:
+    radial-gradient(110% 70% at 50% 0%, color-mix(in srgb, var(--color-ink-700) 55%, transparent) 0%, transparent 70%),
+    var(--color-ink-900);
+}
+.aw-overlay[data-gate] > .aw-frame {
+  flex: none;
+  margin-block: auto;
+}
+.aw-gate-head,
+.aw-gate-foot {
+  flex: none;
+  width: min(1030px, 100%);
+  color: var(--color-mute);
+}
+.aw-gate-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.aw-gate-word {
+  margin: 0;
+  font: 600 11.5px / 1.2 var(--font-mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-fg);
+}
+.aw-gate-lead {
+  margin: 0;
+  font-size: 12px;
+}
+.aw-gate-foot {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
+  font-size: 11.5px;
+}
+.aw-gate-foot nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.aw-gate-foot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 10px;
+  color: inherit;
+  text-underline-offset: 2px;
+}
+.aw-gate-foot a:hover {
+  color: var(--color-fg);
+  text-decoration: underline;
+}
+.aw-gate-foot a:focus-visible {
+  outline: 2px solid var(--color-fg);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.aw-gate-note {
+  margin: 0;
+  max-width: 62ch;
+}
+/* `#preise` ohne Anmeldung (nur lesen): schmale Leiste mit Anmelden / Konto erstellen, unten dieselben Links wie unter dem Fenster */
+.aw-pricing-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-ink-900) 92%, transparent);
+  backdrop-filter: blur(8px);
+}
+.aw-pricing-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 1320px;
+  margin-inline: auto;
+  padding: 10px 16px;
+}
+.aw-pricing-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.aw-pricing-foot {
+  display: flex;
+  justify-content: center;
+  padding: 0 16px 32px;
+}
+@media (min-width: 640px) {
+  .aw-pricing-row {
+    padding-inline: 24px;
+  }
+}
