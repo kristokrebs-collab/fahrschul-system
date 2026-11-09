@@ -218,7 +218,11 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
     await expect(sheet.getByLabel("E-Mail")).toHaveValue("trader@example.com");
     await context.setOffline(false);
     await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
-    await expect(page.locator('[data-auth-view="welcome"]')).toBeVisible({ timeout: 30_000 });
+    // back online the same input signs in: the end of a login is the welcome view or – with a journal already in this browser
+    // (returningBrowser) – the takeover question that replaces it (same contract as completeSignIn); the gate is gone either way
+    const ended = page.locator('[data-auth-view="welcome"]').or(page.getByTestId("takeover-choose"));
+    await expect(ended).toBeVisible({ timeout: 30_000 });
+    await expect(entryGate(page)).toHaveCount(0, { timeout: 10_000 });
   });
 
   test("Einrichtung (4 Schritte) kommt EINMAL nach der Registrierung, speichert den Fortschritt und kehrt nach einem Reload nicht von selbst zurück", async ({ page }) => {
