@@ -4,6 +4,7 @@
  * with „Erneut versuchen“), Login/Signup-Morph (one form, the card's height eases) and Thinking Orbs (the frame loop stops for a hidden
  * tab). The login test runs on the cloud edition against the Supabase mock (`PW_CLOUD_BASE_URL`).
  */
+import { bandSettled, expectNotInert } from "./cloudSignIn";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -397,64 +398,56 @@ test.describe("Speicher-Morph", () => {
 test.describe("Login/Signup-Morph", () => {
   test.setTimeout(90_000);
 
-  test("Anmelden ↔ Registrieren: dasselbe Formular, E-Mail und Fokus bleiben, die Höhe federt statt zu springen", async ({ page }, info) => {
+  // Paket V replaced the morphing sheet (tabs, height spring) with the landscape card of the reference recording: the band crosses
+  // the card once and the card keeps its height. The band run itself (900 ms, curve, focus) is pinned in auth-b.spec.ts; here: every
+  // frame of the switch, the password manager's pairs on both sides, a11y and a clean console.
+  test("Anmelden ↔ Registrieren: die Karte behält in jedem Bild ihre Höhe, die Passwort-Manager-Paare stimmen auf beiden Seiten", async ({ page }, info) => {
     only(info);
     const errors = collectErrors(page);
     await mockSupabase(page);
     await seed(page, {});
     await openRoute(page, cloudUrl("konto"), "Konto", { timeout: 30_000 });
     await page.locator('[data-cloud-pill="signin"]').click();
-    const sheet = page.getByRole("dialog", { name: "Anmelden" });
-    await expect(sheet).toBeVisible();
-    await expect(sheet.locator("[inert]")).toHaveCount(0);
-    const mail = sheet.getByLabel("E-Mail");
-    await mail.fill("ich@beispiel.de");
-    await expect(mail).toHaveAttribute("autocomplete", "username");
-    await expect(sheet.getByLabel("Passwort", { exact: true })).toHaveAttribute("autocomplete", "current-password");
-    await mail.evaluate((el) => ((window as unknown as { __mail: Element }).__mail = el));
-    await mail.focus();
+    const signin = page.getByRole("dialog", { name: "Anmelden" });
+    await expectNotInert(signin.getByLabel("E-Mail"));
+    await expect(signin.getByLabel("E-Mail")).toHaveAttribute("autocomplete", "username");
+    await expect(signin.getByLabel("Passwort", { exact: true })).toHaveAttribute("autocomplete", "current-password");
 
     // sample the card height every frame during the switch
     await page.evaluate(() => {
-      const panel = document.querySelector('[role="dialog"]')!;
+      const card = document.querySelector('[data-testid="auth-card"]')!;
       const w = window as unknown as { __h: number[]; __stop: boolean };
       w.__h = [];
       w.__stop = false;
       const tick = () => {
-        w.__h.push(panel.getBoundingClientRect().height);
+        w.__h.push(card.getBoundingClientRect().height);
         if (!w.__stop) requestAnimationFrame(tick);
       };
       tick();
     });
-    await sheet.getByRole("radio", { name: "Neu hier" }).click();
-    // the title follows the mode: from here on the dialog is found by role alone
-    const card = page.getByRole("dialog");
-    await page.waitForTimeout(1100);
-    const { heights, same, value } = await page.evaluate(() => {
-      const w = window as unknown as { __h: number[]; __stop: boolean; __mail: Element };
+    await page.getByTestId("auth-to-signup").click();
+    const signup = page.getByRole("dialog", { name: "Konto erstellen" });
+    await expect(signup).toBeVisible({ timeout: 5_000 });
+    await bandSettled(page, 5_000);
+    const heights = await page.evaluate(() => {
+      const w = window as unknown as { __h: number[]; __stop: boolean };
       w.__stop = true;
-      const m = document.querySelector<HTMLInputElement>('input[name="email"]')!;
-      return { heights: w.__h, same: m === w.__mail, value: m.value };
+      return w.__h;
     });
-    expect(same, "the e-mail input is the same DOM node").toBe(true);
-    expect(value).toBe("ich@beispiel.de");
-    await expect(card.getByLabel("Passwort", { exact: true })).toHaveAttribute("autocomplete", "new-password");
-    await expect(card.getByLabel("E-Mail")).toHaveAttribute("autocomplete", "email");
-    const first = heights[0]!;
-    const last = heights[heights.length - 1]!;
-    const total = Math.abs(last - first);
-    expect(total).toBeGreaterThan(40); // registering has more to show
-    // the height eased: it never dipped or overshot (one panel animation, not two on top of each other) and passed through values in between
-    for (let i = 1; i < heights.length; i++) expect(heights[i]!, `frame ${i}: ${heights.map((h) => Math.round(h)).join(",")}`).toBeGreaterThanOrEqual(heights[i - 1]! - 2);
-    expect(Math.max(...heights)).toBeLessThanOrEqual(last + 3);
-    expect(heights.some((h) => h > first + 4 && h < last - 4), "at least one frame between the two heights").toBe(true);
+    expect(heights.length, "frames sampled during the switch").toBeGreaterThan(5);
+    const h0 = heights[0]!;
+    for (let i = 1; i < heights.length; i++) expect(Math.abs(heights[i]! - h0), `frame ${i}: ${heights.map((h) => Math.round(h)).join(",")}`).toBeLessThan(1);
+    await expect(signup.getByLabel("E-Mail")).toHaveAttribute("autocomplete", "email");
+    await expect(signup.getByLabel("Passwort", { exact: true })).toHaveAttribute("autocomplete", "new-password");
 
-    // back to Anmelden: the same node again, the password manager's pair is restored
-    await card.getByRole("radio", { name: "Passwort" }).click();
-    await expect(card.getByLabel("Passwort", { exact: true })).toHaveAttribute("autocomplete", "current-password");
-    expect(await mail.evaluate((el) => el === (window as unknown as { __mail: Element }).__mail)).toBe(true);
+    // back to Anmelden: the pair for the password manager is restored
+    await signup.getByTestId("auth-to-signin").click();
+    const again = page.getByRole("dialog", { name: "Anmelden" });
+    await expect(again).toBeVisible({ timeout: 5_000 });
+    await bandSettled(page, 5_000);
+    await expect(again.getByLabel("Passwort", { exact: true })).toHaveAttribute("autocomplete", "current-password");
     await expectNoHorizontalScroll(page);
-    await axeClean(page, '[role="dialog"]', "Anmelde-Blatt");
+    await axeClean(page, '[role="dialog"]', "Anmelde-Karte");
     expect(errors).toEqual([]);
   });
 
