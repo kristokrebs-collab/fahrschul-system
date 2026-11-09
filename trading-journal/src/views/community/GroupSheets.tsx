@@ -13,6 +13,7 @@ import { Input, Textarea } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import type { GroupKind } from "@/social/contract";
 import { useCloudSession } from "@/cloud/session";
+import { useTakeover } from "@/cloud/takeover";
 import { checkInvite, clearInvite, closeSheet, createGroup, joinGroup, useSocial } from "@/social/store";
 import { GROUP_KIND_HINT, GROUP_KIND_LABEL, GROUPS, ROLE_LABEL } from "@/social/strings";
 import { Glyph } from "@/social/ui/glyphs";
@@ -94,9 +95,11 @@ export function JoinSheet() {
   const reduced = useReducedFx();
   const invite = useSocial((s) => s.invite);
   const asked = useSocial((s) => s.sheet?.kind === "join");
-  // an invitation from the URL opens the sheet by itself – once the login sheet is gone (never two dialogs at once)
+  // an invitation from the URL opens the sheet by itself – once the login sheet AND the takeover question after a first login are
+  // gone (never two dialogs at once: the takeover sheet would sit inert underneath and could not be closed – same rule as ReturnHost)
   const authOpen = useCloudSession((s) => s.sheet.open);
-  const open = asked || (!!invite?.code && !authOpen);
+  const takeoverOpen = useTakeover((s) => s.phase !== "idle" && s.phase !== "undone");
+  const open = asked || (!!invite?.code && !authOpen && !takeoverOpen);
   const onClose = closeSheet;
   const busy = useSocial((s) => s.busy);
   const [code, setCode] = useState(invite?.code ?? "");
