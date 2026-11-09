@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, openTradeEditor, seed } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockSupabase } from "./mocks/supabase";
+import { gateToSignIn, openGated } from "./cloudSignIn";
 import { noisePng, sha256 } from "./shotFixtures";
 
 const PROJECTS = ["mobile", "desktop"];
@@ -402,9 +403,9 @@ test.describe("Login/Signup-Morph", () => {
     const errors = collectErrors(page);
     await mockSupabase(page);
     await seed(page, {});
-    await openRoute(page, cloudUrl("konto"), "Konto", { timeout: 30_000 });
-    await page.locator('[data-cloud-pill="signin"]').click();
-    const sheet = page.getByRole("dialog", { name: "Anmelden" });
+    // Konto-Pflicht: the login is the entry gate in front of the Konto page
+    await openGated(page, cloudUrl("konto"));
+    const sheet = await gateToSignIn(page);
     await expect(sheet).toBeVisible();
     await expect(sheet.locator("[inert]")).toHaveCount(0);
     const mail = sheet.getByLabel("E-Mail");
@@ -462,9 +463,9 @@ test.describe("Login/Signup-Morph", () => {
     only(info);
     await mockSupabase(page);
     await seed(page, {});
-    await openRoute(page, cloudUrl("konto"), "Konto", { timeout: 30_000 });
-    await page.locator('[data-cloud-pill="signin"]').click();
-    const sheet = page.getByRole("dialog", { name: "Anmelden" });
+    // Konto-Pflicht: the login is the entry gate in front of the Konto page
+    await openGated(page, cloudUrl("konto"));
+    const sheet = await gateToSignIn(page);
     await expect(sheet.locator("[inert]")).toHaveCount(0);
     await sheet.getByLabel("E-Mail").fill("keine-mail");
     await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();

@@ -11,7 +11,7 @@
 import { expect, test, type Page, type Route, type TestInfo } from "@playwright/test";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed } from "./helpers";
 import { mockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, entryGate, openGated, openSignedIn } from "./cloudSignIn";
 
 const PROJECTS = ["mobile", "desktop"];
 /** `EXTRACT_SHOTS=<dir>` writes review screenshots of the preview. */
@@ -92,10 +92,6 @@ async function mockExtract(page: Page, opts: MockExtractOptions = {}): Promise<M
   return state;
 }
 
-async function signIn(page: Page): Promise<void> {
-  await signInViaSheet(page, { synced: true });
-}
-
 const fab = (page: Page) => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" });
 const journalCount = (page: Page) => page.evaluate(() => (window as unknown as { __tjJournal: { getState(): { trades: unknown[] } } }).__tjJournal.getState().trades.length);
 
@@ -117,8 +113,9 @@ async function start(page: Page, ex: MockExtractOptions = {}, extraTrades: unkno
   await mockSupabase(page);
   const mock = await mockExtract(page, ex);
   await seed(page, { extra: extraTrades.length ? { "tj2-trades": [...(fixture["tj2-trades"] as unknown[]), ...extraTrades] } : undefined });
-  await openRoute(page, cloudUrl("konto"), "Konto", { timeout: 30_000 });
-  if (signedIn) await signIn(page);
+  // Konto-Pflicht: signed out the entry gate stands in front of the app; signed in, the Konto page
+  if (signedIn) await openSignedIn(page, cloudUrl("konto"), "Konto", { synced: true });
+  else await openGated(page, cloudUrl("konto"));
   return { errors, mock };
 }
 
@@ -320,14 +317,16 @@ test.describe("Screenshot-Import", () => {
     await expect(page.getByTestId("extract-trade")).toHaveCount(0);
   });
 
-  test("ohne Anmeldung: keine KI – der Knopf liest auf dem Gerät, die Einstellungen erklären warum", async ({ page }) => {
-    const { errors } = await start(page, {}, [], false);
+  test("ohne Anmeldung: keine KI – im Cloud-Build steht das Tor davor, ohne Cloud liest der Knopf auf dem Gerät", async ({ page }) => {
+    const { errors, mock } = await start(page, {}, [], false);
+    // Konto-Pflicht: signed out nothing of the app (no editor, no import) is reachable – the entry gate stands in front of the settings
     await page.goto(cloudUrl("settings"));
-    const note = page.getByTestId("settings-shot-extract");
-    await note.scrollIntoViewIfNeeded();
-    await expect(note).toHaveAttribute("data-state", "signed-out");
-    await expect(note).toContainText("Melde dich an");
-    await expect(note).toContainText("Ohne den Import trägst du die Werte wie gewohnt von Hand ein");
+    await expect(entryGate(page)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("settings-shot-extract")).toHaveCount(0);
+    await expect(fab(page)).toHaveCount(0);
+    expect(mock.posts).toHaveLength(0);
+    // without a login (the default build has no cloud): the button reads on the device, no AI
+    await openRoute(page, "/#settings", "Einstellungen", { timeout: 30_000 });
     const editor = await openEditorWithShots(page, 1);
     await expect(editor.getByTestId("extract-action")).toHaveAttribute("data-reader", "local");
     await expect(editor.getByTestId("extract-reader")).toContainText("ohne KI");

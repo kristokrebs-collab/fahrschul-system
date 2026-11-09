@@ -18,6 +18,7 @@ import { pushToast } from "@/store/uiStore";
 import { emailProblem, isSendLimit, passwordProblem, type AuthField } from "../authErrors";
 import { oauthProviders, type OAuthProvider } from "../env";
 import { setIdleMinutes, useIdlePref } from "../idle";
+import { gateViewOf, knownVisitor } from "../gate";
 import { ensureCloud } from "../runtime";
 import { closeAuthSheet, setAuthEmail, setAuthView, useCloudSession } from "../session";
 import { useSyncStatus } from "../sync/status";
@@ -33,7 +34,15 @@ export { NewPasswordForm } from "./NewPasswordForm";
 export interface AuthSheetProps {
   /** Opens the Konto page (the integrator passes `() => navigate("konto")`); hidden when absent. */
   onOpenAccount?: () => void;
+  /**
+   * Konto-Pflicht (`src/cloud/gate.ts`, mounted by `src/app/gate/EntryGate.tsx`): the window is the page in front of the app – always
+   * open, no close, on the view `gateViewOf` resolves (the entry view, the step the person is on, or the 2FA code); `header` / `footer`
+   * frame the card.
+   */
+  gate?: { header?: ReactNode; footer?: ReactNode };
 }
+
+const noop = (): void => undefined;
 
 /**
  * Login window (P09, Paket V – all German): password, magic link, registration (strength hint, e-mail confirmation), reset, new
@@ -46,12 +55,25 @@ export interface AuthSheetProps {
  * every mail link (AUTH-06), the password rules, the AGB / privacy consent at registration, errors at their field (the field shakes and
  * takes the focus), offline said before anything is sent, Escape / close, the focus trap.
  */
-export function AuthSheet({ onOpenAccount }: AuthSheetProps) {
+export function AuthSheet({ onOpenAccount, gate }: AuthSheetProps) {
   const sheet = useCloudSession((s) => s.sheet);
+  const needsMfa = useCloudSession((s) => s.needsMfa);
   // warm the Supabase chunk while the user types (idempotent)
   useEffect(() => {
     void ensureCloud().catch(() => undefined);
   }, []);
+  if (gate)
+    return (
+      <AuthWindow
+        gate
+        open
+        view={gateViewOf(sheet, needsMfa, knownVisitor())}
+        onClose={noop}
+        header={gate.header}
+        footer={gate.footer}
+        renderView={(view, titleId) => <ViewBody view={view} titleId={titleId} onOpenAccount={onOpenAccount} />}
+      />
+    );
   return <AuthWindow open={sheet.open} view={sheet.view} onClose={closeAuthSheet} renderView={(view, titleId) => <ViewBody view={view} titleId={titleId} onOpenAccount={onOpenAccount} />} />;
 }
 

@@ -1,6 +1,6 @@
 # `src/showroom` – der Showroom (Paket S)
 
-Nur für Netlify-Deploy-Previews und `npm run build:showroom` (Schalter `__TJ_SHOWROOM__`, Vite `define`). In jedem anderen Build ist nichts davon im Bundle
+Nur für `npm run build:showroom` – eine **lokale** Demo (Schalter `__TJ_SHOWROOM__`, Vite `define`); seit der Konto-Pflicht bauen auch die Netlify-Deploy-Previews die echte App. In jedem anderen Build ist nichts davon im Bundle
 (`tests/unit/showroom.bundle.test.ts`). Ausführlich: [`docs/SHOWROOM.md`](../../docs/SHOWROOM.md).
 
 | Datei | Aufgabe |

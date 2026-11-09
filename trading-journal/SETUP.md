@@ -356,7 +356,7 @@ alles Fehlende sichtbar als **„Platzhalter – vom Betreiber auszufüllen“**
 | `VITE_LEGAL_AGB_URL` | ja | deine AGB |
 | `VITE_LEGAL_WIDERRUF_URL` | nein | eigene Widerrufsbelehrung; ohne sie verweist die App auf die AGB |
 | `VITE_LEGAL_DRAFTS_REVIEWED` | nein | `true` nur, wenn ein Anwalt die Entwurfstexte der App (`docs/RECHT/`) geprüft hat; blendet die Leiste „Entwurf – Prüfung durch Anwalt nötig“ aus. Eigene Erklärung des Betreibers, die App prüft nichts |
-| `VITE_SHOWROOM` | nein, **nie setzen** | Build-Schalter des Showrooms (`1`): setzen nur die Skripte `build:showroom` / `build:showroom:deploy`; Netlify verwendet sie ausschließlich im Kontext `deploy-preview` (`netlify.toml`). Produktion und Branch-Deploys bauen ohne ihn und enthalten keinen Showroom-Code. Siehe `docs/SHOWROOM.md` |
+| `VITE_SHOWROOM` | nein, **nie setzen** | Build-Schalter des Showrooms (`1`): setzt nur das Skript `build:showroom` (lokale Demo, Ausgabe `dist-showroom/`). Kein Netlify-Kontext baut ihn – Produktion, Branch-Deploys und Deploy-Previews bauen die echte App ohne Showroom-Code. Siehe `docs/SHOWROOM.md` |
 
 Wo die Links erscheinen: im Footer jeder Seite, auf **Konto**, im Rechtshinweis der **Preise**, bei der Registrierung
 (Pflicht-Häkchen „Ich akzeptiere die AGB und habe die Datenschutzerklärung gelesen“ – auch vor einer Registrierung über
@@ -551,7 +551,17 @@ Produktionszweig der Seite zielen. Zielt ein PR auf einen anderen Zweig (zum Bei
 keine Vorschau; dann die Basis des PR auf den Produktionszweig stellen und einmal pushen. Der erste Build danach dauert
 etwa 2 bis 5 Minuten, den Link schreibt Netlify als Kommentar in den PR.
 
-**Netlify deploy-preview = Showroom (Paket S).** Die Vorschau eines Pull Requests wird mit `VITE_SHOWROOM=1` gebaut (`netlify.toml`, Kontext
-`deploy-preview`): kein Supabase, Stripe, Binance oder Anthropic nötig – alles läuft gegen ein Mock-Backend im Browser, sichtbar mit dem festen Banner „SHOWROOM ·
-Demo-Daten · keine echten Konten oder Zahlungen“. **Die Vorschau beweist deshalb nichts über deine echten Dienste.** Produktion und Branch-Deploys bauen ohne den
-Schalter; den echten Durchstich (Schritte 3–5) prüfst du lokal oder auf der Produktions-Seite. Lokal: `npm run build:showroom`, Details in `docs/SHOWROOM.md`.
+**Netlify deploy-preview = die echte App.** Die Vorschau eines Pull Requests baut genau wie die Produktion (`netlify.toml`, Kontext `deploy-preview`:
+`npm ci && npm run build && npm run build:share`) – mit deinem Supabase-Projekt, Stripe im Testmodus und der Konto-Pflicht. Die Werte der Vorschau setzt du in
+Netlify mit dem Bereich „Deploy Previews“: `SITE_ORIGIN` (die `deploy-preview-<Nummer>--…`-Adresse), das `STRIPE_WEBHOOK_SECRET` des Vorschau-Endpunkts; die
+Vorschau-Adresse muss in Supabase unter Authentication → URL Configuration in den Redirect-URLs stehen (`https://*--<deine-site>.netlify.app/**`, siehe 2.2), sonst
+landen Bestätigungs- und Reset-Links auf der Site-URL. Kein „Neu in dieser Version“, kein Demo-Banner, kein Mock-Backend in irgendeinem Deploy
+(`tests/unit/showroom.bundle.test.ts`). Der Showroom (Paket S) ist nur noch eine **lokale** Demo: `npm run build:showroom`, Details in `docs/SHOWROOM.md`.
+
+**Konto-Pflicht.** In jedem Build mit `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY` (Produktion, Vorschau) sieht ein nicht angemeldeter Besucher zuerst
+das Anmelde-/Registrierfenster als ganze Seite (`src/cloud/gate.ts`, `src/app/gate/EntryGate.tsx`): beim ersten Besuch „Konto erstellen“, wer in diesem Browser
+schon angemeldet war, „Anmelden“. Nach der Bestätigungs-Mail ist man in der App auf Free; ein Journal, das schon in diesem Browser lag, geht durch die
+Datenübernahme beim ersten Login (nichts geht verloren). Ohne Anmeldung erreichbar: Impressum, Datenschutz, AGB, Widerruf, Hinweise (`?rechtliches=…`),
+„Verträge hier kündigen“ (`?kuendigen`, § 312k BGB) und „Vertrag widerrufen“ (`?widerruf`, § 356a BGB) samt den Token-Links der Mails, `#preise` (nur lesen –
+jeder Kaufknopf führt zur Registrierung, die Auswahl kommt nach dem Login zurück), die geteilte Ansicht `#share/<token>` und die Teilen-Edition `/teilen/`.
+Abmelden, Leerlauf-Abmeldung und eine abgelaufene Sitzung führen zurück zum Tor. Builds ohne Cloud (lokal, `npm run dev`, die Standard-e2e) haben kein Tor.

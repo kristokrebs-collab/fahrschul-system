@@ -60,6 +60,16 @@ export interface AuthWindowProps {
   onClose: () => void;
   /** The form half's content for a view; `titleId` goes on its heading (the dialog's name). */
   renderView: (view: AuthView, titleId: string) => ReactNode;
+  /**
+   * Konto-Pflicht (`src/cloud/gate.ts`): the window IS the page in front of the app – no dim, no close button, Escape and the Android
+   * back do nothing, no focus trap (the page's own links below the card stay reachable), not `aria-modal`. The card, the band and every
+   * animation are the same.
+   */
+  gate?: boolean;
+  /** Below the card (gate only): the page's links (Rechtliches, Verträge, Preise). */
+  footer?: ReactNode;
+  /** Above the card (gate only): the page's heading. */
+  header?: ReactNode;
 }
 
 const focusFirst = (root: HTMLElement | null): void => {
@@ -67,7 +77,7 @@ const focusFirst = (root: HTMLElement | null): void => {
   el?.focus({ preventScroll: true });
 };
 
-export function AuthWindow({ open, view, onClose, renderView }: AuthWindowProps) {
+export function AuthWindow({ open, view, onClose, renderView, gate = false, footer, header }: AuthWindowProps) {
   const [l, setL] = useState<Layout>(() => fresh(view));
   // state from props: a new opening starts fresh; a view change either stays in its half (a step) or runs the band (a side change)
   if (open && !l.open) setL(fresh(view));
@@ -95,7 +105,12 @@ export function AuthWindow({ open, view, onClose, renderView }: AuthWindowProps)
   const brands = { a: useRef<HTMLDivElement>(null), b: useRef<HTMLDivElement>(null) };
   const anims = useRef<Animation[]>([]);
 
-  useDialogBehaviour(frame, open, onClose);
+  useDialogBehaviour(frame, open && !gate, onClose);
+  // the gate has no dialog session: field 1 takes the focus once at the opening (a dialog's session does that itself)
+  useLayoutEffect(() => {
+    if (open && gate) focusFirst(cols[l.side].current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only at the opening
+  }, [open, gate]);
 
   // the band run (A ↔ B): started in the layout effect of the commit that changed the side, so the first painted frame already moves
   useLayoutEffect(() => {
@@ -154,12 +169,22 @@ export function AuthWindow({ open, view, onClose, renderView }: AuthWindowProps)
   return (
     <AnimatePresence>
       {open && (
-        <motion.div key="aw" className="aw-overlay" data-layer="Anmelden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: reduced ? 0 : 0.14 } }} transition={{ duration: reduced ? 0 : 0.2 }}>
-          <div className="aw-dim" aria-hidden="true" onClick={onClose} />
+        <motion.div
+          key="aw"
+          className="aw-overlay"
+          data-layer="Anmelden"
+          data-gate={gate ? "" : undefined}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, transition: { duration: reduced ? 0 : 0.14 } }}
+          transition={{ duration: reduced ? 0 : 0.2 }}
+        >
+          {!gate && <div className="aw-dim" aria-hidden="true" onClick={onClose} />}
+          {gate && header}
           <motion.div
             ref={frame}
             role="dialog"
-            aria-modal="true"
+            aria-modal={gate ? undefined : "true"}
             aria-labelledby={titleId(l.side)}
             className="aw-frame"
             data-orient={orient}
@@ -208,12 +233,15 @@ export function AuthWindow({ open, view, onClose, renderView }: AuthWindowProps)
                 </div>
               </div>
             </div>
-            <button type="button" className="aw-close" onClick={onClose} aria-label={AUTH.card.close}>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
+            {!gate && (
+              <button type="button" className="aw-close" onClick={onClose} aria-label={AUTH.card.close}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            )}
           </motion.div>
+          {gate && footer}
         </motion.div>
       )}
     </AnimatePresence>

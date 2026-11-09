@@ -12,9 +12,9 @@
  */
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, seed } from "./helpers";
 import { mockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, openSignedIn } from "./cloudSignIn";
 
 const REPORT = { ...JSON.parse(readFileSync(new URL("../fixtures/orderhistory-bitunix-report.json", import.meta.url), "utf8")), model: "claude-opus-5-5" };
 const PROJECTS = ["mobile", "desktop"];
@@ -39,10 +39,6 @@ async function mockExtract(page: Page, opts: MockOptions = {}): Promise<{ posts:
   return state;
 }
 
-async function signIn(page: Page): Promise<void> {
-  await signInViaSheet(page, { synced: true });
-}
-
 const fab = (page: Page) => page.locator('[data-layer="Dock"], [data-layer="Seitenleiste"]').getByRole("button", { name: "Trade eintragen" });
 type Journal = { __tjJournal: { getState(): { trades: Record<string, unknown>[] } } };
 const journalCount = (page: Page) => page.evaluate(() => (window as unknown as Journal).__tjJournal.getState().trades.length);
@@ -53,8 +49,8 @@ async function start(page: Page, ex: MockOptions = {}, extraTrades: unknown[] = 
   await mockSupabase(page);
   const mock = await mockExtract(page, ex);
   await seed(page, { extra: extraTrades.length ? { "tj2-trades": [...(fixture["tj2-trades"] as unknown[]), ...extraTrades] } : undefined });
-  await openRoute(page, cloudUrl("konto"), "Konto", { timeout: 30_000 });
-  await signIn(page);
+  // Konto-Pflicht: the entry gate first, the Konto page after the sign-in
+  await openSignedIn(page, cloudUrl("konto"), "Konto", { synced: true });
   return { errors, mock };
 }
 
@@ -325,8 +321,7 @@ test.describe("Screenshot-Import: Orderhistorie (2 Schließungen + 1 Eröffnung)
     await mockSupabase(page);
     await page.route("**/api/v1/shot-extract", (route) => route.abort("failed"));
     await seed(page);
-    await openRoute(page, cloudUrl("konto"), "Konto", { timeout: 30_000 });
-    await signIn(page);
+    await openSignedIn(page, cloudUrl("konto"), "Konto", { synced: true });
     await page.goto(cloudUrl("settings"));
     const note = page.getByTestId("settings-shot-extract");
     await note.scrollIntoViewIfNeeded();

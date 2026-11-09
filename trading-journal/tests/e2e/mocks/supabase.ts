@@ -17,7 +17,7 @@ import { parseBody, type MockReq, type MockRes } from "../../../src/showroom/moc
 import { createSupabaseCore, type MockSupabase, type MockSupabaseOptions } from "../../../src/showroom/mock/supabaseCore";
 
 export { fakeQrSvg, TOTP_CODE } from "../../../src/showroom/mock/supabaseCore";
-export type { MockRow, MockSupabase, MockSupabaseOptions } from "../../../src/showroom/mock/supabaseCore";
+export type { MockRow, MockSupabase, MockSupabaseOptions, SupabaseCore } from "../../../src/showroom/mock/supabaseCore";
 
 export const SUPABASE_E2E_URL = "https://e2e-mock.supabase.co";
 export const SUPABASE_E2E_KEY = "sb_publishable_e2e";

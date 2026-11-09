@@ -18,7 +18,7 @@ import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute,
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockBilling } from "./mocks/billing";
 import { mockSupabase, type MockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, entryGate, openGated, signInViaSheet } from "./cloudSignIn";
 
 const SHOTS = process.env.EMAIL_SHOTS_DIR;
 const EMAIL = "trader@example.com";
@@ -37,7 +37,9 @@ async function waitMarkt(page: Page): Promise<void> {
   await expect(section).toBeVisible();
 }
 
+/** The default build opens the Markt page; the cloud build signed out shows the entry gate (Konto-Pflicht) – `signIn` then lands on Markt. */
 async function openMarkt(page: Page, url: string): Promise<void> {
+  if (url !== "/#markt") return openGated(page, url);
   await openRoute(page, url, "Markt");
   await waitMarkt(page);
 }
@@ -84,6 +86,8 @@ async function mockAlertFn(page: Page, s: Server): Promise<void> {
 /** Signs in through the header pill and waits for the first sync (see cloud.spec.ts). */
 async function signIn(page: Page): Promise<void> {
   await signInViaSheet(page, { synced: true });
+  await expect(page.getByRole("heading", { level: 1, name: "Markt" }).first()).toBeVisible({ timeout: 30_000 });
+  await waitMarkt(page);
 }
 
 type StoredAlerts = { email?: boolean; armedAt?: number; maxPerDay?: number; mails?: { day: string; n: number }; mem?: Record<string, unknown>; outbox?: unknown[] };
@@ -124,10 +128,10 @@ test.describe("E-Mail-Alarm bei geschlossener App", () => {
     await seed(page, { boxes: true });
     await openMarkt(page, cloudUrl("markt"));
 
-    // signed out
-    await state(page, "signedout");
-    await expect(section(page)).toContainText("Nur mit Konto");
-    await expect(theSwitch(page)).toBeDisabled();
+    // signed out: Konto-Pflicht – the entry gate, nothing of the Markt page (and its alarm switch) before the account
+    await expect(entryGate(page)).toBeVisible();
+    await expect(section(page)).toHaveCount(0);
+    await expect(theSwitch(page)).toHaveCount(0);
     await expectNoHorizontalScroll(page);
     await shot(page, info, "signedout");
 

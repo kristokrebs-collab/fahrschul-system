@@ -16,7 +16,7 @@ import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, seed } fr
 import { mockBilling } from "./mocks/billing";
 import { mockExchange, WRONG_SECRET, type MockExchangeOptions } from "./mocks/exchange";
 import { mockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, openGated, signInViaSheet } from "./cloudSignIn";
 
 const URL_ = process.env.PW_BOERSE_URL ?? cloudUrl("konto");
 const SHOTS = process.env.P11_SHOTS_DIR;
@@ -32,7 +32,9 @@ async function shot(page: Page, info: TestInfo, name: string, target?: Locator):
   else await page.screenshot({ path, animations: "disabled" });
 }
 
+/** Konto-Pflicht: signed out, the entry gate stands in front of the Konto page; `signIn` lands on it. */
 async function open(page: Page, url = URL_): Promise<void> {
+  if (url === URL_) return openGated(page, url);
   await openRoute(page, url, "Konto", { timeout: 30_000 });
 }
 
@@ -55,6 +57,7 @@ async function setup(page: Page, ex: MockExchangeOptions = {}, docs?: NonNullabl
 
 async function signIn(page: Page): Promise<void> {
   await signInViaSheet(page, { synced: true });
+  await expect(page.locator('[data-page-role="current"] h1').first()).toBeVisible({ timeout: 30_000 });
 }
 
 const card = (page: Page) => page.getByTestId("exchange-card");
@@ -238,7 +241,8 @@ test.describe("Börse (P11)", () => {
   test("CSV-Import: erkanntes Format und Mapping-Assistent", async ({ page }, info) => {
     const { errors } = await setup(page);
     await open(page);
-    // signed out, the Börse card offers the CSV import
+    await signIn(page);
+    // the Börse card offers the CSV import (Konto-Pflicht: after the sign-in at the entry gate)
     const csvButton = card(page).getByRole("button", { name: "CSV importieren" });
     await csvButton.click();
     const sheet = page.getByRole("dialog", { name: "CSV importieren" });

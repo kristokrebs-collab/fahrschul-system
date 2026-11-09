@@ -9,7 +9,7 @@
  * operator must supply). `PW_PREISE_URL` overrides the cloud URL like in `preise.spec.ts`.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { bandSettled, blockExternalNetwork, expectNotInert, signInViaSheet } from "./cloudSignIn";
+import { bandSettled, blockExternalNetwork, entryGate, expectNotInert, openGated, signInViaSheet } from "./cloudSignIn";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, seed } from "./helpers";
 import { mockBilling } from "./mocks/billing";
 import { mockSupabase, type MockSupabaseOptions } from "./mocks/supabase";
@@ -27,6 +27,11 @@ async function setup(page: Page, supa: MockSupabaseOptions = {}, opts: { empty?:
   const bill = await mockBilling(page, { outcome: "active" });
   await seed(page, opts.empty ? { empty: true } : {});
   return { supabase, bill, errors };
+}
+
+/** This browser had a session before (Konto-Pflicht: the entry gate then opens on „Anmelden“ instead of „Konto erstellen“). */
+async function returningBrowser(page: Page) {
+  await page.addInitScript(() => localStorage.setItem("tj2-cloud-known", "1"));
 }
 
 /** Fills the registration card (the sheet body is inert until its morph settled) and ticks the consent box when the build has one. */
@@ -166,8 +171,8 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
 
   test("Anmelden ↔ Registrieren (Paket V): das Band läuft einmal über die Karte, die Seiten tauschen, die Karte behält ihre Höhe, Feld 1 hat den Fokus", async ({ page }, info) => {
     await setup(page);
-    await openRoute(page, KONTO, "Konto", { timeout: 30_000 });
-    await page.locator('[data-cloud-pill="signin"]').click();
+    await returningBrowser(page);
+    await openGated(page, KONTO);
     const card = page.getByTestId("auth-card");
     await expectNotInert(page.getByRole("dialog", { name: "Anmelden" }).getByLabel("E-Mail"));
     await expect(page.getByRole("dialog").getByRole("radio")).toHaveCount(0);
@@ -201,9 +206,9 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
 
   test("offline: gesagt, bevor etwas gesendet wird – die Eingabe bleibt", async ({ page, context }) => {
     await setup(page);
-    await openRoute(page, KONTO, "Konto", { timeout: 30_000 });
-    await page.locator('[data-cloud-pill="signin"]').click();
-    const sheet = page.getByRole("dialog", { name: "Anmelden" });
+    await returningBrowser(page);
+    await openGated(page, KONTO);
+    const sheet = entryGate(page).getByRole("dialog", { name: "Anmelden" });
     await expectNotInert(sheet.getByLabel("E-Mail"));
     await sheet.getByLabel("E-Mail").fill("trader@example.com");
     await sheet.getByLabel("Passwort", { exact: true }).fill("richtig-geheim-42");
@@ -218,12 +223,9 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
 
   test("Einrichtung (4 Schritte) kommt EINMAL nach der Registrierung, speichert den Fortschritt und kehrt nach einem Reload nicht von selbst zurück", async ({ page }) => {
     await setup(page, {}, { empty: true });
-    await openRoute(page, KONTO, "Konto", { timeout: 30_000 });
-    await page.locator('[data-cloud-pill="signin"]').click();
-    const sheet = page.getByRole("dialog", { name: "Anmelden" });
-    await expectNotInert(sheet.getByLabel("E-Mail"));
-    await page.waitForTimeout(500);
-    await sheet.getByTestId("auth-to-signup").click();
+    // first visit: the entry gate opens on „Konto erstellen“ by itself
+    await openGated(page, KONTO);
+    await expect(entryGate(page).getByRole("dialog", { name: "Konto erstellen" })).toBeVisible();
     await register(page);
     // registration without a confirmation round: signed in, welcome → "Los geht's" → the wizard (and not before)
     await expect(page.locator('[data-auth-view="welcome"]')).toBeVisible({ timeout: 30_000 });
@@ -255,7 +257,7 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
 
   test("Einrichtung: bestehende Trader (Journal mit Trades) werden nicht gefragt", async ({ page }) => {
     await setup(page); // the seeded journal has trades
-    await openRoute(page, KONTO, "Konto", { timeout: 30_000 });
+    await openGated(page, KONTO);
     await page.evaluate(() => localStorage.setItem("tj2-setup-wizard", JSON.stringify({ v: 1, status: "pending", step: 0, data: null, at: new Date().toISOString() })));
     await signInViaSheet(page, { email: "trader@example.com", password: "richtig-geheim-42", synced: true, choice: "keep" });
     await page.waitForTimeout(1200);

@@ -14,7 +14,7 @@ import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockBilling, mockSubscription } from "./mocks/billing";
 import { mockSocial } from "./mocks/social";
 import { mockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, openGated, signInViaSheet } from "./cloudSignIn";
 
 const PROJECTS = ["mobile", "desktop"];
 const THEMES = ["dark", "light"] as const;
@@ -83,9 +83,13 @@ async function openSignedIn(page: Page, hash: string, theme: "dark" | "light" = 
   await mockBilling(page, { plan: { plan: "pro", status: "active", trialEnd: null }, subscription: mockSubscription({ plan: "pro", status: "active" }) });
   await mockSocial(page, { optIn: true });
   await seed(page, { extra: { "tj2-theme": JSON.stringify(theme) } });
-  await page.goto(cloudUrl(hash));
-  await expect(layer(page, hash).locator("h1").first()).toBeVisible({ timeout: 30_000 });
+  // Konto-Pflicht: the entry gate first, the page after the sign-in; the pricing page is public (read only, its bar signs in)
+  if (hash === "preise") {
+    await page.goto(cloudUrl(hash));
+    await expect(page.getByTestId("public-pricing").getByRole("heading", { level: 1, name: "Preise" })).toBeVisible({ timeout: 30_000 });
+  } else await openGated(page, cloudUrl(hash));
   await signIn(page);
+  await expect(layer(page, hash).locator("h1").first()).toBeVisible({ timeout: 30_000 });
   await page.reload();
   await expect(layer(page, hash).locator("h1").first()).toBeVisible({ timeout: 30_000 });
 }

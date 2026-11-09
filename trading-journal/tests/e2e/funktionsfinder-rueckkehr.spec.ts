@@ -2,8 +2,8 @@
  * A4 Rückführung: wer im Finder nach einer Aufgabe fragt und an einer Anmeldung vorbeimuss, landet danach wieder bei seiner Aufgabe.
  * Läuft im Cloud-Build gegen den Supabase-Mock (`mocks/supabase.ts`, `cloudUrl` in helpers.ts) – dieselbe Anmeldung wie im Konto-Spec.
  *
- *   1. "Gruppe beitreten" ohne Konto: der Finder bringt zur Community, der Fundort-Hinweis sagt "dafür brauchst du ein Konto" und
- *      bietet "Anmelden" an; nach der Anmeldung steht die Karte "Gruppen" im Bild (die ursprüngliche Aufgabe), kein Toast.
+ *   1. "Gruppe beitreten": ohne Konto steht seit der Konto-Pflicht das Tor vor der App (der Finder ist erst danach erreichbar); nach der
+ *      Anmeldung bringt der Finder zur Community, die Karte "Gruppen" steht im Bild (die Aufgabe), kein Toast, nichts bleibt vorgemerkt.
  *   2. Der Link `#konto?returnTo=feature:backup` merkt sich die Aufgabe, räumt die Adresse auf und führt nach der Anmeldung zu Backup.
  *   3. Ein Fremdlink als `returnTo` (https://…, unbekannte Seite) wird still verworfen: nach der Anmeldung geht nichts anderswohin.
  *
@@ -14,7 +14,7 @@ import { cloudUrl, collectErrors, seed } from "./helpers";
 import { mockBilling } from "./mocks/billing";
 import { mockSocial } from "./mocks/social";
 import { mockSupabase } from "./mocks/supabase";
-import { blockExternalNetwork, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, entryGate, openGated, signInViaSheet } from "./cloudSignIn";
 
 const PROJECTS = ["mobile", "desktop"];
 const RETURN_KEY = "tj2-return-to";
@@ -38,9 +38,10 @@ async function setup(page: Page) {
   return errors;
 }
 
-/** Signs in through the sheet that is open (or the header pill) and closes the welcome sheet once the first sync is live. */
-async function signInInOpenSheet(page: Page): Promise<void> {
-  await signInViaSheet(page, { fromPill: false, synced: true });
+/** Signs in through the entry gate (Konto-Pflicht) and closes the welcome sheet once the first sync is live. */
+async function signInAtGate(page: Page): Promise<void> {
+  await expect(entryGate(page)).toBeVisible({ timeout: 30_000 });
+  await signInViaSheet(page, { synced: true });
 }
 
 test.describe("Finder: zurück zur Aufgabe nach der Anmeldung", () => {
@@ -50,9 +51,12 @@ test.describe("Finder: zurück zur Aufgabe nach der Anmeldung", () => {
     test.skip(!PROJECTS.includes(info.project.name), "runs on mobile + desktop");
   });
 
-  test("„Gruppe beitreten“ ohne Konto → Hinweis → Anmelden → die Karte „Gruppen“ steht im Bild", async ({ page }) => {
+  test("„Gruppe beitreten“: erst das Tor, nach der Anmeldung bringt der Finder zur Karte „Gruppen“", async ({ page }) => {
     const errors = await setup(page);
-    await page.goto(cloudUrl("overview"));
+    // Konto-Pflicht: no finder, no page before the account
+    await openGated(page, cloudUrl("overview"));
+    await expect(page.getByRole("button", { name: /Navigation öffnen|Menü/ })).toHaveCount(0);
+    await signInAtGate(page);
     await expect(layer(page, "overview").locator("h1").first()).toBeAttached({ timeout: 30_000 });
     await page.getByRole("button", { name: /Navigation öffnen|Menü/ }).first().click();
     const nav = page.getByRole("dialog", { name: "Navigation" });
@@ -62,20 +66,10 @@ test.describe("Finder: zurück zur Aufgabe nach der Anmeldung", () => {
     await expect(nav.getByRole("option").first()).toHaveAttribute("data-feature", "gruppen", { timeout: 15_000 });
     await field.press("Enter");
 
-    // the page, and a note that says why the card is not there – with the way on
+    // signed in: the page of the task, no „dafür brauchst du ein Konto“, nothing waits for a login
     await expect(page).toHaveURL(/#community$/);
-    const note = page.getByTestId("arrival-note");
-    await expect(note).toBeVisible({ timeout: 25_000 });
-    await expect(note).toContainText("dafür brauchst du ein Konto");
     await noToast(page);
-    await note.getByTestId("arrival-login").click();
-
-    // the original task waits (this tab only) …
-    await expect.poll(async () => (await pending(page))?.target?.id).toBe("gruppen");
-    await signInInOpenSheet(page);
-
-    // … and comes back: the card of the task is on the screen, the waiting note is gone
-    await expect(page).toHaveURL(/#community$/);
+    await expect(page.getByTestId("arrival-note").filter({ hasText: "dafür brauchst du ein Konto" })).toHaveCount(0);
     await expect(layer(page, "community").getByTestId("groups-card")).toBeInViewport({ timeout: 30_000 });
     expect(await pending(page)).toBeNull();
     expect(errors, errors.join("\n")).toEqual([]);
@@ -83,13 +77,11 @@ test.describe("Finder: zurück zur Aufgabe nach der Anmeldung", () => {
 
   test("#konto?returnTo=feature:backup merkt sich die Aufgabe, räumt die Adresse auf und führt nach der Anmeldung zu Backup", async ({ page }) => {
     const errors = await setup(page);
-    await page.goto(cloudUrl("konto?returnTo=feature:backup"));
-    await expect(layer(page, "konto").locator("h1").first()).toBeVisible({ timeout: 30_000 });
-    // the address is clean; the task is in this tab's memory
+    await openGated(page, cloudUrl("konto?returnTo=feature:backup"));
+    // the address is clean; the task is in this tab's memory while the entry gate asks for the account
     await expect(page).toHaveURL(/#konto$/);
     expect(await pending(page)).toMatchObject({ target: { kind: "feature", id: "backup" }, wait: { on: "signedIn" } });
-    await page.locator('[data-cloud-pill="signin"]').click();
-    await signInInOpenSheet(page);
+    await signInAtGate(page);
     await expect(page).toHaveURL(/#settings$/, { timeout: 25_000 });
     await expect(layer(page, "settings").getByTestId("settings-data")).toBeInViewport({ timeout: 30_000 });
     expect(errors, errors.join("\n")).toEqual([]);
@@ -97,13 +89,12 @@ test.describe("Finder: zurück zur Aufgabe nach der Anmeldung", () => {
 
   test("ein Fremdlink als returnTo wird verworfen: nach der Anmeldung geht nichts anderswohin", async ({ page }) => {
     const errors = await setup(page);
-    await page.goto(cloudUrl("konto?returnTo=https://evil.example/phish"));
-    await expect(layer(page, "konto").locator("h1").first()).toBeVisible({ timeout: 30_000 });
+    await openGated(page, cloudUrl("konto?returnTo=https://evil.example/phish"));
     expect(await pending(page)).toBeNull();
-    await page.locator('[data-cloud-pill="signin"]').click();
-    await signInInOpenSheet(page);
+    await signInAtGate(page);
     await page.waitForTimeout(1500);
     await expect(page).toHaveURL(/#konto$/);
+    await expect(layer(page, "konto").locator("h1").first()).toBeVisible({ timeout: 30_000 });
     expect(new URL(page.url()).hostname).not.toContain("evil");
     expect(errors, errors.join("\n")).toEqual([]);
   });

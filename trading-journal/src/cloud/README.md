@@ -9,6 +9,16 @@ with TOTP 2FA, see and sign out the other devices, and sync the journal across d
 lossless. DSGVO tools (export, deletion, nightly backups, audit trail) run in the Netlify functions
 (`netlify/functions/README.md`), the schema in `supabase/`.
 
+## Konto-Pflicht (entry gate)
+
+With a cloud in the build (personal web edition, not claude.ai) the account is mandatory: `gate.ts` (light, pure `gateOf`) decides per render
+whether `App` mounts the shell or the gate chunk (`src/app/gate/EntryGate.tsx`). Signed out, the login window of Paket V is the page
+(`AuthSheet gate` → `AuthWindow gate`: no dim, no close, no focus trap, the band animation unchanged) – first visit on „Konto erstellen“, a
+browser that had a session (`<prefix>cloud-known` or a stored session) on „Anmelden“. Public: the legal sheets, the contract pages
+(`?kuendigen` / `?widerruf`), `#preise` read only, `#share/<token>` and the share edition. A stored login or an e-mail link is `pending`
+(a quiet splash) until the client has read it. Sign-out, idle sign-out and an expired session put the gate back; the local journal is never
+touched (the first sync's takeover question decides). Without cloud: no gate, nothing changes.
+
 ## No secret in the browser bundle
 
 `VITE_*` values are copied as text into the public JavaScript. `cloud/publicKey.ts` says which Supabase keys may be public

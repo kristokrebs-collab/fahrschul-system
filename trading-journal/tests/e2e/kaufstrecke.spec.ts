@@ -9,7 +9,7 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { blockExternalNetwork, completeSignIn, expectNotInert } from "./cloudSignIn";
+import { blockExternalNetwork, completeSignIn, expectNotInert, openGated } from "./cloudSignIn";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, seed } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 import { mockBilling, mockSubscription, type MockBillingOptions } from "./mocks/billing";
@@ -312,8 +312,11 @@ test.describe("Kaufstrecke", () => {
       plan: { plan: "pro", status: "active", trialEnd: null },
       subscription: mockSubscription({ status: "active", trialEnd: null, startedAt: new Date(Date.now() - 2 * 86_400_000).toISOString() }),
     });
-    await openRoute(page, KONTO, "Konto", { timeout: 30_000 });
-    await signInHeader(page);
+    // Konto-Pflicht: the Konto page is behind the entry gate – sign in right there
+    await openGated(page, KONTO);
+    await signInViaSheet(page);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1, name: "Konto" }).first()).toBeVisible({ timeout: 30_000 });
     await page.getByTestId("manage-open").click();
     const manage = page.getByTestId("manage-sheet");
     await expect(manage).toBeVisible();
