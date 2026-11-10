@@ -1,0 +1,180 @@
+/*
+ * Print view of a report (P04) – the PDF export is the browser's print dialog ("Als PDF sichern").
+ * Always light, whatever the app looks like: white paper, near-black ink, the signal red only as a thin accent.
+ * `ReportPrint` portals `.report-print-root` into <body> and sets `html.tj-report-printing` only while printing;
+ * on screen the root is never visible.
+ */
+.report-print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm 16mm;
+  }
+
+  html.tj-report-printing,
+  html.tj-report-printing body {
+    background: #fff !important;
+    color: #111 !important;
+    color-scheme: light;
+  }
+
+  html.tj-report-printing body > :not(.report-print-root) {
+    display: none !important;
+  }
+
+  html.tj-report-printing .report-print-root {
+    display: block !important;
+    color: #111;
+    background: #fff;
+    font:
+      10pt/1.45 "IBM Plex Sans",
+      system-ui,
+      sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rp-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 12pt;
+    border-bottom: 1.5pt solid #111;
+    padding-bottom: 6pt;
+    margin-bottom: 10pt;
+  }
+  .rp-brand {
+    font:
+      600 8pt/1 "IBM Plex Mono",
+      ui-monospace,
+      monospace;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #555;
+  }
+  .rp-brand::before {
+    content: "";
+    display: inline-block;
+    width: 5pt;
+    height: 5pt;
+    border-radius: 50%;
+    background: #e5202e;
+    margin-right: 5pt;
+    vertical-align: 1pt;
+  }
+  .rp-title {
+    font-size: 18pt;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 4pt 0 0;
+  }
+  .rp-meta {
+    color: #555;
+    font-size: 8.5pt;
+    text-align: right;
+  }
+  .rp-net {
+    font:
+      600 20pt/1 "IBM Plex Mono",
+      ui-monospace,
+      monospace;
+  }
+  .rp-summary {
+    font-size: 11pt;
+    margin: 0 0 6pt;
+  }
+  .rp-highlights {
+    margin: 0 0 8pt;
+    padding-left: 12pt;
+    list-style: disc;
+  }
+  .rp-highlights li {
+    margin: 1.5pt 0;
+  }
+  .rp-figures {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4pt;
+    margin: 6pt 0 8pt;
+  }
+  .rp-figure {
+    border: 0.75pt solid #ccc;
+    border-radius: 4pt;
+    padding: 4pt 5pt;
+  }
+  .rp-figure dt {
+    font-size: 6.5pt;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #666;
+  }
+  .rp-figure dd {
+    margin: 1pt 0 0;
+    font:
+      500 10pt/1.2 "IBM Plex Mono",
+      ui-monospace,
+      monospace;
+  }
+  .rp-curve {
+    display: block;
+    width: 100%;
+    height: 70pt;
+    margin: 4pt 0 6pt;
+  }
+  .rp-section {
+    break-inside: avoid;
+    margin-top: 10pt;
+  }
+  .rp-section h2 {
+    font-size: 11pt;
+    font-weight: 600;
+    margin: 0 0 4pt;
+    padding-bottom: 2pt;
+    border-bottom: 0.75pt solid #bbb;
+  }
+  .rp-section p {
+    margin: 3pt 0;
+  }
+  .rp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+  .rp-table th,
+  .rp-table td {
+    text-align: left;
+    padding: 2.5pt 4pt;
+    border-bottom: 0.5pt solid #ddd;
+  }
+  .rp-table th {
+    font-size: 7pt;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #666;
+    font-weight: 600;
+  }
+  .rp-table td.rp-n,
+  .rp-table th.rp-n {
+    text-align: right;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  .rp-win {
+    color: #12823f;
+  }
+  .rp-loss {
+    color: #c4161f;
+  }
+  .rp-mute {
+    color: #666;
+  }
+  .rp-foot {
+    margin-top: 14pt;
+    padding-top: 4pt;
+    border-top: 0.5pt solid #ccc;
+    color: #777;
+    font-size: 7.5pt;
+  }
+}
