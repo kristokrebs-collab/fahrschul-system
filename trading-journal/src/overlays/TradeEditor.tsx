@@ -12,7 +12,6 @@ import { nowLocalInput } from "@/lib/dates";
 import { n1, n2, price as fmtPrice, signed } from "@/lib/format";
 import { parseNumber, sanitizeUrl, toInputString } from "@/lib/parse";
 import { priceMv } from "@/market/motionValues";
-import { celebrateFrom } from "@/motion/Celebrate";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { Sheet } from "@/motion/Sheet";
@@ -33,8 +32,6 @@ import { ShotsField } from "@/journal/screenshots/ShotsField";
 import { clearShotFill, markText, useShotFill, type FillKey, type FillMark } from "@/journal/editor/shotFill";
 import { RatingDots } from "@/journal/ui/RatingDots";
 import { TagInput, tagSuggestions } from "@/journal/ui/TagInput";
-import { winCelebration } from "./celebration";
-import { FAB_LABEL } from "@/app/navGroups";
 import { BinDelete, useBinDelete, useKept } from "@/motion/BinDelete";
 import { confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
 import { AutoHeight } from "@/views/trades/AutoHeight";
@@ -900,8 +897,6 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         dropEmptyJournalKeys(record);
         // stored MAE / MFE were measured from the old entry / exit / stop: drop them, the backfill measures again
         if (trade && excursionStale(trade, record)) for (const k of EXCURSION_KEYS) delete (record as Record<string, unknown>)[k];
-        // `trades` is still the journal before this save – exactly what the equity-high check compares against
-        const burst = winCelebration(trades, record, trade);
         // Local storage persists and publishes synchronously: the toast and the close (or the reset for the next trade)
         // follow in the same tick, so React commits the new journal, the close and the toast together. A remote store
         // is awaited first; nothing closes before the write is known to have happened (zero data loss).
@@ -915,18 +910,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           value: cur.x.pnl == null ? "offen" : signed(cur.x.pnl),
           valueTone: cur.x.pnl == null ? undefined : cur.x.pnl < 0 ? "loss" : "win",
         });
-        if (burst) {
-          if (mode === "close") {
-            // one moment, not two: the sheet exits first (`tween.exit`), then the burst rises from the hero Netto-P&L
-            // that is about to roll (or the FAB the editor morphs back into) – never from the vanished Save button
-            const save = saveRef.current;
-            setTimeout(() => {
-              const hero = document.querySelector('[data-celebrate-anchor="hero-net"]');
-              const fab = document.querySelector(`[aria-label="${FAB_LABEL}"]`);
-              celebrateFrom([hero, fab, save], { kind: burst, tone: "win", squash: false });
-            }, tween.exit.duration * 1000);
-          } else celebrateFrom(againRef.current, { kind: burst, tone: "win" });
-        }
+        // No burst of dots for a realised win (decision of the operator, 2026-11-10: „kein Konfetti“): the journal rewards process,
+        // never the outcome of a trade (docs/PSYCHOLOGIE.md). The toast above states the result – in its sign and colour, nothing more.
         if (mode === "close") {
           closeEditor();
         } else {
@@ -949,7 +934,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         if (busyShown) setSaving(false);
       }
     },
-    [rec, d, t, checking, trade, draft, trades, closeEditor, reduced, jumpTo],
+    [rec, d, t, checking, trade, draft, closeEditor, reduced, jumpTo],
   );
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {

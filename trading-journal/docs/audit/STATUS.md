@@ -238,7 +238,7 @@ Basis: `5fa335a3` (PR #6) plus die Commits von PR #7 (`claude/exciting-planck-hc
 - K1: Die Einstellungsseite wächst bei 1024 bis 1279 px nach dem Laden. Nachgemessen: die reservierten Höhen stammen von 1280/1440 px, bei 1024 px sind „Live-Daten“ und „Einstiegs-Check“ deutlich höher. Die Kartenhöhen hängen von den Marktdaten ab, die diese Umgebung nicht erreicht (451), deshalb hier nicht verlässlich einstellbar.
 - B3: keine eigene Landing-Seite. Seit der Konto-Pflicht ist das Anmeldefenster der erste Bildschirm (mit „Preise ansehen“); mehr ist eine Produktentscheidung.
 - Touch-Ziele unter 44 px (4.2): die genannten Schalter tragen `touch-hit` (44 × 44 px auf Touch-Geräten); die Messung des Crawls hat die Trefferfläche nicht mitgezählt. Heatmap-Zellen bleiben klein. Am echten Gerät zu bestätigen.
-- Gewinn-Konfetti beim Speichern eines Trades: unverändert Entscheidung des Betreibers (`docs/PSYCHOLOGIE.md`, Abschnitt 6, Punkt 1).
+- ~~Gewinn-Konfetti beim Speichern eines Trades~~: entschieden („kein Konfetti“, 10.11.2026) und entfernt (`docs/PSYCHOLOGIE.md`, Abschnitt 6, Punkt 1).
 - Impressum der Vorschau zeigt weiter „PLATZHALTER“ (Betreiber setzt `VITE_LEGAL_*`); der Kauf bleibt dort deshalb gesperrt (`purchaseBlockedBy: legal`, an `/api/v1/billing/status` der Vorschau gemessen).
 - Alles aus Abschnitt 8 (Supabase-Produktion, Stripe live, Binance 451, TradingView, Resend/Twilio, Geräte, Anwalt).
 

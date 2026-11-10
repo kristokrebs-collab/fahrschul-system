@@ -3,57 +3,19 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { priceMv } from "@/market/motionValues";
 import { MotionRoot } from "@/motion/MotionRoot";
-import { BIG_WIN_R, winCelebration } from "@/overlays/celebration";
 import { HoldConfirm, useConfirmFocus } from "@/motion/HoldConfirm";
 import { rectFullyVisible } from "@/primitives/fieldFx";
 import { TradeDetail } from "@/overlays/TradeDetail";
 import { EDITOR_MESSAGES, TradeEditor, invalidFieldOf, type TradeRecord } from "@/overlays/TradeEditor";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
-import { SAMPLE, mkTrade, settings } from "./domain.fixtures";
+import { SAMPLE, settings } from "./domain.fixtures";
 import { registerFlatForm } from "./editorLayout";
 
 // the older specs test every field's data path: all fields stay on screen (the short form has its own specs)
 registerFlatForm();
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-describe("winCelebration", () => {
-  const win = (id: string, date: string, pnl: number) => mkTrade({ id, date, pnl });
-
-  it("only celebrates realised wins", () => {
-    expect(winCelebration([], { pnl: null, r: null, date: "2026-01-01T10:00", status: "closed" })).toBeNull();
-    expect(winCelebration([], { pnl: -5, r: -1, date: "2026-01-01T10:00", status: "closed" })).toBeNull();
-    expect(winCelebration([], { pnl: 0, r: 0, date: "2026-01-01T10:00", status: "closed" })).toBeNull();
-    expect(winCelebration([], { pnl: 50, r: 1, date: "2026-01-01T10:00", status: "open" })).toBeNull();
-    expect(winCelebration([], { pnl: 50, r: 1, date: "2026-01-01T10:00", status: "closed" })).toBe("win");
-  });
-
-  it("stays quiet when an edit keeps a win a win, celebrates when it turns into one", () => {
-    const saved = { id: "x", pnl: 80, r: 1, date: "2026-01-01T10:00", status: "closed" as const };
-    expect(winCelebration([], saved, { pnl: 60, status: "closed" })).toBeNull();
-    expect(winCelebration([], saved, { pnl: -10, status: "closed" })).toBe("win");
-    expect(winCelebration([], saved, { pnl: null, status: "open" })).toBe("win");
-  });
-
-  it("record: the total after the save beats every running high of the curve before it", () => {
-    const history = [win("a", "2026-01-01T10:00", 100), mkTrade({ id: "b", date: "2026-01-02T10:00", pnl: -60 })];
-    // peak 100, now 40 → +50 = 90 is no new high, +70 = 110 is
-    expect(winCelebration(history, { pnl: 50, r: 0.5, date: "2026-01-03T10:00", status: "closed" })).toBe("win");
-    expect(winCelebration(history, { pnl: 70, r: 0.5, date: "2026-01-03T10:00", status: "closed" })).toBe("record");
-    // the saved trade's old version is ignored by id
-    expect(winCelebration([...history, win("c", "2026-01-03T10:00", 500)], { id: "c", pnl: 70, r: 0.5, date: "2026-01-03T10:00", status: "closed" })).toBe("record");
-  });
-
-  it("streak: a big R win or the third realised win in a row", () => {
-    const history = [mkTrade({ id: "l", date: "2026-01-01T10:00", pnl: -500 })];
-    expect(winCelebration(history, { pnl: 10, r: BIG_WIN_R, date: "2026-01-05T10:00", status: "closed" })).toBe("streak");
-    const two = [...history, win("a", "2026-01-02T10:00", 10), win("b", "2026-01-03T10:00", 10)];
-    expect(winCelebration(two, { pnl: 10, r: 0.4, date: "2026-01-05T10:00", status: "closed" })).toBe("streak");
-    // a back-dated trade only counts the wins before it
-    expect(winCelebration(two, { pnl: 10, r: 0.4, date: "2026-01-02T09:00", status: "closed" })).toBe("win");
-  });
-});
 
 describe("invalidFieldOf / rectFullyVisible", () => {
   it("maps every field message to its control", () => {
@@ -168,7 +130,7 @@ describe("TradeEditor motion", () => {
     expect(input("Ausstieg")).toHaveAttribute("aria-invalid", "true");
   });
 
-  it("saving a realised win queues one confetti burst from the save button; a loss does not", async () => {
+  it("saving a trade never starts a burst of dots – not for a win, not for a big win, not for a loss (decision 2026-11-10: kein Konfetti)", async () => {
     mount();
     type("Einstieg", "80000");
     type("Stop-Loss", "79000");
@@ -176,8 +138,11 @@ describe("TradeEditor motion", () => {
     type("Größe (USDT)", "8000");
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
     await waitFor(() => expect(saveTrade).toHaveBeenCalledTimes(1));
-    // R ≈ 4 on an empty realised history → the bigger "streak" burst
-    await waitFor(() => expect(useUi.getState().celebrations.map((c) => [c.kind, c.tone])).toEqual([["streak", "win"]]));
+    // R ≈ 4, a new equity high: exactly the save that used to celebrate
+    await pause(260);
+    expect(useUi.getState().celebrations).toEqual([]);
+    // the result is still said – by the toast, in its sign and tone
+    expect(useUi.getState().toasts.at(-1)).toMatchObject({ kind: "success", title: "Trade gespeichert", valueTone: "win" });
 
     act(() => useUi.setState({ editor: { open: true, fromFab: false }, celebrations: [] }));
     type("Einstieg", "80000");

@@ -9,12 +9,11 @@
  *  5. every opt-in is OFF by default (feedback channels, review reminder, the pause after losses);
  *  6. Frost (Paket F2): "Heute abschließen" rewards only done process, the journal card dresses no loss up, the question bar stays local.
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { cooldownOf, DEFAULT_RISK, limitsSetByUser, riskLimits } from "@/domain/risk";
 import type { EnrichedTrade } from "@/domain/types";
-import { winCelebration } from "@/overlays/celebration";
 
 const ROOT = join(__dirname, "..", "..");
 const SRC = join(ROOT, "src");
@@ -69,7 +68,6 @@ describe("1 · process feedback only after a process step", () => {
 describe("2 · bursts of dots: a closed list of places", () => {
   /** Every file that may start a burst, and why. Adding one is a product decision – write it in docs/PSYCHOLOGIE.md first. */
   const ALLOWED: Record<string, string> = {
-    "src/overlays/TradeEditor.tsx": "OFFEN (Entscheidung des Betreibers): Gewinn-Burst beim Speichern – bestehender Goldstandard, in diesem Paket bewusst nicht angefasst",
     "src/App.tsx": "Toast-Meilenstein (`milestone`): nur die Prozess-Rückmeldung setzt das Flag",
     "src/views/wachstum/StreakBadge.tsx": "Serien sind Prozess-Serien (Journal, Check-in, Limits gehalten, Disziplin) – nie PnL, nie Handelsvolumen",
     "src/views/wachstum/BestsCard.tsx": "persönliche Bestwerte der Prozess-Serien",
@@ -89,8 +87,10 @@ describe("2 · bursts of dots: a closed list of places", () => {
     expect(unknown, "neue Stelle mit Konfetti – erst in docs/PSYCHOLOGIE.md entscheiden").toEqual([]);
   });
 
-  it("the places the product removed stay without one (import, sync, market move, connection, risk page, Übersicht)", () => {
+  it("the places the product removed stay without one (trade save, import, sync, market move, connection, risk page, Übersicht)", () => {
     for (const f of [
+      // the save of a trade: the win burst is gone (decision of the operator, 2026-11-10 – the last place that rewarded an outcome)
+      "src/overlays/TradeEditor.tsx",
       "src/exchanges/csv/CsvImportSheet.tsx",
       "src/exchanges/ui/ExchangeConnectionsCard.tsx",
       "src/exchanges/ui/ConnectSheet.tsx",
@@ -112,18 +112,12 @@ describe("2 · bursts of dots: a closed list of places", () => {
 });
 
 describe("3 · LDW: a loss never earns a win", () => {
-  const trade = (pnl: number | null, status: "open" | "closed" = "closed", r: number | null = null) => ({ id: "t", pnl, status, r, date: "2026-11-02", createdAt: "2026-11-02T10:00:00Z" });
-  const noOthers: never[] = [];
-
-  it("only a realised profit can earn a burst – a loss, a flat, an open or an unknown result never", () => {
-    for (const pnl of [-250, -0.01, 0, null]) expect(winCelebration(noOthers, trade(pnl)), String(pnl)).toBeNull();
-    expect(winCelebration(noOthers, trade(120, "open"))).toBeNull();
-    expect(winCelebration(noOthers, trade(Number.NaN))).toBeNull();
-  });
-
-  it("an edit that turns a win into a loss (or touches a win again) stays quiet; a partial loss on an old win does not re-celebrate", () => {
-    expect(winCelebration(noOthers, trade(-30), { pnl: 80, status: "closed" })).toBeNull();
-    expect(winCelebration(noOthers, trade(80), { pnl: 60, status: "closed" })).toBeNull();
+  it("no result of a trade earns a burst at all any more: the module that decided it (`overlays/celebration.ts`) is gone and the editor starts none", () => {
+    expect(existsSync(join(SRC, "overlays", "celebration.ts"))).toBe(false);
+    const editor = code(join(SRC, "overlays", "TradeEditor.tsx"));
+    expect(editor).not.toMatch(/winCelebration|celebrateFrom|celebrate\(/);
+    // nothing in the product reads a P&L to decide about a burst
+    for (const f of files) expect(code(f), rel(f)).not.toMatch(/winCelebration/);
   });
 
   const banned = /Konfetti|Fanfare|Jackpot|Glückwunsch|Volltreffer|Siegesserie|Triumph|Glücksrad|knapp daneben|beinahe gewonnen|fast gewonnen|so nah dran|Beinahe-Treffer/i;

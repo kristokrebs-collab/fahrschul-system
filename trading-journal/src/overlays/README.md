@@ -184,7 +184,7 @@ interface TradeDetailProps {
 | live strip | `MotionNumber flash` (win/loss tint per change). Checklist bar crossfades to win at 100 %, the `{x} von {n} erfüllt` label rolls (`TextRoll`). |
 | chips | emotion chips share one thumb (`layoutId="emotion-{useId}"`, `spring.segment`, `style.borderRadius` pill, label-only press); setup chips pop their dot into a check disc (`spring.pop`) and glide to their new order on an account switch (`layout="position"`, `layoutDependency={account}`). |
 | `LivePriceButton` | aria-hidden mini `RollingDigits source={priceMv}` next to the label while a live price exists (container query: only when label + digits fit). The name stays exactly the label; a click applies the freshest trade (`freshLivePrice`: `priceMv`, full precision) and falls back to the `livePrice` prop (re-read once a second, rounded) until a trade has arrived. |
-| celebration | a save that realises a win calls `celebrateFrom(button, { kind })` – `winCelebration(tradesBefore, record, before)`: `record` = new equity high, `streak` = R ≥ 2 or third win in a row, `win` otherwise; edits of an existing win stay quiet. |
+| celebration | none (decision of the operator, 2026-11-10): saving a trade never starts a burst of dots – the journal rewards process, not the outcome of a trade (`docs/PSYCHOLOGIE.md`). The toast states the result. `celebration.ts` (`winCelebration`) is deleted. |
 | `TradeDetail` | like `MorphDialog`: the fixed wrapper is the backdrop click target (the dim layer is decorative, never the target), the drop shadow sits on an unscaled sibling and fades in after the morph, and `useDialogBehaviour(…, { settled })` keeps the page isolation (`aria-hidden` + `data-modal-behind` + focus guard) and the focus return out of the morph and exit frames. The body is a stagger parent: fact tiles one by one (`stagger.cards`) → more facts → setups → checklist (bar fills, discs pop `spring.pop` · `stagger.rows`) → meta → notes → chart → actions. |
 | delete / destructive | `HoldConfirm` (`@/motion/HoldConfirm`, built on `HoldButton`'s `onRelease`): tap/click/quick key/AT → `onAsk` (the existing inline `Wirklich löschen? Ja, löschen / Nein` flow, unchanged names); a completed hold → `onConfirm` at once. `useConfirmFocus(confirming)` moves focus to `Nein` and back. Used by TradeEditor, TradeDetail (delete after the drawn check), SetupEditor, ImportDialog (`Ersetzen`), Settings `Wiederherstellen`. |
 | `SetupEditor` | fields cascade (`StaggerItem`), checklist rows enter/leave and lift while dragged (scale 1.02 + pre-rendered shadow layer), colour ring glides (`layoutId="sf-color-{useId}"`), a missing name shakes into view. |
@@ -204,7 +204,7 @@ interface TradeDetailProps {
 
 | swipe handles | every swipe handle (sheet header, dialog head, detail grabber / header, toast) carries `useTouchMoveGuard` (`@/motion/a11y`): a native non-passive `touchmove` that is `preventDefault`ed while dragging – otherwise Chrome treats the next tap within ~1 s as a fling cancel and swallows its click (e.g. the FAB right after swiping the editor away). |
 
-Helpers: `winCelebration` (`celebration.ts`), `BIG_WIN_R`, `STREAK_WINS`, `invalidFieldOf`. Shared with the views (moved out of this
+Helpers: `invalidFieldOf`. Shared with the views (moved out of this
 folder): `revealInvalid(idOrEl, { reduced })` → `@/primitives/fieldFx` (focus without jump → smooth scroll if needed → shake once
 visible); `HoldConfirm`, `useConfirmFocus`, `HOLD_CONFIRM_TITLE` → `@/motion/HoldConfirm`.
 
