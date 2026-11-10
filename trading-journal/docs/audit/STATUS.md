@@ -242,5 +242,35 @@ Basis: `5fa335a3` (PR #6) plus die Commits von PR #7 (`claude/exciting-planck-hc
 - Impressum der Vorschau zeigt weiter „PLATZHALTER“ (Betreiber setzt `VITE_LEGAL_*`); der Kauf bleibt dort deshalb gesperrt (`purchaseBlockedBy: legal`, an `/api/v1/billing/status` der Vorschau gemessen).
 - Alles aus Abschnitt 8 (Supabase-Produktion, Stripe live, Binance 451, TradingView, Resend/Twilio, Geräte, Anwalt).
 
-**Geprüft in dieser Runde:** Typprüfung und Lint sauber; Unit-Tests 670 Dateien / 9.689 grün (CI auf `f433d3ef`); E2E in der CI auf `f433d3ef`: alle vier Teile grün; Budget JS 662,2 / 800 KiB, CSS 52,5 / 52,5 KiB. Nicht geprüft: echte Geräte, echte Dienste.
+### Funktionsprüfung im Browser: drei unabhängige Durchgänge (Desktop, Handy, Konto/Kauf)
+
+Drei getrennte Prüfer haben die laufende App durchgeklickt (Showroom-Build mit Demo-Konto, Cloud-Build ohne Server, Build ohne Cloud; 1440 × 900, 390 × 844 und 360 × 740 Touch). Jeder Fund wurde zweimal in frischem Kontext nachgestellt und nach der Korrektur mit demselben Skript gegen den neu gebauten Stand wiederholt. Kein Durchgang sah eine unbehandelte Ausnahme oder einen eigenen Konsolenfehler der App.
+
+| Fund | Schwere | Jetzt | Beleg |
+| --- | --- | --- | --- |
+| CSV-Import las deutsche Tausenderpunkte als Dezimalpunkt („1.000“ → 1, „79.500“ → 79,5) | P1 | Die Schreibweise wird aus den Zahlen der Datei gelesen (`numberStyle`): zeigt die Datei ein Dezimalkomma, sind Punkte vor genau drei Ziffern Tausender | `src/exchanges/csv/parse.ts`; `tests/unit/csv.import.parse.test.ts`; Browser: 80.000,5 / 1.000 / 79.500 → 80000,5 / 1000 / 79500 |
+| Zuordnungs-Assistent legte „Größe (Wert)“ auf „Bewertung“; der eigene CSV-Export verdoppelte beim Einlesen das Journal (41 → 82) | P1 | „Größe“ wird erkannt; derselbe Trade aus einer anderen Quelle (von Hand getippt, anderer Importweg) gilt als „bereits im Journal“ (Paar, Richtung, Einstieg, Ausstieg, Zeit auf die Minute oder um ganze Viertelstunden verschoben) | `generic.ts`, `csv/index.ts` (`sameTrade`); Browser: eigener Export → „Alles schon im Journal“, 41 → 41 |
+| Vorgewählte Bestellung (Mail-Link `?order=…`) verschwand mit der falschen Meldung „Zahlungen noch nicht eingerichtet“ | P1 | Die Bestellung wartet, bis die Abo-Konfiguration vom Server da ist (`ReturnHost`, `requestOrder`) | `tests/unit/billing.store.test.tsx`; Browser: Bestellfenster öffnet, keine Meldung |
+| Mail-Link, dessen Code nicht einlösbar ist (`?code=…`, schon benutzt oder anderer Browser): keine Rückmeldung | P1 | Grund und Weg zu einem neuen Link im Magic-Link-Formular | `src/cloud/client.ts`, `authErrors.ts`; Browser (Showroom und Cloud-Build) |
+| Hell-Modus: gewählter Konto-Reiter im dunklen Kopf der Übersicht unlesbar | P2 | dunkle Inseln behalten das dunkle Glas | `shell-motion.css`; Browser-Bild |
+| „Trade bearbeiten“ auf dem Handy: „Speichern“ rutschte allein in eine zweite Zeile | P2 | eine Zeile bei 390 und 360 px (Fußzeile 44 px) | `TradeEditor.tsx`; Browser |
+| Suche „Backup“ landete auf „Datenarchiv“ | P2 | Überschrift zählt nur als ganzes Wort | `featureOpen.ts` (`headingMatch`); Browser |
+| Filter auf eine gelöschte Grundlage blieb unsichtbar aktiv („6 Trades“ unter „Alle Trades“) | P2 | Filter fällt mit der Grundlage weg | `tradesModel.ts`, `SetupEditor.tsx`; Browser |
+| Falscher 2FA-Code: Feld verlor den Fokus (Handy: Tastatur zu) | P2 | Fokus zurück im Feld | `AuthSheet.tsx`; Browser |
+| „Neues Passwort“: Meldung lag halb unter dem Knopf; Registrierung: Passwort-Fehler lag über der Stärkezeile und stand doppelt; fehlende Zustimmung ohne Bezug zum Kästchen; „Passwort vergessen?“ verlor die E-Mail | P2 | Platz für die Meldung, Fehler ersetzt die Stärkezeile, Kästchen bekommt Fokus und `aria-describedby`, E-Mail reist mit | `authWindow.css`, `AuthSheet.tsx`, `AuthFields.tsx`; Browser |
+| Handy: Rechnungszeile (Datum unter dem Betrag), Vergleich der Berichte und Coach „Heute“ (Zahlen abgeschnitten), Serien-Kachel (Flamme auf der Nachbarkachel, 360 px), Emotionstagebuch (letztes Etikett abgeschnitten) | P2 | nichts wird mehr abgeschnitten oder überlagert | je Datei; `tests/unit/qa.round13.test.tsx` |
+| Texte: „Regelverstoße“, Dateipfad `docs/TARIFE.md` im Tarifdetail | P2 | „Regelverstöße“, kein Pfad | `weekReview.ts`, `purchase/strings.ts` |
+
+**Gefunden und bewusst nicht geändert** (Entscheidung des Betreibers oder geringe Wirkung):
+
+- **Trade-Formular liest „81.230“ als 81,23** (ein Punkt = Dezimalpunkt; `src/lib/parse.ts` dokumentiert das als übernommenes Verhalten). „81.230,5“ und „81230.5“ stimmen; der Risikorechner liest dieselbe Eingabe als 81 230. Das ist für deutsche Schreibweise eine Falle, aber „1.500“ kann im Feld „Größe“ auch 1,5 heißen, und „Trade eintragen“ soll unverändert bleiben. Vorschlag zur Entscheidung: bei genau drei Ziffern nach einem einzelnen Punkt im Preisfeld nachfragen statt still zu speichern.
+- Coach-Antwortkachel kürzt lange Grundlagen-Namen („Makro-Zone (De…“), Einstellungen › Grundregeln kürzen lange Regeln im Eingabefeld.
+- Handy quer (844 × 390): die Seitenliste der Leiste ist nur 22 px hoch; die Seiten bleiben über „Menü“ erreichbar.
+- Konto-Fenster auf dem Handy: das Schließen-✕ liegt über dem abgedunkelten „+“ der Kopfzeile (liest sich „+✕“).
+- Öffentliche Preisseite, wenn der Server nicht antwortet: „Zahlungen noch nicht eingerichtet … alle Funktionen freigeschaltet“ passt nicht zu einem Ausfall.
+- Größe „1e308“ wird angenommen; zwei Grundlagen mit gleichem Namen sind möglich; ungespeicherte Einstellungen gehen beim Seitenwechsel ohne Nachfrage verloren; eine gespeicherte Ansicht merkt die Sortierung nicht (je einmal gesehen, nicht erneut geprüft).
+- Showroom (nur lokal): auf dem Anmeldefenster fehlen die Demo-Knöpfe („Bestätigungslink simulieren“); Community und Alarme zeigen dort „Nicht gefunden“, weil der Demo-Server diese Wege nicht kennt.
+- Formularfelder sind 13,5 bis 14 px groß; iOS Safari zoomt unter 16 px beim Fokus. Nur am Gerät zu prüfen.
+
+**Geprüft in dieser Runde:** Typprüfung und Lint sauber; Unit-Tests 672 Dateien / 9.713 grün, 1 übersprungen (lokal auf ruhiger Maschine, Stand `665b5103`); E2E in der CI auf `f433d3ef` (vor den Korrekturen der drei Prüfdurchläufe): alle vier Teile grün; der Lauf auf dem Endstand steht im PR #7. Budget JS 662,4 / 800 KiB, CSS 52,5 / 52,5 KiB (53 739 von 53 760 Bytes: die Reserve ist aufgebraucht, neue Stile gehören in Lazy-Chunks). Ein Unit-Test der Risiko-Seite lief in der CI auf einem Zwischenstand einmal in eine Zeitüberschreitung und danach zweimal grün; `tests/e2e/settings.spec.ts` („Startkapital → Speichern“) schlägt lokal unter hoher Last wechselnd fehl, auf dem Ausgangsstand `5fa335a3` genauso (3 von 6 gegen 4 von 6), in der CI grün. Nicht geprüft: echte Geräte, echte Dienste.
 
