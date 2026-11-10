@@ -1,6 +1,9 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Later, LATER_SCROLL_QUIET_MS, resetLaterForTests } from "@/primitives/Later";
+import { Later, LATER_LAND_FROM, LATER_SCROLL_QUIET_MS, resetLaterForTests } from "@/primitives/Later";
+
+const fx = vi.hoisted(() => ({ reduced: false }));
+vi.mock("@/motion/useReducedFx", () => ({ useReducedFx: () => fx.reduced }));
 
 class FakeIO {
   static last: FakeIO | null = null;
@@ -138,5 +141,61 @@ describe("Later", () => {
     );
     unmount();
     expect(() => runIdle()).not.toThrow();
+  });
+
+  describe("the landing (Runde 13): the cell brightens in once instead of a hard cut", () => {
+    /** A cell with a recording `animate` (jsdom has no WAAPI). */
+    function cellWith(opacity: string) {
+      const calls: { frames: Keyframe[]; timing: KeyframeAnimationOptions }[] = [];
+      const cell = document.createElement("div");
+      cell.style.opacity = opacity;
+      (cell as unknown as { animate: unknown }).animate = (frames: Keyframe[], timing: KeyframeAnimationOptions) => {
+        calls.push({ frames, timing });
+        return { cancel: () => undefined, play: () => undefined, currentTime: 0 };
+      };
+      document.body.appendChild(cell);
+      return { cell, calls };
+    }
+    afterEach(() => {
+      fx.reduced = false;
+      document.body.innerHTML = "";
+    });
+
+    it("a deferred card: one opacity run on its cell when it lands – from LATER_LAND_FROM to 1, nothing else animated", () => {
+      const { cell, calls } = cellWith("1");
+      render(
+        <Later fallback={<i>f</i>}>
+          <p>Karte</p>
+        </Later>,
+        { container: cell },
+      );
+      expect(calls).toHaveLength(0);
+      runIdle();
+      expect(screen.getByText("Karte")).toBeInTheDocument();
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.frames).toEqual([{ opacity: LATER_LAND_FROM }, { opacity: 1 }]);
+      expect(Number(calls[0]!.timing.duration)).toBeLessThanOrEqual(250);
+      expect(LATER_LAND_FROM).toBeGreaterThan(0); // never a blink through zero: the cell keeps its shape
+    });
+
+    it("no run under reduced motion, for a card that mounts at once, or in a cell its own reveal still hides", () => {
+      fx.reduced = true;
+      const a = cellWith("1");
+      render(<Later fallback={<i>f</i>}><p>eins</p></Later>, { container: a.cell });
+      runIdle();
+      expect(screen.getByText("eins")).toBeInTheDocument();
+      expect(a.calls).toHaveLength(0);
+
+      fx.reduced = false;
+      const b = cellWith("1");
+      render(<Later now><p>zwei</p></Later>, { container: b.cell });
+      expect(b.calls).toHaveLength(0);
+
+      const c = cellWith("0");
+      render(<Later fallback={<i>f</i>}><p>drei</p></Later>, { container: c.cell });
+      runIdle();
+      expect(screen.getByText("drei")).toBeInTheDocument();
+      expect(c.calls).toHaveLength(0);
+    });
   });
 });

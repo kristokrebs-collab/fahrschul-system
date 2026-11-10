@@ -168,7 +168,7 @@ export function GlobalSearch() {
         className="absolute inset-0 bg-ink-950/80"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1, transition: tween.fade }}
-        exit={{ opacity: 0, transition: tween.exit }}
+        exit={{ opacity: 0, transition: reduced ? { duration: 0 } : tween.exitSurface }}
         onClick={() => closeSearch()}
       />
       <div className="pointer-events-none absolute inset-0 flex items-start justify-center px-3 pt-[max(12px,env(safe-area-inset-top))] sm:px-6 sm:pt-[max(9vh,64px)]">
@@ -179,7 +179,8 @@ export function GlobalSearch() {
           aria-label={SEARCH_STRINGS.label}
           tabIndex={-1}
           className="pointer-events-auto relative w-full max-w-[720px] overflow-hidden rounded-[24px] outline-none shadow-dialog"
-          exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: tween.exit }}
+          // the panel arrives behind a red curtain – it leaves as a surface too (lifts away, eases out), not as a 120 ms blink (Runde 13)
+          exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: -8, scale: 0.985, transition: tween.exitSurface }}
         >
           {/* signal curtain: leads the ink panel by `curtainLead` (decorative), gone once the panel has landed */}
           {!reduced && !opened && (

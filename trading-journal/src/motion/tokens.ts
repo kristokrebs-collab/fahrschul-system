@@ -52,6 +52,9 @@ export const tween = {
   bar: { duration: 0.8, ease: ease.out },
   fade: { duration: 0.2, ease: "easeOut" },
   exit: { duration: 0.12, ease: "linear" }, // exit is always shorter than enter
+  // Runde 13: the exit of a LARGE surface (a window, a full panel, a phone sheet that leaves without a morph). 0.12 s linear reads as a
+  // blink at that size; this one accelerates out (ease-in) and is still shorter than the surface's entrance. Small things keep `exit`.
+  exitSurface: { duration: 0.18, ease: [0.4, 0, 1, 1] as [number, number, number, number] },
   sheetIos: { duration: 0.5, ease: ease.ios }, // NEW: mobile bottom sheet without layoutId
   body: { delay: 0.12, duration: 0.25, ease: ease.out }, // dialog body
   libDefault: { duration: 0.45, ease: [0.4, 0, 0.1, 1] as [number, number, number, number] },

@@ -24,6 +24,7 @@ import { Input } from "@/primitives/Input";
 import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { useUi, type Page } from "@/store/uiStore";
+import "./wizard.css";
 import { chooseWizardData, finishWizard, goToWizardStep, pauseWizard, skipWizard, useWizard, WIZARD_COUNT, WIZARD_STEP_LABELS, WIZARD_STEPS, type WizardData } from "./wizardStore";
 
 export const WIZARD = {
@@ -253,6 +254,20 @@ function StepStart({ data, trades, onTrade, onDemo, onAnalysis }: { data: Wizard
   );
 }
 
+/**
+ * The swap of two steps. The direction is read from `custom` at the moment of the swap – also by the step that LEAVES: with a plain
+ * `exit` prop the leaving step kept the direction of the render that mounted it, so on „Zurück“ both steps moved to the left.
+ */
+export interface StepWay {
+  dir: 1 | -1;
+  reduced: boolean;
+}
+export const STEP_SWAP = {
+  from: (w: StepWay) => (w.reduced ? { opacity: 0 } : { opacity: 0, x: 20 * w.dir }),
+  shown: { opacity: 1, x: 0, transition: { opacity: tween.fade, x: spring.enter } },
+  gone: (w: StepWay) => (w.reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, x: -14 * w.dir, transition: tween.exit }),
+};
+
 export function SetupWizard() {
   const open = useWizard((s) => s.open);
   const step = useWizard((s) => s.step);
@@ -263,6 +278,7 @@ export function SetupWizard() {
   const [invalid, setInvalid] = useState(false);
   const id = WIZARD_STEPS[step] ?? WIZARD_STEPS[0];
   const last = step === WIZARD_COUNT - 1;
+  const stepWay: StepWay = { dir, reduced };
 
   const go = (n: number) => {
     setDir(n > step ? 1 : -1);
@@ -305,11 +321,22 @@ export function SetupWizard() {
             </Button>
           </span>
           <div className="flex items-center gap-2.5">
-            {step > 0 && (
-              <Button variant="secondary" onClick={() => go(step - 1)} data-testid="wizard-back">
-                {WIZARD.back}
-              </Button>
-            )}
+            {/* „Zurück“ arrives with the second step and leaves with the way back to the first – faded, not popped */}
+            <AnimatePresence initial={false}>
+              {step > 0 && (
+                <motion.span
+                  key="back"
+                  className="inline-flex"
+                  initial={reduced ? false : { opacity: 0, x: 6 }}
+                  animate={{ opacity: 1, x: 0, transition: tween.fade }}
+                  exit={{ opacity: 0, transition: reduced ? { duration: 0 } : tween.exit }}
+                >
+                  <Button variant="secondary" onClick={() => go(step - 1)} data-testid="wizard-back">
+                    {WIZARD.back}
+                  </Button>
+                </motion.span>
+              )}
+            </AnimatePresence>
             {id === "verbindung" && (
               <Button variant="secondary" onClick={() => go(step + 1)} data-testid="wizard-optional-later">
                 {WIZARD.verbindung.later}
@@ -346,13 +373,9 @@ export function SetupWizard() {
           ))}
         </ol>
         <div className="relative min-h-[220px] min-w-0">
-          <AnimatePresence mode="wait" initial={false} custom={dir}>
-            <motion.div
-              key={id}
-              initial={reduced ? { opacity: 0 } : { opacity: 0, x: 20 * dir }}
-              animate={{ opacity: 1, x: 0, transition: { opacity: tween.fade, x: spring.enter } }}
-              exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, x: -14 * dir, transition: tween.exit }}
-            >
+          <AnimatePresence mode="wait" initial={false} custom={stepWay}>
+            {/* `wz-step`: the pieces of a step (title, text, choices, action) rise in one after another (`wizard.css`) */}
+            <motion.div key={id} className="wz-step" custom={stepWay} variants={STEP_SWAP} initial="from" animate="shown" exit="gone">
               {id === "konto" && <StepKonto onClose={pauseWizard} />}
               {id === "daten" && <StepDaten data={data} invalid={invalid} />}
               {id === "verbindung" && <StepVerbindung onOpen={() => toPage("konto")} />}

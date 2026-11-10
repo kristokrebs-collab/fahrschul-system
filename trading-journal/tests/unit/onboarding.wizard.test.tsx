@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 /**
  * Paket B – the setup wizard: at most four steps (Konto · Daten · Verbindung optional · erster Trade), progress is stored, every
  * step but the one decision can be passed, it runs ONCE (armed by a registration, never by a login or a reload), an existing trader
@@ -14,7 +15,7 @@ vi.mock("@/motion/useReducedFx", () => ({ useReducedFx: () => fx.reduced }));
 const { setCloudEnabledForTests } = await import("@/cloud/env");
 const { resetCloudSession, useCloudSession } = await import("@/cloud/session");
 const { MotionRoot } = await import("@/motion/MotionRoot");
-const { SetupWizard, WIZARD } = await import("@/onboarding/wizard/SetupWizard");
+const { SetupWizard, STEP_SWAP, WIZARD } = await import("@/onboarding/wizard/SetupWizard");
 const { WizardHost } = await import("@/onboarding/wizard/WizardHost");
 const ws = await import("@/onboarding/wizard/wizardStore");
 const { useJournal, resetJournal } = await import("@/store/journalStore");
@@ -224,5 +225,31 @@ describe("the host: once, quiet, never in front of a payment", () => {
     mountHost();
     await waitFor(() => expect(ws.readWizard()?.status).toBe("skipped"));
     expect(ws.useWizard.getState().open).toBe(false);
+  });
+});
+
+describe("the swap of two steps (motion review, Runde 13)", () => {
+  it("the LEAVING step follows the direction of the swap: forward out to the left, „Zurück“ out to the right – never both the same way", () => {
+    const fwd = { dir: 1 as const, reduced: false };
+    const back = { dir: -1 as const, reduced: false };
+    // forward: the new step comes from the right, the old one leaves to the left
+    expect(STEP_SWAP.from(fwd)).toMatchObject({ x: 20 });
+    expect(STEP_SWAP.gone(fwd)).toMatchObject({ x: -14 });
+    // back: mirrored – the old step leaves to the RIGHT (it used to leave to the left like the entering one)
+    expect(STEP_SWAP.from(back)).toMatchObject({ x: -20 });
+    expect(STEP_SWAP.gone(back)).toMatchObject({ x: 14 });
+    // reduced motion: no travel at all
+    expect(STEP_SWAP.from({ dir: 1, reduced: true })).toEqual({ opacity: 0 });
+    expect(STEP_SWAP.gone({ dir: -1, reduced: true })).toEqual({ opacity: 0, transition: { duration: 0 } });
+  });
+
+  it("the step reads the direction from `custom` (variants), and its pieces carry the build-up class", () => {
+    const src = readFileSync("src/onboarding/wizard/SetupWizard.tsx", "utf8");
+    expect(src).toMatch(/<AnimatePresence mode="wait" initial=\{false\} custom=\{stepWay\}>/);
+    expect(src).toMatch(/className="wz-step" custom=\{stepWay\} variants=\{STEP_SWAP\}/);
+    const css = readFileSync("src/onboarding/wizard/wizard.css", "utf8");
+    // opacity and transform only, staggered by position
+    expect(css).toMatch(/\.wz-step > \* > :nth-child\(2\) \{\s*animation-delay: 45ms;/);
+    expect(css.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/\b(height|width|top|left|margin|padding)\s*:/);
   });
 });

@@ -45,6 +45,7 @@ seconds unless noted. Additions over the bundle set:
 | `spring.enter` | `{240, 30, mass .9}` | `Reveal` / `StaggerItem` y, list inserts, PageSwitch x/scale, page-header words |
 | `spring.pageEnter` | `spring.enter` + `restDelta 3.125, restSpeed 12.5` | `PageHost` string-keyframe slide (Motion springs string keyframes over 0…100: = 0.5 px / 2 px·s⁻¹ on the 16 px slide, settles ≈ 0.42 s) |
 | `spring.island` | `{400, 30}` | dynamic-island size morphs (trades count pill) |
+| `tween.exitSurface` (Runde 13) | `.18 s` ease-in `[.4, 0, 1, 1]` | the exit of a LARGE surface: payment window, global search panel, a phone sheet that leaves without a hand-back morph. Small things (chips, rows, strips) keep `tween.exit` (0.12 s linear) |
 | `tween.sheetBody` | `.3 s ease.out` | `Sheet` body after the morph |
 | `tween.check` / `tween.checkToast` | `.25 s` / `.35 s delay .15` | drawn checks, toast check mark |
 | `tween.toastExit` / `tween.toastText` | `.22 s` / `tween.fade` + `delay .12` | toast island exit / text fade + win-value roll start |

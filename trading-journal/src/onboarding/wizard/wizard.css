@@ -1,0 +1,28 @@
+/*
+ * Setup wizard: the pieces of a step – title and text, the choices, the action, a note – rise in one after another instead of arriving
+ * as one block (motion review, Runde 13). Opacity and transform only, once per step (the pieces are mounted with their step; a later
+ * re-render does not replay), 45 ms apart like the rows of the login window; a piece that appears later (the "bitte wählen" line) rises
+ * on its own. Lives in the wizard's lazy chunk, not in the first-load stylesheet. Reduced motion (device or the reader's setting): the
+ * global rule in `base.css` sets duration and delay to zero – every piece is at rest at once.
+ */
+@keyframes wz-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.wz-step > * > * {
+  animation: wz-rise 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.wz-step > * > :nth-child(2) {
+  animation-delay: 45ms;
+}
+.wz-step > * > :nth-child(3) {
+  animation-delay: 90ms;
+}
+.wz-step > * > :nth-child(4) {
+  animation-delay: 135ms;
+}
+.wz-step > * > :nth-child(n + 5) {
+  animation-delay: 180ms;
+}

@@ -20,6 +20,7 @@ import { TERMS_CONSENT, TERMS_PARTS } from "@/legal/consentRecord";
 import { IMMEDIATE_START_CONSENT } from "@/legal/consentTexts";
 import { useDialogBehaviour } from "@/motion/a11y";
 import { payStage } from "@/motion/vorbild";
+import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { cancelAll, settled } from "@/motion/waapi";
 import { Segmented } from "@/primitives/Segmented";
@@ -295,10 +296,30 @@ export function PayWindow() {
   const inFlight = phase === "starting" || phase === "confirming" || phase === "waiting";
   /** What the stage shows: an answer that came while the card was still flying waits for the landing. */
   const shown = stage !== "landed" && (phase === "confirmed" || phase === "slow") ? "waiting" : phase;
+  /**
+   * The window leaves instead of vanishing (motion review, Runde 13): it fades and eases back a little on `tween.exitSurface`, THEN the
+   * order closes. The order stays open for those 180 ms, so nothing of the stage is reset while it is still visible. Reduced motion, or
+   * a browser without the Web Animations API: closed at once, as before.
+   */
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const leaving = useRef(false);
   const close = () => {
-    if (inFlight || form.phase === "confirming") return;
+    if (inFlight || form.phase === "confirming" || leaving.current) return;
     if (phase === "confirmed") void loadBilling();
-    closeOrder();
+    const el = overlayRef.current;
+    if (reduced || !el || typeof el.animate !== "function") {
+      closeOrder();
+      return;
+    }
+    leaving.current = true;
+    el.style.pointerEvents = "none";
+    const done = () => {
+      leaving.current = false;
+      closeOrder();
+    };
+    const timing = { duration: tween.exitSurface.duration * 1000, easing: `cubic-bezier(${tween.exitSurface.ease.join(", ")})`, fill: "forwards" as const };
+    dialogRef.current?.animate?.([{ transform: "scale(1)" }, { transform: "scale(0.985)" }], timing);
+    el.animate([{ opacity: 1 }, { opacity: 0 }], timing).finished.then(done, done);
   };
   useDialogBehaviour(dialogRef, open, close);
 
@@ -354,7 +375,7 @@ export function PayWindow() {
 
   if (!open) return null;
   return (
-    <div className="pw-overlay" data-orient={portrait ? "portrait" : "landscape"} data-layer="Bezahlen">
+    <div ref={overlayRef} className="pw-overlay" data-orient={portrait ? "portrait" : "landscape"} data-layer="Bezahlen">
       <div className="pw-dim" aria-hidden="true" onClick={close} />
       <div
         ref={dialogRef}

@@ -1,5 +1,8 @@
-import { startTransition, useEffect, useRef, useState, type ReactNode } from "react";
+import { startTransition, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { canObserveInView } from "@/motion/inView";
+import { replay } from "@/motion/replay";
+import { tween } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { CardSkeleton } from "@/primitives/Reserve";
 
 /**
@@ -17,8 +20,15 @@ import { CardSkeleton } from "@/primitives/Reserve";
  *   nothing moves when the card lands. Each mount is a `startTransition`, so React renders it in time slices.
  * - Without `IntersectionObserver` or `requestIdleCallback` (jsdom, SSR, old engines) the children render at once: nothing
  *   is ever left out. Reduced motion changes nothing here (it is about when, not how).
+ * - The landing is not a hard cut (motion review, Runde 13): the skeleton and the card used to swap inside one frame. When the card
+ *   lands, its CELL (the parent that holds the reserved size – every user of `Later` gives it one of its own) brightens in once on
+ *   `tween.fade`, opacity only, from `LATER_LAND_FROM` (not from zero: the cell keeps its shape, the content arrives in it). On a long
+ *   page whose cards mount one per idle slice this reads as the page building itself up card by card. Skipped under reduced motion, in a
+ *   cell that is still hidden by its own reveal (its opacity is not 1 yet – that reveal IS the entrance) and without WAAPI.
  * Once mounted a card stays mounted.
  */
+/** The opacity the cell starts from when its card lands. */
+export const LATER_LAND_FROM = 0.35;
 export const LATER_TIMEOUT_MS = 120;
 export const LATER_SCROLL_QUIET_MS = 200;
 export const LATER_NEAR_PX = 500;
@@ -106,6 +116,18 @@ export function Later({ children, fallback, now = false }: LaterProps) {
   const immediate = now || !canMountLater();
   const [on, setOn] = useState(immediate);
   const box = useRef<HTMLDivElement>(null);
+  const reduced = useReducedFx();
+  /** The cell of a card that was deferred, remembered until it has landed (the fallback box is gone by then). */
+  const cell = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const el = cell.current;
+    if (!on || !el) return;
+    cell.current = null;
+    if (reduced || typeof el.animate !== "function") return;
+    // a cell that its own reveal still hides (or is fading in) keeps that entrance – a style read, no layout
+    if (getComputedStyle(el).opacity !== "1") return;
+    replay(el, { opacity: [LATER_LAND_FROM, 1] }, tween.fade);
+  }, [on, reduced]);
   useEffect(() => {
     if (on) return;
     const el = box.current;
@@ -119,6 +141,7 @@ export function Later({ children, fallback, now = false }: LaterProps) {
       if (at >= 0) queue.splice(at, 1);
       nearListeners.delete(el);
       near?.unobserve(el);
+      cell.current = el.parentElement;
       startTransition(() => setOn(true));
     };
     queue.push(mount);

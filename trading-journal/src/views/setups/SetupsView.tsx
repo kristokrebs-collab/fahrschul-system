@@ -7,7 +7,7 @@ import { DEFAULT_RANK_KEY, RANK_KEYS, rankSetupStats, setupVisibleFor, type Rank
 import type { AccountId } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { RevealGroup, RevealItem } from "@/motion/Reveal";
-import { radius, spring } from "@/motion/tokens";
+import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Card } from "@/primitives/Card";
 import { Icon } from "@/primitives/icons";
@@ -121,7 +121,9 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
       )}
 
       <motion.div layout layoutDependency={layoutDependency} transition={{ layout: spring.layout }} className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))]">
-        <AnimatePresence mode="popLayout" initial={false}>
+        {/* no `initial={false}`: on page entry the cards rise in one after another (`SetupCard`: `stagger.cards`, its bullets and bars
+            already wait for it) – with it the grid simply stood there while only the insides of the cards moved (motion review, Runde 13) */}
+        <AnimatePresence mode="popLayout">
           {ranked.map((c, i) => (
             <SetupCard
               key={c.id}
@@ -139,7 +141,10 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
             key="__new"
             layout
             layoutDependency={layoutDependency}
-            transition={{ layout: spring.layout, default: spring.press }}
+            // the tile closes the cascade of the cards: a fade after the last of them (opacity only – hover and press keep their spring)
+            initial={reduced ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ layout: spring.layout, default: spring.press, opacity: { ...tween.fade, delay: reduced ? 0 : Math.min(ranked.length, stagger.max) * stagger.cards } }}
             style={{ borderRadius: radius.card }}
             type="button"
             onClick={create}

@@ -1082,3 +1082,51 @@
     transition-duration: 0ms;
   }
 }
+
+/* ---------------------------------------------------------------- Auftritt (Runde 13, Bewegungsprüfung)
+   Das Fenster erschien bisher in einem Bild (173 Knoten ohne Bewegung). Jetzt: Abdunklung und Rahmen blenden ein wie beim Anmeldefenster
+   (0,2 s, Rahmen von 98,5 %), dann bauen sich die vier Zonen nacheinander auf – Kopf, Karte, Bestellung, Formular, 45 ms auseinander.
+   Nur Deckkraft und transform; `backwards`: nach dem Ende bleibt nichts auf den Elementen stehen, die Bühne (Karte hebt ab, WAAPI) und die
+   Drehung der Karte finden ihre Elemente unverändert vor. Reduzierte Bewegung: die globale Regel in base.css setzt Dauer und Verzögerung
+   auf null. Der Ausgang ist Sache von PayWindow.tsx (`tween.exitSurface`). */
+@keyframes pw-in-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pw-in-frame {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+@keyframes pw-in-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.pw-dim {
+  animation: pw-in-fade 0.2s ease-out backwards;
+}
+.pw-frame {
+  animation: pw-in-frame 0.2s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.pw-head,
+.pw-cardbox,
+.pw-summary,
+.pw-form {
+  animation: pw-in-rise 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.pw-head {
+  animation-delay: 70ms;
+}
+.pw-cardbox {
+  animation-delay: 115ms;
+}
+.pw-summary {
+  animation-delay: 160ms;
+}
+.pw-form {
+  animation-delay: 205ms;
+}
