@@ -145,8 +145,9 @@ function AnswerView({ entry, trades, cur, aiNotes }: { entry: ChatEntry; trades:
                 animate={landed ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }}
                 transition={{ default: tween.reveal, y: spring.enter }}
               >
-                <dt className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-mute">{f.label}</dt>
-                <dd className={cn("num truncate font-mono text-[14px]", TONE_TEXT[f.tone])}>
+                <dt className="break-words text-[10px] font-semibold uppercase tracking-[0.1em] text-mute">{f.label}</dt>
+                {/* the value is never cut: a long name („Makro-Zone (Demo)“) wraps inside its tile (it read „Makro-Zone (De“, QA Runde 13) */}
+                <dd className={cn("num break-words font-mono text-[14px]", TONE_TEXT[f.tone])}>
                   <LandingValue raw={f.raw} landed={landed}>
                     {f.value}
                   </LandingValue>

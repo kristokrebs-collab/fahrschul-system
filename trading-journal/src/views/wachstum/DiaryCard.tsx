@@ -87,9 +87,9 @@ function Timeline({ shown }: { shown: readonly DiaryDay[] }) {
   const wide = useMediaQuery("(min-width: 640px)", true);
   const total = shown.length;
   // the axis runs a little past the last day, so the row labels after the newest bars stay inside the card – further on a phone,
-  // where a day is only ≈ 28 px wide: with 1.5 days of room „2 Trades“ after the newest bar was cut at the card's edge by 14–18 px
+  // where a day is only ≈ 28 px wide: with 1.5 days of room „2 Trades“ after the newest bar was cut at the card's edge by 14–18 px (and still by 3 px at 360 px with 2.6)
   // (QA Runde 13)
-  const axis = total + (wide ? 1.5 : 2.6);
+  const axis = total + (wide ? 1.5 : 3.2);
   const time = useMotionValue(axis);
   const [idx, setIdx] = useState(total - 1);
   useMotionValueEvent(time, "change", (t) => {

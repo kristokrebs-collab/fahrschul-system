@@ -37,11 +37,15 @@ describe("phone layout", () => {
     expect(cmp).toMatch(/<span role="cell" className="num text-right font-mono text-fg">\s*\{r\.a\}/);
     expect(cmp).toMatch(/<span role="cell" className="num text-right font-mono text-mute">\s*\{r\.b\}/);
     expect(read("src/views/coach/TodayCard.tsx")).toMatch(/<dd className=\{cn\("num font-mono text-\[14px\]", c\)\}>/);
+    // the answer tiles of the coach: label and value wrap, neither is cut („Makro-Zone (De“, „Stärkste Grup…“)
+    const chat = read("src/views/coach/ChatCard.tsx");
+    expect(chat).toMatch(/<dt className="break-words text-\[10px\] font-semibold uppercase tracking-\[0\.1em\] text-mute">\{f\.label\}<\/dt>/);
+    expect(chat).toMatch(/<dd className=\{cn\("num break-words font-mono text-\[14px\]", TONE_TEXT\[f\.tone\]\)\}>/);
   });
 
   it("Wachstum: the streak row wraps (the flame lay on the neighbouring tile at 360 px), the diary axis leaves room for its last label", () => {
     expect(read("src/views/wachstum/StreakBadge.tsx")).toMatch(/<div className="flex flex-wrap items-baseline gap-1\.5">/);
-    expect(read("src/views/wachstum/DiaryCard.tsx")).toMatch(/const axis = total \+ \(wide \? 1\.5 : 2\.6\);/);
+    expect(read("src/views/wachstum/DiaryCard.tsx")).toMatch(/const axis = total \+ \(wide \? 1\.5 : 3\.2\);/);
   });
 
   it("„Tarif im Detail“ names no file path of the repository", () => {

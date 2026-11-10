@@ -709,6 +709,8 @@ button.aw-ficon:focus-visible {
 }
 .aw-frame[data-orient="portrait"] .aw-close {
   top: -46px;
+  /* on a phone the button lies over the dimmed header: an opaque plate, so the header's „+“ does not show through it („+✕“, QA Runde 13) */
+  background: #1c1c1c;
 }
 
 @media (prefers-reduced-motion: reduce) {

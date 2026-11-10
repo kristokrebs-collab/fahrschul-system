@@ -259,14 +259,14 @@ Drei getrennte Prüfer haben die laufende App durchgeklickt (Showroom-Build mit 
 | Falscher 2FA-Code: Feld verlor den Fokus (Handy: Tastatur zu) | P2 | Fokus zurück im Feld | `AuthSheet.tsx`; Browser |
 | „Neues Passwort“: Meldung lag halb unter dem Knopf; Registrierung: Passwort-Fehler lag über der Stärkezeile und stand doppelt; fehlende Zustimmung ohne Bezug zum Kästchen; „Passwort vergessen?“ verlor die E-Mail | P2 | Platz für die Meldung, Fehler ersetzt die Stärkezeile, Kästchen bekommt Fokus und `aria-describedby`, E-Mail reist mit | `authWindow.css`, `AuthSheet.tsx`, `AuthFields.tsx`; Browser |
 | Handy: Rechnungszeile (Datum unter dem Betrag), Vergleich der Berichte und Coach „Heute“ (Zahlen abgeschnitten), Serien-Kachel (Flamme auf der Nachbarkachel, 360 px), Emotionstagebuch (letztes Etikett abgeschnitten) | P2 | nichts wird mehr abgeschnitten oder überlagert | je Datei; `tests/unit/qa.round13.test.tsx` |
+| Coach-Antwortkachel kürzte lange Namen („Makro-Zone (De“); Konto-Fenster auf dem Handy: Schließen-✕ lag durchscheinend über dem „+“ der Kopfzeile | P2 | Name und Etikett brechen um; der Knopf hat eine deckende Platte | `ChatCard.tsx`, `authWindow.css`; Browser-Bild |
 | Texte: „Regelverstoße“, Dateipfad `docs/TARIFE.md` im Tarifdetail | P2 | „Regelverstöße“, kein Pfad | `weekReview.ts`, `purchase/strings.ts` |
 
 **Gefunden und bewusst nicht geändert** (Entscheidung des Betreibers oder geringe Wirkung):
 
 - **Trade-Formular liest „81.230“ als 81,23** (ein Punkt = Dezimalpunkt; `src/lib/parse.ts` dokumentiert das als übernommenes Verhalten). „81.230,5“ und „81230.5“ stimmen; der Risikorechner liest dieselbe Eingabe als 81 230. Das ist für deutsche Schreibweise eine Falle, aber „1.500“ kann im Feld „Größe“ auch 1,5 heißen, und „Trade eintragen“ soll unverändert bleiben. Vorschlag zur Entscheidung: bei genau drei Ziffern nach einem einzelnen Punkt im Preisfeld nachfragen statt still zu speichern.
-- Coach-Antwortkachel kürzt lange Grundlagen-Namen („Makro-Zone (De…“), Einstellungen › Grundregeln kürzen lange Regeln im Eingabefeld.
+- Einstellungen › Grundregeln kürzen lange Regeln im Eingabefeld (der Text ist im Feld vollständig, nur nicht auf einen Blick lesbar).
 - Handy quer (844 × 390): die Seitenliste der Leiste ist nur 22 px hoch; die Seiten bleiben über „Menü“ erreichbar.
-- Konto-Fenster auf dem Handy: das Schließen-✕ liegt über dem abgedunkelten „+“ der Kopfzeile (liest sich „+✕“).
 - Öffentliche Preisseite, wenn der Server nicht antwortet: „Zahlungen noch nicht eingerichtet … alle Funktionen freigeschaltet“ passt nicht zu einem Ausfall.
 - Größe „1e308“ wird angenommen; zwei Grundlagen mit gleichem Namen sind möglich; ungespeicherte Einstellungen gehen beim Seitenwechsel ohne Nachfrage verloren; eine gespeicherte Ansicht merkt die Sortierung nicht (je einmal gesehen, nicht erneut geprüft).
 - Showroom (nur lokal): auf dem Anmeldefenster fehlen die Demo-Knöpfe („Bestätigungslink simulieren“); Community und Alarme zeigen dort „Nicht gefunden“, weil der Demo-Server diese Wege nicht kennt.
