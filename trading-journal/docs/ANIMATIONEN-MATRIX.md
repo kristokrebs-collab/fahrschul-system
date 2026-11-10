@@ -223,6 +223,24 @@ unten dunkel), `--gl-face` / `--gl-on` (Fläche, aktiv), `--gl-in` (dünne Innen
 Belege: Vergleichsbögen Video | Nachbau `vorbild2/vergleich-a.png`, `vorbild2/vergleich-b.png`, Vorher/Nachher `glass/before/*.png`, `glass/after/*.png`
 (1692 × 978 und 390 × 844, dunkel und hell) im Scratchpad der Sitzung.
 
+## Runde 13 – Bewegungsprüfung: Aufbau nacheinander, Ausgänge mit Absicht
+
+Stand 2026-11-10. Auftrag des Nutzers: das Gerüst bleibt, Einstiege sollen sich **nacheinander aufbauen**, Ausgänge sollen **gehen statt verschwinden**. Grundlage war eine Messung in der laufenden App (Showroom-Build, 1440 × 900 und 390 × 844 Touch, dazu ein Durchgang mit reduzierter Bewegung): etwa 90 Interaktionen, je Bild `getAnimations()`, Deckkraft, `transform` und DOM-Präsenz. Dauern stammen aus den Definitionen, der Browser belegt Reihenfolge, Präsenz und Abruptheit (die Sandbox teilt sich 4 Kerne). Keiner der 177 Punkte ändert dadurch seinen Status; die Zeilen der Matrix bleiben wie sie sind.
+
+| Stelle | Gemessen vorher | Jetzt | Datei | Beleg |
+| --- | --- | --- | --- | --- |
+| Bezahlfenster, Auftritt | 173 Knoten in einem Bild bei Deckkraft 1, keine Bewegung | Abdunklung und Rahmen blenden ein (0,2 s, Rahmen von 98,5 %), dann Kopf, Karte, Bestellung, Formular im Abstand von 45 ms (Deckkraft + 10 px) | `src/billing/purchase/pay/payWindow.css` (`pw-in-*`, im Lazy-Chunk) | Browser: Reihenfolge 70 / 115 / 160 / 205 ms gemessen; `tests/unit/motion.round13.test.tsx` |
+| Bezahlfenster, Ausgang | bei Escape im selben Bild entfernt | blendet aus und weicht leicht zurück (`tween.exitSurface`, 0,18 s ease-in), **dann** schließt die Bestellung; die Bühne wird nicht zurückgesetzt, solange sie sichtbar ist; eine laufende Zahlung schließt weiterhin nie | `src/billing/purchase/PayWindow.tsx` (`close`) | Browser: Deckkraft 1 → 0,12 über ≈ 190 ms, danach entfernt (Desktop und Handy); Test wie oben |
+| Einrichtungs-Assistent, „Zurück“ | **Fehler:** der alte Schritt verließ die Bühne nach links wie der neue hereinkam (beide −x) | der gehende Schritt liest die Richtung im Moment des Wechsels (`custom` + Varianten): vor = nach links, zurück = nach rechts | `src/onboarding/wizard/SetupWizard.tsx` (`STEP_SWAP`) | Browser: zurück → alter Schritt +12 px, neuer von −20 px; `tests/unit/onboarding.wizard.test.tsx` |
+| Einrichtungs-Assistent, Schritte | ein Block (29 Knoten) von x 20; „Zurück“-Knopf sprang herein und heraus | Titel, Text, Auswahl, Aktion steigen im Abstand von 45 ms ein; „Zurück“ blendet ein und aus | `src/onboarding/wizard/wizard.css` (Lazy-Chunk), `SetupWizard.tsx` | Browser: drei Stücke bei 424 ms auf 0,80 / 0,56 / 0,12 |
+| Entscheidungsgrundlagen, Karten | 5 Karten und die Kachel „Neue“ standen sofort da, nur Listen und Balken in den Karten bewegten sich (`initial={false}` auf der Präsenz) | Karten steigen nacheinander ein (`stagger.cards`, die Karte hatte die Bewegung schon definiert), die Kachel schließt die Folge mit einer Blende | `src/views/setups/SetupsView.tsx` | Browser: bei 352 ms Karte 1 / 3 / 5 auf 0,87 / 0,64 / 0,26 |
+| Suche (`/`), Ausgang | Auftritt mit rotem Vorhang (520 ms), Ausgang nur Deckkraft 120 ms linear | Fläche hebt sich weg (−8 px, 98,5 %) auf `tween.exitSurface` | `src/search/GlobalSearch.tsx` | Browser: 1 → 0,23 über ≈ 160 ms mit y −6 |
+| Nachgeladene Karten (`Later`: Einstellungen, Analyse, Berichte, Wachstum) | Platzhalter und Karte tauschten in einem Bild | die Zelle hellt beim Landen einmal auf (0,35 → 1, `tween.fade`); auf der Einstellungsseite landen die Karten in Seitenreihenfolge, die Seite baut sich Karte für Karte auf | `src/primitives/Later.tsx` | Browser: 14 Landungen in Reihenfolge über ≈ 750 ms; `tests/unit/primitives.later.test.tsx` |
+
+Neuer Takt: `tween.exitSurface` (0,18 s, ease-in `[.4, 0, 1, 1]`) für den Ausgang **großer** Flächen. Kleines (Chips, Zeilen, Streifen) behält `tween.exit` (0,12 s linear). Reduzierte Bewegung: überall sofort im Endzustand (CSS-Auftritte über die globale Regel in `base.css`, die JS-Wege über `useReducedFx`).
+
+**Bewusst nicht angefasst** (gemessen und für gut befunden, oder geschützt): Anmeldefenster (12 Elemente im Abstand von 45 bis 60 ms, kein Layoutsprung), Intro und Seitenleisten-Welle, Seitenwechsel (`PageHost`), Menü, Trade speichern / löschen / filtern, Trade-Detail-Morph, `MorphSelect`, Falten, Themenwechsel, Teilen-Fächer. „Trade eintragen“ und sein Blatt bleiben nach der Leitplanke unverändert, deshalb auch der Ausgang des Handy-Blatts (blendet am Ort aus) und die Neusortierung der Trades-Tabelle (Zeilen bauen sich neu auf, ohne eigenen Ausgang). **Offen als Entscheidung des Betreibers** (unverändert, `docs/PSYCHOLOGIE.md` Abschnitt 6, Punkt 1): beim Speichern eines Gewinn-Trades läuft weiterhin ein Konfetti-Stoß.
+
 ## Die Matrix
 
 Spalten: Nr · Name · Quelle · Status · Stelle im Code · Entscheidung · Begründung.
