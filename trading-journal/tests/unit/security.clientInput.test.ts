@@ -159,4 +159,8 @@ describe("index.html", () => {
     for (const l of hints) expect(l, "a resource hint to another origin").not.toMatch(/href=["']https?:\/\//i);
     expect(/(?:fapi|fstream|stream)\.binance\.com|bybit\.com|okx\.com/i.test(html)).toBe(false);
   });
+
+  it("hides the deploy preview's collaboration bar (an empty white strip over the bottom navigation under this site's CSP)", () => {
+    expect(html).toMatch(/body > div\[data-netlify-deploy-id\]\s*\{\s*display: none !important;\s*\}/);
+  });
 });

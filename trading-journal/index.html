@@ -25,6 +25,12 @@
       body {
         background: #0a0a0a;
       }
+      /* Netlify adds a collaboration bar to deploy previews only (a fixed 48-px strip at the bottom, z-index max). Its frame is not
+         allowed by this site's CSP, so it stayed an empty white bar that covered the bottom navigation on phones and swallowed taps
+         (Launch-Audit D1, blocker 4). Production never has it; the preview does without it. */
+      body > div[data-netlify-deploy-id] {
+        display: none !important;
+      }
     </style>
     <!-- no connect-ahead hint to an exchange here: the browser would send the visitor's IP address to Binance on every page view,
          before any choice was made (DSGVO, docs/RECHT-CHECKLISTE.md). The market connection opens when the app asks for it. -->
