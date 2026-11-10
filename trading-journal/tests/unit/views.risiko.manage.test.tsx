@@ -10,7 +10,8 @@ import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { useJournal } from "@/store/journalStore";
 import { RisikoView } from "@/views/risiko";
-import { DEFAULT_MANAGE } from "@/domain/plan";
+import { DEFAULT_MANAGE, type ManageSpec } from "@/domain/plan";
+import { ManageCard } from "@/views/plan/ManageCard";
 import { useCalcManage, CALC_MANAGE_KEY } from "@/views/plan/manageStore";
 import { pinMidday } from "./midday.fixture";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
@@ -69,5 +70,31 @@ describe("Positionsrechner · Verwaltung", () => {
     // die Wahl bleibt auf dem Gerät
     expect(useCalcManage.getState().spec.breakEven.on).toBe(true);
     expect(JSON.parse(localStorage.getItem(CALC_MANAGE_KEY)!).partial.on).toBe(true);
+  });
+
+  it("zwei Regeln direkt nacheinander angehakt, ohne dass die Karte dazwischen neu rendert: beide bleiben (keine geht verloren)", () => {
+    // a host that takes the change but does not hand a new `spec` down in between – the state the card is in when two ticks arrive before
+    // its next render (seen in CI: Break-even ticked, then Teilziel, and only Teilziel stayed, about one run in ten)
+    const seen: ManageSpec[] = [];
+    render(
+      <MotionRoot>
+        <ManageCard spec={DEFAULT_MANAGE} onChange={(next) => seen.push(next)} result={null} waiting="…" testPrefix="t" />
+      </MotionRoot>,
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Break-even/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Teilziel/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Trailing-Stop/ }));
+    expect(seen).toHaveLength(3);
+    expect(seen.map((x) => [x.breakEven.on, x.partial.on, x.trail.on])).toEqual([
+      [true, false, false],
+      [true, true, false],
+      [true, true, true],
+    ]);
+    // the same rule twice: on, then off again – the second tick reads the first one's result, not the render's
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Break-even/ }));
+    expect(seen.at(-1)!.breakEven.on).toBe(false);
+    expect(seen.at(-1)!.partial.on).toBe(true);
+    // nothing but the ticked rule changed
+    expect(seen.at(-1)).toEqual({ ...DEFAULT_MANAGE, partial: { ...DEFAULT_MANAGE.partial, on: true }, trail: { ...DEFAULT_MANAGE.trail, on: true } });
   });
 });

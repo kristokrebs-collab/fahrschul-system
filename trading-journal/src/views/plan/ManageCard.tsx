@@ -6,7 +6,7 @@
  *
  * Die Wirt-Seiten besitzen den Zustand (`spec` / `onChange`) und rechnen das Ergebnis; die Karte zeigt und fragt.
  */
-import { useId } from "react";
+import { useId, useLayoutEffect, useRef } from "react";
 import { manageActive, moneyText, num, type ManageResult, type ManageSpec } from "@/domain/plan";
 import { cn } from "@/lib/cn";
 import { Collapse } from "@/primitives/Expander";
@@ -35,7 +35,18 @@ export function ManageCard({ spec, onChange, result, waiting, testPrefix, extraA
   const uid = useId();
   const p = testPrefix;
   const active = manageActive(spec);
-  const set = (patch: Partial<ManageSpec>): void => onChange({ ...spec, ...patch });
+  // Every change starts from the LATEST rules, not from those of the last render: two rules ticked in quick succession lost the first
+  // one whenever the card had not rendered in between – the second change was built on the old `spec` (Break-even ticked, then Teilziel:
+  // only Teilziel stayed; it showed in CI as a test that failed about one run in ten). `latest` follows every render and every own change.
+  const latest = useRef(spec);
+  useLayoutEffect(() => {
+    latest.current = spec;
+  });
+  const set = (patch: (s: ManageSpec) => Partial<ManageSpec>): void => {
+    const next = { ...latest.current, ...patch(latest.current) };
+    latest.current = next;
+    onChange(next);
+  };
   const be = spec.breakEven;
   const pa = spec.partial;
   const tr = spec.trail;
@@ -50,48 +61,48 @@ export function ManageCard({ spec, onChange, result, waiting, testPrefix, extraA
       </header>
 
       <div className="grid gap-2" data-testid={`${p}-manage-rules`}>
-        <CheckboxRow checked={be.on} onToggle={() => set({ breakEven: { ...be, on: !be.on } })} sub="Nach einem Kursgewinn rückt der Stop auf den Einstieg oder auf Netto-Break-even.">
+        <CheckboxRow checked={be.on} onToggle={() => set((s) => ({ breakEven: { ...s.breakEven, on: !s.breakEven.on } }))} sub="Nach einem Kursgewinn rückt der Stop auf den Einstieg oder auf Netto-Break-even.">
           Break-even
         </CheckboxRow>
         <Collapse open={be.on} id={`${uid}-be`}>
           <div className="grid gap-3 pb-1 pl-1 pt-2 sm:grid-cols-2" data-testid={`${p}-manage-be`}>
             <div className="flex flex-wrap items-end gap-2">
-              <NumInput label="Auslöser: Kurs läuft um" value={be.value} onCommit={(v) => v != null && set({ breakEven: { ...be, value: v } })} min={be.trigger === "r" ? 0.2 : 0.1} max={be.trigger === "r" ? 10 : 50} suffix={be.trigger === "r" ? "R" : "%"} testId={`${p}-manage-be-value`} className="w-36" />
+              <NumInput label="Auslöser: Kurs läuft um" value={be.value} onCommit={(v) => v != null && set((s) => ({ breakEven: { ...s.breakEven, value: v } }))} min={be.trigger === "r" ? 0.2 : 0.1} max={be.trigger === "r" ? 10 : 50} suffix={be.trigger === "r" ? "R" : "%"} testId={`${p}-manage-be-value`} className="w-36" />
               <FieldRow label="Einheit">
-                <ChipPick id={`${uid}-be-trig`} label="Break-even: Einheit des Auslösers" value={be.trigger} options={[{ v: "r", label: "R" }, { v: "pct", label: "%" }]} onChange={(trigger) => set({ breakEven: { ...be, trigger, value: trigger === "r" ? 1 : 2 } })} />
+                <ChipPick id={`${uid}-be-trig`} label="Break-even: Einheit des Auslösers" value={be.trigger} options={[{ v: "r", label: "R" }, { v: "pct", label: "%" }]} onChange={(trigger) => set((s) => ({ breakEven: { ...s.breakEven, trigger, value: trigger === "r" ? 1 : 2 } }))} />
               </FieldRow>
             </div>
             <FieldRow label="Der Stop wandert">
-              <ChipPick id={`${uid}-be-to`} label="Break-even: Ziel des Stops" value={be.to} options={[{ v: "entry", label: "auf den Einstieg" }, { v: "net", label: "auf Netto-Break-even" }]} onChange={(to) => set({ breakEven: { ...be, to } })} />
+              <ChipPick id={`${uid}-be-to`} label="Break-even: Ziel des Stops" value={be.to} options={[{ v: "entry", label: "auf den Einstieg" }, { v: "net", label: "auf Netto-Break-even" }]} onChange={(to) => set((s) => ({ breakEven: { ...s.breakEven, to } }))} />
             </FieldRow>
           </div>
         </Collapse>
 
-        <CheckboxRow checked={pa.on} onToggle={() => set({ partial: { ...pa, on: !pa.on } })} sub="Ein Teil der Position wird bei einem näheren Kurs mit Limit-Order verkauft.">
+        <CheckboxRow checked={pa.on} onToggle={() => set((s) => ({ partial: { ...s.partial, on: !s.partial.on } }))} sub="Ein Teil der Position wird bei einem näheren Kurs mit Limit-Order verkauft.">
           Teilziel
         </CheckboxRow>
         <Collapse open={pa.on} id={`${uid}-pa`}>
           <div className="grid gap-3 pb-1 pl-1 pt-2 sm:grid-cols-2" data-testid={`${p}-manage-pa`}>
-            <NumInput label="Teilziel bei" value={pa.atR} onCommit={(v) => v != null && set({ partial: { ...pa, atR: v } })} min={0.2} max={10} suffix="R" testId={`${p}-manage-pa-r`} help="Vielfaches deines Anfangsrisikos; muss vor dem Ziel liegen." />
-            <NumInput label="Anteil der Position" value={pa.fracPct} onCommit={(v) => v != null && set({ partial: { ...pa, fracPct: Math.round(v) } })} min={5} max={95} suffix="%" testId={`${p}-manage-pa-frac`} />
-            <CheckboxRow checked={pa.thenBreakEven} onToggle={() => set({ partial: { ...pa, thenBreakEven: !pa.thenBreakEven } })} className="sm:col-span-2">
+            <NumInput label="Teilziel bei" value={pa.atR} onCommit={(v) => v != null && set((s) => ({ partial: { ...s.partial, atR: v } }))} min={0.2} max={10} suffix="R" testId={`${p}-manage-pa-r`} help="Vielfaches deines Anfangsrisikos; muss vor dem Ziel liegen." />
+            <NumInput label="Anteil der Position" value={pa.fracPct} onCommit={(v) => v != null && set((s) => ({ partial: { ...s.partial, fracPct: Math.round(v) } }))} min={5} max={95} suffix="%" testId={`${p}-manage-pa-frac`} />
+            <CheckboxRow checked={pa.thenBreakEven} onToggle={() => set((s) => ({ partial: { ...s.partial, thenBreakEven: !s.partial.thenBreakEven } }))} className="sm:col-span-2">
               Danach den Stop auf Break-even setzen
             </CheckboxRow>
           </div>
         </Collapse>
 
-        <CheckboxRow checked={tr.on} onToggle={() => set({ trail: { ...tr, on: !tr.on } })} sub="Der Stop folgt dem besten Kurs mit Abstand – nur in Gewinnrichtung.">
+        <CheckboxRow checked={tr.on} onToggle={() => set((s) => ({ trail: { ...s.trail, on: !s.trail.on } }))} sub="Der Stop folgt dem besten Kurs mit Abstand – nur in Gewinnrichtung.">
           Trailing-Stop
         </CheckboxRow>
         <Collapse open={tr.on} id={`${uid}-tr`}>
           <div className="grid gap-3 pb-1 pl-1 pt-2 sm:grid-cols-2" data-testid={`${p}-manage-tr`}>
             <div className="flex flex-wrap items-end gap-2">
-              <NumInput label="Abstand hinter dem besten Kurs" value={tr.value} onCommit={(v) => v != null && set({ trail: { ...tr, value: v } })} min={tr.kind === "atr" ? 0.5 : 0.2} max={tr.kind === "atr" ? 10 : 30} suffix={tr.kind === "atr" ? "× ATR" : "%"} testId={`${p}-manage-tr-value`} className="w-40" />
+              <NumInput label="Abstand hinter dem besten Kurs" value={tr.value} onCommit={(v) => v != null && set((s) => ({ trail: { ...s.trail, value: v } }))} min={tr.kind === "atr" ? 0.5 : 0.2} max={tr.kind === "atr" ? 10 : 30} suffix={tr.kind === "atr" ? "× ATR" : "%"} testId={`${p}-manage-tr-value`} className="w-40" />
               <FieldRow label="Art">
-                <ChipPick id={`${uid}-tr-kind`} label="Trailing: Art des Abstands" value={tr.kind} options={[{ v: "atr", label: "× ATR" }, { v: "pct", label: "%" }]} onChange={(kind) => set({ trail: { ...tr, kind, value: kind === "atr" ? 2 : 3 } })} />
+                <ChipPick id={`${uid}-tr-kind`} label="Trailing: Art des Abstands" value={tr.kind} options={[{ v: "atr", label: "× ATR" }, { v: "pct", label: "%" }]} onChange={(kind) => set((s) => ({ trail: { ...s.trail, kind, value: kind === "atr" ? 2 : 3 } }))} />
               </FieldRow>
             </div>
-            <NumInput label="Trailing startet ab" value={tr.activateR} onCommit={(v) => v != null && set({ trail: { ...tr, activateR: v } })} min={0} max={10} suffix="R" testId={`${p}-manage-tr-from`} help="0 = ab der ersten Kerze." />
+            <NumInput label="Trailing startet ab" value={tr.activateR} onCommit={(v) => v != null && set((s) => ({ trail: { ...s.trail, activateR: v } }))} min={0} max={10} suffix="R" testId={`${p}-manage-tr-from`} help="0 = ab der ersten Kerze." />
           </div>
         </Collapse>
       </div>
