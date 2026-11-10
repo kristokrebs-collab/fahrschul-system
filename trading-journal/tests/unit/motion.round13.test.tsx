@@ -52,6 +52,16 @@ describe("payment window", () => {
   });
 });
 
+describe("payment window on a phone", () => {
+  it("the close button on the paper head is dark ink, not the dark theme's near-white foreground (it was a white ✕ on white)", () => {
+    const css = noComments(read("src/billing/purchase/pay/payWindow.css"));
+    const rule = /\.pw-frame\[data-orient="portrait"\] \.pw-close \{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(rule).toMatch(/color: #121212;/);
+    expect(rule).not.toMatch(/color: var\(--color-fg\)/);
+    expect(css).toMatch(/\.pw-frame\[data-orient="portrait"\] \.pw-close:focus-visible \{\s*outline-color: #121212;/);
+  });
+});
+
 describe("setups, search", () => {
   it("the setup cards cascade in on page entry (no `initial={false}` on their presence), the „Neue“ tile closes the cascade", () => {
     const src = read("src/views/setups/SetupsView.tsx");

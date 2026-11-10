@@ -877,13 +877,22 @@
   width: 100vw;
   height: 100dvh;
 }
+/* On the phone the close button lies ON the paper head. It is a child of the frame, not of the paper scope, so `--color-fg` was the
+   dark theme's near-white there: a white ✕ on white paper, practically invisible (found in the visual pass of Runde 13) – and on a phone
+   it is the only way out of the window. The paper is light in both themes, so the ink is fixed. */
 .pw-frame[data-orient="portrait"] .pw-close {
   top: 10px;
   right: 10px;
   z-index: 6;
-  color: var(--color-fg);
+  color: #121212;
   background: transparent;
   border-color: transparent;
+}
+.pw-frame[data-orient="portrait"] .pw-close:hover {
+  background: rgb(0 0 0 / 0.06);
+}
+.pw-frame[data-orient="portrait"] .pw-close:focus-visible {
+  outline-color: #121212;
 }
 .pw-win[data-orient="portrait"] {
   aspect-ratio: auto;
