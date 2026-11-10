@@ -339,7 +339,14 @@ test.describe("Community", () => {
     await shot(pub, info, "shared-view");
 
     // revoke in "Deine Links"
+    // Closing a dialog takes its history entry back with an asynchronous `history.go(-1)` (`src/store/backStack.ts`). An address-bar
+    // navigation that lands before that traversal is undone by it – the page stayed on „Alle Trades“ (seen on a loaded machine, 4 of 6
+    // runs). No person types an address within milliseconds of Escape; the test waits until the entry is gone, then navigates.
+    const depth = () => page.evaluate(() => ((history.state ?? {}) as { tjBack?: number }).tjBack ?? 0);
+    const before = await depth();
     await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expect.poll(depth).toBeLessThan(Math.max(before, 1));
     await page.goto(COMMUNITY_URL);
     const links = page.getByTestId("shares-card");
     await expect(links.getByTestId("share-row")).toHaveCount(1);
