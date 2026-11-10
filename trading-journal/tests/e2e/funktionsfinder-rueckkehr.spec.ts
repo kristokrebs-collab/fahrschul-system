@@ -53,7 +53,9 @@ test.describe("Finder: zurück zur Aufgabe nach der Anmeldung", () => {
 
   test("„Gruppe beitreten“: erst das Tor, nach der Anmeldung bringt der Finder zur Karte „Gruppen“", async ({ page }) => {
     const errors = await setup(page);
-    // Konto-Pflicht: no finder, no page before the account
+    // Konto-Pflicht: no finder, no page before the account (a browser that had a session: the gate – a first visit of the start page
+    // would get the landing page, `gate.spec.ts`)
+    await page.addInitScript(() => localStorage.setItem("tj2-cloud-known", "1"));
     await openGated(page, cloudUrl("overview"));
     await expect(page.getByRole("button", { name: /Navigation öffnen|Menü/ })).toHaveCount(0);
     await signInAtGate(page);

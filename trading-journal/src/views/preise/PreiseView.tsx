@@ -32,8 +32,8 @@ export interface PreiseViewProps {
   className?: string;
 }
 
-/** Monat / Jahr toggle (shared with the upgrade sheet); the yearly label carries the real saving of Pro. */
-function IntervalToggle() {
+/** Monat / Jahr toggle (shared with the upgrade sheet and the landing page); the yearly label carries the real saving of Pro. */
+export function IntervalToggle() {
   const interval = useBilling((s) => s.interval);
   const config = useBilling((s) => s.config);
   const savings = planSaving("pro", config?.prices).pct;
@@ -73,8 +73,8 @@ function RefBanner() {
   );
 }
 
-/** "Verträge hier kündigen" (§ 312k BGB) – always reachable from the pricing page, WITHOUT a login (the public page). */
-function LegalLine() {
+/** "Verträge hier kündigen" (§ 312k BGB) – always reachable from the pricing page, WITHOUT a login (the public page, the landing page). */
+export function LegalLine() {
   const mode = useBillingMode();
   if (mode === "off") return null;
   return (

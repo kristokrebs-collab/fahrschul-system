@@ -6,6 +6,8 @@
  * - `gate`: the login / registration window of Paket V (`AuthSheet` → `AuthWindow`, the band animation unchanged) as a full page – always
  *   open, no close; first visit on „Konto erstellen“, a browser that had a session on „Anmelden“. Under the card the public pages:
  *   Impressum, Datenschutz, AGB, Widerruf, Hinweise, „Verträge hier kündigen“ (§ 312k BGB), „Vertrag widerrufen“ (§ 356a BGB), Preise.
+ * - `landing`: a first visit of the start page (`Landing.tsx`): what the journal does and the plans to choose from; „Kostenlos starten“,
+ *   a plan's button and „Anmelden“ open the window over it (a dialog, as on `#preise`).
  * - `pricing`: `#preise` read only (the pricing page itself, a small bar with „Anmelden“ / „Konto erstellen“, the same links below). Every
  *   buy button routes through `requestOrder`, which notes the choice and opens the registration – the order comes back after the login.
  *
@@ -14,7 +16,7 @@
  * by idle time or an expired session says why). Local journal data on the device is never touched here: after the sign-in the app's
  * first sync asks what to do with it (Datenübernahme, `TakeoverDialog`).
  */
-import { Suspense, useLayoutEffect, useMemo, type ReactNode } from "react";
+import { lazy, Suspense, useLayoutEffect, useMemo, type ReactNode } from "react";
 import { HostSlot } from "@/app/HostSlot";
 import { lazyView } from "@/app/pages";
 import { PageSkeleton } from "@/app/PageSkeleton";
@@ -35,6 +37,8 @@ import { useUi } from "@/store/uiStore";
 import { GATE } from "./strings";
 
 const Preise = lazyView("preise");
+/** The landing page of a first visit: its own chunk (with the pricing parts it shows) – a returning browser never loads it. */
+const Landing = lazy(() => import("./Landing"));
 
 function Toasts() {
   const toasts = useUi((s) => s.toasts);
@@ -76,17 +80,18 @@ function PageLink({ page, children }: { page: "preise"; children: ReactNode }) {
   );
 }
 
-function GateFoot({ pricing = false }: { pricing?: boolean }) {
+function GateFoot({ pricing = false, landing = false }: { pricing?: boolean; landing?: boolean }) {
   const hasLocal = useJournal((s) => s.trades.length > 0);
   return (
     <footer className="aw-gate-foot" data-testid="gate-foot">
-      {!pricing && hasLocal && (
+      {/* the landing page says it next to its first button (`Landing.tsx`), not a second time down here */}
+      {!pricing && !landing && hasLocal && (
         <p className="aw-gate-note" data-testid="gate-local-note">
           {GATE.localNote}
         </p>
       )}
       <LegalLinks roomy className="justify-center" />
-      {!pricing && (
+      {!pricing && !landing && (
         <nav aria-label={GATE.moreLabel}>
           <PageLink page="preise">{GATE.pricingLink}</PageLink>
         </nav>
@@ -156,10 +161,18 @@ function PublicPricing() {
   );
 }
 
-export default function EntryGate({ mode }: { mode: Extract<GateState, "gate" | "pricing"> }) {
+export default function EntryGate({ mode }: { mode: Extract<GateState, "gate" | "pricing" | "landing"> }) {
   return (
     <MorphDialogProvider>
-      {mode === "pricing" ? <PublicPricing /> : <GatePage />}
+      {mode === "landing" ? (
+        <Suspense fallback={<div className="min-h-dvh" aria-busy="true" data-testid="entry-pending" />}>
+          <Landing foot={<GateFoot landing />} />
+        </Suspense>
+      ) : mode === "pricing" ? (
+        <PublicPricing />
+      ) : (
+        <GatePage />
+      )}
       <PublicHosts />
     </MorphDialogProvider>
   );

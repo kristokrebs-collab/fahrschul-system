@@ -236,11 +236,21 @@ Basis: `5fa335a3` (PR #6) plus die Commits von PR #7 (`claude/exciting-planck-hc
 **Weiter offen (nicht in dieser Runde):**
 
 - K1: Die Einstellungsseite wächst bei 1024 bis 1279 px nach dem Laden. Nachgemessen: die reservierten Höhen stammen von 1280/1440 px, bei 1024 px sind „Live-Daten“ und „Einstiegs-Check“ deutlich höher. Die Kartenhöhen hängen von den Marktdaten ab, die diese Umgebung nicht erreicht (451), deshalb hier nicht verlässlich einstellbar.
-- B3: keine eigene Landing-Seite. Seit der Konto-Pflicht ist das Anmeldefenster der erste Bildschirm (mit „Preise ansehen“); mehr ist eine Produktentscheidung.
+- ~~B3: keine eigene Landing-Seite~~: entschieden („eigene Landingpage für die Tarifentscheidung“, 10.11.2026) und gebaut, siehe „Landingpage für Erstbesucher“ unten.
 - Touch-Ziele unter 44 px (4.2): die genannten Schalter tragen `touch-hit` (44 × 44 px auf Touch-Geräten); die Messung des Crawls hat die Trefferfläche nicht mitgezählt. Heatmap-Zellen bleiben klein. Am echten Gerät zu bestätigen.
 - ~~Gewinn-Konfetti beim Speichern eines Trades~~: entschieden („kein Konfetti“, 10.11.2026) und entfernt (`docs/PSYCHOLOGIE.md`, Abschnitt 6, Punkt 1).
 - Impressum der Vorschau zeigt weiter „PLATZHALTER“ (Betreiber setzt `VITE_LEGAL_*`); der Kauf bleibt dort deshalb gesperrt (`purchaseBlockedBy: legal`, an `/api/v1/billing/status` der Vorschau gemessen).
 - Alles aus Abschnitt 8 (Supabase-Produktion, Stripe live, Binance 451, TradingView, Resend/Twilio, Geräte, Anwalt).
+
+### Landingpage für Erstbesucher (B3, VIS-01) – Entscheidung des Betreibers vom 10.11.2026
+
+**Was gilt:** Wer die Startseite (`/`, `#overview`) zum ersten Mal öffnet (Cloud-Build, kein Konto in diesem Browser), sieht statt des Registrierungsformulars eine eigene Seite: die Aussage („Hör auf zu raten. Fang an zu messen.“), ein als **Beispielansicht** beschriftetes Journal, das sich Zeile für Zeile aufbaut, drei Schritte, dann die Tarife (Monat/Jahr, die vier Karten der Preisseite mit ihren echten Preisen und Knöpfen), der volle Vergleich, die FAQ und ein Schlussaufruf. „Kostenlos starten“ öffnet die Registrierung ohne Bestellung, ein Tarif-Knopf merkt die Wahl und öffnet die Registrierung (die Bestellung kommt nach der Anmeldung zurück, derselbe Weg wie auf `#preise`), „Anmelden“ das Anmeldefenster – jeweils als Dialog über der Seite. Rechtliches, „Verträge hier kündigen“ und „Vertrag widerrufen“ stehen im Fuß und gehen ohne Konto.
+
+**Was unverändert bleibt:** Ein Browser, der schon einmal angemeldet war, bekommt wie bisher das Tor auf „Anmelden“ (niemandem wird das Produkt zweimal verkauft). Ein Direktlink auf eine andere Seite (`#trades`, `#konto` …) zeigt das Tor auf „Konto erstellen“. `#preise` ohne Anmeldung, die geteilte Ansicht, die Rückkehr eines Mail-Links und die Builds ohne Cloud sind unberührt. Übersicht und Cockpit sind nicht angefasst – die Seite steht **vor** der App, nicht in ihr.
+
+**Was die Seite nicht behauptet:** keine Nutzerzahlen, keine versprochenen Ergebnisse, keine Bewertungen. Die Beispielzahlen sind als Beispiel beschriftet und rechnen auf (Test). „Free bleibt kostenlos, ohne Zeitlimit. Keine Karte nötig.“ entspricht dem Free-Tarif und der Registrierung ohne Bestellung.
+
+**Belege:** `src/cloud/gate.ts` (Zustand `landing`), `src/app/gate/Landing.tsx`, `landing.css` (eigener Lazy-Chunk, nichts im Erstlade-Stylesheet: CSS weiter 52,5 / 52,5 KiB); `tests/unit/cloud.gate.test.ts`, `tests/unit/app.gate.test.tsx`, `tests/unit/app.landing.test.tsx`; `tests/e2e/gate.spec.ts` („erster Besuch der Startseite …“, „Landingpage: axe ohne Verstöße …“) auf Desktop, Handy und Tablet grün gegen die Mocks. Im Browser am gebauten Cloud-Build nachgesehen: 1440 px und 390 px, dunkel und hell, reduzierte Bewegung (alles sofort im Endzustand), abgelaufener Mail-Link beim Erstbesuch (Landingpage, darüber das Fenster mit dem Grund). Nicht belegt: echte Preise und ein echter Kauf von dieser Seite aus (Stripe/Supabase des Betreibers), echte Geräte.
 
 ### Funktionsprüfung im Browser: drei unabhängige Durchgänge (Desktop, Handy, Konto/Kauf)
 

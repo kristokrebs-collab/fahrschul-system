@@ -1,7 +1,8 @@
 /**
  * Konto-Pflicht (`src/cloud/gate.ts`, `src/app/gate/EntryGate.tsx`) on the cloud build against the Supabase / billing mocks: a signed-out
- * visitor sees the login window of Paket V as the page in front of the app – first visit on „Konto erstellen“, a returning browser on
- * „Anmelden“. Registration → the confirmation mail's link (mock mailbox, PKCE code) → the app on Free → the upgrade opens the pay window.
+ * visitor sees the login window of Paket V as the page in front of the app – first visit (a deep link) on „Konto erstellen“, a returning
+ * browser on „Anmelden“. A first visit of the START page gets the landing page instead (`Landing.tsx`, Launch-Audit B3): the claim, the
+ * plans, and the window as a dialog over it. Registration → the confirmation mail's link (mock mailbox, PKCE code) → the app on Free → the upgrade opens the pay window.
  * Sign-out and an expired session lead back to the gate. Public without a login: the legal sheets, the contract pages (§ 312k / § 356a),
  * `#preise` read only, the share view. Accessibility: axe, keyboard, 390 px and the tablets.
  *
@@ -9,7 +10,7 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { blockExternalNetwork, entryGate, gateToSignIn, openGated, signInViaSheet } from "./cloudSignIn";
+import { blockExternalNetwork, entryGate, expectNotInert, gateToSignIn, openGated, signInViaSheet } from "./cloudSignIn";
 import { cloudUrl, collectErrors, expectNoHorizontalScroll, seed, toast } from "./helpers";
 import { mockBilling } from "./mocks/billing";
 import { mockSupabase, type MockSupabaseOptions, type SupabaseCore } from "./mocks/supabase";
@@ -39,7 +40,8 @@ test.describe("Konto-Pflicht: das Tor vor der App", () => {
 
   test("erster Besuch → Konto erstellen → Bestätigungslink (Mock) → App auf Frei → Upgrade öffnet das Bezahlfenster", async ({ page }, info) => {
     const { sb, errors } = await setup(page, { signupConfirm: true, mailbox: true });
-    await openGated(page, cloudUrl("overview"));
+    // a deep link of a first visit: the gate (the start page of a first visit is the landing page – its own test below)
+    await openGated(page, cloudUrl("trades"));
     const gate = entryGate(page);
     // nothing of the app before the account: no header, no dock, no page
     await expect(page.locator('[data-layer="Header"]')).toHaveCount(0);
@@ -102,6 +104,98 @@ test.describe("Konto-Pflicht: das Tor vor der App", () => {
     expect(errors).toEqual([]);
   });
 
+  test("erster Besuch der Startseite: Landingpage – Aussage, Tarife, Fenster als Dialog; Tarifwahl merkt die Bestellung; Anmelden führt in die App", async ({ page }, info) => {
+    const { errors } = await setup(page);
+    const res = await page.goto(cloudUrl("overview"));
+    expect(res?.ok()).toBe(true);
+    const landing = page.getByTestId("entry-landing");
+    await expect(landing).toBeVisible({ timeout: 30_000 });
+    // no gate, nothing of the app: no header, no dock, no page
+    await expect(entryGate(page)).toHaveCount(0);
+    await expect(page.locator('[data-layer="Header"]')).toHaveCount(0);
+    await expect(page.locator('[data-layer="Dock"]')).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Hör auf zu raten\.\s*Fang an zu messen\./);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    // the sample builds up and comes to rest: every row, the reading lines and the whole line are there
+    await expect(landing.getByTestId("landing-sample").getByRole("listitem")).toHaveCount(5);
+    await expect
+      .poll(() => landing.evaluate((el) => [...el.querySelectorAll(".lp-in, .lp-row, .lp-verdict-row, .lp-sample")].every((n) => getComputedStyle(n).opacity === "1")), { timeout: 10_000 })
+      .toBe(true);
+    await expect.poll(() => landing.locator('[data-fx="equity-draw"] > div').first().evaluate((el) => (el as HTMLElement).style.clipPath), { timeout: 10_000 }).toBe("none");
+    await expectNoHorizontalScroll(page);
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/landing-${info.project.name}.png` });
+
+    // „Kostenlos starten“: the registration as a dialog over the page – no order noted; Escape closes it, the focus is back on the button
+    await landing.getByTestId("landing-start").click();
+    const signup = page.getByRole("dialog", { name: "Konto erstellen" });
+    await expect(signup).toBeVisible({ timeout: 20_000 });
+    expect(await page.evaluate(() => localStorage.getItem("tj2-return-to-order"))).toBeNull();
+    await expectNotInert(signup.getByLabel("E-Mail"));
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(landing.getByTestId("landing-start")).toBeFocused();
+
+    // „Tarife vergleichen“ brings the plans up (the heading has the focus, below the bar)
+    await landing.getByTestId("landing-compare").click();
+    const plansHead = landing.getByRole("heading", { level: 2, name: "Wähle, womit du startest" });
+    await expect(plansHead).toBeFocused();
+    await expect(plansHead).toBeInViewport();
+
+    // a plan's button notes this choice and opens the registration (the order comes back after the login)
+    const cta = landing.getByTestId("cta-premium");
+    await cta.scrollIntoViewIfNeeded();
+    await cta.click();
+    await expect(signup).toBeVisible({ timeout: 20_000 });
+    expect(await page.evaluate(() => localStorage.getItem("tj2-return-to-order"))).toContain("premium.year.1");
+    await expectNotInert(signup.getByLabel("E-Mail"));
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.evaluate(() => localStorage.removeItem("tj2-return-to-order"));
+
+    // the public pages on top of the landing page: Datenschutz by its deep link, „Verträge hier kündigen“ in the foot
+    const foot = landing.getByTestId("gate-foot");
+    for (const id of ["legal-impressum", "legal-datenschutz", "legal-agb", "legal-widerruf", "contract-link-cancel", "contract-link-withdraw"]) await expect(foot.getByTestId(id)).toBeVisible();
+    await foot.getByTestId("legal-impressum").click();
+    const legal = page.getByRole("dialog", { name: /Impressum/ });
+    await expect(legal).toBeVisible({ timeout: 20_000 });
+    await page.keyboard.press("Escape");
+    await expect(legal).toHaveCount(0);
+
+    // „Anmelden“ (the bar's pill): the login over the page → the app on the Übersicht; from now on this browser gets the gate
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await signInViaSheet(page, { synced: true });
+    await expect(page.getByTestId("entry-landing")).toHaveCount(0);
+    await expect(page.locator('[data-cloud-pill="account"]')).toBeVisible({ timeout: 30_000 });
+    expect(await page.evaluate(() => localStorage.getItem("tj2-cloud-known"))).toBe("1");
+    expect(errors).toEqual([]);
+  });
+
+  test("Landingpage: axe ohne Verstöße, eine h1, Tastatur erreicht Knöpfe und Tarife; reduzierte Bewegung zeigt alles sofort", async ({ page }) => {
+    await setup(page);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(cloudUrl("overview"));
+    const landing = page.getByTestId("entry-landing");
+    await expect(landing).toBeVisible({ timeout: 30_000 });
+    // reduced motion: nothing waits in a start pose, the line is drawn
+    expect(await landing.evaluate((el) => [...el.querySelectorAll(".lp-in, .lp-row, .lp-verdict-row, .lp-sample")].every((n) => getComputedStyle(n).opacity === "1"))).toBe(true);
+    await expect.poll(() => landing.locator('[data-fx="equity-draw"] > div').first().evaluate((el) => (el as HTMLElement).style.clipPath)).toBe("none");
+    await expect(landing.getByTestId("cta-pro")).toBeAttached({ timeout: 20_000 });
+    await page.waitForTimeout(600);
+    const res = await new AxeBuilder({ page }).withTags(TAGS).analyze();
+    const lines = res.violations.map((v) => `${v.id} (${v.impact}): ${v.help} → ${v.nodes.slice(0, 4).map((n) => n.target.join(" ")).join(" | ")}`);
+    expect(lines).toEqual([]);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+    // Tab: the bar, then the hero's buttons in reading order
+    const order: string[] = [];
+    for (let i = 0; i < 8 && !order.includes("landing-compare"); i++) {
+      await page.keyboard.press("Tab");
+      const id = await page.evaluate(() => document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.getAttribute("data-cloud-pill") ?? "");
+      if (id) order.push(id);
+    }
+    expect(order).toEqual(["signin", "landing-signup", "landing-start", "landing-compare"]);
+    await expectNoHorizontalScroll(page);
+  });
+
   test("wiederkehrend: „Anmelden“ zuerst; Abmelden und eine abgelaufene Sitzung führen zurück zum Tor", async ({ page }, info) => {
     const { errors } = await setup(page, {}, { empty: true });
     await openGated(page, cloudUrl("konto"));
@@ -139,7 +233,7 @@ test.describe("Konto-Pflicht: das Tor vor der App", () => {
 
   test("lokale Daten bleiben: das Tor sagt es, nach der Anmeldung fragt die Datenübernahme", async ({ page }) => {
     const { sb } = await setup(page, {}, { empty: false });
-    await openGated(page, cloudUrl("overview"));
+    await openGated(page, cloudUrl("trades"));
     await expect(entryGate(page).getByTestId("gate-local-note")).toContainText("bleibt erhalten");
     const before = await page.evaluate(() => (JSON.parse(localStorage.getItem("tj2-trades") ?? "[]") as unknown[]).length);
     expect(before).toBeGreaterThan(0);
@@ -151,7 +245,7 @@ test.describe("Konto-Pflicht: das Tor vor der App", () => {
 
   test("öffentlich ohne Anmeldung: Rechtliches, Kündigen / Widerruf, Preise (nur lesen), geteilte Ansicht", async ({ page }) => {
     const { bill } = await setup(page);
-    await openGated(page, cloudUrl("overview"));
+    await openGated(page, cloudUrl("trades"));
     const foot = entryGate(page).getByTestId("gate-foot");
     for (const id of ["legal-impressum", "legal-datenschutz", "legal-agb", "legal-widerruf", "contract-link-cancel", "contract-link-withdraw", "gate-link-preise"]) await expect(foot.getByTestId(id)).toBeVisible();
 
@@ -174,9 +268,9 @@ test.describe("Konto-Pflicht: das Tor vor der App", () => {
     expect(bill.contracts).toEqual([{ kind: "cancel", email: "trader@example.com" }]);
 
     // § 356a deep link and the legal deep link on the gate (as a mail or Stripe brings them)
-    await page.goto(cloudUrl("overview", "?widerruf"));
+    await page.goto(cloudUrl("trades", "?widerruf"));
     await expect(page.getByTestId("contract-sheet")).toHaveAttribute("data-kind", "withdraw", { timeout: 30_000 });
-    await page.goto(cloudUrl("overview", "?rechtliches=datenschutz"));
+    await page.goto(cloudUrl("trades", "?rechtliches=datenschutz"));
     await expect(page.getByRole("dialog", { name: /Datenschutz/ })).toBeVisible({ timeout: 30_000 });
     await expect(entryGate(page)).toBeVisible();
     await page.keyboard.press("Escape");

@@ -3,7 +3,7 @@
  * the public routes (share view, `#preise` read only) and the entry view of a first vs. a returning visitor.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { gateApplies, gateEntryView, gateOf, gateViewOf, KNOWN_KEY, knownVisitor, markKnownVisitor, PUBLIC_PAGES, type GateInput } from "@/cloud/gate";
+import { gateApplies, gateEntryView, gateOf, gateViewOf, KNOWN_KEY, knownVisitor, LANDING_PAGE, markKnownVisitor, PUBLIC_PAGES, type GateInput } from "@/cloud/gate";
 import { setCloudEnabledForTests } from "@/cloud/env";
 import { PAGES } from "@/store/uiStore";
 
@@ -27,6 +27,22 @@ describe("gateOf", () => {
     expect(PUBLIC_PAGES).toEqual(["preise"]);
     // an idle phase without anything to restore is signed out at once (no splash for a first visit)
     expect(at({ phase: "idle" })).toBe("gate");
+  });
+
+  it("a first visit of the start page gets the landing page; a deep link and a returning browser get the gate (Launch-Audit B3)", () => {
+    expect(LANDING_PAGE).toBe("overview");
+    for (const page of PAGES) expect(at({ page, known: false }), page).toBe(PUBLIC_PAGES.includes(page) ? "pricing" : page === LANDING_PAGE ? "landing" : "gate");
+    // a browser that had a session is not sold the product again – on every page the gate („Anmelden“)
+    for (const page of PAGES) expect(at({ page, known: true }), page).toBe(PUBLIC_PAGES.includes(page) ? "pricing" : "gate");
+    // the landing page never stands in front of a session, a login being read, the 2FA step or the share view
+    expect(at({ known: false, phase: "signedIn" })).toBe("open");
+    expect(at({ known: false, phase: "signedIn", needsMfa: true })).toBe("gate");
+    expect(at({ known: false, phase: "loading" })).toBe("pending");
+    expect(at({ known: false, phase: "idle", restoring: true })).toBe("pending");
+    expect(at({ known: false, share: true })).toBe("open");
+    expect(at({ known: false, enabled: false })).toBe("off");
+    // an idle phase with nothing to restore is a first visit at once (no splash)
+    expect(at({ known: false, phase: "idle" })).toBe("landing");
   });
 
   it("signed in: the app on every page", () => {

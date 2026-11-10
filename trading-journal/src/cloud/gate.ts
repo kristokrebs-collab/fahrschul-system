@@ -9,6 +9,7 @@
  * | `open`    | signed in (2FA satisfied), or the public share view `#share/<token>`                           | the app                       |
  * | `pending` | a stored login or an auth callback (`?code=` of a confirmation / magic / reset link) is being read | a quiet splash, then app/gate |
  * | `pricing` | signed out on `#preise`                                                                      | the public pricing page (read only, every buy button leads to the registration) |
+ * | `landing` | signed out on the start page (`#overview`, the bare address), in a browser that never had a session | the landing page: what the journal does, the plans to choose from; „Kostenlos starten“, a plan's button and „Anmelden“ open the window over it |
  * | `gate`    | signed out (or 2FA code missing) anywhere else                                               | the entry gate                |
  *
  * Public without a login, on top of the gate page (each a sheet with its own deep link): Impressum, Datenschutz, AGB, Widerruf, Hinweise
@@ -16,8 +17,10 @@
  * token links of their confirmation mails. The return of an e-mail link (confirmation, magic link, password reset) is `pending` until the
  * client has read it; a failed link lands on the gate with the reason.
  *
- * First visit vs. returning: the gate opens on „Konto erstellen“; once this browser had a session (`<prefix>cloud-known`, written at every
- * sign-in, or a stored – maybe expired – session) it opens on „Anmelden“.
+ * First visit vs. returning: a first visit of the start page gets the landing page (Launch-Audit B3: someone who does not know the product
+ * yet reads what it is and what it costs before a form asks for an account); a deep link to another page gets the gate on „Konto
+ * erstellen“. Once this browser had a session (`<prefix>cloud-known`, written at every sign-in, or a stored – maybe expired – session)
+ * every page opens the gate on „Anmelden“ – a returning person is not sold the product again.
  */
 import { IS_SHARE } from "@/edition";
 import { hasClaudeRuntime } from "@/store/capability";
@@ -29,10 +32,13 @@ import { hasAuthCallback, hasStoredSession } from "./hint";
 import { useCloudSession, type CloudPhase } from "./session";
 import type { AuthView } from "./types";
 
-export type GateState = "off" | "open" | "pending" | "pricing" | "gate";
+export type GateState = "off" | "open" | "pending" | "pricing" | "landing" | "gate";
 
 /** The pages a signed-out visitor may see (read only). Everything else is behind the gate. */
 export const PUBLIC_PAGES: readonly Page[] = ["preise"];
+
+/** The page whose place the landing page takes for a first visit (the start page: `#overview` and the bare address). */
+export const LANDING_PAGE: Page = "overview";
 
 export interface GateInput {
   /** Konto-Pflicht applies to this build (`gateApplies()`). */
@@ -44,6 +50,8 @@ export interface GateInput {
   /** `#share/<token>` is on screen (the public view of a share link). */
   share: boolean;
   page: Page;
+  /** This browser had a session before (`knownVisitor()`); `undefined` counts as known – the gate, as before the landing page existed. */
+  known?: boolean;
 }
 
 /** Pure routing of the gate (see the table above). */
@@ -52,7 +60,8 @@ export function gateOf(i: GateInput): GateState {
   if (i.share) return "open";
   if (i.phase === "signedIn") return i.needsMfa ? "gate" : "open";
   if (i.phase === "loading" || (i.phase === "idle" && i.restoring)) return "pending";
-  return (PUBLIC_PAGES as readonly string[]).includes(i.page) ? "pricing" : "gate";
+  if ((PUBLIC_PAGES as readonly string[]).includes(i.page)) return "pricing";
+  return i.known === false && i.page === LANDING_PAGE ? "landing" : "gate";
 }
 
 /** Konto-Pflicht applies: cloud configured, a web build of the personal edition, not inside claude.ai. */
@@ -97,5 +106,5 @@ export function useEntryGate(): GateState {
   const needsMfa = useCloudSession((s) => s.needsMfa);
   const share = useShareRoute((s) => s.token !== null);
   const page = useUi((s) => s.page);
-  return gateOf({ enabled, phase, needsMfa, restoring: enabled && (hasStoredSession() || hasAuthCallback()), share, page });
+  return gateOf({ enabled, phase, needsMfa, restoring: enabled && (hasStoredSession() || hasAuthCallback()), share, page, known: enabled ? knownVisitor() : true });
 }

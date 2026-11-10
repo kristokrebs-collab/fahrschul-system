@@ -33,3 +33,5 @@ Die Pillen „Empfohlen“, „Aktueller Tarif“ und „Dein Tarif“ schweben 
 ## Kaufstrecke (B4)
 
 `PlanGrid` (glass cards; „Weiter zur Bestellung“ and „Tarif im Detail“ – never an order button), `PricingHero`, `PreiseView` (toggle label „Jährlich −X %“ only from the shown prices, `PRICE_TAX_NOTE` in the legal line, „Verträge hier kündigen“ opens the public page without a login) and `ResultView.tsx` (the five states after Stripe, mounted by `src/billing/purchase/PurchaseHost`). The order itself: `src/billing/purchase/` (see the billing README).
+
+`IntervalToggle`, `LegalLine`, `PlanGrid`, `PlanComparison`, `PricingFaq` and `StatsMarquee` are also the plan part of the landing page of a first visit (`src/app/gate/Landing.tsx`, `gate: "landing"`): one set of cards and buttons, so a price or a button's wording can never differ between the two pages. `StatsMarquee` measures its own box – its parent must be a column that may shrink (`min-w-0` / `minmax(0, 1fr)`), otherwise the band widens the page with every copy it adds.

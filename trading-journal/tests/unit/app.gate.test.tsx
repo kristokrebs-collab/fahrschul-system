@@ -1,9 +1,9 @@
 /**
  * Konto-Pflicht in the shell (`App` → `useEntryGate`): with the cloud signed out the entry gate (the login window as the page) stands in
- * front of the app – first visit on „Konto erstellen“, a returning browser on „Anmelden“; signed in, the shell; `#preise` read only; the
- * share view public; without the cloud nothing changes. The pages are stubs (as in `app.shell.test.tsx`), the hosts' chunk a stub.
+ * front of the app – first visit on „Konto erstellen“ (the start page of a first visit: the landing page), a returning browser on
+ * „Anmelden“; signed in, the shell; `#preise` read only; the share view public; without the cloud nothing changes. The pages are stubs (as in `app.shell.test.tsx`), the hosts' chunk a stub.
  */
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
@@ -46,7 +46,7 @@ vi.mock("@/billing/ui/BillingHost", () => ({ BillingHost: () => null }));
 
 import App from "@/App";
 import { setCloudEnabledForTests } from "@/cloud/env";
-import { resetCloudSession, useCloudSession } from "@/cloud/session";
+import { closeAuthSheet, resetCloudSession, useCloudSession } from "@/cloud/session";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { useShareRoute } from "@/store/router";
 import { useUi } from "@/store/uiStore";
@@ -72,6 +72,7 @@ describe("Konto-Pflicht: the gate in front of the shell", () => {
     act(() => {
       resetCloudSession();
       useShareRoute.setState({ token: null });
+      useUi.getState().setPage("overview");
     });
     setCloudEnabledForTests(null);
     (Element.prototype as { animate?: unknown }).animate = realAnimate;
@@ -84,15 +85,45 @@ describe("Konto-Pflicht: the gate in front of the shell", () => {
     expect(screen.queryByTestId("entry-gate")).toBeNull();
   }, 20_000);
 
-  it("signed out, first visit: the gate on „Konto erstellen“ – no header, no dock, no page", async () => {
+  it("signed out, first visit of the start page: the landing page – no gate, no header, no dock, no page; its buttons open the window over it", async () => {
     setCloudEnabledForTests(true);
     act(() => useCloudSession.setState({ phase: "signedOut" }));
+    renderApp();
+    const landing = await screen.findByTestId("entry-landing", {}, { timeout: 12_000 });
+    expect(screen.queryByTestId("entry-gate")).toBeNull();
+    expect(screen.queryByRole("toolbar", { name: "Navigation" })).toBeNull();
+    expect(screen.queryByTestId("page-overview")).toBeNull();
+    // one h1: the claim; the plans are on the page
+    expect(within(landing).getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(within(landing).getByRole("heading", { level: 1 })).toHaveTextContent("Hör auf zu raten. Fang an zu messen.");
+    expect(within(landing).getByTestId("landing-plans")).toBeInTheDocument();
+    // the public links under the page
+    expect(within(landing).getByTestId("gate-foot")).toContainElement(within(within(landing).getByTestId("gate-foot")).getByTestId("legal-impressum"));
+    // „Kostenlos starten“: the registration as a dialog over the page (it can be closed – the page stays)
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(within(landing).getByTestId("landing-start"));
+    expect(useCloudSession.getState().sheet).toMatchObject({ open: true, view: "signup", source: "card" });
+    expect(await screen.findByRole("dialog", { name: "Konto erstellen" }, { timeout: 8_000 })).toBeInTheDocument();
+    expect(screen.getByTestId("entry-landing")).toBeInTheDocument();
+    // „Anmelden“ at the end of the page
+    act(() => closeAuthSheet());
+    fireEvent.click(within(landing).getByTestId("landing-signin"));
+    expect(useCloudSession.getState().sheet).toMatchObject({ open: true, view: "signin" });
+  }, 40_000);
+
+  it("signed out, first visit by a deep link: the gate on „Konto erstellen“ – no header, no dock, no page", async () => {
+    setCloudEnabledForTests(true);
+    act(() => {
+      useCloudSession.setState({ phase: "signedOut" });
+      useUi.getState().setPage("trades");
+    });
     renderApp();
     const gate = await screen.findByTestId("entry-gate", {}, { timeout: 8_000 });
     expect(gate).toHaveAttribute("data-gate-view", "signup");
     expect(await screen.findByRole("dialog", { name: "Konto erstellen" }, { timeout: 8_000 })).toBeInTheDocument();
     expect(screen.queryByRole("toolbar", { name: "Navigation" })).toBeNull();
-    expect(screen.queryByTestId("page-overview")).toBeNull();
+    expect(screen.queryByTestId("page-trades")).toBeNull();
+    expect(screen.queryByTestId("entry-landing")).toBeNull();
     // the public links under the card
     expect(screen.getByTestId("legal-impressum")).toBeInTheDocument();
     expect(screen.getByTestId("contract-link-cancel")).toBeInTheDocument();
