@@ -119,7 +119,7 @@ test.describe("Konto-Pflicht: das Tor vor der App", () => {
     // the sample builds up and comes to rest: every row, the reading lines and the whole line are there
     await expect(landing.getByTestId("landing-sample").getByRole("listitem")).toHaveCount(5);
     await expect
-      .poll(() => landing.evaluate((el) => [...el.querySelectorAll(".lp-in, .lp-row, .lp-verdict-row, .lp-sample")].every((n) => getComputedStyle(n).opacity === "1")), { timeout: 10_000 })
+      .poll(() => landing.evaluate((el) => Array.from(el.querySelectorAll(".lp-in, .lp-row, .lp-verdict-row, .lp-sample")).every((n) => getComputedStyle(n).opacity === "1")), { timeout: 10_000 })
       .toBe(true);
     await expect.poll(() => landing.locator('[data-fx="equity-draw"] > div').first().evaluate((el) => (el as HTMLElement).style.clipPath), { timeout: 10_000 }).toBe("none");
     await expectNoHorizontalScroll(page);
@@ -177,7 +177,7 @@ test.describe("Konto-Pflicht: das Tor vor der App", () => {
     const landing = page.getByTestId("entry-landing");
     await expect(landing).toBeVisible({ timeout: 30_000 });
     // reduced motion: nothing waits in a start pose, the line is drawn
-    expect(await landing.evaluate((el) => [...el.querySelectorAll(".lp-in, .lp-row, .lp-verdict-row, .lp-sample")].every((n) => getComputedStyle(n).opacity === "1"))).toBe(true);
+    expect(await landing.evaluate((el) => Array.from(el.querySelectorAll(".lp-in, .lp-row, .lp-verdict-row, .lp-sample")).every((n) => getComputedStyle(n).opacity === "1"))).toBe(true);
     await expect.poll(() => landing.locator('[data-fx="equity-draw"] > div').first().evaluate((el) => (el as HTMLElement).style.clipPath)).toBe("none");
     await expect(landing.getByTestId("cta-pro")).toBeAttached({ timeout: 20_000 });
     await page.waitForTimeout(600);
