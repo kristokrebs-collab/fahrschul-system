@@ -209,3 +209,38 @@ Dieser Bericht entstand auf dem Stand 13bbb7d, also vor Paket B (Anmeldung/Bezah
 - **Durch Paket B behoben (Code + Tests, nur gegen Mocks belegt):** B1 (Tarifwahl über `?order=` im Bestätigungslink, 60-Minuten-Notiz auch in localStorage), B2/B5 (Bestellkontext in der Registrierung, CTA-Beschriftungen), B4 teilweise (Vorschau ohne Supabase bleibt wie sie ist), B6 (Einrichtungs-Assistent), B7 (Jahresbetrag statt Monatsäquivalent als Schlagzeile, "Heute 0 EUR … danach 120 EUR pro Jahr"), AUTH-03 (neutrale Registrierungsantwort).
 - **Weiter offen:** B3 (keine eigene Landing-/Einstiegsseite), B8 (Hinweis auf Zusatzkosten), B9 (Link-Ablauf im URL-Fragment), alle P1/P2-Punkte dieses Berichts, und alles, was echte Dienste braucht.
 - **Urteil unverändert: NO-GO.**
+
+## Nachtrag Runde 13 (2026-11-10): offene Funde abgearbeitet, Bewegung nachgemessen
+
+Basis: `5fa335a3` (PR #6) plus die Commits von PR #7 (`claude/exciting-planck-hc1c7u`). **Urteil unverändert: NO-GO**, weil die Freigabebedingungen aus Abschnitt 1 an Betreiber-Zugängen, Geräten und dem Anwalt hängen. Was sich geändert hat:
+
+**Behoben (Code + Test, im Browser am gebauten Stand nachgeprüft):**
+
+| Fund (Abschnitt) | Was jetzt gilt | Beleg |
+| --- | --- | --- |
+| P1 abgelaufener Bestätigungslink im Fragment (4.2, B9) | Beide Formen (`/?error=…` und `/#error=…`) öffnen das Magic-Link-Formular, der Grund steht dort sichtbar („Der Link ist abgelaufen. Fordere einfach einen neuen an.“). Ursache war, dass der Hash-Router die Adresse umschrieb, bevor der Fehler gelesen wurde; er wird jetzt beim Laden gemerkt. | `src/cloud/callbackUrl.ts`, `src/cloud/ui/AuthSheet.tsx`; `tests/unit/cloud.callbackUrl.test.ts`, `tests/unit/cloud.authB.test.tsx`; Browser: Cloud-Build, beide Adressen |
+| P2 Betreiber-Satz vor Besuchern (4.2, B10) | Nur noch im Dev-Server oder mit `?debug` | `src/lib/operatorHints.ts`; `tests/unit/lib.operatorHints.test.ts`; Browser: `#konto`, `#community` |
+| P1 Preisseite ohne Zusatzkosten und Support (5.3, B8) | Zwei FAQ-Einträge | `src/views/preise/strings.ts`; Browser: `#preise` |
+| P2 statische Dateien (4.2) | `robots.txt` und `favicon.ico` sind echte Dateien, das Manifest kommt als `application/manifest+json`, fehlende Dateien unter `/assets/*`, `/teilen/assets/*`, `/ocr/*`, `/icons/*`, `/sitemap.xml`, `/sw.js`, `/.well-known/*` antworten mit 404 statt mit der App-HTML | `netlify.toml`, `public/`; `tests/unit/integration.deploy.test.ts`; an der Vorschau von PR #7 mit curl gemessen (robots 200 text/plain, `/assets/nope.js` 404, Manifest-Typ, sitemap 404) |
+| P2 weißer Balken der Netlify-Vorschau (4.2, Blocker 4) | In der App ausgeblendet (`index.html`); an der Vorschau von PR #7 bei 390 px gemessen: `display: none` | `tests/unit/security.clientInput.test.ts` |
+| K7 Fehlerrahmen für nachgeladene Teile | `FeatureHosts` und `BillingBanner` laden mit Wiederholung und haben eigene Rahmen | `src/App.tsx` |
+| neu gefunden: Schließen-✕ des Bezahlfensters auf dem Handy | war weiß auf weißem Papierkopf (praktisch unsichtbar, dort der einzige Weg hinaus); jetzt dunkle Tinte in beiden Themen | `payWindow.css`; `tests/unit/motion.round13.test.tsx`; Browser 390 px |
+| neu gefunden: Einrichtungs-Assistent „Zurück“ | der gehende Schritt lief in die falsche Richtung | `SetupWizard.tsx`; `tests/unit/onboarding.wizard.test.tsx`; Browser bildweise |
+
+**Nachgezogen (Stand der Dokumente):** AUTH-03 und AUTH-06 standen in `RELEASE_TEST_RESULTS.csv` noch als FAIL, obwohl Paket B sie behoben hat; beide sind nachgeprüft und stehen als PASS (26 PASS, 0 FAIL, 43 BLOCKED). `PRODUKTABGLEICH.md`: K7, K14, K15 fertig, K16 auf dem Stand der Mikrofon-Richtlinie.
+
+**Nachgemessen, kein Befund:** „`/?rechtliches=datenschutz` löst vier Navigationen aus“ (4.2) sind drei Änderungen der Adresse im selben Dokument (Router normalisiert den Hash, der Rechtstext-Host nimmt den Parameter aus der Adresse, der Dialog legt einen Verlaufseintrag an, damit „Zurück“ ihn schließt); die Seite lädt nicht neu. Der Intro-Film (B11) hat „Überspringen“, Esc, Enter, Leertaste und Klick und läuft einmal je Sitzung.
+
+**Bewegung:** siehe `docs/ANIMATIONEN-MATRIX.md`, Abschnitt „Runde 13 – Bewegungsprüfung“ (Bezahlfenster, Assistent, Grundlagen-Karten, Suche, nachgeladene Karten).
+
+**Weiter offen (nicht in dieser Runde):**
+
+- K1: Die Einstellungsseite wächst bei 1024 bis 1279 px nach dem Laden. Nachgemessen: die reservierten Höhen stammen von 1280/1440 px, bei 1024 px sind „Live-Daten“ und „Einstiegs-Check“ deutlich höher. Die Kartenhöhen hängen von den Marktdaten ab, die diese Umgebung nicht erreicht (451), deshalb hier nicht verlässlich einstellbar.
+- B3: keine eigene Landing-Seite. Seit der Konto-Pflicht ist das Anmeldefenster der erste Bildschirm (mit „Preise ansehen“); mehr ist eine Produktentscheidung.
+- Touch-Ziele unter 44 px (4.2): die genannten Schalter tragen `touch-hit` (44 × 44 px auf Touch-Geräten); die Messung des Crawls hat die Trefferfläche nicht mitgezählt. Heatmap-Zellen bleiben klein. Am echten Gerät zu bestätigen.
+- Gewinn-Konfetti beim Speichern eines Trades: unverändert Entscheidung des Betreibers (`docs/PSYCHOLOGIE.md`, Abschnitt 6, Punkt 1).
+- Impressum der Vorschau zeigt weiter „PLATZHALTER“ (Betreiber setzt `VITE_LEGAL_*`); der Kauf bleibt dort deshalb gesperrt (`purchaseBlockedBy: legal`, an `/api/v1/billing/status` der Vorschau gemessen).
+- Alles aus Abschnitt 8 (Supabase-Produktion, Stripe live, Binance 451, TradingView, Resend/Twilio, Geräte, Anwalt).
+
+**Geprüft in dieser Runde:** Typprüfung und Lint sauber; Unit-Tests 670 Dateien / 9.689 grün (CI auf `f433d3ef`); E2E in der CI auf `f433d3ef`: alle vier Teile grün; Budget JS 662,2 / 800 KiB, CSS 52,5 / 52,5 KiB. Nicht geprüft: echte Geräte, echte Dienste.
+
