@@ -5,7 +5,7 @@
  * workflow running the gate (e2e on pull requests with Playwright's own Chromium) and `SETUP.md` covering every
  * migration, variable and scheduled function.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -83,6 +83,20 @@ describe("netlify.toml", () => {
       expect(paths.length, `${f} has a path`).toBeGreaterThan(0);
       for (const p of paths) expect(p, f).toMatch(/^\/api\/v1\//);
     }
+  });
+
+  it("missing files are an honest 404, never the app's HTML (stale chunk after a deploy, crawler probes); robots.txt and favicon.ico exist", () => {
+    const spa = toml.indexOf('from = "/*"');
+    for (const from of ["/assets/*", "/teilen/assets/*", "/ocr/*", "/icons/*", "/sitemap.xml", "/sw.js", "/.well-known/*"]) {
+      const at = toml.indexOf(`from = "${from}"\n  to = "/not-found.txt"\n  status = 404`);
+      expect(at, from).toBeGreaterThan(0);
+      expect(at, `${from} before the SPA fallback`).toBeLessThan(spa);
+      // never forced: an existing file always wins
+      expect(toml.slice(at, at + 120)).not.toContain("force");
+    }
+    for (const f of ["robots.txt", "favicon.ico", "not-found.txt", "manifest.webmanifest"]) expect(existsSync(join(root, "public", f)), f).toBe(true);
+    expect(readFileSync(join(root, "public/robots.txt"), "utf8")).toMatch(/User-agent: \*\nAllow: \/\nDisallow: \/api\//);
+    expect(toml).toMatch(/for = "\/manifest\.webmanifest"\s+\[headers\.values\]\s+Content-Type = "application\/manifest\+json; charset=utf-8"/);
   });
 });
 

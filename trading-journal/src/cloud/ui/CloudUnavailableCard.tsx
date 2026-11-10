@@ -4,6 +4,7 @@ import { DotMatrix, type DotFrame } from "@/motion";
 import { stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Card } from "@/primitives/Card";
+import { operatorHints } from "@/lib/operatorHints";
 import { hasClaudeRuntime } from "@/store/capability";
 import { KONTO } from "./strings";
 
@@ -21,7 +22,8 @@ export const CLOUD_OFF: DotFrame = [
 
 /**
  * Honest state when the cloud is not configured (P09): no fake login. File builds / file:// say so; claude.ai points to
- * its own sync; a web build without the Supabase variables names them for the operator (small print). The dot matrix
+ * its own sync; a web build without the Supabase variables names them for the operator only on request (small print, `operatorHints`:
+ * dev server or `?debug` – never in front of a visitor). The dot matrix
  * shows a struck-through cloud (static frame – nothing loops).
  */
 export function CloudUnavailableCard({ className }: { className?: string }) {
@@ -49,7 +51,7 @@ export function CloudUnavailableCard({ className }: { className?: string }) {
               </motion.li>
             ))}
           </ul>
-          {!file && !claude && <p className="mt-1 font-mono text-[11px] leading-relaxed text-faint">{KONTO.unavailableOwner}</p>}
+          {!file && !claude && operatorHints() && <p className="mt-1 font-mono text-[11px] leading-relaxed text-faint">{KONTO.unavailableOwner}</p>}
         </div>
       </div>
     </Card>

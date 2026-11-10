@@ -104,6 +104,15 @@ export const FAQ: readonly { q: string; a: string }[] = [
     a: "Ja. Jede Zahlung erzeugt eine Rechnung, die du unter Konto → Rechnungen oder im Stripe-Kundenportal herunterladen kannst.",
   },
   {
+    // Launch-Audit D1, B8: what is NOT in the price, said before the purchase
+    q: "Kommen zu den Preisen noch Kosten dazu?",
+    a: "Für das Journal nicht: KI-Coach, Screenshot-Import, Simulationen und Alarme sind bis zu den Kontingenten deines Tarifs enthalten, sie stehen im Vergleich oben. Was andere Anbieter berechnen, zahlst du dort selbst – etwa die Handelsgebühren deiner Börse oder einen TradingView-Tarif, falls du Alarme von dort per Webhook schicken willst.",
+  },
+  {
+    q: "Wie erreiche ich den Support?",
+    a: "Schreib an die E-Mail-Adresse im Impressum, der Link steht unten auf jeder Seite. Für Kündigung und Widerruf brauchst du keinen Login: „Verträge hier kündigen“ und „Vertrag widerrufen“ stehen ebenfalls in der Fußzeile.",
+  },
+  {
     q: "Wie funktionieren Einladungen?",
     a: "Unter Konto findest du deinen Einladungslink. Wer darüber startet, testet länger – und du bekommst Guthaben, sobald die erste Zahlung eingeht.",
   },

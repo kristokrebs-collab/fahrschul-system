@@ -6,6 +6,7 @@ import { Reveal } from "@/motion/Reveal";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Card } from "@/primitives/Card";
+import { operatorHints } from "@/lib/operatorHints";
 import { hasClaudeRuntime } from "@/store/capability";
 import { COMMUNITY } from "@/social/strings";
 import { Glyph } from "@/social/ui/glyphs";
@@ -15,7 +16,8 @@ import { Constellation, FeatureTiles, Principles } from "./parts";
 /**
  * Honest state without a cloud (file build, claude.ai, missing Supabase env): no fake leaderboard, no invented members.
  * The community glyph builds up once, the promises rise in, one red sweep crosses the card; below what the community
- * WOULD offer (tiles without numbers) and what works anyway (the trade picture). The operator hint names the variables.
+ * WOULD offer (tiles without numbers) and what works anyway (the trade picture). The operator hint names the variables – only in the
+ * dev server or with `?debug` (`operatorHints`), never in front of a visitor.
  */
 export function NoCloudState() {
   const reduced = useReducedFx();
@@ -42,7 +44,7 @@ export function NoCloudState() {
               <h2 className="text-[clamp(20px,5.6vw,26px)] font-semibold tracking-tight [text-wrap:balance]">{COMMUNITY.noCloudTitle}</h2>
               <p className="max-w-[60ch] text-[14px] leading-relaxed text-mute">{file ? COMMUNITY.noCloudFile : claude ? COMMUNITY.noCloudClaude : COMMUNITY.noCloudText}</p>
               <Principles className="mt-1" />
-              {!file && !claude && <p className="mt-1 font-mono text-[11px] leading-relaxed text-faint">{COMMUNITY.noCloudOwner}</p>}
+              {!file && !claude && operatorHints() && <p className="mt-1 font-mono text-[11px] leading-relaxed text-faint">{COMMUNITY.noCloudOwner}</p>}
             </div>
           </div>
         </Card>

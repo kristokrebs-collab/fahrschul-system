@@ -12,7 +12,7 @@ export function hasAuthCallback(href: string = typeof location === "undefined" ?
   try {
     const u = new URL(href);
     if (u.searchParams.has("code") || u.searchParams.has("error_description")) return true;
-    return /(^|[#&])(access_token|error_description)=/.test(u.hash);
+    return /(^|[#&])(access_token|error_description|error_code)=/.test(u.hash);
   } catch {
     return false;
   }

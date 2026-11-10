@@ -127,6 +127,45 @@
   status = 200
   force = true
 
+# Files that do not exist must not answer with the app's HTML and status 200 (Launch-Audit D1): a tab that is still open after a new
+# deploy asks for a chunk that is gone – the SPA fallback handed it index.html as "JavaScript". A rule without `force` only applies when
+# no file is there, so every existing asset is served as before; a missing one is an honest 404 (the app's chunk loader then offers
+# „Neu laden“). The same for the well-known paths crawlers and browsers probe. robots.txt and favicon.ico are real files in public/.
+[[redirects]]
+  from = "/assets/*"
+  to = "/not-found.txt"
+  status = 404
+
+[[redirects]]
+  from = "/teilen/assets/*"
+  to = "/not-found.txt"
+  status = 404
+
+[[redirects]]
+  from = "/ocr/*"
+  to = "/not-found.txt"
+  status = 404
+
+[[redirects]]
+  from = "/icons/*"
+  to = "/not-found.txt"
+  status = 404
+
+[[redirects]]
+  from = "/sitemap.xml"
+  to = "/not-found.txt"
+  status = 404
+
+[[redirects]]
+  from = "/sw.js"
+  to = "/not-found.txt"
+  status = 404
+
+[[redirects]]
+  from = "/.well-known/*"
+  to = "/not-found.txt"
+  status = 404
+
 # Share edition: its own SPA fallback, BEFORE the catch-all (existing files such as /teilen/assets/* win anyway;
 # `/teilen` without slash is served as /teilen/index.html by Netlify itself – no extra rule, rules ignore the slash).
 [[redirects]]
@@ -170,6 +209,12 @@
     # off. Paket V: `payment` for the app and Stripe's frames only (the card fields / 3-D Secure of the payment window).
     Permissions-Policy = "camera=(), microphone=(self), geolocation=(), payment=(self \"https://js.stripe.com\")"
     X-Frame-Options = "DENY"
+
+# The web app manifest with its registered media type (Netlify served `application/octet-stream`, Launch-Audit D1).
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json; charset=utf-8"
 
 # Hashed build assets never change: cache them for a year (index.html stays revalidated, so a deploy is picked up at once).
 [[headers]]

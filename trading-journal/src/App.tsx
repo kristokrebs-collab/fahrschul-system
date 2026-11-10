@@ -10,6 +10,7 @@ import { Footer } from "@/app/Footer";
 import { Header } from "@/app/Header";
 import { Sidebar } from "@/app/Sidebar";
 import { HostSlot } from "@/app/HostSlot";
+import { loadChunk } from "@/lib/chunkLoad";
 import { useLayerDiagOpen } from "@/app/layerDiag";
 import { LocalModeBanner, useLocalBannerOpen } from "@/app/LocalModeBanner";
 import { MotionTierHost } from "@/app/MotionTierHost";
@@ -47,13 +48,13 @@ import { useUi, type Page } from "@/store/uiStore";
 /** Layer diagnostics (decision 7): its own chunk, loaded only when `?debug=layers` or five logo taps open it. */
 const LayerDiagnostics = lazy(() => import("@/app/LayerDiagnostics"));
 /** The feature hosts (P02–P12 watchers and sheets): one lazy chunk, mounted after the first commit. */
-const DeferredHosts = lazy(() => import("@/app/DeferredHosts"));
+const DeferredHosts = lazy(() => loadChunk(() => import("@/app/DeferredHosts")));
 /** A page whose plan feature is locked (only with open payments): its header + the upgrade teaser. */
 const LockedPage = lazy(() => import("@/app/LockedPage"));
 /** The public view of a share link (`#share/<token>`, P12). */
 const SharedView = lazy(() => import("@/views/community/SharedView").then((m) => ({ default: m.SharedView })));
 /** P10 trial / payment banner – only in builds with billing (cloud configured, a web build). */
-const BillingBanner = lazy(() => import("@/billing/ui/BillingBanner").then((m) => ({ default: m.BillingBanner })));
+const BillingBanner = lazy(() => loadChunk(() => import("@/billing/ui/BillingBanner").then((m) => ({ default: m.BillingBanner }))));
 
 /** Konto-Pflicht: the entry gate and the public pricing page for a signed-out visitor (only in a build with the cloud, `src/cloud/gate.ts`). */
 const EntryGate = lazy(() => import("@/app/gate/EntryGate"));
@@ -217,9 +218,12 @@ function SetupEditorHost() {
 function Banners() {
   if (!billingActive()) return null;
   return (
-    <Suspense fallback={null}>
-      <BillingBanner className="mb-5" />
-    </Suspense>
+    // K7: a banner chunk that cannot be fetched (offline, a deploy replaced it) must not take the page down – it is simply not there
+    <ErrorBoundary variant="widget" label="Abo-Hinweis" fallback={() => null}>
+      <Suspense fallback={null}>
+        <BillingBanner className="mb-5" />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
@@ -274,12 +278,18 @@ function IdlePreload() {
   return null;
 }
 
-/** The feature hosts' chunk: requested by the first render, never waited for (no fallback – the shell paints at once). */
+/**
+ * The feature hosts' chunk: requested by the first render, never waited for (no fallback – the shell paints at once). The download waits
+ * for the network and is tried twice (`loadChunk`); if it still fails (K7) the journal itself keeps running behind its own boundary
+ * instead of the whole app falling into „Neu laden“ – the hosts (review prompts, sheets of paid features …) come with the next load.
+ */
 function FeatureHosts() {
   return (
-    <Suspense fallback={null}>
-      <DeferredHosts />
-    </Suspense>
+    <ErrorBoundary variant="widget" label="Zusatzfunktionen" fallback={() => null}>
+      <Suspense fallback={null}>
+        <DeferredHosts />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 

@@ -16,6 +16,7 @@ import { pushToast } from "@/store/uiStore";
 import { KEYS } from "@/store/storage";
 import { ApiError, apiFetch, setAccessTokenProvider } from "./api";
 import { authErrorCodeOf, authErrorText, type AuthErrorText } from "./authErrors";
+import { readCallback } from "./callbackUrl";
 import { cloudConfig, type OAuthProvider } from "./env";
 import { primeOpsFlags } from "./flags";
 import { ACCOUNT_PRIVACY_KEYS, onPrivacyChange, parsePrivacy, setPrivacy, usePrivacy, type PrivacyPrefs } from "./privacy";
@@ -126,17 +127,13 @@ async function onAuthEvent(event: AuthChangeEvent): Promise<void> {
 let initialized: Promise<void> | null = null;
 let stopController: (() => void) | null = null;
 
-/** Clears a failed / used auth callback from the URL (keeps the hash route). */
+/** Clears a failed / used auth callback from the URL (keeps a hash route; an error in the fragment is taken out, `callbackUrl.ts`). */
 function cleanCallbackUrl(): { error: AuthErrorText | null } {
   try {
-    const u = new URL(location.href);
-    const code = u.searchParams.get("error_code") ?? u.searchParams.get("error");
-    const desc = u.searchParams.get("error_description");
-    const params = ["code", "error", "error_code", "error_description", "sb_flow_id"];
-    if (!params.some((p) => u.searchParams.has(p))) return { error: null };
-    for (const p of params) u.searchParams.delete(p);
-    history.replaceState(history.state, "", u.toString());
-    return { error: code || desc ? authErrorText({ code: code ?? undefined, message: desc ?? "" }) : null };
+    const { cleaned, error } = readCallback(location.href);
+    if (cleaned === null) return { error: null };
+    history.replaceState(history.state, "", cleaned);
+    return { error: error ? authErrorText(error) : null };
   } catch {
     return { error: null };
   }
