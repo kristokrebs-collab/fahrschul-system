@@ -548,6 +548,11 @@ button.aw-ficon:focus-visible {
   line-height: 1.5;
   color: var(--color-mute);
 }
+/* the reason a link failed, in the lead's place of the magic-link form: read first, in the ink of the title */
+.aw-lead[data-notice] {
+  color: var(--color-fg);
+  font-weight: 600;
+}
 .aw-notice {
   margin: 0;
   padding: 1.2cqh 1.6cqh;

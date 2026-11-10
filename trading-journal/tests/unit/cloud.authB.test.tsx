@@ -187,6 +187,27 @@ describe("the 'mail sent' step: resend with a wait and the server's limit", () =
     expect(await screen.findByTestId("auth-resend")).toBeEnabled();
     expect(screen.getByTestId("auth-notice")).toHaveTextContent("noch nicht bestätigt");
   });
+
+  it("a failed e-mail link (B9): the magic-link form says why, in the place of its lead – and stays the way to a new link", async () => {
+    openAuthSheet("magic", "callback");
+    useCloudSession.setState({ sheet: { ...useCloudSession.getState().sheet, notice: "Der Link ist abgelaufen. Fordere einfach einen neuen an." } });
+    mount();
+    await dialog();
+    const notice = screen.getByTestId("auth-notice");
+    expect(notice).toHaveTextContent("Der Link ist abgelaufen. Fordere einfach einen neuen an.");
+    expect(notice).toHaveAttribute("role", "status");
+    expect(screen.queryByText("Wir schicken dir einen Link. Ein Klick, und du bist drin.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Link senden" })).toBeInTheDocument();
+    expect(screen.getByLabelText("E-Mail")).toBeInTheDocument();
+  });
+
+  it("without a notice the magic-link form keeps its lead", async () => {
+    openAuthSheet("magic", "card");
+    mount();
+    await dialog();
+    expect(screen.getByText("Wir schicken dir einen Link. Ein Klick, und du bist drin.")).toBeInTheDocument();
+    expect(screen.queryByTestId("auth-notice")).toBeNull();
+  });
 });
 
 describe("fields: understandable errors, offline, show/hide", () => {

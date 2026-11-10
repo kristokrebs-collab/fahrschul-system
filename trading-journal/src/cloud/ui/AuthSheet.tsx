@@ -183,6 +183,7 @@ const B_ROWS = { head: 9.5, field1: 20.1, field2: 37.2, field3: 53.9, hint: 66.3
 
 function SignInForm({ mode, titleId }: { mode: "signin" | "magic"; titleId: string }) {
   const stored = useCloudSession((s) => s.sheet.email);
+  const notice = useCloudSession((s) => s.sheet.notice);
   const idleNever = useIdlePref((s) => s.minutes === 0);
   const [remember, setRemember] = useState(idleNever);
   const [email, setEmail] = useState(stored);
@@ -299,8 +300,9 @@ function SignInForm({ mode, titleId }: { mode: "signin" | "magic"; titleId: stri
           top={A_ROWS.field2}
         />
       ) : (
-        <p className="aw-lead aw-abs" style={at(A_ROWS.lead)} data-aw-row="">
-          {AUTH.card.magicLead}
+        // a failed e-mail link lands here (`client.ts`, AUTH-05 / B9): its reason takes the lead's place – this form is the way on (a new link)
+        <p className="aw-lead aw-abs" style={at(A_ROWS.lead)} data-aw-row="" {...(notice ? { role: "status", "data-notice": "", "data-testid": "auth-notice" } : {})}>
+          {notice ?? AUTH.card.magicLead}
         </p>
       )}
       {mode === "signin" ? (

@@ -4,13 +4,16 @@
  */
 import { hasClaudeRuntime } from "@/store/capability";
 import { KEYS, readRaw } from "@/store/storage";
+import { hasBootFragmentError } from "./callbackUrl";
 import { cloudEnabled } from "./env";
 import { readPrivacy } from "./privacy";
 
 /** The URL carries a Supabase auth callback (PKCE `?code=`, or an error / implicit token in the fragment). */
-export function hasAuthCallback(href: string = typeof location === "undefined" ? "" : location.href): boolean {
+export function hasAuthCallback(href?: string): boolean {
+  // the page was opened with a link error in its fragment (the router has replaced it since, `callbackUrl.ts`)
+  if (href === undefined && hasBootFragmentError()) return true;
   try {
-    const u = new URL(href);
+    const u = new URL(href ?? (typeof location === "undefined" ? "" : location.href));
     if (u.searchParams.has("code") || u.searchParams.has("error_description")) return true;
     return /(^|[#&])(access_token|error_description|error_code)=/.test(u.hash);
   } catch {

@@ -16,7 +16,7 @@ import { pushToast } from "@/store/uiStore";
 import { KEYS } from "@/store/storage";
 import { ApiError, apiFetch, setAccessTokenProvider } from "./api";
 import { authErrorCodeOf, authErrorText, type AuthErrorText } from "./authErrors";
-import { readCallback } from "./callbackUrl";
+import { readCallback, takeBootFragmentError } from "./callbackUrl";
 import { cloudConfig, type OAuthProvider } from "./env";
 import { primeOpsFlags } from "./flags";
 import { ACCOUNT_PRIVACY_KEYS, onPrivacyChange, parsePrivacy, setPrivacy, usePrivacy, type PrivacyPrefs } from "./privacy";
@@ -127,13 +127,17 @@ async function onAuthEvent(event: AuthChangeEvent): Promise<void> {
 let initialized: Promise<void> | null = null;
 let stopController: (() => void) | null = null;
 
-/** Clears a failed / used auth callback from the URL (keeps a hash route; an error in the fragment is taken out, `callbackUrl.ts`). */
+/**
+ * Clears a failed / used auth callback from the URL (keeps a hash route; an error in the fragment is taken out, `callbackUrl.ts`). The
+ * fragment shape is usually gone by now (the router replaced it): its error was noted when the page loaded.
+ */
 function cleanCallbackUrl(): { error: AuthErrorText | null } {
   try {
+    const boot = takeBootFragmentError();
     const { cleaned, error } = readCallback(location.href);
-    if (cleaned === null) return { error: null };
-    history.replaceState(history.state, "", cleaned);
-    return { error: error ? authErrorText(error) : null };
+    if (cleaned !== null) history.replaceState(history.state, "", cleaned);
+    const found = error ?? boot;
+    return { error: found ? authErrorText(found) : null };
   } catch {
     return { error: null };
   }

@@ -41,3 +41,38 @@ export function readCallback(href: string): CallbackRead {
   if (frag) u.hash = ""; // the fragment was the error, not a page
   return { cleaned: u.toString(), error: code || desc ? { code: code ?? undefined, message: desc ?? "" } : null };
 }
+
+/**
+ * The fragment shape must be read BEFORE the hash router runs: the router takes `#error=…` for an unknown page and rewrites the address
+ * to `#overview` long before the cloud chunk (and with it `cleanCallbackUrl`) is there – measured on the built app, the reason was gone.
+ * So the address the page was opened with is noted when this module loads (it is part of the first chunk through `hint.ts`).
+ */
+let bootFragmentError: CallbackRead["error"] = (() => {
+  if (typeof location === "undefined") return null;
+  try {
+    return fragmentError(new URL(location.href).hash) ? readCallback(location.href).error : null;
+  } catch {
+    return null;
+  }
+})();
+
+/** A link error the opening address carried in its fragment is still waiting to be shown. */
+export function hasBootFragmentError(): boolean {
+  return bootFragmentError !== null;
+}
+
+/** Hands that error out once (the router has long replaced the fragment). */
+export function takeBootFragmentError(): CallbackRead["error"] {
+  const e = bootFragmentError;
+  bootFragmentError = null;
+  return e;
+}
+
+/** Tests only: note an opening address as if the page had been loaded with it. */
+export function noteBootHrefForTests(href: string): void {
+  try {
+    bootFragmentError = fragmentError(new URL(href).hash) ? readCallback(href).error : null;
+  } catch {
+    bootFragmentError = null;
+  }
+}

@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { authErrorText } from "@/cloud/authErrors";
-import { readCallback } from "@/cloud/callbackUrl";
+import { hasBootFragmentError, noteBootHrefForTests, readCallback, takeBootFragmentError } from "@/cloud/callbackUrl";
 import { hasAuthCallback } from "@/cloud/hint";
 
 const ORIGIN = "https://journal.example";
@@ -48,5 +48,17 @@ describe("readCallback", () => {
     expect(hasAuthCallback(`${ORIGIN}/#${EXPIRED}`)).toBe(true);
     expect(hasAuthCallback(`${ORIGIN}/#error=access_denied&error_code=otp_expired`)).toBe(true);
     expect(hasAuthCallback(`${ORIGIN}/#preise`)).toBe(false);
+  });
+
+  it("the opening address is noted before the router replaces the fragment, and handed out once", () => {
+    expect(hasBootFragmentError()).toBe(false); // the test page was opened without a link error
+    noteBootHrefForTests(`${ORIGIN}/#${EXPIRED}`);
+    expect(hasBootFragmentError()).toBe(true);
+    expect(hasAuthCallback()).toBe(true); // … although the address of the page itself no longer shows it
+    expect(takeBootFragmentError()).toEqual({ code: "otp_expired", message: "Email link is invalid or has expired" });
+    expect(takeBootFragmentError()).toBeNull();
+    expect(hasBootFragmentError()).toBe(false);
+    noteBootHrefForTests(`${ORIGIN}/#preise`);
+    expect(hasBootFragmentError()).toBe(false);
   });
 });
