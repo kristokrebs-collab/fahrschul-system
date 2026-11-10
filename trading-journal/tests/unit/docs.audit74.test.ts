@@ -219,11 +219,13 @@ describe("docs/audit/RELEASE_TEST_RESULTS.csv", () => {
     expect(createHash("sha256").update(text, "utf8").digest("hex")).toBe(QA_SOURCE_SHA256);
   });
 
-  it("fills result, proof and date in every row: PASS / FAIL / BLOCKED and 2026-11-08", () => {
+  it("fills result, proof and date in every row: PASS / FAIL / BLOCKED and the day of the run (2026-11-08) or of a later re-check", () => {
     for (const r of body) {
       expect(RESULTS, `${r[0]}: Ergebnis`).toContain(r[5]);
       expect(r[6]!.trim().length, `${r[0]}: Beleg leer`).toBeGreaterThan(40);
-      expect(r[7], `${r[0]}: Datum`).toBe("2026-11-08");
+      expect(r[7], `${r[0]}: Datum`).toMatch(/^2026-(11-(0[89]|[12]\d|30)|12-\d\d)$/);
+      // a re-checked row says so in its proof
+      if (r[7] !== "2026-11-08") expect(r[6], `${r[0]}: Nachprüfung`).toMatch(/Nachprüfung \d{4}-\d\d-\d\d/);
     }
   });
 
