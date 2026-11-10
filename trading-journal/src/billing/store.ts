@@ -343,14 +343,49 @@ export function noteOrderReturn(draft: OrderDraft): void {
   setReturnTo({ kind: "order", order: formatOrderParam(draft) }, { on: "signedIn" }, "Bestellung");
 }
 
+/** How long an order waits for the configuration before it is decided on what is known (ms). */
+export const CONFIG_WAIT_MS = 8000;
+
+/** Resolves when the billing configuration has arrived or failed – at the latest after `CONFIG_WAIT_MS`. Starts the load if nobody has. */
+export function whenConfigSettled(timeoutMs: number = CONFIG_WAIT_MS): Promise<void> {
+  const settled = (): boolean => {
+    const st = useBilling.getState();
+    return st.config !== null || st.configState === "ready" || st.configState === "error";
+  };
+  if (settled()) return Promise.resolve();
+  if (useBilling.getState().configState === "idle") void loadBilling().catch(() => undefined);
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (): void => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      stop();
+      resolve();
+    };
+    const stop = useBilling.subscribe(() => {
+      if (settled()) finish();
+    });
+    const timer = setTimeout(finish, timeoutMs);
+    if (settled()) finish();
+  });
+}
+
 /**
  * The entry of every "buy" button (B4): closed purchase flow → an honest toast and nothing else; signed out → the order is
  * noted for `returnTo` and the login opens (after it the ReturnHost reopens THIS order); signed in → the order sheet opens
  * with the summary. The order itself is placed ONLY by the button of that sheet.
  */
-export function requestOrder(intent: CheckoutIntent): void {
+export function requestOrder(intent: CheckoutIntent, opts: { waited?: boolean } = {}): void {
   const draft = normalizeDraft({ plan: intent.plan, interval: intent.interval, seats: intent.seats ?? useBilling.getState().seats });
   const s = useBilling.getState();
+  // The server's configuration is still on its way (right after a sign-in, or a link that opens the app on an order): decide when it
+  // is there, not on a guess. Before, „not loaded yet“ counted as „Stripe not connected“: the order of a mail link was dropped with
+  // the toast „Zahlungen noch nicht eingerichtet“ although payments were set up (QA Runde 13, AUTH-06 end to end).
+  if (!opts.waited && !s.config && billingActive() && (s.configState === "idle" || s.configState === "loading")) {
+    void whenConfigSettled().then(() => requestOrder(intent, { waited: true }));
+    return;
+  }
   const gate = purchaseOpenOf(s.config, currentMode());
   if (!gate.open) {
     pushToast({ kind: "info", title: BILLING.closedTitle, detail: gate.blockedBy.includes("legal") && !gate.blockedBy.includes("stripe") ? BILLING.legalClosedText : BILLING.closedText });

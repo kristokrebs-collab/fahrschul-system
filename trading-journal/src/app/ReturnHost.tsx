@@ -8,7 +8,7 @@ import { useEffect } from "react";
 import { pageTargetId } from "@/app/pageTargets";
 import { entitledNow } from "@/billing/entitlements";
 import { parseOrderParam } from "@/billing/purchase/order";
-import { requestOrder, useBilling, useEffectivePlan } from "@/billing/store";
+import { billingActive, loadBilling, requestOrder, useBilling, useEffectivePlan } from "@/billing/store";
 import { useCloudSession } from "@/cloud/session";
 import { useTakeover } from "@/cloud/takeover";
 import { primaryConnection, useExchange } from "@/exchanges/store";
@@ -38,6 +38,8 @@ export function ReturnHost() {
   const plan = useEffectivePlan().plan;
   const account = useBilling((s) => s.account);
   const cached = useBilling((s) => s.cached);
+  const config = useBilling((s) => s.config);
+  const configState = useBilling((s) => s.configState);
 
   useEffect(() => {
     if (!pending) return;
@@ -46,6 +48,13 @@ export function ReturnHost() {
     if (!waitMet(now.wait, { signedIn, connected, entitled: (f) => entitledNow(f as Feature) })) return;
     // an order waits until the login sheet (its welcome step and the takeover question) is closed: two sheets never stack
     if (now.target.kind === "order" && (authSheetOpen || takeoverOpen)) return;
+    // … and until the server's billing configuration is there. Right after a sign-in it is still loading; acting on „not loaded“ dropped
+    // the order of a mail link with the toast „Zahlungen noch nicht eingerichtet“ (QA Runde 13). The note stays pending meanwhile, so
+    // nothing else takes the screen (the setup wizard waits for a pending return).
+    if (now.target.kind === "order" && billingActive() && !config && (configState === "idle" || configState === "loading")) {
+      if (configState === "idle") void loadBilling().catch(() => undefined);
+      return;
+    }
     // once: the note is cleared before the target opens, so nothing can fire it twice
     clearReturnTo();
     const t = now.target;
@@ -58,7 +67,7 @@ export function ReturnHost() {
     const id = t.kind === "feature" ? t.id : pageTargetId(t.page);
     // the register is a lazy chunk of its own: it is fetched only when a return actually happens
     void import("@/app/featureOpen").then((m) => m.openFeature(id, { remember: false }));
-  }, [pending, signedIn, authSheetOpen, takeoverOpen, connected, plan, account, cached]);
+  }, [pending, signedIn, authSheetOpen, takeoverOpen, connected, plan, account, cached, config, configState]);
 
   return null;
 }

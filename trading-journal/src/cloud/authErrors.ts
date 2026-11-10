@@ -12,6 +12,13 @@ export interface AuthErrorText {
 }
 
 /** The one sentence for "this address may already have an account": it names neither case. */
+/**
+ * A mail link whose code could not be exchanged for a session (used before, or opened in another browser than the one that asked for
+ * it, or while the server could not be reached) – Supabase reports no error in the address then, the visitor simply stayed signed
+ * out without a word (QA Runde 13). The sentence names no account and no address.
+ */
+export const AUTH_LINK_UNUSABLE = "Der Link konnte nicht eingelöst werden: Er wurde schon benutzt, in einem anderen Browser angefordert, oder die Verbindung fehlte gerade. Fordere einfach einen neuen an.";
+
 export const AUTH_NEUTRAL = "Wenn die Adresse frei ist, schicken wir dir eine Bestätigung. Hast du schon ein Konto, melde dich an oder setze dein Passwort zurück.";
 
 const BY_CODE: Record<string, AuthErrorText> = {

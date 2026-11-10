@@ -194,7 +194,11 @@ export function SetupEditor(props: SetupEditorProps) {
 
   // „Löschen“ (Runde 13): the delete pill whose bin eats the word once the deletion was confirmed; its spinner is this very write
   const bin = useBinDelete(async () => {
-    if (existing) await saveSettings(removeSetup(useJournal.getState().settings, existing.id));
+    if (!existing) return;
+    await saveSettings(removeSetup(useJournal.getState().settings, existing.id));
+    // a trades filter on this Grundlage goes with it (the list must not keep filtering by an id that no longer has a name)
+    const ui = useUi.getState();
+    if (ui.tradeFilter.setup === existing.id) ui.setTradeFilter({ setup: "all" });
   }, {
     done: () => {
       pushToast({ kind: "info", title: SETUP_EDITOR_STRINGS.toastDeleted });

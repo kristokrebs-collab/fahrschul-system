@@ -3,8 +3,9 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Trade } from "@/domain/types";
-import { aggregateFills, normalizePair, parseCsv, parseNum, parseTime, planCsvMerge, toJournalTrade, type CsvFill } from "@/exchanges/csv";
-import { detectDelimiter, fnv1a, parseSide, tokenize, uniqueHeader } from "@/exchanges/csv/parse";
+import { CSV_HEADER } from "@/domain/csv";
+import { aggregateFills, guessMapping, normalizePair, parseCsv, parseNum, parseTime, parseWithMapping, planCsvMerge, sameTrade, toJournalTrade, type CsvFill } from "@/exchanges/csv";
+import { detectDelimiter, fnv1a, numberStyle, parseSide, tokenize, uniqueHeader } from "@/exchanges/csv/parse";
 
 describe("tokenizer", () => {
   it("detects the delimiter from the header line", () => {
@@ -48,6 +49,43 @@ describe("numbers", () => {
     ["abc", false, null],
   ])("parseNum(%j, %s) = %s", (raw, comma, want) => {
     expect(parseNum(raw, comma)).toBe(want);
+  });
+});
+
+describe("numbers: the file's own convention (QA Runde 13: German thousands dots were read as decimals)", () => {
+  it("German evidence in the file → a dot before exactly three digits separates thousands", () => {
+    const cells = ["80.000,5", "81.000,5", "1.000", "1,25", "79.500"];
+    const st = numberStyle(cells, true);
+    expect(st).toEqual({ decimalComma: true, dotThousands: true });
+    expect(cells.map((c) => parseNum(c, st.decimalComma, st.dotThousands))).toEqual([80000.5, 81000.5, 1000, 1.25, 79500]);
+    // "3.000 → 2.940, 1.500" of the same file
+    expect(["3.000", "2.940", "1.500"].map((c) => parseNum(c, true, true))).toEqual([3000, 2940, 1500]);
+    // never thousands: a leading zero group, other digit counts
+    expect(parseNum("0.125", true, true)).toBe(0.125);
+    expect(parseNum("81230.5", true, true)).toBe(81230.5);
+    expect(parseNum("1.25", true, true)).toBe(1.25);
+  });
+
+  it("English evidence → decimal dot, also in a semicolon file; \"1.500\" stays 1.5", () => {
+    const st = numberStyle(["81230.5", "0.25", "1.500"], true);
+    expect(st).toEqual({ decimalComma: false, dotThousands: false });
+    expect(parseNum("1.500", st.decimalComma, st.dotThousands)).toBe(1.5);
+    expect(numberStyle(["1,234.56"], true)).toEqual({ decimalComma: false, dotThousands: false });
+  });
+
+  it("no evidence, or both: the fallback decides the comma and a lone dot stays decimal (as before)", () => {
+    expect(numberStyle(["100", "2500", "1.500"], true)).toEqual({ decimalComma: true, dotThousands: false });
+    expect(numberStyle(["100", "2500"], false)).toEqual({ decimalComma: false, dotThousands: false });
+    expect(numberStyle(["1,25", "0.5"], true)).toEqual({ decimalComma: true, dotThousands: false });
+    expect(numberStyle(["", "–", "abc", "BTC"], false)).toEqual({ decimalComma: false, dotThousands: false });
+  });
+
+  it("several dots in groups of three have only one reading – thousands, whatever the file", () => {
+    expect(parseNum("1.234.567")).toBe(1234567);
+    expect(numberStyle(["1.234.567"], false)).toEqual({ decimalComma: true, dotThousands: true });
+    // unchanged defaults: one dot is decimal without evidence
+    expect(parseNum("1.000")).toBe(1);
+    expect(parseNum("79.500", true)).toBe(79.5);
   });
 });
 
@@ -129,6 +167,52 @@ describe("merge into the journal", () => {
     expect(plan.updated[0]).toMatchObject({ notes: "Lehrbuch-Ausbruch", setups: ["s_mtf"], emotion: "Ruhig", stop: 61500, pnlManual: 58.5 });
     expect(planCsvMerge([edited], [base], now)).toMatchObject({ added: [], updated: [], unchanged: 1 });
   });
+  it("the same trade under another id (hand-typed, or read through another path) is already in the journal – never added twice", () => {
+    const typed: Trade = { ...base, id: "t_hand_1", syncSource: undefined, origin: undefined, notes: "von Hand" } as Trade;
+    // the journal's own export read back through the mapping assistant: another id, another source, the same trade
+    const reread: Trade = { ...base, id: "t_csv_generic_x", syncSource: "csv:generic" };
+    expect(sameTrade(typed, reread)).toBe(true);
+    expect(planCsvMerge([typed], [reread], now)).toMatchObject({ added: [], updated: [], unchanged: 1 });
+    // read as UTC instead of local time: shifted by whole hours – still the same trade
+    const shifted: Trade = { ...reread, date: reread.date.replace(/T(\d{2})/, (_m, h: string) => `T${String(+h + 2).padStart(2, "0")}`) };
+    expect(shifted.date).not.toBe(reread.date);
+    expect(planCsvMerge([typed], [shifted], now)).toMatchObject({ added: [], unchanged: 1 });
+    // a different trade stays new: another exit, another entry, the other side, 7 minutes apart, another day
+    for (const other of [
+      { ...reread, exit: (reread.exit ?? 0) + 1 },
+      { ...reread, entry: (reread.entry ?? 0) + 0.5 },
+      { ...reread, side: "short" as const },
+      { ...reread, date: reread.date.replace(/:(\d{2})$/, ":37") },
+      { ...reread, date: reread.date.replace(/-05T/, "-07T") },
+    ]) {
+      expect(planCsvMerge([typed], [other], now).added, JSON.stringify(other.date)).toHaveLength(1);
+    }
+    // two rows of the SAME source with different ids stay two trades (the source's identity wins)
+    expect(planCsvMerge([base], [{ ...base, id: "t_csv_other" }], now).added).toHaveLength(1);
+  });
+
+  it("the mapping assistant: „Größe“ is the position value, „Bewertung“ is not; the journal's own export maps completely", () => {
+    const header: string[] = [...CSV_HEADER];
+    const m = guessMapping(header);
+    const at = (name: string) => header.indexOf(name);
+    expect(m.size).toBe(at("Größe"));
+    expect(m.size).not.toBe(at("Bewertung"));
+    expect(m).toMatchObject({ date: at("Datum"), exitDate: at("Ausstiegszeit"), pair: at("Paar"), side: at("Richtung"), entry: at("Einstieg"), exit: at("Ausstieg"), qty: at("Menge"), fees: at("Gebühren"), pnl: at("P&L"), stop: at("Stop"), target: at("Ziel"), leverage: at("Hebel") });
+    for (const h of ["Größe (Wert)", "Groesse", "Positionsgröße", "Notional", "Position Value", "Wert"]) expect(guessMapping([h]).size, h).toBe(0);
+    for (const h of ["Bewertung", "Auswertung", "Rating"]) expect(guessMapping([h]).size, h).toBe(-1);
+  });
+
+  it("a German file through the assistant: thousands dots and decimal commas become the right numbers", () => {
+    const text = ["Datum;Paar;Richtung;Einstieg;Ausstieg;Größe;Gebühren;Stop", "2026-11-02 10:15;BTC/USDT;long;80.000,5;81.000,5;1.000;1,25;79.500", "2026-11-03 09:00;ETH/USDT;short;3.000;2.940;1.500;0,9;3.060"].join("\n");
+    const table = parseCsv(text);
+    const res = parseWithMapping(table, guessMapping(table.header), { assume: "local", fallbackPair: "BTC/USDT" });
+    expect(res.skipped).toBe(0);
+    expect(res.trades.map((t) => [t.entry, t.exit, t.size, t.fees, t.stop])).toEqual([
+      [80000.5, 81000.5, 1000, 1.25, 79500],
+      [3000, 2940, 1500, 0.9, 3060],
+    ]);
+  });
+
   it("fnv1a is stable", () => {
     expect(fnv1a("abc")).toBe("1a47e90b");
   });

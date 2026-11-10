@@ -15,7 +15,7 @@ import { ORDER_QUERY } from "@/store/returnTo";
 import { pushToast } from "@/store/uiStore";
 import { KEYS } from "@/store/storage";
 import { ApiError, apiFetch, setAccessTokenProvider } from "./api";
-import { authErrorCodeOf, authErrorText, type AuthErrorText } from "./authErrors";
+import { AUTH_LINK_UNUSABLE, authErrorCodeOf, authErrorText, type AuthErrorText } from "./authErrors";
 import { readCallback, takeBootFragmentError } from "./callbackUrl";
 import { cloudConfig, type OAuthProvider } from "./env";
 import { primeOpsFlags } from "./flags";
@@ -164,12 +164,15 @@ export function initClient(): Promise<void> {
       return null;
     });
     const { error } = cleanCallbackUrl();
-    if (error) {
-      // an expired or foreign link (AUTH-05): not only a toast – the sheet opens on a sign-in with the reason and the way on (a new link)
-      pushToast({ kind: "error", title: "Anmeldung nicht möglich", detail: error.message });
+    // a link that brought a code but no session and no error: the code could not be exchanged (the session restore above has waited
+    // for the exchange) – that is said too, with the same way on
+    const reason = error?.message ?? (arrivedByLink && !session ? AUTH_LINK_UNUSABLE : null);
+    if (reason) {
+      // an expired, used or foreign link (AUTH-05): not only a toast – the sheet opens on a sign-in with the reason and the way on (a new link)
+      pushToast({ kind: "error", title: "Anmeldung nicht möglich", detail: reason });
       openAuthSheet("magic", "callback");
       const cur = useCloudSession.getState().sheet;
-      useCloudSession.setState({ sheet: { ...cur, notice: error.message } });
+      useCloudSession.setState({ sheet: { ...cur, notice: reason } });
       arrivedByLink = false;
     }
     if (session) {

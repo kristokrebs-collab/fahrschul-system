@@ -126,7 +126,7 @@ export const DETAIL = {
   unlimited: "unbegrenzt",
   perDay: "pro Tag",
   perMonth: "pro Monat",
-  honest: "Alles hier steht so im Tarifvertrag der App (docs/TARIFE.md). Zahlen, die dort nicht stehen, gibt es nicht.",
+  honest: "Alles hier steht so im Tarifvertrag der App, derselben Quelle wie der Vergleich auf der Preisseite. Zahlen, die dort nicht stehen, gibt es nicht.",
 } as const;
 
 export const RESULT = {

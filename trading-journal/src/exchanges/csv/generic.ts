@@ -3,7 +3,7 @@
  * what (pre-filled by a guess from the header), the preview shows the result at once.
  */
 import type { CsvTrade, ParseResult } from "./model";
-import { cell, normalizePair, parseNum, parseSide, parseTime, type CsvTable } from "./parse";
+import { cell, normalizePair, numberStyle, parseNum, parseSide, parseTime, type CsvTable } from "./parse";
 import { isInverseContract, noRejections, reject, rejectionWarnings } from "./scope";
 
 export const MAP_FIELDS = ["date", "exitDate", "pair", "side", "entry", "exit", "qty", "size", "fees", "pnl", "stop", "target", "leverage", "bot"] as const;
@@ -40,7 +40,9 @@ const GUESS: Readonly<Record<MapField, RegExp[]>> = {
   entry: [/(entry|open|einstieg).*price|^entry$|einstieg/i, /^price$/i],
   exit: [/(exit|close|ausstieg).*price|^exit$|ausstieg/i],
   qty: [/^(qty|quantity|menge|amount|volume|contracts|size)$/i],
-  size: [/notional|value|wert|position value/i],
+  // "Größe" is the journal's own word for the position value (its CSV export). The old loose `wert` matched „Be-wert-ung“ (the rating
+  // column of that export) and never „Größe“ (QA Runde 13): whole-word matches first, then the unambiguous compounds.
+  size: [/^(gr(ö|oe)(ß|ss)e|positionsgr(ö|oe)(ß|ss)e|positionswert|notional|wert|value)(\s*\(.*\))?$/i, /notional|position.?value|positionswert/i],
   fees: [/fee|gebühr|commission/i],
   pnl: [/net.*p(n|&)l|realized.*p(n|&)l|^p(n|&)l|profit|gewinn/i],
   stop: [/^(stop|sl|s ?\/ ?l|stop.?loss)$/i],
@@ -75,7 +77,13 @@ export interface GenericOptions {
 
 /** Rows → trades with the trader's mapping. */
 export function parseWithMapping(t: CsvTable, m: ColumnMapping, opts: GenericOptions): ParseResult {
-  const decimalComma = t.delimiter === ";";
+  // the file's own number convention, read from every mapped number column (fallback for the comma: a semicolon file is German)
+  const numCols = (["entry", "exit", "qty", "size", "fees", "pnl", "stop", "target", "leverage"] as const).map((f) => m[f]).filter((i) => i >= 0);
+  const style = numberStyle(
+    t.rows.flatMap((r) => numCols.map((i) => cell(r, i))),
+    t.delimiter === ";",
+  );
+  const num = (raw: string): number | null => parseNum(raw, style.decimalComma, style.dotThousands);
   const out: CsvTrade[] = [];
   const rej = noRejections();
   let skipped = 0;
@@ -83,14 +91,14 @@ export function parseWithMapping(t: CsvTable, m: ColumnMapping, opts: GenericOpt
     // F42: a pair that is spelled like a Coin-M contract (BTCUSD_PERP, BTC-USD-SWAP) is not read as a linear one
     if (isInverseContract("any", cell(r, m.pair))) return reject(rej, "inverse", cell(r, m.pair));
     const side = parseSide(cell(r, m.side));
-    const entry = parseNum(cell(r, m.entry), decimalComma);
+    const entry = num(cell(r, m.entry));
     const openedAt = parseTime(cell(r, m.date), { assume: opts.assume });
     if (!side || !entry || openedAt === null) {
       skipped++;
       return;
     }
     const closedAt = parseTime(cell(r, m.exitDate), { assume: opts.assume });
-    const exit = parseNum(cell(r, m.exit), decimalComma);
+    const exit = num(cell(r, m.exit));
     const pairRaw = cell(r, m.pair);
     out.push({
       key: `${pairRaw}|${openedAt}|${side}|${entry}|${exit ?? ""}`,
@@ -101,16 +109,16 @@ export function parseWithMapping(t: CsvTable, m: ColumnMapping, opts: GenericOpt
       closedAt: closedAt ?? (exit ? openedAt : null),
       entry,
       exit,
-      qty: parseNum(cell(r, m.qty), decimalComma),
-      size: parseNum(cell(r, m.size), decimalComma),
+      qty: num(cell(r, m.qty)),
+      size: num(cell(r, m.size)),
       fees: (() => {
-        const f = parseNum(cell(r, m.fees), decimalComma);
+        const f = num(cell(r, m.fees));
         return f === null ? null : Math.abs(f);
       })(),
-      pnl: parseNum(cell(r, m.pnl), decimalComma),
-      stop: parseNum(cell(r, m.stop), decimalComma),
-      target: parseNum(cell(r, m.target), decimalComma),
-      leverage: parseNum(cell(r, m.leverage), decimalComma),
+      pnl: num(cell(r, m.pnl)),
+      stop: num(cell(r, m.stop)),
+      target: num(cell(r, m.target)),
+      leverage: num(cell(r, m.leverage)),
       ...(cell(r, m.bot ?? -1) ? { bot: cell(r, m.bot ?? -1).slice(0, 40) } : null),
     });
   });

@@ -2,7 +2,8 @@
  * CSV basics for the exchange importers (P11) – pure, no DOM.
  * - `parseCsv`: RFC-4180-ish tokenizer (quotes, doubled quotes, CR/LF, BOM), delimiter detected from the header line
  *   (`,` `;` tab `|`), duplicate header names get `_2`, `_3` (MT4/5 reports repeat "Time" / "Price").
- * - `parseNum`: "1,234.56", "1.234,56", "−12,5 USDT", "(3.10)", "12%", "1e-4" → number.
+ * - `parseNum`: "1,234.56", "1.234,56", "−12,5 USDT", "(3.10)", "12%", "1e-4" → number; `numberStyle`: the file's own convention
+ *   (German "1.000" = 1000 only when the file shows a decimal comma elsewhere).
  * - `parseTime`: ISO, "2026-10-05 07:30:12", "05.10.2026 09:30", "10/05/2026 07:30", "20261005;093012", epoch s / ms →
  *   epoch ms (UTC unless the string carries a zone or `assume: "local"`).
  * - `toWallClock`: epoch ms → the journal's local wall clock `YYYY-MM-DDTHH:mm` (this browser's zone).
@@ -122,11 +123,68 @@ export function findCol(header: readonly string[], ...patterns: RegExp[]): numbe
 
 export const cell = (row: readonly string[], i: number): string => (i >= 0 ? (row[i] ?? "").trim() : "");
 
+/** How a file writes its numbers (read from the cells themselves, `numberStyle`). */
+export interface NumberStyle {
+  /** a lone `,` is the decimal separator */
+  decimalComma: boolean;
+  /** a lone `.` in strict groups of three ("1.000", "79.500") separates thousands – German notation */
+  dotThousands: boolean;
+}
+
+const cleanNum = (raw: string): string =>
+  raw
+    .trim()
+    .replace(/^\((.*)\)$/, "$1")
+    .replace(/[\u2212\u2013]/g, "-")
+    .replace(/[\s\u00a0']/g, "")
+    .replace(/[A-Za-z$€£%]+$/g, "")
+    .replace(/^[A-Za-z$€£]+/g, "");
+
+/**
+ * The number convention of a file, decided by evidence in its numeric cells – not by the delimiter alone (QA Runde 13: a German file
+ * with "80.000,5" and "1.000" had its "1.000" read as 1). German evidence: a decimal comma that cannot be a thousands comma
+ * ("80.000,5", "1,25", "0,5") or several dots ("1.234.567"). English evidence: a decimal dot that cannot be a thousands dot
+ * ("81230.5", "0.25", "1,234.56"). Only German evidence → decimal comma AND dots in groups of three are thousands. Only English →
+ * decimal dot. Both or neither (integers, or only the ambiguous "1.500") → the fallback for the comma, dots stay decimal (as before).
+ */
+export function numberStyle(cells: Iterable<string>, fallbackDecimalComma = false): NumberStyle {
+  let german = false;
+  let english = false;
+  for (const raw of cells) {
+    const s = cleanNum(raw).replace(/^-/, "");
+    if (!s || !/^[\d.,]+$/.test(s)) continue;
+    const dot = s.lastIndexOf(".");
+    const comma = s.lastIndexOf(",");
+    const dots = s.split(".").length - 1;
+    const commas = s.split(",").length - 1;
+    if (comma >= 0 && dot >= 0) {
+      if (comma > dot) german = true;
+      else english = true;
+    } else if (comma >= 0) {
+      const decimals = s.length - comma - 1;
+      if (commas === 1 && (decimals !== 3 || /^0+$/.test(s.slice(0, comma)))) german = true;
+      else if (commas > 1) english = true; // "1,234,567"
+    } else if (dot >= 0) {
+      const decimals = s.length - dot - 1;
+      if (dots > 1) german = true; // "1.234.567"
+      else if (decimals !== 3 || /^0+$/.test(s.slice(0, dot))) english = true;
+    }
+  }
+  if (german && !english) return { decimalComma: true, dotThousands: true };
+  if (english && !german) return { decimalComma: false, dotThousands: false };
+  return { decimalComma: fallbackDecimalComma, dotThousands: false };
+}
+
+/** "1.000", "79.500", "1.234.567": dots in strict groups of three after a leading group that is not zero. */
+const DOT_GROUPS = /^-?[1-9]\d{0,2}(\.\d{3})+$/;
+
 /**
  * Number from an export cell. Decimal separator: the LAST of `.` / `,` when both occur; a lone `,` is decimal when
- * `decimalComma` (semicolon files, German exports) or when it is followed by 1–2 digits only… else thousands.
+ * `decimalComma` (semicolon files, German exports) or when it is followed by 1–2 digits only… else thousands. A lone `.` is decimal,
+ * except: several dots in groups of three are always thousands ("1.234.567" has no other reading), and ONE dot before exactly three
+ * digits is thousands when the file is known to be German (`dotThousands`, from `numberStyle`).
  */
-export function parseNum(raw: string, decimalComma = false): number | null {
+export function parseNum(raw: string, decimalComma = false, dotThousands = false): number | null {
   let s = raw.trim();
   if (!s || s === "-" || s === "–" || s === "--") return null;
   let neg = false;
@@ -146,6 +204,8 @@ export function parseNum(raw: string, decimalComma = false): number | null {
     const commas = s.split(",").length - 1;
     const zeroInt = /^-?0$/.test(s.slice(0, lastComma));
     s = decimalComma || zeroInt || (commas === 1 && decimals !== 3) ? s.replace(",", ".") : s.replace(/,/g, "");
+  } else if (lastDot >= 0 && DOT_GROUPS.test(s) && (dotThousands || s.split(".").length > 2)) {
+    s = s.replace(/\./g, "");
   }
   const n = Number(s);
   if (!Number.isFinite(n)) return null;

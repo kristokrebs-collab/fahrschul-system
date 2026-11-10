@@ -201,6 +201,16 @@ describe("the 'mail sent' step: resend with a wait and the server's limit", () =
     expect(screen.getByLabelText("E-Mail")).toBeInTheDocument();
   });
 
+  it("„Passwort vergessen?“ takes the typed e-mail along", async () => {
+    openAuthSheet("signin", "card");
+    mount();
+    await dialog();
+    fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: "  ich@example.com " } });
+    fireEvent.click(screen.getByTestId("auth-forgot"));
+    await waitFor(() => expect(useCloudSession.getState().sheet).toMatchObject({ view: "reset", email: "ich@example.com" }));
+    await waitFor(() => expect(screen.getByLabelText("E-Mail")).toHaveValue("ich@example.com"));
+  });
+
   it("without a notice the magic-link form keeps its lead", async () => {
     openAuthSheet("magic", "card");
     mount();

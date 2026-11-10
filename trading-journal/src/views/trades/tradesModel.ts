@@ -12,6 +12,15 @@ import { pairKey } from "@/domain/grouping";
 /** Sentinel of the `Entscheidungsgrundlage` select: trades without any known setup. */
 export const NO_SETUP = "__none";
 
+/**
+ * A Grundlage filter that names a Grundlage which no longer exists (it was deleted while the filter was set): the list still showed
+ * the trades that carry the dead id – „6 Trades“, all „ohne Grundlage“ – under a dropdown that read „–“ and a view called „Alle
+ * Trades“, until a reload (QA Runde 13). Such a filter is no filter.
+ */
+export function staleSetupFilter(setup: string, setups: readonly { id: string }[]): boolean {
+  return setup !== "all" && setup !== NO_SETUP && !setups.some((s) => s.id === setup);
+}
+
 /** First setup (settings order) referenced by the trade, or `"~"` for unassigned trades (bundle `f`; note ICU sorts `~` before letters). */
 export function setupNameOf(t: Pick<EnrichedTrade, "setups">, setups: readonly Setup[]): string {
   return setups.find((s) => (t.setups || []).includes(s.id))?.name || "~";

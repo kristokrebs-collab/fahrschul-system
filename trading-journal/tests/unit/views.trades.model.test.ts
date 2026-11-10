@@ -111,3 +111,16 @@ describe("tradesModel search suggestions", () => {
     expect(new Set(out.map((o) => o.value)).size).toBe(out.length);
   });
 });
+
+describe("a filter on a Grundlage that no longer exists (QA Runde 13)", () => {
+  it("is stale – but „alle“, „ohne Grundlage“ and an existing Grundlage are not", async () => {
+    const { staleSetupFilter, NO_SETUP } = await import("@/views/trades/tradesModel");
+    const setups = [{ id: "s_a" }, { id: "s_b" }];
+    expect(staleSetupFilter("s_gone", setups)).toBe(true);
+    expect(staleSetupFilter("s_a", setups)).toBe(false);
+    expect(staleSetupFilter("all", setups)).toBe(false);
+    expect(staleSetupFilter(NO_SETUP, setups)).toBe(false);
+    expect(staleSetupFilter("s_a", [])).toBe(true);
+  });
+});
+

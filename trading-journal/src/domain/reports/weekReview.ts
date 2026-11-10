@@ -117,7 +117,7 @@ export function weekReview(input: WeekReviewInput): WeekReview {
   const gl = r.goals;
   const discLines: string[] = [];
   discLines.push(`Disziplin Ø ${gl.discipline == null ? "–" : Math.round(gl.discipline)}${gl.streak ? `, ${gl.streak} ${gl.streak === 1 ? "Tag" : "Tage"} in Folge gut` : ""}.`);
-  discLines.push(`${gl.ruleBreaks} Regelverstoß${gl.ruleBreaks === 1 ? "" : "e"}${r.risk.dayBreaches ? `, ${r.risk.dayBreaches} Tag${r.risk.dayBreaches === 1 ? "" : "e"} über dem Tageslimit` : ""}; ${flagged.size} Trade${flagged.size === 1 ? "" : "s"} mit einem Verhaltensmuster.`);
+  discLines.push(`${gl.ruleBreaks} ${gl.ruleBreaks === 1 ? "Regelverstoß" : "Regelverstöße"}${r.risk.dayBreaches ? `, ${r.risk.dayBreaches} Tag${r.risk.dayBreaches === 1 ? "" : "e"} über dem Tageslimit` : ""}; ${flagged.size} Trade${flagged.size === 1 ? "" : "s"} mit einem Verhaltensmuster.`);
   if (r.psychology.planRate != null) discLines.push(`Plan befolgt bei ${pct0(r.psychology.planRate)} der Trades mit Angabe.`);
   const discEv: EvidenceGroup[] = [];
   if (broke.length) discEv.push(group("Regelverstöße", broke));
@@ -126,7 +126,7 @@ export function weekReview(input: WeekReviewInput): WeekReview {
   findings.push({
     id: "discipline",
     title: "Disziplin",
-    headline: gl.discipline == null ? "Keine Disziplin-Daten" : gl.ruleBreaks === 0 && !flagged.size ? "Keine Regelverstöße, keine Muster" : `${gl.ruleBreaks} Regelverstoß${gl.ruleBreaks === 1 ? "" : "e"}, ${flagged.size} Muster`,
+    headline: gl.discipline == null ? "Keine Disziplin-Daten" : gl.ruleBreaks === 0 && !flagged.size ? "Keine Regelverstöße, keine Muster" : `${gl.ruleBreaks} ${gl.ruleBreaks === 1 ? "Regelverstoß" : "Regelverstöße"}, ${flagged.size} Muster`,
     lines: discLines,
     tone: gl.ruleBreaks > 0 || flagged.size > 0 ? "loss" : gl.discipline != null && gl.discipline >= 70 ? "win" : "fg",
     n,

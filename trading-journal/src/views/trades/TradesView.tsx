@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, type TargetAndTransition, type Transition } from "motion/react";
-import { useCallback, useDeferredValue, useMemo, type ReactNode } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, type ReactNode } from "react";
 import { FeatureLinks } from "@/app/FeatureLinks";
 import { aggregate } from "@/domain/agg";
 import { EMOTIONS } from "@/domain/defaults";
@@ -18,7 +18,7 @@ import { KpiStrip } from "./KpiStrip";
 import { TradeFilters } from "./TradeFilters";
 import { TradesCards } from "./TradesCards";
 import { TradesTable } from "./TradesTable";
-import { filterExtra, filterTrades, listKey, mistakeFilterTags, mistakesOf, rowsKey, searchSuggestions, signalOf, sortTrades } from "./tradesModel";
+import { filterExtra, filterTrades, listKey, mistakeFilterTags, mistakesOf, rowsKey, searchSuggestions, signalOf, sortTrades, staleSetupFilter } from "./tradesModel";
 
 export interface TradesViewProps {
   /** Override of the `Trade eintragen` CTA (default: `useUi().openEditor()`). */
@@ -63,6 +63,11 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   const deferredQ = useDeferredValue(liveFilter.q);
   const filter = useMemo(() => (deferredQ === liveFilter.q ? liveFilter : { ...liveFilter, q: deferredQ }), [liveFilter, deferredQ]);
   const setTradeFilter = useUi((s) => s.setTradeFilter);
+  // a filter on a Grundlage that was deleted meanwhile is dropped (only once the journal is loaded: before, the list of setups is empty)
+  const journalLoaded = useJournal((s) => s.loaded);
+  useEffect(() => {
+    if (journalLoaded && staleSetupFilter(liveFilter.setup, settings.setups)) setTradeFilter({ setup: "all" });
+  }, [journalLoaded, liveFilter.setup, settings.setups, setTradeFilter]);
   const extra = useUi((s) => s.tradeExtra);
   const setTradeExtra = useUi((s) => s.setTradeExtra);
   const resetTradeFilter = useUi((s) => s.resetTradeFilter);

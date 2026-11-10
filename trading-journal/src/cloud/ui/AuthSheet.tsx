@@ -311,7 +311,10 @@ function SignInForm({ mode, titleId }: { mode: "signin" | "magic"; titleId: stri
           <span id={rememberHint} className="sr-only">
             {AUTH.card.rememberHint}
           </span>
-          <CardLink onClick={() => setAuthView("reset")}>{AUTH.forgot}</CardLink>
+          {/* the address typed here goes along (it was dropped: the reset form opened empty, QA Runde 13) */}
+          <CardLink onClick={() => setAuthView("reset", { email: email.trim() })} testId="auth-forgot">
+            {AUTH.forgot}
+          </CardLink>
         </div>
       ) : (
         <span className="aw-abs" style={at(A_ROWS.line)} data-aw-row="" aria-hidden="true" />

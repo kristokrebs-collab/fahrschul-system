@@ -196,6 +196,32 @@ describe("store flows", () => {
     expect(purchaseOpenOf(CONFIG, "open")).toEqual({ open: true, blockedBy: [] });
   });
 
+  it("an order asked for while the configuration is still loading waits for it – no false „Zahlungen noch nicht eingerichtet“ (QA Runde 13)", async () => {
+    signIn();
+    const toastsBefore = useUi.getState().toasts.length;
+    // right after the sign-in: nothing loaded yet
+    useBilling.setState({ config: null, configState: "loading", order: { open: false, draft: null, loaded: false, openedAt: 0 } });
+    requestOrder({ plan: "premium", interval: "year" });
+    expect(useBilling.getState().order.open).toBe(false);
+    expect(useUi.getState().toasts).toHaveLength(toastsBefore); // nothing is claimed about Stripe
+    // the server answers: payments are open → the order window opens with exactly this choice
+    act(() => useBilling.setState({ config: CONFIG, configState: "ready" }));
+    await waitFor(() => expect(useBilling.getState().order).toMatchObject({ open: true, draft: { plan: "premium", interval: "year", seats: 1 } }));
+    expect(useUi.getState().toasts).toHaveLength(toastsBefore);
+  });
+
+  it("… and when the answer says payments are closed, the honest toast comes then (once), not before", async () => {
+    signIn();
+    const toastsBefore = useUi.getState().toasts.length;
+    useBilling.setState({ config: null, configState: "loading", order: { open: false, draft: null, loaded: false, openedAt: 0 } });
+    requestOrder({ plan: "pro", interval: "month" });
+    expect(useUi.getState().toasts).toHaveLength(toastsBefore);
+    act(() => useBilling.setState({ config: { ...CONFIG, purchaseOpen: false, purchaseBlockedBy: ["legal" as const] }, configState: "ready" }));
+    await waitFor(() => expect(useUi.getState().toasts).toHaveLength(toastsBefore + 1));
+    expect(useUi.getState().toasts.at(-1)).toMatchObject({ kind: "info", title: "Zahlungen noch nicht eingerichtet" });
+    expect(useBilling.getState().order.open).toBe(false);
+  });
+
   it("an order signed in opens the order sheet with exactly the choice (Team seats clamped)", () => {
     signIn();
     useBilling.setState({ config: CONFIG });

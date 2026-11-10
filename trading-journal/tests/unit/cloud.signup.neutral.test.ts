@@ -12,7 +12,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { authErrorCodeOf, authErrorText, AUTH_NEUTRAL } from "@/cloud/authErrors";
+import { readFileSync } from "node:fs";
+import { authErrorCodeOf, authErrorText, AUTH_LINK_UNUSABLE, AUTH_NEUTRAL } from "@/cloud/authErrors";
 import { redirectUrl, resendConfirmation, sendMagicLink, sendPasswordReset, setClientForTests, signUp } from "@/cloud/client";
 import { captureOrderQuery, clearReturnTo, ORDER_QUERY, pendingOrderParam, peekReturnTo } from "@/store/returnTo";
 
@@ -72,6 +73,15 @@ describe("AUTH-03: registration never says whether an account exists", () => {
     expect(AUTH_NEUTRAL).toMatch(/Wenn die Adresse frei ist.*melde dich an oder setze dein Passwort zurück/);
     // a wrong password and an unknown address are the same sentence (the login never tells which one it was)
     expect(authErrorText({ code: "invalid_credentials" })).toEqual(authErrorText({ message: "Invalid login credentials" }));
+  });
+
+  it("a link whose code cannot be exchanged is answered with a reason and the way on – and says nothing about an account", () => {
+    expect(AUTH_LINK_UNUSABLE).toMatch(/Link konnte nicht eingelöst werden.*Fordere einfach einen neuen an\.$/);
+    expect(AUTH_LINK_UNUSABLE).not.toMatch(/Konto|registriert|existiert|E-Mail/i);
+    const src = readFileSync("src/cloud/client.ts", "utf8");
+    // said only when the page was opened by a link (a code in the address), no session came of it and no error was reported
+    expect(src).toMatch(/const reason = error\?\.message \?\? \(arrivedByLink && !session \? AUTH_LINK_UNUSABLE : null\);/);
+    expect(src).toMatch(/openAuthSheet\("magic", "callback"\);\s*const cur = useCloudSession\.getState\(\)\.sheet;\s*useCloudSession\.setState\(\{ sheet: \{ \.\.\.cur, notice: reason \} \}\);/);
   });
 
   it("the reset and the magic link ask the server and ignore the answer's detail: the same ok for any address", async () => {
