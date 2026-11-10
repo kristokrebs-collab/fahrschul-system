@@ -59,8 +59,30 @@ async function mountEverything(page: Page): Promise<void> {
   await page.waitForTimeout(400);
 }
 
+/**
+ * The pricing hero is a staged entrance of about 4 s (`LaunchGrid`); its last piece, the line with the plan's button or note, fades in
+ * from 3.2 s on. axe skips text at opacity 0 and passes text at rest – but a scan that lands inside that fade measures half-faded text
+ * and reports a contrast the page never rests at (seen on loaded machines: once light, then dark). So the scan waits until that line
+ * and everything around it is at full opacity. Pages without such a stage pass at once.
+ */
+async function stagedEntranceAtRest(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          Array.from(document.querySelectorAll('[data-testid="hero-note"], [data-testid="hero-cta"]')).every((start) => {
+            for (let el: Element | null = start; el && el !== document.body; el = el.parentElement) if (getComputedStyle(el).opacity !== "1") return false;
+            return true;
+          }),
+        ),
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+}
+
 async function expectAccessible(page: Page, key: string): Promise<void> {
   await page.waitForTimeout(900);
+  await stagedEntranceAtRest(page);
   const res = await new AxeBuilder({ page }).include(`[data-page="${key}"][data-page-role="current"]`).withTags(TAGS).analyze();
   const lines = res.violations.map(
     (v) =>
