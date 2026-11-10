@@ -34,6 +34,7 @@ Netlify with scope Functions only.
 |---|---|---|
 | `index.ts` | light barrel | the Wave-0 contract (`isCloudAvailable`, `useCloudUser`, `apiFetch`, `ApiError`, `getAccessToken`, `reportError`, `installErrorReporting`) + session / privacy / sync-status hooks, `ensureCloud`, `signOut` |
 | `env.ts`, `api.ts`, `session.ts`, `privacy.ts`, `report.ts`, `scrub.ts`, `hint.ts`, `idle.ts`, `runtime.ts`, `sync/status.ts` | light (zustand only) | always in the main bundle |
+| `callbackUrl.ts` | first load (through `hint.ts`), no Supabase import | reads a used / failed auth callback out of the address in BOTH shapes Supabase uses (query and fragment). The fragment shape is noted when the module loads – the hash router replaces `#error=…` before the cloud chunk is there; `client.ts` shows the reason in the magic-link form (the way to a new link) |
 | `client.ts` (+ `sync/*`) | **lazy chunk** with `@supabase/supabase-js` | loaded by `ensureCloud()` only when a login is stored, an auth callback is in the URL, or the login sheet opens |
 | `ui/*`, `CloudSyncHost.tsx` | UI | the host loads `AuthSheet` lazily on first open; the Konto page is lazy via `pages.ts` (P14) |
 

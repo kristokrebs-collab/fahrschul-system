@@ -115,7 +115,7 @@ known, so the app now lets the device answer it:
   <Header/>                                HeaderEdge + HeaderTicker; mode pill + AccountPill (P09, renders nothing without cloud)
   <main class="mx-auto max-w-[1320px] px-4 pb-10 pt-6 sm:px-6">
     <LocalModeBanner/>                     mode === "local" && !hideLocalBanner
-    <Banners/>                             P10 BillingBanner (lazy) only when billingActive()
+    <Banners/>                             P10 BillingBanner (lazy) only when billingActive() – `loadChunk` + own widget boundary (K7)
     <motion.div layout="position" layoutDependency={bannerOpen}>
       <Routed/>                            #share/<token> → SharedView (P12, lazy, page boundary) | <Pages/>
     </motion.div>
@@ -124,7 +124,8 @@ known, so the app now lets the device answer it:
   <Detail/> <EditorHost/> <SetupEditorHost/>   each behind its own widget boundary (fallback null), each an `ArmedOverlay` (lazy chunk, see "Budget-Schnitt")
   hosts (P14, leaves after SetupEditor, before Celebrate – each a HostSlot: widget boundary + data-layer):
   <HostSlot Suche/Tastenkürzel/Einführung/Cloud>   GlobalSearchHost, ShortcutHost, OnboardingHost, CloudSyncHost
-  <FeatureHosts/>                          lazy chunk DeferredHosts (table below)
+  <FeatureHosts/>                          lazy chunk DeferredHosts (table below); loaded through `loadChunk` (waits for the network, one retry)
+                                           behind its own widget boundary – a chunk that still cannot be fetched leaves the journal running (K7)
   <Celebrate/> <IntroHost/> <LayerDiagHost/>
 </MorphDialogProvider>
 ```

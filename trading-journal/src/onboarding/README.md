@@ -89,6 +89,9 @@ oben (die bleibt unter Einstellungen › Einführung & Hilfe).
   auf; „Überspringen“ beendet ihn für immer. Pflicht ist nur die eine Entscheidung (Demo oder eigene Daten); die Verbindung hat ihr eigenes „Später verbinden“.
 - **Ehrlich.** Der Konto-Schritt behauptet nichts (E-Mail „bestätigt“ nur, wenn Supabase es sagt; ohne Cloud steht dort, dass es kein Konto gibt); „Verbindung optional – zunächst Demo ausprobieren“
   ist der Leerzustand der Verbindung (auch in der Börsen-Karte unter Konto); die Demo ist die abgegrenzte Beispiel-Sitzung, nicht das Journal.
+- **Bewegung (Runde 13).** Der Wechsel zweier Schritte liest die Richtung im Moment des Wechsels (`STEP_SWAP` + `custom`): vor = der alte Schritt geht nach links, „Zurück“ = nach rechts
+  (vorher verließ er die Bühne in beiden Fällen nach links). Die Stücke eines Schritts steigen im Abstand von 45 ms ein (`wizard.css`, im Lazy-Chunk des Assistenten), „Zurück“ blendet ein und aus.
+  Reduzierte Bewegung: Schritte tauschen ohne Weg.
 - Dateien: `wizardStore.ts` (Zustand + reine Entscheidung, in der Karte und im Anmelde-Blatt geladen), `WizardHost.tsx` (Auslöser), `SetupWizard.tsx` (das Blatt, eigener Chunk). Tests:
   `tests/unit/onboarding.wizard.test.tsx`, `tests/e2e/auth-b.spec.ts`.
 - **Paket P (Verhaltenspsychologie, `docs/PSYCHOLOGIE.md`).** Echter Fortschritt statt Druck: `wizardProgress` zählt die Schritte hinter dir („2 von 4 Schritten durchgegangen“, nie aufgefüllt),
