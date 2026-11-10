@@ -371,6 +371,8 @@ function SignUpForm({ titleId }: { titleId: string }) {
   const ids = useId();
   const emailId = `${ids}-email`;
   const pwId = `${ids}-pw`;
+  const consentId = `${ids}-consent`;
+  const consentMsgId = `${ids}-msg`;
 
   const fail = (e: FieldError) => {
     setErr(e);
@@ -389,6 +391,8 @@ function SignUpForm({ titleId }: { titleId: string }) {
     // registration: the operator's AGB and privacy policy first (Review F07)
     if (consentNeeded && !consent) {
       setConsentMissing(true);
+      // the message stands under the button (the card's layout); the checkbox it is about gets the focus and reads it (QA Runde 13)
+      requestAnimationFrame(() => document.getElementById(consentId)?.focus());
       return setErr(errorOf(null, AUTH_LEGAL.missing));
     }
     if (typeof navigator !== "undefined" && navigator.onLine === false) return setErr(errorOf(null, AUTH.offline));
@@ -447,9 +451,13 @@ function SignUpForm({ titleId }: { titleId: string }) {
         errorKey={err?.field === "password" ? err.key : null}
         top={B_ROWS.field3}
       />
-      <StrengthHint password={password} top={B_ROWS.hint} />
+      {/* the error of the password field stands exactly where this row is: while there is one it takes the row's place – the two
+          lay over each other and said the same twice (QA Runde 13) */}
+      {err?.field !== "password" && <StrengthHint password={password} top={B_ROWS.hint} />}
       {consentNeeded && (
         <ConsentLine
+          inputId={consentId}
+          describedBy={consentMissing ? consentMsgId : undefined}
           checked={consent}
           onChange={(v) => {
             setConsent(v);
@@ -470,7 +478,7 @@ function SignUpForm({ titleId }: { titleId: string }) {
       )}
       <PillButton label={AUTH.submit.signup} busyLabel={AUTH.busy.signup} busy={busy} top={B_ROWS.button} />
       {err && err.field === null && (
-        <p role="alert" className="aw-msg aw-abs" style={at(B_ROWS.error)}>
+        <p role="alert" id={consentMsgId} className="aw-msg aw-abs" style={at(B_ROWS.error)}>
           {err.message}
         </p>
       )}
@@ -662,11 +670,15 @@ function MfaCodeForm({ onLost }: { onLost: () => void }) {
     if (!r || !r.ok) {
       setErr(errorOf("code", r && !r.ok ? r.message : AUTH.unavailable));
       setCode("");
+      // the field was disabled while the code was checked and lost the focus with it: back into the (empty) field, so the next
+      // code can be typed at once – on a phone the keyboard had closed (QA Runde 13)
+      requestAnimationFrame(() => slots.current?.querySelector<HTMLInputElement>("input:not([disabled])")?.focus());
       return;
     }
     setAccepted(true);
     setTimeout(() => setAuthView("welcome"), 450);
   }
+  const slots = useRef<HTMLDivElement>(null);
   return (
     <form
       className="contents"
@@ -679,7 +691,7 @@ function MfaCodeForm({ onLost }: { onLost: () => void }) {
       <p className="aw-lead" data-aw-row="">
         {AUTH.lead.mfa}
       </p>
-      <div data-aw-row="">
+      <div data-aw-row="" ref={slots}>
         <CodeSlots
           value={code}
           onChange={(c) => {

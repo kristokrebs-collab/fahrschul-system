@@ -54,7 +54,8 @@ export function TodayCard({ list, events, plan, cur, now, className }: { list: r
           ].map(([k, v, c]) => (
             <div key={k} className="grid min-w-0 gap-0.5 rounded-xl border border-line bg-ink-950/50 px-2.5 py-2">
               <dt className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-mute">{k}</dt>
-              <dd className={cn("num truncate font-mono text-[14px]", c)}>{v}</dd>
+              {/* a value is never cut („−122 US…“ at 360 px, QA Runde 13): it wraps inside its tile */}
+              <dd className={cn("num font-mono text-[14px]", c)}>{v}</dd>
             </div>
           ))}
         </dl>

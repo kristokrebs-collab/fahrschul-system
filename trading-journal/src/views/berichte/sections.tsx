@@ -198,10 +198,11 @@ export function CompareCard({ report, className }: { report: Report; className?:
             <span role="cell" className="truncate text-mute">
               {r.label}
             </span>
-            <span role="cell" className="num truncate text-right font-mono text-fg">
+            {/* numbers are never cut („+1.248 U…“ on a phone left the reader guessing, QA Runde 13): the unit wraps under the value */}
+            <span role="cell" className="num text-right font-mono text-fg">
               {r.a}
             </span>
-            <span role="cell" className="num truncate text-right font-mono text-mute">
+            <span role="cell" className="num text-right font-mono text-mute">
               {r.b}
             </span>
             <span role="cell" className="num truncate text-right font-mono">

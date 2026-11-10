@@ -995,7 +995,9 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         </motion.div>
       ) : (
         // a new trade on a phone: ONE row – Abbrechen (small) + the two saves in equal columns, an error above them
-        // (P1-12; the 3 buttons wrapped into two rows ≈ 150 px of an 844-px screen). Editing keeps the flex row (it fits).
+        // (P1-12; the 3 buttons wrapped into two rows ≈ 150 px of an 844-px screen). Editing keeps the flex row; on a phone its two
+        // buttons take the same small metrics (`FOOT_SM`): with the wider delete pill „Speichern“ had wrapped alone onto a second
+        // row at 390 and 360 px (QA Runde 13).
         <motion.div key="actions" className={cn("flex w-full flex-wrap items-center gap-2.5", !trade && "max-sm:grid max-sm:grid-cols-[auto_1fr_1fr] max-sm:gap-2")} {...confirmSwapMotion(reduced)}>
       {trade && (
         <span className="flex min-h-10 items-center">
@@ -1045,7 +1047,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           )}
         </AnimatePresence>
       </span>
-      <Button ref={discardTrigger} className={cn("pointer-coarse:min-h-11", !trade && FOOT_SM)} onClick={cancel}>
+      <Button ref={discardTrigger} className={cn("pointer-coarse:min-h-11", FOOT_SM)} onClick={cancel}>
         Abbrechen
       </Button>
       <span className={cn("inline-flex gap-1.5", !trade && "max-sm:contents")}>
@@ -1054,7 +1056,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
             Speichern & neu
           </Button>
         )}
-        <Button ref={saveRef} variant="primary" type="submit" form="trade-form" disabled={saving} aria-busy={saving || undefined} className={cn("min-w-[110px] pointer-coarse:min-h-11", !trade && cn(FOOT_SM, "max-sm:min-w-0"))}>
+        <Button ref={saveRef} variant="primary" type="submit" form="trade-form" disabled={saving} aria-busy={saving || undefined} className={cn("min-w-[110px] pointer-coarse:min-h-11", FOOT_SM, "max-sm:min-w-0")}>
           <TextRoll mode="roll" text={saving ? "Speichert …" : "Speichern"} />
         </Button>
       </span>

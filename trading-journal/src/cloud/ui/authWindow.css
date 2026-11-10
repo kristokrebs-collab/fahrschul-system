@@ -537,6 +537,11 @@ button.aw-ficon:focus-visible {
   position: relative;
   flex: none;
 }
+/* a step's field with an error keeps room for its message: it hung 0.8cqh under the field into the next row and lay half under the
+   button („Die Passwörter stimmen nicht überein.“ in the new-password step, QA Runde 13) */
+.aw-step .aw-field[data-invalid] {
+  margin-bottom: max(18px, 3cqh);
+}
 .aw-step .aw-btn {
   flex: none;
   min-height: 48px;

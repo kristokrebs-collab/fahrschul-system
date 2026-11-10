@@ -4,7 +4,11 @@
 
 /* Frosted glass from the existing tokens (Runde 11): light from the top (`--gl-hi`), edges and shade in the ink of the theme (`--gl-ink` / `--gl-lo`). The plan's motion
    profile (`motion/tier.ts`) sets `--mt-d`: 0 calm (Free), 1 more depth (Pro), 1.6 (Premium, Team). Light mode: slate edges and shade instead of white ones. */
-:root {
+/* The second selector: the ink islands of the LIGHT mode (themes.css „dark islands“: intro stage, full-screen navigation, the overview
+   hero, `[data-theme-scope="dark"]`) keep the DARK glass. Without it the light plate (white face) sat inside the dark hero under the
+   island's light text – the selected account tab of the Übersicht was unreadable in light mode (QA Runde 13). */
+:root,
+:root[data-theme="light"] :is([data-intro-stage], [data-layer="Navigation (Vollbild)"], :has(> [data-hero-backdrop]), [data-theme-scope="dark"]) {
   --gl-hi: 255 255 255;
   --gl-ink: 255 255 255;
   --gl-lo: 0 0 0;

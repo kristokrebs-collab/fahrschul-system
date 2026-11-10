@@ -49,7 +49,8 @@ export function StreakBadge({ streak: s, index = 0, badgeRef }: StreakBadgeProps
         <span className="label !text-[10px] truncate">{s.label}</span>
         {live ? <PulseDot tone="win" rings={2} size={6} /> : <span aria-hidden="true" className="size-1.5 rounded-full bg-white/15" />}
       </div>
-      <div className="flex items-baseline gap-1.5">
+      {/* `flex-wrap`: on a 360-px phone count + „Rekord“ + flame were 15 px wider than the tile and the flame lay on the next tile */}
+      <div className="flex flex-wrap items-baseline gap-1.5">
         <RollingDigits value={s.current} className={cn("dot-num text-[38px] leading-none", live ? "text-fg" : "text-faint")} aria-label={`${s.label}: ${s.current} ${s.unit}`} />
         {record && <span className="rounded-full border border-signal/50 px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wider text-signal">Rekord</span>}
         {/* rich page: a running streak carries a small flickering flame (33 px – inside the 38 px of the count) */}

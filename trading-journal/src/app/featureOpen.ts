@@ -53,8 +53,28 @@ export const ALIGN_HOLD_MS = 7000;
 /** The "So geht's" note closes by itself after this long (ms); a note that explains a missing card stays. */
 export const PATH_NOTE_MS = 12_000;
 
-const headingStart = (heading: string) => (layer: Element): HTMLElement | null =>
-  Array.from(layer.querySelectorAll<HTMLElement>("h2, h3")).find((h) => (h.textContent ?? "").replace(/\s+/g, " ").trim().startsWith(heading)) ?? null;
+/**
+ * The card heading that IS `heading` or begins with it as a whole word („Daten“, „Daten · lokal“) – never a longer word that merely
+ * starts the same way: „Daten“ found „Datenarchiv“ while the „Daten“ card of the settings page was not mounted yet, and „Backup“
+ * landed on the wrong card (QA Runde 13). The exact heading wins over a prefix.
+ */
+export function headingMatch(text: string, heading: string): "exact" | "prefix" | null {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t === heading) return "exact";
+  if (!t.startsWith(heading)) return null;
+  // the next character ends the word (space, punctuation, a symbol) – a letter or digit continues it
+  return /[\p{L}\p{N}]/u.test(t.charAt(heading.length)) ? null : "prefix";
+}
+
+const headingStart = (heading: string) => (layer: Element): HTMLElement | null => {
+  let prefix: HTMLElement | null = null;
+  for (const h of Array.from(layer.querySelectorAll<HTMLElement>("h2, h3"))) {
+    const m = headingMatch(h.textContent ?? "", heading);
+    if (m === "exact") return h;
+    if (m === "prefix") prefix ??= h;
+  }
+  return prefix;
+};
 
 /** The element of an anchor inside a page layer: the test id first, else the card heading. */
 export function findAnchor(layer: Element, a: FeatureAnchor): HTMLElement | null {

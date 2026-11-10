@@ -73,9 +73,11 @@ export function BillingCard({ className }: { className?: string }) {
                     key={inv.id}
                     className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5 text-[13px]"
                   >
-                    <span className="min-w-0 flex-1">
+                    {/* number + date keep room for the date (`min-w-[110px]`): on a 360-px phone the cell was squeezed to „DEM…“ and
+                        the date ran under the amount (QA Runde 13) – now the amount, badge and links wrap to the next line instead */}
+                    <span className="min-w-[110px] flex-1">
                       <span className="block truncate font-mono text-fg">{inv.number ?? inv.id}</span>
-                      <span className="text-[12px] text-faint">{formatDay(inv.created)}</span>
+                      <span className="block truncate text-[12px] text-faint">{formatDay(inv.created)}</span>
                     </span>
                     <span className="num font-mono">{formatMoney(inv.total, inv.currency)}</span>
                     <Badge tone={inv.status === "paid" ? "win" : inv.status === "open" ? "warn" : "mute"}>

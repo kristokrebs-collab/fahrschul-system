@@ -149,12 +149,31 @@ export function CheckBox({ checked, onChange, label, describedBy, testId }: { ch
 }
 
 /** The consent line at registration (a real checkbox; the documents are links that never toggle it). */
-export function ConsentLine({ checked, onChange, invalid, children, top }: { checked: boolean; onChange: (v: boolean) => void; invalid?: boolean; children: ReactNode; top?: number }) {
-  const id = `${useId()}-consent`;
+export function ConsentLine({
+  checked,
+  onChange,
+  invalid,
+  children,
+  top,
+  inputId,
+  describedBy,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  invalid?: boolean;
+  children: ReactNode;
+  top?: number;
+  /** id of the checkbox (so the form can move the focus to it when the consent is missing) */
+  inputId?: string;
+  /** id of the message that says what is missing – read with the checkbox while it is invalid */
+  describedBy?: string;
+}) {
+  const own = `${useId()}-consent`;
+  const id = inputId ?? own;
   return (
     <div className={`aw-consent ${top === undefined ? "" : "aw-abs"}`} style={at(top)} data-aw-row="" data-invalid={invalid && !checked ? "" : undefined} data-testid="signup-consent" data-checked={checked ? "true" : "false"}>
       <span className="aw-check" style={{ minHeight: 0 }}>
-        <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-invalid={invalid && !checked ? true : undefined} />
+        <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-invalid={invalid && !checked ? true : undefined} aria-describedby={invalid && !checked ? describedBy : undefined} />
         <span className="aw-box" aria-hidden="true">
           <Tick />
         </span>
