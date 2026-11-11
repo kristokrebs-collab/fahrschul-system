@@ -228,7 +228,7 @@ function disciplineToDraft(s: Settings): Pick<SettingsDraft, (typeof DISCIPLINE_
   return { dlTrade: pctInput(l.maxLossTradePct), dlDay: pctInput(l.maxLossDayPct), dlMakro: toInputString(l.maxTrades.makro), dlScalp: toInputString(l.maxTrades.scalp) };
 }
 
-export type DraftResult = { ok: true; settings: Settings } | { ok: false; error: "numeric"; field: DraftTextKey };
+export type DraftResult = { ok: true; settings: Settings } | { ok: false; error: "numeric" | "negative"; field: DraftTextKey };
 
 const clampInt = (v: number, lo: number, hi = Infinity): number => Math.min(hi, Math.max(lo, Math.round(v)));
 const clampNum = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
@@ -247,6 +247,9 @@ export function draftToSettings(d: SettingsDraft, base: Settings): DraftResult {
     if (v == null) return { ok: false, error: "numeric", field: k };
     nums[k] = v;
   }
+  // a starting capital below zero is no capital: every percentage of the journal divides by it (a Makro capital of −6.000 was saved,
+  // the overview then read „Startkapital −1.000 USDT“, „−110,8 %“ – Funktionsprüfung Runde 14). Zero stays allowed (an account not in use).
+  for (const k of ["makro", "scalp"] as const) if ((nums[k] ?? 0) < 0) return { ok: false, error: "negative", field: k };
   const saved = settingsToDraft(base);
 
   let signals: unknown = base.signals;

@@ -160,5 +160,14 @@ export function adaptiveBenchmark(closed: readonly EnrichedTrade[], start: numbe
   const current = rets[rets.length - 1]!;
   const earlier = rets.slice(0, -1);
   const below = earlier.filter((r) => r <= current).length;
-  return { current, percentile: below / earlier.length, windows: earlier.length, window, best: Math.max(...earlier), worst: Math.min(...earlier) };
+  // a loop, not `Math.max(...earlier)`: one value per calendar day since the first trade – a trade dated in the year 26 (a two-digit
+  // year typed into the date field) made that 700 000 arguments, „Maximum call stack size exceeded“, and the Analyse page stayed down
+  // until the date was corrected (Funktionsprüfung Runde 14)
+  let best = -Infinity;
+  let worst = Infinity;
+  for (const r of earlier) {
+    if (r > best) best = r;
+    if (r < worst) worst = r;
+  }
+  return { current, percentile: below / earlier.length, windows: earlier.length, window, best, worst };
 }

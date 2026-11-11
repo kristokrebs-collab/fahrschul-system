@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { Profiler } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MotionRoot } from "@/motion/MotionRoot";
-import { SAVE_BUSY_DELAY_MS, TradeEditor, defaultForm, livePriceInput, resetForNext, toRecord, validateRecord, type TradeRecord } from "@/overlays/TradeEditor";
+import { SAVE_BUSY_DELAY_MS, TradeEditor, defaultForm, invalidFieldOf, livePriceInput, plausibleTradeDate, resetForNext, toRecord, validateRecord, type TradeRecord } from "@/overlays/TradeEditor";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { SAMPLE, settings } from "./domain.fixtures";
@@ -49,6 +49,31 @@ describe("TradeEditor – pure helpers", () => {
     expect(validateRecord(toRecord({ ...base.d, entry: "80000", pnlManual: "12,5" }, base.t), "")).toBeNull();
     expect(validateRecord(toRecord({ ...base.d, entry: "80000" }, { ...base.t, status: "open" }), "")).toBeNull();
     expect(validateRecord(toRecord({ ...base.d, entry: "80000", pnlManual: "1", chart: "tradingview.com/x" }, base.t), "tradingview.com/x")).toBe("Der Chart-Link muss mit https:// beginnen.");
+  });
+  it("a year nobody traded in is refused (\"26\" typed as the year reads as the year 26 and took the Analyse page down), a real one is not", () => {
+    const base = defaultForm(settings(), "scalp");
+    const ok = { ...base.d, entry: "80000", pnlManual: "1" };
+    const range = "Bitte das Datum prüfen: Das Jahr liegt außerhalb des plausiblen Bereichs (vierstellig eingeben, z. B. 2026).";
+    expect(validateRecord(toRecord({ ...ok, date: "0026-11-10T09:00" }, base.t), "")).toBe(range);
+    expect(validateRecord(toRecord({ ...ok, date: "1900-01-01T09:00" }, base.t), "")).toBe(range);
+    expect(validateRecord(toRecord({ ...ok, date: "2099-01-01T09:00" }, base.t), "")).toBe(range);
+    expect(validateRecord(toRecord({ ...ok, date: "2019-03-01T09:00" }, base.t), "")).toBeNull();
+    const now = Date.UTC(2026, 10, 11);
+    expect(plausibleTradeDate("2026-11-10T09:00", now)).toBe(true);
+    expect(plausibleTradeDate("2027-12-31T23:59", now)).toBe(true); // a device clock that is off by months is no reason to refuse
+    expect(plausibleTradeDate("2028-01-01T00:00", now)).toBe(false);
+    expect(plausibleTradeDate("1990-01-01T00:00", now)).toBe(true);
+    expect(plausibleTradeDate("1989-12-31T23:59", now)).toBe(false);
+    expect(invalidFieldOf(range)).toBe("date");
+  });
+  it("a leverage of 0 or below and a blank pair are refused; an empty leverage stays allowed; the pair is stored trimmed", () => {
+    const base = defaultForm(settings(), "scalp");
+    const ok = { ...base.d, entry: "80000", pnlManual: "1" };
+    expect(validateRecord(toRecord({ ...ok, leverage: "-3" }, base.t), "")).toBe("Der Hebel muss größer als 0 sein (oder leer bleiben).");
+    expect(validateRecord(toRecord({ ...ok, leverage: "0" }, base.t), "")).toBe("Der Hebel muss größer als 0 sein (oder leer bleiben).");
+    expect(validateRecord(toRecord({ ...ok, leverage: "" }, base.t), "")).toBeNull();
+    expect(validateRecord(toRecord({ ...ok, pair: " " }, base.t), "")).toBe("Bitte ein Paar angeben (z. B. BTC/USDT).");
+    expect(toRecord({ ...ok, pair: "  ETH/USDT " }, base.t).pair).toBe("ETH/USDT");
   });
   it("a number no market has is refused (\"1e308\" overflowed the journal's sums), a large real one is not", () => {
     const base = defaultForm(settings(), "scalp");
@@ -121,6 +146,19 @@ describe("TradeEditor – sheet", () => {
     const dim = dialog.closest(".fixed")?.querySelector<HTMLElement>(":scope > [aria-hidden='true']");
     expect(dim).toBeTruthy();
     expect(Number(dim!.style.opacity)).toBeGreaterThan(0.8);
+  });
+
+  it("the message leaves with the red frame once its field is corrected (it used to stay over the footer until the next save)", async () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Bitte einen Einstiegspreis angeben.");
+    // another field does not clear a message that is not about it
+    type("Stop-Loss", "79000");
+    expect(screen.getByRole("alert")).toHaveTextContent("Bitte einen Einstiegspreis angeben.");
+    type("Einstieg", "80000");
+    expect(input("Einstieg")).not.toHaveAttribute("aria-invalid");
+    // (the line fades out, so it is gone a moment later)
+    await waitFor(() => expect(screen.queryByText("Bitte einen Einstiegspreis angeben.")).toBeNull());
   });
 
   it("validates before saving and shows the error in the footer", () => {

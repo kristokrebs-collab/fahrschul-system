@@ -7,6 +7,9 @@ import { deriveTrade } from "@/domain/derive";
 import { normalizeTrade } from "@/domain/normalize";
 import { buildTrades, detectFormat, guessMapping, loadCsv, parseWithMapping, toWallClock } from "@/exchanges/csv";
 import { isImported } from "@/exchanges/inbox";
+import { tradesToCsv } from "@/domain/csv";
+import { planCsvMerge } from "@/exchanges/csv";
+import { A, B, C, D, E, F, enriched, settings } from "./domain.fixtures";
 
 const utc = (s: string) => Date.parse(`${s}Z`);
 const local = (y: number, mo: number, d: number, h: number, mi: number, s = 0) => new Date(y, mo - 1, d, h, mi, s).getTime();
@@ -225,3 +228,68 @@ describe("mapping assistant", () => {
     expect(parsed.trades[0]!.openedAt).toBe(utc("2026-10-05T09:30:00"));
   });
 });
+
+describe("the journal's own CSV export, read back (Funktionsprüfung Runde 14)", () => {
+  const source = [A, B, C, D, E, F];
+  const csv = tradesToCsv(enriched(source), settings());
+
+  it("is recognised (no mapping assistant) and every row is one trade", () => {
+    const { l, parsed, trades } = run(csv);
+    expect(l.format!.id).toBe("journal");
+    expect(l.score).toBe(1);
+    expect(parsed.skipped).toBe(0);
+    expect(trades).toHaveLength(source.length);
+    expect(parsed.warnings.join(" ")).toMatch(/JSON-Backup/);
+    // an exchange export is not mistaken for it
+    expect(detectFormat(["Date(UTC)", "Symbol", "Side", "Price", "Quantity", "Amount", "Fee", "Realized Profit"])?.format.id).toBe("binance");
+  });
+
+  it("keeps the times as written (local time, not shifted by the zone), the account of each row and the trader's text", () => {
+    const { trades } = run(csv);
+    const byDate = new Map(trades.map((t) => [t.date, t] as const));
+    for (const raw of source) {
+      // the fixtures are legacy records (some without account / text fields): compare with what the journal makes of them
+      const src = normalizeTrade(raw);
+      const back = byDate.get(src.date);
+      expect(back, src.date).toBeDefined();
+      expect(back!.account, src.date).toBe(src.account === "makro" ? "makro" : "scalp");
+      expect({ pair: back!.pair, side: back!.side, status: back!.status, entry: back!.entry, exit: back!.exit, stop: back!.stop, target: back!.target, size: back!.size, leverage: back!.leverage }, src.date).toEqual({
+        pair: src.pair,
+        side: src.side,
+        status: src.status,
+        entry: src.entry,
+        exit: src.status === "open" ? null : (src.exit ?? null),
+        stop: src.stop ?? null,
+        target: src.target ?? null,
+        size: src.size ?? null,
+        leverage: src.leverage ?? null,
+      });
+      expect({ timeframe: back!.timeframe, reason: back!.reason, notes: back!.notes, chart: back!.chart, emotion: back!.emotion, followedPlan: back!.followedPlan, conviction: back!.conviction }, src.date).toEqual({
+        timeframe: src.timeframe ?? "",
+        reason: src.reason ?? "",
+        notes: src.notes ?? "",
+        chart: src.chart ?? "",
+        emotion: src.emotion ?? "",
+        followedPlan: src.followedPlan ?? null,
+        conviction: src.conviction ?? null,
+      });
+      // the result is the journal's own again: derived from the prices, or the typed figure where there is nothing to derive it from
+      expect(deriveTrade(normalizeTrade(back!)).pnl ?? 0, src.date).toBeCloseTo(deriveTrade(src).pnl ?? 0, 2);
+    }
+  });
+
+  it("rows that differ in a single column stay two trades; the same file read twice is the same trades; a free text that looks like a formula comes back as typed", () => {
+    const twin = { ...A, id: "t_twin", leverage: 7 };
+    const tricky = { ...B, id: "t_tricky", date: "2026-03-01T08:00", notes: "=SUMME(A1)", reason: "-1 R geplant" };
+    const text = tradesToCsv(enriched([A, twin, tricky]), settings());
+    const first = run(text).trades;
+    expect(first).toHaveLength(3);
+    expect(new Set(first.map((t) => t.id)).size).toBe(3);
+    expect(first.find((t) => t.date === tricky.date)).toMatchObject({ notes: "=SUMME(A1)", reason: "-1 R geplant" });
+    expect(run(text).trades.map((t) => t.id)).toEqual(first.map((t) => t.id));
+    // read into a journal that already holds these trades (typed by hand): nothing is added a second time
+    const plan = planCsvMerge([A, tricky], run(tradesToCsv(enriched([A, tricky]), settings())).trades, "2026-10-12T08:00:00.000Z");
+    expect(plan.added).toHaveLength(0);
+  });
+});
+

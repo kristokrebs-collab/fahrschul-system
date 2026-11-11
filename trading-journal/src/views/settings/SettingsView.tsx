@@ -98,6 +98,7 @@ export const SETTINGS_STRINGS = {
   zoneHelp: "Makro-Long-Zone: Hinweis auf der Übersicht und Band im Chart",
   toastSaved: "Einstellungen gespeichert",
   toastNumbers: "Bitte alle Zahlenfelder ausfüllen",
+  toastNegative: "Das Startkapital kann nicht negativ sein",
   toastFailed: "Speichern fehlgeschlagen",
   /** leaving the page with unsaved edits: nothing is lost, nothing is saved behind the person's back */
   toastParked: "Einstellungen noch nicht gespeichert",
@@ -284,7 +285,7 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
   async function save() {
     const res = draftToSettings(draft, useJournal.getState().settings);
     if (!res.ok) {
-      pushToast({ kind: "error", title: SETTINGS_STRINGS.toastNumbers });
+      pushToast({ kind: "error", title: res.error === "negative" ? SETTINGS_STRINGS.toastNegative : SETTINGS_STRINGS.toastNumbers });
       setInvalidField(res.field);
       revealInvalid(`s-${res.field}`, { reduced });
       return;

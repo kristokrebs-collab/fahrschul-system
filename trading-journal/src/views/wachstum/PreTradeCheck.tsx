@@ -62,7 +62,7 @@ export function PreTradeCheck({ checkin, mood, events, todayKey, className }: Pr
     toggleTick(todayKey, id);
     if (complete && !wasComplete) {
       processDone("checklist");
-      // the same process moment, seen on the card itself: one band of light crosses the word (once per completion, never in a loop)
+      // the same process moment, seen on the card itself: one band of light crosses the checklist (once per completion, never in a loop)
       setSwept((n) => n + 1);
     }
   };
@@ -78,8 +78,7 @@ export function PreTradeCheck({ checkin, mood, events, todayKey, className }: Pr
   return (
     <Card title={WACHSTUM.ready.title} data-testid="growth-ready" data-state={r.state} className={className}>
       <div className="grid gap-4">
-        <div className="relative flex flex-wrap items-center justify-between gap-4">
-          <SpotlightSweep play={swept} playOnView={false} tone="win" />
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="grid gap-2">
             <DotMatrixText text={WORD[r.state]} width={6} align="left" tone={TONE[r.state]} size={5} gap={2} label={READINESS_LABEL[r.state]} />
             <span className={cn("text-[13px] font-semibold", r.state === "ready" ? "text-win" : r.state === "pause" ? "text-signal" : "text-warn")} data-testid="growth-ready-label">
@@ -109,7 +108,9 @@ export function PreTradeCheck({ checkin, mood, events, todayKey, className }: Pr
           </ul>
         )}
 
-        <div className="grid gap-1.5 border-t border-line pt-3">
+        <div className="relative grid gap-1.5 border-t border-line pt-3">
+          {/* the band crosses the checklist that was just completed – not the verdict above it, which may still say „offen“ (no check-in yet) */}
+          <SpotlightSweep play={swept} playOnView={false} tone="win" />
           <div className="flex items-baseline justify-between gap-2">
             <span className="label !text-[10px]">{WACHSTUM.ready.checklist}</span>
             <span className="num font-mono text-[11px] text-faint" data-testid="growth-ready-count">

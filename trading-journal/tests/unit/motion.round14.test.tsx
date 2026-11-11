@@ -160,7 +160,7 @@ describe("empty state", () => {
 });
 
 describe("the closing ritual", () => {
-  const dots = [{ key: "2026-11-11", state: "done" as const, label: "Mi: erledigt" }];
+  const dots = [{ key: "2026-11-11", short: "Mi", state: "done" as const, label: "Mittwoch 11.11.: Rückblick gemacht" }];
   const action = { label: "Heute abschließen", hint: "Ein Tipp genügt.", done: "Heute abgeschlossen" };
 
   it("the word follows the check right after the tap (`fr-said` + `data-fresh`); a day merely shown as closed plays nothing", () => {

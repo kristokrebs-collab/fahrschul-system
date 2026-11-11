@@ -14,6 +14,7 @@
  * | mt | MetaTrader 4/5 Kontoauszug „Positionen" als CSV | one position per row (lots, profit + commission + swap) |
  * | ibkr | IBKR Flex Query „Trades" als CSV | fills → positions (quantity signed, multiplier) |
  * | tradingview | TradingView Strategietester → Liste der Trades → Export | entry + exit row per trade (tag „Backtest") |
+ * | journal | the journal's OWN export (Einstellungen › Daten › CSV exportieren) | one trade per row, local time, own account + text |
  */
 import { aggregateFills, type CsvFill, type CsvFormat, type CsvTrade, type ParseResult } from "./model";
 import { cell, findCol, normalizePair, parseBuySell, parseNum, parseSide, parseTime, type CsvTable } from "./parse";
@@ -646,7 +647,105 @@ export const tradingViewFormat: CsvFormat = {
   },
 };
 
+/* ------------------------------------------------------------------ the journal's own export */
+
+/** Columns of `CSV_HEADER` (`domain/csv.ts`) that only the journal's own export has together. */
+const OWN_MARKS = ["Datum", "Konto", "Paar", "Richtung", "Status", "Einstieg", "Ausstieg", "Größe", "Ergebnis", "Grundlagen", "Checkliste", "Plan befolgt"] as const;
+
+/** A free-text cell of the export may carry the `'` that keeps a spreadsheet from running it as a formula (`lib/csvSafe.ts`). */
+const ownText = (v: string): string => (/^'[=+\-@\t\r]/.test(v) ? v.slice(1) : v);
+
+/**
+ * The journal's own CSV export („Einstellungen › Daten › CSV exportieren“), read back (Funktionsprüfung Runde 14). Before, the file went
+ * through the mapping assistant as „Format nicht erkannt“: every time moved by one or two hours (the export writes local time, the
+ * assistant assumes UTC), the „Konto“ column was ignored (a Makro trade became Scalp), reason, notes and timeframe were dropped and rows
+ * that differed only in leverage or stop collapsed into one. Here every row is one trade, in local time, with its own account and the
+ * trader's text. What a CSV cannot carry back is said in the preview: Grundlagen and checklist ticks are names and counts there, not
+ * ids – the JSON backup is the full restore.
+ */
+export const journalFormat: CsvFormat = {
+  id: "journal",
+  label: "Trade Journal – eigener CSV-Export",
+  hint: "Einstellungen → Daten → CSV exportieren.",
+  detect: (h) => {
+    const names = new Set(h.map((x) => x.trim()));
+    return OWN_MARKS.every((m) => names.has(m)) ? 1 : 0;
+  },
+  parse: (t) => {
+    const at = (name: string) => t.header.findIndex((h) => h.trim() === name);
+    const c = Object.fromEntries(
+      ["Datum", "Konto", "Paar", "Richtung", "Status", "Einstieg", "Stop", "Ziel", "Ausstieg", "Größe", "Hebel", "Gebühren", "P&L", "Überzeugung", "Plan befolgt", "Gefühl", "Timeframe", "Begründung", "Notizen", "Chart", "Ausstiegszeit", "Markt", "Menge", "Funding", "Margin-Modus", "Tags"].map((n) => [n, at(n)]),
+    ) as Record<string, number>;
+    const num = (row: readonly string[], name: string): number | null => parseNum(cell(row, c[name] ?? -1), true);
+    const text = (row: readonly string[], name: string): string => ownText(cell(row, c[name] ?? -1));
+    const out: CsvTrade[] = [];
+    let skipped = 0;
+    for (const row of t.rows) {
+      const side = cell(row, c.Richtung ?? -1).toLowerCase();
+      const openedAt = parseTime(cell(row, c.Datum ?? -1), { assume: "local" });
+      const entry = num(row, "Einstieg");
+      if ((side !== "long" && side !== "short") || openedAt == null || entry == null) {
+        skipped++;
+        continue;
+      }
+      const status = cell(row, c.Status ?? -1).toLowerCase() === "open" ? "open" : "closed";
+      const exit = num(row, "Ausstieg");
+      const size = num(row, "Größe");
+      const closedAt = parseTime(cell(row, c.Ausstiegszeit ?? -1), { assume: "local" });
+      const conviction = num(row, "Überzeugung");
+      const plan = cell(row, c["Plan befolgt"] ?? -1).toLowerCase();
+      const account = cell(row, c.Konto ?? -1).toLowerCase();
+      const market = cell(row, c.Markt ?? -1).toLowerCase();
+      const margin = cell(row, c["Margin-Modus"] ?? -1).toLowerCase();
+      const tags = text(row, "Tags")
+        .split("|")
+        .map((x) => x.trim())
+        .filter(Boolean);
+      const trade: CsvTrade = {
+        // the whole row is the identity: two trades that differ in one column stay two, the same file read again is the same trades
+        key: row.join("\u0001"),
+        pair: text(row, "Paar"),
+        side,
+        status,
+        openedAt,
+        closedAt: status === "closed" ? closedAt : null,
+        entry,
+        exit: status === "open" ? null : exit,
+        qty: num(row, "Menge"),
+        size,
+        fees: num(row, "Gebühren"),
+        funding: num(row, "Funding"),
+        stop: num(row, "Stop"),
+        target: num(row, "Ziel"),
+        leverage: num(row, "Hebel"),
+        notes: text(row, "Notizen"),
+        reason: text(row, "Begründung"),
+        timeframe: text(row, "Timeframe"),
+        chart: text(row, "Chart"),
+        emotion: text(row, "Gefühl"),
+        followedPlan: plan === "ja" ? true : plan === "nein" ? false : null,
+      };
+      // the result of a trade without exit or size was typed by hand (the journal derives it otherwise): keep the figure of the file
+      if (status === "closed" && (exit == null || size == null)) trade.pnl = num(row, "P&L");
+      if (account === "makro" || account === "scalp") trade.account = account;
+      if (conviction != null && Number.isInteger(conviction) && conviction >= 1 && conviction <= 5) trade.conviction = conviction as NonNullable<CsvTrade["conviction"]>;
+      if (market === "perp" || market === "spot") trade.market = market;
+      if (margin === "isoliert") trade.marginMode = "isolated";
+      else if (margin === "cross") trade.marginMode = "cross";
+      if (tags.length) trade.tags = tags;
+      out.push(trade);
+    }
+    return {
+      trades: out,
+      skipped,
+      warnings: ["Eigener Export: Zeiten in Ortszeit, Konto je Zeile. Grundlagen und Checklisten-Haken stehen in der CSV nur als Namen und Zahl – das vollständige Journal stellt das JSON-Backup wieder her."],
+    };
+  },
+};
+
 export const FORMATS: readonly CsvFormat[] = [
+  // first: its header is exact, and columns like „Einstieg“ / „Ausstieg“ must not half-match an exchange format
+  journalFormat,
   bitunixFormat,
   binanceFormat,
   bybitFormat,

@@ -127,11 +127,15 @@ export const LIVE_PRICE_CONFIRM_MS = 800;
 
 export const EDITOR_MESSAGES = {
   date: "Bitte Datum angeben.",
+  /** a year nobody traded in ("26" typed as the year reads as the year 26) or far ahead – the field shows 10.11.26 either way */
+  dateRange: "Bitte das Datum prüfen: Das Jahr liegt außerhalb des plausiblen Bereichs (vierstellig eingeben, z. B. 2026).",
   entry: "Bitte einen Einstiegspreis angeben.",
   exit: "Bitte Ausstieg angeben oder P&L manuell eintragen.",
   size: "Bitte Positionsgröße angeben oder P&L manuell eintragen.",
   chart: "Der Chart-Link muss mit https:// beginnen.",
   huge: "Eine der Zahlen ist unplausibel groß. Bitte prüfe Preise, Größe und Gebühren.",
+  leverage: "Der Hebel muss größer als 0 sein (oder leer bleiben).",
+  pair: "Bitte ein Paar angeben (z. B. BTC/USDT).",
   saveFailed: "Speichern fehlgeschlagen. Prüfe die Verbindung und versuch es erneut.",
   deleteFailed: "Löschen fehlgeschlagen.",
 } as const;
@@ -452,7 +456,7 @@ function toBundleRecord(d: TradeFormStrings, t: Omit<TradeFormTyped, "j">): Omit
   return {
     ...t,
     date: d.date,
-    pair: d.pair,
+    pair: (d.pair || "").trim(),
     timeframe: d.timeframe,
     entry: parseNumber(d.entry),
     stop: parseNumber(d.stop),
@@ -468,6 +472,20 @@ function toBundleRecord(d: TradeFormStrings, t: Omit<TradeFormTyped, "j">): Omit
   };
 }
 
+/** The first year a trade of this journal can be from (well before the first crypto exchange; older is a typing slip like the year 26). */
+export const MIN_TRADE_YEAR = 1990;
+
+/**
+ * A date a trade can have: from `MIN_TRADE_YEAR` to one year ahead of now (the clock of a device can be off, a trade cannot be from 2099).
+ * "0026-11-10T09:00" is what a date field holds after someone typed "26" as the year – the list showed "10.11.26", every series by
+ * calendar day ran from the year 26, and the Analyse page crashed (Funktionsprüfung Runde 14).
+ */
+export function plausibleTradeDate(date: string, now: number = Date.now()): boolean {
+  const y = Number(/^(\d{4,6})-/.exec(date)?.[1]);
+  if (!Number.isFinite(y)) return true; // not the form's own format: left to the checks that read it
+  return y >= MIN_TRADE_YEAR && y <= new Date(now).getFullYear() + 1;
+}
+
 /** Above this no price, size or fee of the form is believed (a trillion; the largest real notional is orders of magnitude below). */
 export const MAX_FORM_NUMBER = 1e12;
 
@@ -478,6 +496,7 @@ export const MAX_FORM_NUMBER = 1e12;
  */
 export function validateRecord(rec: ReturnType<typeof toRecord>, rawChart: string, j?: JournalForm): string | null {
   if (!rec.date) return EDITOR_MESSAGES.date;
+  if (!plausibleTradeDate(rec.date)) return EDITOR_MESSAGES.dateRange;
   if (!(rec.entry != null && rec.entry > 0)) return EDITOR_MESSAGES.entry;
   if (rec.status !== "open" && rec.pnlManual == null) {
     if (!(rec.exit != null && rec.exit > 0)) {
@@ -489,6 +508,9 @@ export function validateRecord(rec: ReturnType<typeof toRecord>, rawChart: strin
   }
   // a number no market has ("1e308" was accepted, Funktionsprüfung Runde 13): its P&L overflows and poisons every sum of the journal
   for (const v of [rec.entry, rec.stop, rec.target, rec.exit, rec.size, rec.qty, rec.leverage, rec.fees, rec.pnlManual]) if (v != null && Math.abs(v) > MAX_FORM_NUMBER) return EDITOR_MESSAGES.huge;
+  // a leverage of 0 or below is no leverage (the list showed „Scalp · −3x“); a blank pair was stored as " " and the row had no name
+  if (rec.leverage != null && rec.leverage <= 0) return EDITOR_MESSAGES.leverage;
+  if (typeof rec.pair === "string" && !rec.pair.trim()) return EDITOR_MESSAGES.pair;
   if (rawChart.trim() && !rec.chart) return EDITOR_MESSAGES.chart;
   return j ? validateJournal(j, { date: rec.date, status: rec.status, side: rec.side }) : null;
 }
@@ -514,6 +536,7 @@ export type InvalidField = "date" | "entry" | "exit" | "size" | "chart";
 export function invalidFieldOf(problem: string): InvalidField | null {
   switch (problem) {
     case EDITOR_MESSAGES.date:
+    case EDITOR_MESSAGES.dateRange:
       return "date";
     case EDITOR_MESSAGES.entry:
       return "entry";
@@ -739,7 +762,12 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const setStr = (k: keyof TradeFormStrings) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const v = e.target.value;
     setD((o) => ({ ...o, [k]: v }));
-    if (k === invalid) setInvalid(null);
+    // the field the message was about is being corrected: the message goes with the red frame (it used to stay over the footer
+    // until the next save – Funktionsprüfung Runde 14)
+    if (k === invalid) {
+      setInvalid(null);
+      setErr("");
+    }
   };
   const patchT = useCallback((patch: Partial<TradeFormTyped>) => setT((o) => ({ ...o, ...patch })), []);
 

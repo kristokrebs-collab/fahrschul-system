@@ -9,6 +9,8 @@ const f1 = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFra
 const f2 = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fPriceSmall = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 4 });
 const fPrice = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
+// below 1: four SIGNIFICANT digits – four fraction digits showed a coin at 0,00001234 as "0" (list and detail read "0 → 0")
+const fPriceTiny = new Intl.NumberFormat("de-DE", { maximumSignificantDigits: 4, maximumFractionDigits: 12 });
 const fDate = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
 const fTime = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
 const fDateTime = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -41,8 +43,8 @@ export const pct0 = (e: number | null | undefined): string => (isFin(e) ? f0.for
 /** R-multiple: "+1,25 R". */
 export const r = (e: number | null | undefined): string =>
   isFin(e) ? minus((e > 0 ? "+" : "") + f2.format(e)) + " R" : DASH;
-/** Price: 4 fraction digits below 10, else 2 (no U+2212 replacement, like the bundle). */
-export const price = (e: number | null | undefined): string => (isFin(e) ? (e < 10 ? fPriceSmall : fPrice).format(e) : DASH);
+/** Price: 2 fraction digits from 10, 4 below 10, 4 significant digits below 1 (0,00001234 – never "0"; no U+2212 replacement, like the bundle). */
+export const price = (e: number | null | undefined): string => (isFin(e) ? (e > 0 && e < 1 ? fPriceTiny : e < 10 ? fPriceSmall : fPrice).format(e) : DASH);
 /** "dd.MM.yy" */
 export const date = (d: Date): string => (isNaN(+d) ? DASH : fDate.format(d));
 /** "HH:mm" ("" for invalid dates, like the bundle). */

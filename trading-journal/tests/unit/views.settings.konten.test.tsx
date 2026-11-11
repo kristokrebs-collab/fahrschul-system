@@ -28,6 +28,10 @@ describe("settings draft", () => {
     }
     const bad = draftToSettings({ ...d, zoneHigh: "abc" }, s);
     expect(bad).toEqual({ ok: false, error: "numeric", field: "zoneHigh" });
+    // a starting capital below zero is refused at its field (zero stays allowed: an account that is not in use)
+    expect(draftToSettings({ ...d, makro: "-6000" }, s)).toEqual({ ok: false, error: "negative", field: "makro" });
+    expect(draftToSettings({ ...d, scalp: "−5000".replace("−", "-") }, s)).toEqual({ ok: false, error: "negative", field: "scalp" });
+    expect(draftToSettings({ ...d, scalp: "0" }, s).ok).toBe(true);
   });
 
   it("hyblock test helpers follow the bundle output format", () => {
@@ -109,6 +113,15 @@ describe("SettingsView · Konten", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(useUi.getState().toasts).toHaveLength(0);
   }, 20_000);
+
+  it("refuses a negative starting capital with its own message; nothing is saved", async () => {
+    render(<SettingsView />);
+    fireEvent.change(screen.getByLabelText("Startkapital Makro"), { target: { value: "-6000" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Speichern" })[0] as HTMLElement);
+    await waitFor(() => expect(useUi.getState().toasts.map((t) => t.title)).toContain("Das Startkapital kann nicht negativ sein"));
+    expect(useJournal.getState().settings.capital.makro).toBe(20000);
+    expect(screen.getByLabelText("Startkapital Makro")).toHaveAttribute("aria-invalid", "true");
+  });
 
   it("refuses to save with an unparsable number", async () => {
     render(<SettingsView />);

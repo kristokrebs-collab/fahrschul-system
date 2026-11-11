@@ -50,6 +50,17 @@ export interface CsvTrade {
   notes?: string;
   /** Bot / strategy that placed the trade (mapping assistant column „Bot“, review F14) → origin `bot`. */
   bot?: string;
+  /**
+   * The trader's own fields – only the journal's OWN export carries them (`journalFormat`): the account of each row (wins over the
+   * account chosen in the import sheet), timeframe, reason, chart link, feeling, „Plan befolgt“ and conviction.
+   */
+  account?: "makro" | "scalp";
+  timeframe?: string;
+  reason?: string;
+  chart?: string;
+  emotion?: string;
+  followedPlan?: boolean | null;
+  conviction?: Trade["conviction"];
 }
 
 export interface ParseResult {
@@ -213,12 +224,12 @@ export function toJournalTrade(t: CsvTrade, ctx: ToTradeContext): Trade {
   const size = t.size !== undefined ? t.size : t.qty != null && t.entry != null ? round(t.qty * t.entry) : null;
   const rec: Trade = {
     id: csvTradeId(ctx.formatId, t.key),
-    account: ctx.account,
+    account: t.account ?? ctx.account,
     side: t.side,
     status: t.status,
     date: t.openedAt != null ? toWallClock(t.openedAt) : t.closedAt != null ? toWallClock(t.closedAt) : "",
     pair: t.pair,
-    timeframe: "",
+    timeframe: t.timeframe ?? "",
     entry: t.entry,
     stop: t.stop ?? null,
     target: t.target ?? null,
@@ -229,12 +240,12 @@ export function toJournalTrade(t: CsvTrade, ctx: ToTradeContext): Trade {
     pnlManual: t.pnl != null ? round(t.pnl) : null,
     setups: [],
     checks: {},
-    conviction: null,
-    followedPlan: null,
-    emotion: "",
-    reason: "",
+    conviction: t.conviction ?? null,
+    followedPlan: t.followedPlan ?? null,
+    emotion: t.emotion ?? "",
+    reason: t.reason ?? "",
     notes: t.notes ?? "",
-    chart: "",
+    chart: t.chart ?? "",
     pnl: t.pnl != null ? round(t.pnl) : null,
     r: null,
     createdAt: ctx.nowIso,

@@ -59,6 +59,12 @@ describe("lib/format (bundle V)", () => {
     expect(price(84000.5)).toBe("84.000,5");
     expect(price(1.23456)).toBe("1,2346");
     expect(price(0.5)).toBe("0,5");
+    // a low-priced coin keeps its digits (four significant ones) instead of reading "0"
+    expect(price(0.00001234)).toBe("0,00001234");
+    expect(price(0.000012999)).toBe("0,000013");
+    expect(price(0.012345)).toBe("0,01235");
+    expect(price(0.99996)).toBe("1");
+    expect(price(0)).toBe("0");
   });
   it("date/time/dateTime", () => {
     const d = new Date("2026-03-12T09:05");

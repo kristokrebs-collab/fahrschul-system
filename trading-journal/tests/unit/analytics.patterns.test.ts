@@ -157,6 +157,17 @@ describe("benchmark", () => {
     expect(a.current).toBeGreaterThan(a.worst);
     expect(adaptiveBenchmark(closed.slice(0, 50), 1000, Date.UTC(2025, 5, 51))).toBeNull();
   });
+
+  it("adaptive: a first trade dated two thousand years back (a two-digit year typed into the date field) does not overflow the stack", () => {
+    // what the date field holds after "26" was typed as the year
+    const closed = enrich([qt("0026-06-01T12:00", { p: 5 }), ...Array.from({ length: 5 }, (_, i) => qt(utc(2025, 6, 1 + i, 12), { p: 5 }))], S);
+    let a: ReturnType<typeof adaptiveBenchmark> = null;
+    expect(() => {
+      a = adaptiveBenchmark(closed, 1000, Date.UTC(2025, 5, 10, 18));
+    }).not.toThrow();
+    expect(a!.windows).toBeGreaterThan(700_000);
+    expect(Number.isFinite(a!.best) && Number.isFinite(a!.worst)).toBe(true);
+  });
 });
 
 describe("compare", () => {
