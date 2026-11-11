@@ -71,6 +71,45 @@ describe("SettingsView · Konten", () => {
     expect(useUi.getState().toasts.map((t) => t.title)).toContain("Einstellungen gespeichert");
   }, 15_000); // full page render + portal select: slow on a loaded CI box
 
+  it("unsaved edits survive leaving the page: the draft is back with its „Ungespeicherte Änderungen“ bar, a toast says where it waits", async () => {
+    const first = render(<SettingsView />);
+    fireEvent.change(screen.getByLabelText("Startkapital Makro"), { target: { value: "31000" } });
+    first.unmount(); // a page change
+    await waitFor(() => expect(useUi.getState().toasts.map((t) => t.title)).toContain("Einstellungen noch nicht gespeichert"));
+    expect(useUi.getState().toasts.at(-1)?.action?.label).toBe("Zurück");
+    expect(useJournal.getState().settings.capital.makro).toBe(20000); // nothing was saved behind the person's back
+
+    const back = render(<SettingsView />);
+    expect((screen.getByLabelText("Startkapital Makro") as HTMLInputElement).value).toBe("31000");
+    // the page knows the edits are unsaved: saving writes them
+    fireEvent.click(screen.getAllByRole("button", { name: "Speichern" })[0] as HTMLElement);
+    await waitFor(() => expect(useJournal.getState().settings.capital.makro).toBe(31000));
+    useUi.setState({ toasts: [] });
+    back.unmount();
+    await new Promise((r) => setTimeout(r, 0));
+    // saved → nothing is parked, no toast, a fresh page shows the saved value
+    expect(useUi.getState().toasts.map((t) => t.title)).not.toContain("Einstellungen noch nicht gespeichert");
+    render(<SettingsView />);
+    expect((screen.getByLabelText("Startkapital Makro") as HTMLInputElement).value).toBe("31000");
+  }, 20_000);
+
+  it("a parked draft is never offered to another journal (another account, the demo, a restore open a new store handle)", async () => {
+    const first = render(<SettingsView />);
+    fireEvent.change(screen.getByLabelText("Startkapital Makro"), { target: { value: "31000" } });
+    first.unmount();
+    resetJournal();
+    await bootJournal({ autoBackup: false });
+    render(<SettingsView />);
+    expect((screen.getByLabelText("Startkapital Makro") as HTMLInputElement).value).toBe("20000");
+  }, 20_000);
+
+  it("a page that leaves without edits – or after „Verwerfen“ – parks nothing and says nothing", async () => {
+    const first = render(<SettingsView />);
+    first.unmount();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useUi.getState().toasts).toHaveLength(0);
+  }, 20_000);
+
   it("refuses to save with an unparsable number", async () => {
     render(<SettingsView />);
     fireEvent.change(screen.getByLabelText("Startkapital Scalp"), { target: { value: "abc" } });

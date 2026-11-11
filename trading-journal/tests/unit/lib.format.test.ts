@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fmt, n0, n1, n2, signed, pct, pct0, r, price, date, time, dateTime, pf, colorClass, toneClass, mio, minus, isFin } from "@/lib/format";
 import {
   parseNumber,
+  thousandsReading,
   toInputString,
   sanitizeUrl,
   fractionToPercentInput,
@@ -89,6 +90,11 @@ describe("lib/parse (bundle rt/nt/XM)", () => {
   it("parses comma and point decimals", () => {
     expect(parseNumber("85.900,5")).toBe(85900.5);
     expect(parseNumber("85.900")).toBe(85.9);
+    // the other reading of exactly that shape is offered separately – `parseNumber` itself stays the bundle's rule
+    expect(thousandsReading("85.900")).toBe(85900);
+    expect(thousandsReading(" 1.234.567 ")).toBe(1234567);
+    for (const v of ["85.900,5", "85900", "85.90", "85.9000", "0.900", ".900", "85,900", "1e3", "", "abc", "1.2345.678"]) expect(thousandsReading(v), v).toBeNull();
+    expect(thousandsReading(85.9)).toBeNull();
     expect(parseNumber("1 234,5")).toBe(1234.5);
     expect(parseNumber(" 12,5 ")).toBe(12.5);
     expect(parseNumber("-4")).toBe(-4);

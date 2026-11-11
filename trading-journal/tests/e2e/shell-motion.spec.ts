@@ -119,6 +119,26 @@ test.describe("Seitenleiste und Menü: Bewegung", () => {
     await expect.poll(async () => Math.abs((await h1.boundingBox())!.x - x0), { timeout: 5000 }).toBeLessThan(1);
   });
 
+  test("Computer: direkt auf einer Seite geladen steht die Markierung auf deren Zeile – auch während und nach der Einblend-Welle", async ({ page }, info) => {
+    test.skip(mobile(info.project.name), "from 768 px");
+    await seed(page);
+    // a reload on a page far down the list: the wave makes every row's `li` a containing block while it runs – the row then reports
+    // `offsetTop` 0 and the plate was parked at the top of the list until the next page change (Funktionsprüfung Runde 14)
+    await page.goto("/#berichte");
+    await expect(page.getByRole("heading", { name: "Berichte" }).first()).toBeVisible();
+    const gap = () =>
+      page.evaluate(() => {
+        const row = document.querySelector<HTMLElement>('[data-layer="Seitenleiste"] [data-nav-page="berichte"]')!.getBoundingClientRect();
+        const mark = document.querySelector<HTMLElement>("[data-sidebar-marker]")!.getBoundingClientRect();
+        return Math.abs(mark.top - row.top);
+      });
+    // while the wave may still run the rows travel up to 14 px into place; the plate is at the row's resting place from the start
+    expect(await gap()).toBeLessThan(16);
+    await expect(page.locator(".sb")).not.toHaveAttribute("data-draw", /.+/, { timeout: 12_000 });
+    await page.waitForTimeout(300);
+    expect(await gap()).toBeLessThan(1.5);
+  });
+
   test("Die Symbole zeichnen sich einmal pro Seitenaufruf; danach nie wieder; mit „weniger Bewegung“ gar nicht", async ({ page }, info) => {
     const errors = collectErrors(page);
     await seed(page);

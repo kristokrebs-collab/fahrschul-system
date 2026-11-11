@@ -19,6 +19,21 @@ export function parseNumber(e: unknown): number | null {
   return isFinite(r) ? r : null;
 }
 
+/**
+ * The German thousands reading of an input that `parseNumber` reads differently: dots before groups of exactly three digits and
+ * no comma ("81.230", "1.234.567"). `parseNumber` keeps the bundle's rule (one dot = the decimal point → 81,23; several dots →
+ * not a number), which is right for a price copied from a chart ("142.350") and a trap for someone who writes 81.230 for
+ * eighty-one thousand. This returns the other reading (81230) so a form can ASK instead of guessing; `null` when the input has no
+ * such shape. It never changes what `parseNumber` returns.
+ */
+export function thousandsReading(e: unknown): number | null {
+  if (typeof e !== "string") return null;
+  const t = e.trim().replace(/\s/g, "");
+  if (!/^[1-9]\d{0,2}(\.\d{3})+$/.test(t)) return null;
+  const v = Number(t.replace(/\./g, ""));
+  return isFinite(v) ? v : null;
+}
+
 /** `nt`: number → form input string with the first "." replaced by "," (null/undefined → ""). */
 export function toInputString(e: number | string | null | undefined): string {
   return e == null ? "" : String(e).replace(".", ",");

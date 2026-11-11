@@ -18,7 +18,7 @@
 import { animate, useMotionValue } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { requestFree, useBilling, useBillingMode } from "@/billing/store";
-import { ClosedNotice } from "@/billing/ui/parts";
+import { ClosedNotice, OutageNotice } from "@/billing/ui/parts";
 import { closeAuthSheet, openAuthSheet, useCloudSession } from "@/cloud/session";
 import { AccountPill } from "@/cloud/ui/AccountPill";
 import { AuthSheet } from "@/cloud/ui/AuthSheet";
@@ -199,6 +199,7 @@ export default function Landing({ foot }: { foot: ReactNode }) {
             <IntervalToggle />
           </div>
           {mode !== "open" && <ClosedNotice mode={mode} config={config} />}
+          <OutageNotice />
           <PlanGrid />
           <Reveal>
             <StatsMarquee />

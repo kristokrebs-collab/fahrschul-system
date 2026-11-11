@@ -2,13 +2,14 @@
  * Small shared pieces of the billing UI (P10): the rolling price, the lock glyph, the honest "no payments" notice.
  */
 import { motion } from "motion/react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { Button } from "@/primitives/Button";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { BILLING } from "../strings";
-import type { BillingMode } from "../store";
+import { loadBilling, useBillingOutage, type BillingMode } from "../store";
 import type { BillingConfig } from "../contract";
 
 /** `12 €` as rolling Doto digits (value mode: only changed columns roll – the Monat/Jahr switch). */
@@ -95,3 +96,42 @@ export function ClosedNotice({ mode, config, className, action }: { mode: Billin
     </motion.div>
   );
 }
+
+/**
+ * The shop's configuration could not be loaded (the server did not answer) – said as what it is, with the way out. Before, the
+ * page stayed silent and a plan button answered „Zahlungen noch nicht eingerichtet … alle Funktionen freigeschaltet“, which is
+ * wrong for an outage (Funktionsprüfung Runde 13). Renders nothing while the configuration is known, loading or simply closed.
+ */
+export function OutageNotice({ className }: { className?: string }) {
+  const reduced = useReducedFx();
+  const outage = useBillingOutage();
+  const [busy, setBusy] = useState(false);
+  if (!outage && !busy) return null;
+  const retry = (): void => {
+    if (busy) return;
+    setBusy(true);
+    void loadBilling()
+      .catch(() => undefined)
+      .finally(() => setBusy(false));
+  };
+  return (
+    <motion.div
+      role="status"
+      data-testid="billing-outage"
+      className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-warn/25 bg-warn/[0.06] px-4 py-3", className)}
+      initial={reduced ? false : { opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0, transitionEnd: { transform: "none" } }}
+      transition={{ default: tween.reveal, y: spring.layout }}
+    >
+      <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-warn" />
+      <span className="min-w-0 flex-1 text-[13px] leading-snug">
+        <strong className="font-semibold text-fg">{BILLING.outageTitle}</strong>
+        <span className="text-mute"> – {BILLING.outageText}</span>
+      </span>
+      <Button size="sm" loading={busy} onClick={retry} className="pointer-coarse:min-h-11" data-testid="billing-outage-retry">
+        {busy ? BILLING.outageRetrying : BILLING.outageRetry}
+      </Button>
+    </motion.div>
+  );
+}
+

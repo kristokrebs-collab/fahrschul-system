@@ -8,6 +8,11 @@ export const BILLING = {
   /** Stripe is set up but the operator's Impressum / AGB / Datenschutz are not: nothing can be ordered (B4). */
   legalClosedText: "Die Bestellung ist noch nicht freigeschaltet: Impressum, AGB und Datenschutz des Betreibers fehlen noch. Bis dahin sind alle Funktionen freigeschaltet.",
   functionsMissing: "Die Server-Funktionen sind auf dieser Seite nicht eingerichtet. Bis dahin sind alle Funktionen freigeschaltet.",
+  /** The server did not answer (an outage, no network): nothing is known about the shop – never „nicht eingerichtet“, never „alles freigeschaltet“. */
+  outageTitle: "Tarife gerade nicht erreichbar",
+  outageText: "Der Server antwortet im Moment nicht. Unten stehen die Listenpreise – bestellen geht, sobald die Verbindung wieder da ist.",
+  outageRetry: "Erneut versuchen",
+  outageRetrying: "Lädt …",
   signInFirst: "Melde dich an, um ein Abo abzuschließen.",
   redirecting: "Weiter zu Stripe …",
   checkoutCanceled: "Checkout abgebrochen – es wurde nichts berechnet.",

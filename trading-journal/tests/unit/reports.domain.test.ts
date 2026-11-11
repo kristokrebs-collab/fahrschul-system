@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { aggregate } from "@/domain/agg";
 import { detectBehaviors } from "@/domain/coach/events";
 import { coachPrefsOf, withCoachPlan, withReportSeen } from "@/domain/coach/prefs";
-import { buildReport, pendingReport, pendingReports, periodFromKey, periodOf, reportArchive, reportFilename, reportToCsv, reportToJson, reportToMarkdown, shiftPeriod, type ReportPeriod } from "@/domain/reports";
+import { buildReport, pendingReport, pendingReports, periodFromKey, periodOf, planLine, reportArchive, reportFilename, reportToCsv, reportToJson, reportToMarkdown, shiftPeriod, type ReportPeriod } from "@/domain/reports";
 import type { Settings, Trade } from "@/domain/types";
 import { at, COACH_SETTINGS, ct, enrichC } from "./coach.fixtures";
 
@@ -110,6 +110,22 @@ describe("Archiv und Gesehen-Marker", () => {
     expect(weeks.map((w) => w.period.key)).toEqual([periodOf("week", new Date(at(7))).key, periodOf("week", new Date(at(0))).key]);
     expect(weeks[0]!.n).toBe(3);
     expect(reportArchive(list, COACH_SETTINGS, "month", now)).toEqual([]);
+  });
+
+  it("counts the behaviour of a period from the trades that say whether the plan was followed – the closing line of „Bericht bereit“", () => {
+    const [week] = reportArchive(list, COACH_SETTINGS, "week", now);
+    const trades = list.filter((t) => t.result !== "open" && periodOf("week", new Date(t.date)).key === week!.period.key);
+    const known = trades.filter((t) => typeof t.followedPlan === "boolean");
+    expect(week!.plan).toEqual({ followed: known.filter((t) => t.followedPlan).length, known: known.length });
+    // the sentence: counted, no verdict; no answer at all is said as such (never a 0 % that nobody measured)
+    expect(planLine({ n: 8, plan: { followed: 6, known: 7 } })).toBe("Nach Plan gehandelt: 6 von 7 Trades mit Angabe.");
+    expect(planLine({ n: 8, plan: { followed: 0, known: 3 } })).toBe("Nach Plan gehandelt: 0 von 3 Trades mit Angabe.");
+    expect(planLine({ n: 4, plan: { followed: 1, known: 1 } })).toBe("Der eine Trade mit Angabe lief nach Plan.");
+    expect(planLine({ n: 4, plan: { followed: 0, known: 1 } })).toBe("Der eine Trade mit Angabe lief nicht nach Plan.");
+    expect(planLine({ n: 5, plan: { followed: 0, known: 0 } })).toBe("Bei keinem Trade steht, ob er nach Plan lief.");
+    expect(planLine({ n: 1, plan: { followed: 0, known: 0 } })).toBe("Beim Trade steht nicht, ob er nach Plan lief.");
+    // nothing in it praises or blames a result
+    for (const p of [{ followed: 6, known: 7 }, { followed: 0, known: 0 }, { followed: 0, known: 2 }]) expect(planLine({ n: 9, plan: p })).not.toMatch(/gut|schlecht|stark|schwach|super|leider|Gewinn|Verlust|!/i);
   });
 
   it("announces the last week once, until it is seen", () => {

@@ -196,7 +196,8 @@ function RuleRow({ rule, index, count, ids, dragReady, onArm, used, confirming, 
             <circle cx="8" cy="9.5" r="1" />
           </svg>
         </button>
-        <Input value={rule.text} aria-label={RULES_STRINGS.rule(index + 1)} onChange={(e) => onText(e.target.value)} autoComplete="off" />
+        {/* `title`: a rule longer than the field is readable in full on hover (the field itself shows its beginning) */}
+        <Input value={rule.text} title={rule.text || undefined} aria-label={RULES_STRINGS.rule(index + 1)} onChange={(e) => onText(e.target.value)} autoComplete="off" />
         <motion.button
           type="button"
           aria-label={RULES_STRINGS.remove}

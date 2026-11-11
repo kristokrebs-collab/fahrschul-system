@@ -1,5 +1,5 @@
 import { animate, motion, useMotionValue, useTransform } from "motion/react";
-import { lazy, memo, Suspense, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ED } from "@/domain/edition";
 import type { Rule } from "@/domain/types";
 import type { FeedId, ProviderHealth, StatusLabel } from "@/market/types";
@@ -99,6 +99,10 @@ export const SETTINGS_STRINGS = {
   toastSaved: "Einstellungen gespeichert",
   toastNumbers: "Bitte alle Zahlenfelder ausfüllen",
   toastFailed: "Speichern fehlgeschlagen",
+  /** leaving the page with unsaved edits: nothing is lost, nothing is saved behind the person's back */
+  toastParked: "Einstellungen noch nicht gespeichert",
+  toastParkedDetail: "Deine Änderungen warten dort auf dich.",
+  toastParkedBack: "Zurück",
   unsaved: "Ungespeicherte Änderungen",
   unsavedShort: "Ungespeichert",
   failedBar: "Nicht gespeichert",
@@ -169,6 +173,30 @@ export interface SettingsViewProps {
 const NO_CHANGES: ReadonlySet<DraftKey> = new Set();
 
 /**
+ * Unsaved edits of a settings page that was left (page change): kept in this tab until they are saved or discarded. Before, the draft
+ * died with the page – a changed Startkapital or a new rule was gone without a word (Funktionsprüfung Runde 13). Nothing is written
+ * anywhere: this is the same draft the page held, parked while the page is away; a reload starts clean like before.
+ */
+let parkedDraft: SettingsDraft | null = null;
+/**
+ * Which journal the parked draft was edited in: the store's adapter handle, a new object for every journal that is opened (a sign-in,
+ * another account, the demo, a restore). A draft is never offered to another journal.
+ */
+let parkedOwner: unknown = null;
+const journalOwner = (): unknown => useJournal.getState().api;
+/** The parked draft of the journal that is open now (a draft of another account is dropped). */
+function takeParkedDraft(): SettingsDraft | null {
+  if (parkedDraft !== null && (parkedOwner == null || parkedOwner !== journalOwner())) parkedDraft = null;
+  return parkedDraft;
+}
+/** Settings pages on screen (StrictMode mounts twice): the „noch nicht gespeichert“ toast is only for a page that really left. */
+let mountedViews = 0;
+/** Tests: forget a parked draft. */
+export function resetParkedSettingsDraft(): void {
+  parkedDraft = null;
+}
+
+/**
  * `Einstellungen` page (Bundle `K$`, Plan 6.4). Draft state is re-hydrated from `settings` on every
  * settings change (as the bundle does); the single `Speichern` validates the 14 numeric fields
  * (`Bitte alle Zahlenfelder ausfüllen`), applies the fallbacks and writes through `saveSettings`
@@ -189,10 +217,10 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
   const pushToast = useUi((s) => s.pushToast);
   const reduced = useReducedFx();
 
-  const [draft, setDraft] = useState<SettingsDraft>(() => settingsToDraft(settings));
+  const [draft, setDraft] = useState<SettingsDraft>(() => takeParkedDraft() ?? settingsToDraft(settings));
   const [hydratedFrom, setHydratedFrom] = useState(settings);
-  /** true once the user touched the draft; a pristine draft follows external settings changes */
-  const [dirty, setDirty] = useState(false);
+  /** true once the user touched the draft (or came back to parked edits); a pristine draft follows external settings changes */
+  const [dirty, setDirty] = useState(() => parkedDraft !== null);
   const [invalidField, setInvalidField] = useState<DraftTextKey | null>(null);
   /** the unsaved bar stays through `Speichert …` / `Gespeichert` when the save started from it */
   const [holdBar, setHoldBar] = useState(false);
@@ -215,6 +243,22 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
     const keys = changedKeys(draft, saved);
     return keys.size ? keys : NO_CHANGES;
   }, [draft, saved]);
+
+  // unsaved edits stay parked while they exist (saved or discarded → nothing is parked); a page that really leaves with them says so once
+  useEffect(() => {
+    parkedOwner = journalOwner();
+    parkedDraft = parkedOwner != null && dirty && changed.size > 0 ? draft : null;
+  }, [draft, dirty, changed]);
+  useEffect(() => {
+    mountedViews += 1;
+    return () => {
+      mountedViews -= 1;
+      queueMicrotask(() => {
+        if (mountedViews > 0 || takeParkedDraft() === null) return;
+        useUi.getState().pushToast({ kind: "info", title: SETTINGS_STRINGS.toastParked, detail: SETTINGS_STRINGS.toastParkedDetail, action: { label: SETTINGS_STRINGS.toastParkedBack, onClick: () => navigate("settings") } });
+      });
+    };
+  }, []);
 
   const set = useCallback((key: DraftTextKey, value: string) => {
     setDirty(true);

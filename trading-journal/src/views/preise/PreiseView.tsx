@@ -9,7 +9,7 @@ import { PLAN_CATALOG } from "@/billing/plans";
 import { planSaving } from "@/billing/purchase/order";
 import { setBillingInterval, useBilling, useBillingMode, useEffectivePlan } from "@/billing/store";
 import type { BillingInterval } from "@/billing/types";
-import { ClosedNotice } from "@/billing/ui/parts";
+import { ClosedNotice, OutageNotice } from "@/billing/ui/parts";
 import { SpotlightSweep } from "@/motion/fx/SpotlightSweep";
 import { Float } from "@/motion/rich/Float";
 import { Reveal } from "@/motion/Reveal";
@@ -133,6 +133,7 @@ export function PreiseView({ className }: PreiseViewProps) {
         }
       />
       {mode !== "open" && <ClosedNotice mode={mode} config={config} />}
+      <OutageNotice />
       <RefBanner />
       <Cell index={0}>
         <PricingHero />

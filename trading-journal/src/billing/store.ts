@@ -307,6 +307,21 @@ export function purchaseOpenOf(config: BillingConfig | null, mode: BillingMode):
   return { open: false, blockedBy: config.purchaseBlockedBy?.length ? config.purchaseBlockedBy : ["legal"] };
 }
 
+/**
+ * The shop's configuration could not be loaded and nothing is known from before: an outage, not „payments are not set up“.
+ * (A known configuration – fresh or from the cache of this browser – keeps deciding; `modeOf` reads the cache.)
+ */
+export function outageOf(active: boolean, config: BillingConfig | null, configState: BillingState["configState"], cached: BillingCache | null): boolean {
+  return active && !config && configState === "error" && !cached?.closed;
+}
+
+export function useBillingOutage(): boolean {
+  const config = useBilling((s) => s.config);
+  const configState = useBilling((s) => s.configState);
+  const cached = useBilling((s) => s.cached);
+  return outageOf(billingActive(), config, configState, cached);
+}
+
 export function usePurchaseGate(): { open: boolean; blockedBy: ("stripe" | "legal")[] } {
   const config = useBilling((s) => s.config);
   const mode = useBillingMode();
@@ -384,6 +399,12 @@ export function requestOrder(intent: CheckoutIntent, opts: { waited?: boolean } 
   // the toast „Zahlungen noch nicht eingerichtet“ although payments were set up (QA Runde 13, AUTH-06 end to end).
   if (!opts.waited && !s.config && billingActive() && (s.configState === "idle" || s.configState === "loading")) {
     void whenConfigSettled().then(() => requestOrder(intent, { waited: true }));
+    return;
+  }
+  // the server did not answer: say that (and try again) instead of „Zahlungen noch nicht eingerichtet … alles freigeschaltet“
+  if (outageOf(billingActive(), s.config, s.configState, s.cached)) {
+    pushToast({ kind: "error", title: BILLING.outageTitle, detail: BILLING.outageText });
+    void loadBilling().catch(() => undefined);
     return;
   }
   const gate = purchaseOpenOf(s.config, currentMode());

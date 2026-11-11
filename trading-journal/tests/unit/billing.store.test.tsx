@@ -15,12 +15,14 @@ import {
   effectivePlanOf,
   loadBilling,
   modeOf,
+  outageOf,
   purchaseOpenOf,
   requestOrder,
   resetBilling,
   useBilling,
   verifyReferral,
 } from "@/billing/store";
+import { OutageNotice } from "@/billing/ui/parts";
 import { consentSetHash } from "@/legal/consentRecord";
 import { readLastOrder, resetOrderForm, setImmediate, setTerms, submitOrder, useOrderForm } from "@/billing/purchase/orderState";
 import { peekReturnTo, clearReturnTo } from "@/store/returnTo";
@@ -220,6 +222,56 @@ describe("store flows", () => {
     await waitFor(() => expect(useUi.getState().toasts).toHaveLength(toastsBefore + 1));
     expect(useUi.getState().toasts.at(-1)).toMatchObject({ kind: "info", title: "Zahlungen noch nicht eingerichtet" });
     expect(useBilling.getState().order.open).toBe(false);
+  });
+
+  it("the server does not answer: an outage is said as an outage – never „nicht eingerichtet … alles freigeschaltet“ – and the status is asked again", async () => {
+    signIn();
+    handler = () => ({ status: 503, body: { error: { code: "unavailable", message: "Service Unavailable" } } });
+    await act(async () => {
+      await loadBilling();
+    });
+    expect(useBilling.getState()).toMatchObject({ config: null, configState: "error" });
+    expect(outageOf(true, null, "error", null)).toBe(true);
+    // a configuration this browser knows from before keeps deciding (closed stays closed); loading and ready are no outage
+    expect(outageOf(true, null, "error", { userId: null, plan: null, closed: true, at: 0 })).toBe(false);
+    expect(outageOf(true, null, "loading", null)).toBe(false);
+    expect(outageOf(true, CONFIG, "error", null)).toBe(false);
+    expect(outageOf(false, null, "error", null)).toBe(false);
+    const before = calls.length;
+    requestOrder({ plan: "pro", interval: "month" });
+    const toast = useUi.getState().toasts.at(-1);
+    expect(toast).toMatchObject({ kind: "error", title: "Tarife gerade nicht erreichbar" });
+    expect(JSON.stringify(toast)).not.toMatch(/eingerichtet|freigeschaltet/);
+    expect(useBilling.getState().order.open).toBe(false);
+    // … and the button was not a dead end: the status is being asked again
+    await waitFor(() => expect(calls.length).toBeGreaterThan(before));
+  });
+
+  it("the outage note on the page: says what is wrong, „Erneut versuchen“ loads again, and it leaves once the server answers", async () => {
+    handler = () => ({ status: 503, body: { error: { code: "unavailable", message: "Service Unavailable" } } });
+    await act(async () => {
+      await loadBilling();
+    });
+    render(<OutageNotice />);
+    const note = screen.getByTestId("billing-outage");
+    expect(note).toHaveTextContent("Tarife gerade nicht erreichbar");
+    expect(note).not.toHaveTextContent(/eingerichtet|freigeschaltet/);
+    handler = () => ({ body: status() });
+    await act(async () => {
+      screen.getByTestId("billing-outage-retry").click();
+    });
+    await waitFor(() => expect(screen.queryByTestId("billing-outage")).toBeNull());
+    expect(useBilling.getState().configState).toBe("ready");
+  });
+
+  it("no outage note while everything is fine or simply closed", () => {
+    useBilling.setState({ config: CONFIG, configState: "ready" });
+    const { unmount } = render(<OutageNotice />);
+    expect(screen.queryByTestId("billing-outage")).toBeNull();
+    unmount();
+    useBilling.setState({ config: { ...CONFIG, enabled: false }, configState: "ready" });
+    render(<OutageNotice />);
+    expect(screen.queryByTestId("billing-outage")).toBeNull();
   });
 
   it("an order signed in opens the order sheet with exactly the choice (Team seats clamped)", () => {

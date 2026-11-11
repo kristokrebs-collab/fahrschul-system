@@ -9,4 +9,4 @@ export { UpgradeSheet, type UpgradeSheetProps } from "./UpgradeSheet";
 export { CancelSheet } from "./CancelSheet";
 export { ContractHost } from "./ContractHost";
 export { LimitMeter, type LimitMeterProps } from "./LimitMeter";
-export { ClosedNotice, PriceDigits, Mark, LockGlyph } from "./parts";
+export { ClosedNotice, OutageNotice, PriceDigits, Mark, LockGlyph } from "./parts";

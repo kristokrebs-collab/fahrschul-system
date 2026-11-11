@@ -50,6 +50,14 @@ describe("TradeEditor – pure helpers", () => {
     expect(validateRecord(toRecord({ ...base.d, entry: "80000" }, { ...base.t, status: "open" }), "")).toBeNull();
     expect(validateRecord(toRecord({ ...base.d, entry: "80000", pnlManual: "1", chart: "tradingview.com/x" }, base.t), "tradingview.com/x")).toBe("Der Chart-Link muss mit https:// beginnen.");
   });
+  it("a number no market has is refused (\"1e308\" overflowed the journal's sums), a large real one is not", () => {
+    const base = defaultForm(settings(), "scalp");
+    const huge = "Eine der Zahlen ist unplausibel groß. Bitte prüfe Preise, Größe und Gebühren.";
+    expect(validateRecord(toRecord({ ...base.d, entry: "80000", exit: "81000", size: "1e308" }, base.t), "")).toBe(huge);
+    expect(validateRecord(toRecord({ ...base.d, entry: "1e300", pnlManual: "1" }, base.t), "")).toBe(huge);
+    expect(validateRecord(toRecord({ ...base.d, entry: "80000", pnlManual: "-1e15" }, base.t), "")).toBe(huge);
+    expect(validateRecord(toRecord({ ...base.d, entry: "80000", exit: "81000", size: "250000000" }, base.t), "")).toBeNull();
+  });
   it("Speichern & neu reset keeps pair/account/side/leverage/timeframe and clears the rest", () => {
     const base = defaultForm(settings(), "scalp");
     const filled = { ...base.d, entry: "1", exit: "2", size: "3", timeframe: "4h", notes: "x", chart: "https://a" };
@@ -170,6 +178,33 @@ describe("TradeEditor – sheet", () => {
     expect(useUi.getState().editor.open).toBe(true);
     expect(input("Einstieg").value).toBe("80000");
     expect(useUi.getState().toasts.map((t) => t.title)).toContain("Speichern fehlgeschlagen");
+  });
+
+  it("„81.230“ (a dot before three digits): the form says how it reads it and offers the other reading – nothing is re-read silently", async () => {
+    mount();
+    expect(screen.queryByTestId("dot-hint-entry")).toBeNull();
+    type("Einstieg", "81.230");
+    const hint = screen.getByTestId("dot-hint-entry");
+    expect(hint).toHaveTextContent("Gelesen als 81,23 – der Punkt gilt als Komma.");
+    // untouched, the field keeps the old reading (a price copied from a chart: 142.350 = 142,35)
+    expect(input("Einstieg").value).toBe("81.230");
+    fireEvent.click(within(hint).getByRole("button", { name: "81230 gemeint" }));
+    expect(input("Einstieg").value).toBe("81230");
+    expect(screen.queryByTestId("dot-hint-entry")).toBeNull();
+    // every price field and the size ask the same way; a comma, a plain number or two decimals never do
+    type("Stop-Loss", "80.500");
+    type("Größe (USDT)", "1.000");
+    expect(screen.getByTestId("dot-hint-stop")).toBeInTheDocument();
+    expect(screen.getByTestId("dot-hint-size")).toBeInTheDocument();
+    for (const v of ["81.230,5", "81230", "81.23", "0.125", "81,230"]) {
+      type("Take-Profit", v);
+      expect(screen.queryByTestId("dot-hint-target"), v).toBeNull();
+    }
+    // several thousands dots are not a number for the form: it says so and offers the plain number
+    type("Take-Profit", "1.234.567");
+    expect(screen.getByTestId("dot-hint-target")).toHaveTextContent("So nicht lesbar.");
+    fireEvent.click(within(screen.getByTestId("dot-hint-target")).getByRole("button", { name: "1234567 gemeint" }));
+    expect(input("Take-Profit").value).toBe("1234567");
   });
 
   it("leverage warning above the account rule, `Ausstieg` disabled while open", () => {

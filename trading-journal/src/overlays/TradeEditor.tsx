@@ -10,7 +10,7 @@ import type { AccountId, Conviction, ScreenshotRef, Settings, Setup, Side, Trade
 import { cn } from "@/lib/cn";
 import { nowLocalInput } from "@/lib/dates";
 import { n1, n2, price as fmtPrice, signed } from "@/lib/format";
-import { parseNumber, sanitizeUrl, toInputString } from "@/lib/parse";
+import { parseNumber, sanitizeUrl, thousandsReading, toInputString } from "@/lib/parse";
 import { priceMv } from "@/market/motionValues";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { RollingDigits } from "@/motion/RollingDigits";
@@ -131,6 +131,7 @@ export const EDITOR_MESSAGES = {
   exit: "Bitte Ausstieg angeben oder P&L manuell eintragen.",
   size: "Bitte Positionsgröße angeben oder P&L manuell eintragen.",
   chart: "Der Chart-Link muss mit https:// beginnen.",
+  huge: "Eine der Zahlen ist unplausibel groß. Bitte prüfe Preise, Größe und Gebühren.",
   saveFailed: "Speichern fehlgeschlagen. Prüfe die Verbindung und versuch es erneut.",
   deleteFailed: "Löschen fehlgeschlagen.",
 } as const;
@@ -467,6 +468,9 @@ function toBundleRecord(d: TradeFormStrings, t: Omit<TradeFormTyped, "j">): Omit
   };
 }
 
+/** Above this no price, size or fee of the form is believed (a trillion; the largest real notional is orders of magnitude below). */
+export const MAX_FORM_NUMBER = 1e12;
+
 /**
  * Bundle validation order; `null` when valid. Journal v3: a closed trade may give its size as `Menge` (qty) instead of
  * `Größe`; with the form's `j` the v3 checks follow (exit time before the entry, incomplete fills / ladder rungs / stop
@@ -483,6 +487,8 @@ export function validateRecord(rec: ReturnType<typeof toRecord>, rawChart: strin
     }
     if (!(rec.size != null && rec.size > 0) && !(rec.qty != null && rec.qty > 0)) return EDITOR_MESSAGES.size;
   }
+  // a number no market has ("1e308" was accepted, Funktionsprüfung Runde 13): its P&L overflows and poisons every sum of the journal
+  for (const v of [rec.entry, rec.stop, rec.target, rec.exit, rec.size, rec.qty, rec.leverage, rec.fees, rec.pnlManual]) if (v != null && Math.abs(v) > MAX_FORM_NUMBER) return EDITOR_MESSAGES.huge;
   if (rawChart.trim() && !rec.chart) return EDITOR_MESSAGES.chart;
   return j ? validateJournal(j, { date: rec.date, status: rec.status, side: rec.side }) : null;
 }
@@ -1058,12 +1064,35 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     const v = k === "entry" ? fix.entry : k === "size" ? fix.size : isOpen ? null : fix.exit;
     return v == null ? null : toInputString(Number(v.toFixed(v < 10 ? 6 : 2)));
   };
+  // "81.230": the form reads 81,23 (one dot = the decimal point, as a price copied from a chart is written). Someone who means
+  // eighty-one thousand is ASKED – nothing is re-read silently, one tap takes the other reading (Funktionsprüfung Runde 13).
+  const dotHint = (k: "entry" | "stop" | "target" | "exit" | "size"): ReactNode => {
+    const alt = thousandsReading(d[k]);
+    if (alt == null) return null;
+    const read = parseNumber(d[k]);
+    return (
+      <span data-testid={`dot-hint-${k}`} className="text-mute">
+        {read == null ? "So nicht lesbar." : `Gelesen als ${toInputString(read)} – der Punkt gilt als Komma.`}{" "}
+        <button
+          type="button"
+          className="touch-hit font-medium text-fg underline underline-offset-2"
+          onClick={() => {
+            setD((o) => ({ ...o, [k]: String(alt) }));
+            if (k === invalid) setInvalid(null);
+          }}
+        >
+          {alt} gemeint
+        </button>
+      </span>
+    );
+  };
   const priceField = (k: "entry" | "stop" | "target" | "exit", label: string) => {
     const live = (k === "entry" || k === "exit") && hasLive;
     const fixed = k === "entry" || k === "exit" ? fromFills(k) : null;
     const disabled = (k === "exit" && isOpen) || fixed != null;
+    const hint = disabled ? null : dotHint(k);
     return (
-      <Field key={k} label={label} htmlFor={"f-" + k} help={k === "entry" || k === "exit" ? shotHelp(k, fixed != null ? "Ø aus den Fills" : undefined) : fixed != null ? "Ø aus den Fills" : undefined}>
+      <Field key={k} label={label} htmlFor={"f-" + k} help={hint ?? (k === "entry" || k === "exit" ? shotHelp(k, fixed != null ? "Ø aus den Fills" : undefined) : fixed != null ? "Ø aus den Fills" : undefined)}>
         <div className={cn(live && "grid gap-1.5")}>
           <Input
             id={"f-" + k}
@@ -1164,7 +1193,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     target: priceField("target", "Take-Profit"),
     exit: priceField("exit", "Ausstieg"),
     size: (
-      <Field label={`Größe (${cur})`} htmlFor="f-size" help={fix ? "Aus den Fills" : shotHelp("size", "Positionswert inkl. Hebel")}>
+      <Field label={`Größe (${cur})`} htmlFor="f-size" help={fix ? "Aus den Fills" : (dotHint("size") ?? shotHelp("size", "Positionswert inkl. Hebel"))}>
         <Input id="f-size" numeric autoComplete="off" value={fromFills("size") ?? d.size} onChange={setStr("size")} disabled={fix != null} className={cn(shotReview("size") && "border-warn/60")} {...fieldInvalid("size")} />
       </Field>
     ),

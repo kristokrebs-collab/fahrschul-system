@@ -6,7 +6,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Dock } from "@/app/Dock";
 import { NAV_GROUPS, PAGE_LABELS } from "@/app/navGroups";
-import { closedGroups, Sidebar, SIDEBAR_WIDTH, sidebarExpanded } from "@/app/Sidebar";
+import { closedGroups, offsetTopWithin, Sidebar, SIDEBAR_WIDTH, sidebarExpanded } from "@/app/Sidebar";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { loadPrefs, PAGES, useUi } from "@/store/uiStore";
 
@@ -97,6 +97,41 @@ describe("sidebar vs bottom bar", () => {
     act(() => useUi.getState().setPref("sidebar", "open"));
     expect(aside.hasAttribute("data-expanded")).toBe(true);
     expect(screen.getByTestId("sidebar-toggle")).toHaveAttribute("aria-label", "Seitenleiste lösen");
+  });
+
+  it("the marker's place is the row's top inside the list – also while the first-load wave makes every `li` a containing block", () => {
+    // `offsetTop` / `offsetParent` as the browser reports them: at rest the row hangs under the list (top 429) …
+    const node = (offsetTop: number, offsetParent: unknown) => ({ offsetTop, offsetParent }) as unknown as HTMLElement;
+    const list = node(0, null);
+    expect(offsetTopWithin(node(429, list), list)).toBe(429);
+    // … during the wave the animated `li` is in between: the row says 0, the `li` carries the 429 (the plate used to be parked at 0)
+    const li = node(429, list);
+    expect(offsetTopWithin(node(0, li), list)).toBe(429);
+    // a row without a positioned list above it (detached) never loops
+    expect(offsetTopWithin(node(7, null), list)).toBe(7);
+  });
+
+  it("a very low screen (a phone held sideways): the whole sidebar scrolls as one column – the page list is not squeezed between head and foot", () => {
+    // tall: the list scrolls between the fixed head and foot
+    screenOf(1700);
+    const tall = mount();
+    const nav = () => screen.getByRole("navigation", { name: "Hauptnavigation" });
+    expect(nav().className).toContain("overflow-y-auto");
+    expect(nav().closest("aside")?.hasAttribute("data-tiny")).toBe(false);
+    tall.unmount();
+    // 844 × 390: head (two tiles) and foot (four rows) left 22 px for 19 pages
+    window.matchMedia = ((q: string) => {
+      const min = /min-width:\s*(\d+)px/.exec(q);
+      const maxH = /max-height:\s*(\d+)px/.exec(q);
+      const matches = (min ? 844 >= Number(min[1]) : true) && (maxH ? 390 <= Number(maxH[1]) : true) && !/hover|pointer|reduce|max-width/.test(q);
+      return { matches, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false } as unknown as MediaQueryList;
+    }) as typeof window.matchMedia;
+    mount();
+    const aside = nav().closest("aside") as HTMLElement;
+    expect(aside.hasAttribute("data-tiny")).toBe(true);
+    expect(aside.className).toContain("overflow-y-auto");
+    expect(nav().className).not.toContain("overflow-y-auto");
+    expect(nav().className).toContain("shrink-0");
   });
 
   it("a group folds and unfolds; the choice is stored; a short screen folds Auswerten and Konto (unless current) until the reader chooses", () => {

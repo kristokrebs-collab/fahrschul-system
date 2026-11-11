@@ -163,4 +163,13 @@ describe("index.html", () => {
   it("hides the deploy preview's collaboration bar (an empty white strip over the bottom navigation under this site's CSP)", () => {
     expect(html).toMatch(/body > div\[data-netlify-deploy-id\]\s*\{\s*display: none !important;\s*\}/);
   });
+
+  it("keeps iOS Safari from zooming into a focused field: 16 px there, and only there (the rule is fenced by an iOS-only @supports)", () => {
+    const rule = /@supports \(-webkit-touch-callout: none\)\s*\{\s*input,\s*select,\s*textarea\s*\{\s*font-size: 16px !important;\s*\}\s*\}/;
+    expect(html).toMatch(rule);
+    // outside the fence no field size is forced (Android, tablets and desktop keep the designed 13.5–14 px)
+    expect(html.replace(rule, "")).not.toMatch(/font-size:\s*16px/);
+    // pinch zoom stays allowed everywhere (no `maximum-scale` / `user-scalable=no` as the shortcut)
+    expect(html).not.toMatch(/maximum-scale|user-scalable/);
+  });
 });

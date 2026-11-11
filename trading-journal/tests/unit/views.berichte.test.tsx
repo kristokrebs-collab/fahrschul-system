@@ -190,6 +190,10 @@ describe("ReportReadyHost", () => {
     const ready = await screen.findByTestId("report-ready", {}, { timeout: 15_000 });
     const key = ready.getAttribute("data-key")!;
     expect(ready).toHaveTextContent(/(Wochen|Monats|Quartals|Jahres)bericht/);
+    // the wipe's last word is behaviour (how often the plan was followed), the buttons come after it
+    const behaviour = screen.getByTestId("report-ready-behaviour");
+    expect(behaviour).toHaveTextContent(/^Verhalten.*(nach Plan|Nach Plan)/);
+    expect(behaviour.compareDocumentPosition(screen.getByTestId("report-ready-open")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(readAnnounced()).toContain(key);
     expect(readRaw(READY_KEY)).toContain(key);
     fireEvent.click(screen.getByTestId("report-ready-open"));

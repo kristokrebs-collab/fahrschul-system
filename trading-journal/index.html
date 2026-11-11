@@ -31,6 +31,16 @@
       body > div[data-netlify-deploy-id] {
         display: none !important;
       }
+      /* iOS Safari zooms the whole page when a focused field's text is smaller than 16 px, and does not zoom back (Funktionsprüfung
+         Runde 13: the fields are 13.5–14 px). Only iOS knows `-webkit-touch-callout`, so Android, tablets and desktop keep their sizes.
+         Here and not in the stylesheet: it must hold before the first field (the sign-up form) is on screen. */
+      @supports (-webkit-touch-callout: none) {
+        input,
+        select,
+        textarea {
+          font-size: 16px !important;
+        }
+      }
     </style>
     <!-- no connect-ahead hint to an exchange here: the browser would send the visitor's IP address to Binance on every page view,
          before any choice was made (DSGVO, docs/RECHT-CHECKLISTE.md). The market connection opens when the app asks for it. -->

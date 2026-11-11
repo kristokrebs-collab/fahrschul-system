@@ -1,8 +1,8 @@
 /**
  * "Bericht bereit" (P04): when a week / month / quarter / year has just ended and its report has not been opened yet
  * (`pendingReports`, seen markers in `settings.coach.reports.seen`), ONE full-screen wipe announces the most important
- * one – red curtain, black panel, the report name, its net result and three figures rising in (`FullscreenWipe` +
- * `WipeItem`). It shows once per period and device (`storageKey("report-ready")` holds the announced keys; announcing a
+ * one – red curtain, black panel, the report name, its net result and three figures rising in, then – as the last word – how
+ * often the plan was followed (`planLine`: behaviour, counted, never a verdict) (`FullscreenWipe` + `WipeItem`). It shows once per period and device (`storageKey("report-ready")` holds the announced keys; announcing a
  * quarter also covers the month and week that ended with it); "Bericht öffnen" selects the report and hands over to
  * the page (`onOpen`), "Später" just closes – the archive keeps its "neu" marker.
  *
@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useEntitlement } from "@/billing/entitlements";
-import { KIND_REPORT, pendingReports, type ArchiveEntry } from "@/domain/reports";
+import { KIND_REPORT, pendingReports, planLine, type ArchiveEntry } from "@/domain/reports";
 import { cn } from "@/lib/cn";
 import { pct0, signed } from "@/lib/format";
 import { FullscreenWipe, WipeItem } from "@/motion/pulse/FullscreenWipe";
@@ -106,7 +106,14 @@ export function ReportReadyHost({ onOpen }: { onOpen?: (key: string) => void }) 
             ))}
           </dl>
         </WipeItem>
-        <WipeItem index={3} className="flex flex-wrap gap-3">
+        {/* the wipe ends on behaviour, not on the result (docs/PSYCHOLOGIE.md, 6.2): counted from the trades, no verdict */}
+        <WipeItem index={3}>
+          <p className="max-w-[560px] border-t border-white/15 pt-3 text-[15px] leading-snug text-fg" data-testid="report-ready-behaviour">
+            <span className="mr-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">Verhalten</span>
+            {planLine(pending)}
+          </p>
+        </WipeItem>
+        <WipeItem index={4} className="flex flex-wrap gap-3">
           <button type="button" onClick={view} className="touch-hit rounded-full bg-fg px-5 py-2.5 text-[14px] font-medium text-ink-950" data-testid="report-ready-open">
             Bericht öffnen
           </button>

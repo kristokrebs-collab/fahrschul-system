@@ -65,6 +65,35 @@ describe("SetupEditor", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("a name another Grundlage already carries is refused (spaces and case do not make a new name); the own name stays savable", async () => {
+    const saveSpy = vi.fn(useJournal.getState().saveSettings);
+    useJournal.setState({ saveSettings: saveSpy });
+    const taken = "Diesen Namen trägt schon eine andere Grundlage. Wähle einen eigenen, damit du sie in Filtern und Berichten auseinanderhältst.";
+    const fresh = render(<SetupEditor open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "  4h-breakout   über 85.900 " } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(taken);
+    expect(saveSpy).not.toHaveBeenCalled();
+    fresh.unmount();
+
+    // editing a Grundlage under its own name is no clash …
+    const onClose = vi.fn();
+    const own = render(<SetupEditor open setupId="s_bo" fromTrade onClose={onClose} />);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "4H-Breakout über 85.900 " } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(saveSpy).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalled();
+    own.unmount();
+
+    // … renaming it onto another one is
+    const other = useJournal.getState().settings.setups.find((x) => x.id === "s_mtf");
+    render(<SetupEditor open setupId="s_bo" fromTrade onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: other?.name ?? "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(taken);
+    expect(saveSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("edits an existing setup from the trade editor (no morph), shows usage and deletes with confirm", async () => {
     const onClose = vi.fn();
     render(<SetupEditor open setupId="s_bo" fromTrade onClose={onClose} />);

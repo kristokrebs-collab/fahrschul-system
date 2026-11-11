@@ -64,6 +64,8 @@ export const SETUP_EDITOR_STRINGS = {
   cancel: "Abbrechen",
   save: "Speichern",
   errName: "Bitte einen Namen angeben.",
+  /** Two Grundlagen with one name cannot be told apart in a filter, a chip or a report (Funktionsprüfung Runde 13). */
+  errNameTaken: "Diesen Namen trägt schon eine andere Grundlage. Wähle einen eigenen, damit du sie in Filtern und Berichten auseinanderhältst.",
   errSave: "Speichern fehlgeschlagen.",
   errDelete: "Löschen fehlgeschlagen.",
   toastCreated: "Grundlage angelegt",
@@ -175,6 +177,13 @@ export function SetupEditor(props: SetupEditorProps) {
   async function save() {
     if (!form.name.trim()) {
       setError(SETUP_EDITOR_STRINGS.errName);
+      revealInvalid("sf-name", { reduced });
+      return;
+    }
+    // a name another Grundlage already carries – asked only for a new one or a rename (two old namesakes can still be edited apart)
+    const name = normName(form.name);
+    if ((!existing || normName(existing.name) !== name) && useJournal.getState().settings.setups.some((x) => x.id !== existing?.id && normName(x.name) === name)) {
+      setError(SETUP_EDITOR_STRINGS.errNameTaken);
       revealInvalid("sf-name", { reduced });
       return;
     }
@@ -366,6 +375,9 @@ export function SetupEditor(props: SetupEditorProps) {
     </Sheet>
   );
 }
+
+/** A name as people compare it: outer spaces, runs of spaces and case do not make a different name. */
+const normName = (v: string): string => v.trim().replace(/\s+/g, " ").toLocaleLowerCase("de-DE");
 
 /** Same saved meaning: name/desc trimmed, empty checklist rows ignored (what `finalizeSetup` would store). */
 export function sameForm(a: Form, b: Form): boolean {

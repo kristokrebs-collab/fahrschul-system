@@ -16,6 +16,11 @@ export interface ArchiveEntry {
   net: number;
   winRate: number | null;
   seen: boolean;
+  /**
+   * Behaviour of the period, counted and never estimated: closed trades that say whether the plan was followed (`known`) and how many
+   * of them did (`followed`). The „Bericht bereit“ wipe ends on this line, not on the result (docs/PSYCHOLOGIE.md, 6.2).
+   */
+  plan: { followed: number; known: number };
 }
 
 /** A "Bericht bereit" only for periods that ended within this many days. */
@@ -40,7 +45,8 @@ export function reportArchive(list: readonly EnrichedTrade[], settings: object, 
     .slice(0, limit)
     .map(({ period, trades }) => {
       const g = aggregate(trades);
-      return { period, n: g.n, net: g.net, winRate: g.winRate, seen: seen.has(period.key) };
+      const known = trades.filter((t) => t.followedPlan === true || t.followedPlan === false);
+      return { period, n: g.n, net: g.net, winRate: g.winRate, seen: seen.has(period.key), plan: { followed: known.filter((t) => t.followedPlan === true).length, known: known.length } };
     });
 }
 
@@ -66,3 +72,15 @@ export function pendingReports(list: readonly EnrichedTrade[], settings: Setting
 export function pendingReport(list: readonly EnrichedTrade[], settings: Settings, now: number): ArchiveEntry | null {
   return pendingReports(list, settings, now)[0] ?? null;
 }
+
+/**
+ * The closing line of the „Bericht bereit“ wipe: what the period says about BEHAVIOUR – how often the plan was followed, counted from
+ * the trades that say so. No verdict, no score, no praise for a result; without a single answer it says exactly that.
+ */
+export function planLine(e: Pick<ArchiveEntry, "n" | "plan">): string {
+  const { followed, known } = e.plan;
+  if (known === 0) return e.n === 1 ? "Beim Trade steht nicht, ob er nach Plan lief." : "Bei keinem Trade steht, ob er nach Plan lief.";
+  if (known === 1) return followed === 1 ? "Der eine Trade mit Angabe lief nach Plan." : "Der eine Trade mit Angabe lief nicht nach Plan.";
+  return `Nach Plan gehandelt: ${followed} von ${known} Trades mit Angabe.`;
+}
+

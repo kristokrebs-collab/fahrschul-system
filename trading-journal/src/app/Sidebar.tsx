@@ -58,9 +58,26 @@ export const SIDEBAR_STRINGS = { unpin: "Seitenleiste lösen", pin: "Seitenleist
 
 /** Below this screen height the wide sidebar folds every group but the current one until the reader chooses (19 rows of 44 px do not fit). */
 export const SIDEBAR_SHORT_QUERY = "(max-height: 1299px)";
+/**
+ * So low (a phone held sideways, 844 × 390) that the fixed head and foot leave the page list no room: measured 22 px for 19 pages
+ * (Funktionsprüfung Runde 13). There the whole sidebar scrolls as one column instead of the list between head and foot.
+ */
+export const SIDEBAR_TINY_QUERY = "(max-height: 560px)";
 
 /** The groups a short screen folds by default: the long list of evaluation pages and the account group – Erfassen (Trades …) and Prüfen (Übersicht, Markt …) stay open. */
 const FOLD_WHEN_SHORT: readonly NavGroupId[] = ["auswerten", "konto"];
+
+/**
+ * A row's top inside `box`, whatever sits in between: `offsetTop` is measured from the nearest ancestor that is a containing block, and
+ * while the first-load wave runs every `li` of the list is one (its entrance animates a transform) – the row then reports 0, the marker
+ * was parked at the top of the list and stayed there until the next page change (seen on every reload: the plate sat above „Trades“,
+ * far above „Berichte“). Walking the `offsetParent` chain up to the box gives the row's resting place; transforms do not count in it.
+ */
+export function offsetTopWithin(el: HTMLElement, box: HTMLElement | null): number {
+  let top = 0;
+  for (let n: HTMLElement | null = el; n && n !== box; n = n.offsetParent as HTMLElement | null) top += n.offsetTop;
+  return top;
+}
 
 /** Pure: the folded groups. An explicit choice wins; otherwise a short screen folds Auswerten and Konto & Rechtliches unless one of them holds the current page. */
 export function closedGroups(stored: readonly NavGroupId[] | null, short: boolean, current: NavGroupId): readonly NavGroupId[] {
@@ -150,6 +167,7 @@ function SidebarPanel() {
   const pref = useUi((s) => s.sidebar);
   const setPref = useUi((s) => s.setPref);
   const short = useMediaQuery(SIDEBAR_SHORT_QUERY, false);
+  const tiny = useMediaQuery(SIDEBAR_TINY_QUERY, false);
   const canHover = useCanHover();
   const storedClosed = useUi((s) => s.sidebarClosed);
   const expanded = sidebarExpanded(pref);
@@ -223,7 +241,7 @@ function SidebarPanel() {
       return;
     }
     markerOpacity.set(currentOpen ? 1 : 0);
-    const top = el.offsetTop;
+    const top = offsetTopWithin(el, nav.current);
     const jump = !shown.current || reduced || lastExpanded.current !== expanded;
     shown.current = true;
     lastExpanded.current = expanded;
@@ -252,7 +270,7 @@ function SidebarPanel() {
     if (!box || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(() => {
       const el = box.querySelector<HTMLElement>(`[data-nav-page="${page}"]`);
-      if (el) y.jump(el.offsetTop);
+      if (el) y.jump(offsetTopWithin(el, box));
       if (el && performance.now() < keepInView.current) el.scrollIntoView?.({ block: rowAt, behavior: "instant" });
     });
     for (const child of Array.from(box.children)) if (child !== box.querySelector("[data-sidebar-marker]")) ro.observe(child);
@@ -274,7 +292,7 @@ function SidebarPanel() {
   useEffect(() => {
     const onResize = () => {
       const el = nav.current?.querySelector<HTMLElement>(`[data-nav-page="${page}"]`);
-      if (el) y.jump(el.offsetTop);
+      if (el) y.jump(offsetTopWithin(el, nav.current));
     };
     window.addEventListener("resize", onResize, { passive: true });
     return () => window.removeEventListener("resize", onResize);
@@ -334,7 +352,8 @@ function SidebarPanel() {
           data-expanded={expanded ? "" : undefined}
           data-open={open ? "" : undefined}
           aria-label={SIDEBAR_LABEL}
-          className="sb-aside pointer-events-auto absolute inset-0 flex flex-col"
+          data-tiny={tiny ? "" : undefined}
+          className={cn("sb-aside pointer-events-auto absolute inset-0 flex flex-col", tiny && "overflow-y-auto overscroll-contain")}
           {...peek.bind}
         >
           <div className={cn("shrink-0 pb-1 pt-4", expanded ? "px-3" : "pl-2.5")}>
@@ -343,7 +362,7 @@ function SidebarPanel() {
           <div className="shrink-0 px-2 pb-1">
             <SidebarSearch />
           </div>
-          <nav ref={nav} id={id} aria-label={SIDEBAR_LABEL} onKeyDown={onNavKey} className={cn("relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3", expanded ? "pt-3" : "pt-2.5")}>
+          <nav ref={nav} id={id} aria-label={SIDEBAR_LABEL} onKeyDown={onNavKey} className={cn("relative px-2 pb-3", tiny ? "shrink-0" : "min-h-0 flex-1 overflow-y-auto overscroll-contain", expanded ? "pt-3" : "pt-2.5")}>
             {/* the marker: one rounded plate behind the active row, travelling on `spring.layout` (transform only); the dot rides on it */}
             <motion.span aria-hidden="true" data-sidebar-marker="" className="sb-mark glass-on pointer-events-none absolute left-2 top-0 h-11 rounded-xl" style={{ y, opacity: markerOpacity, scaleY: stretch }}>
               <span className="sb-dot absolute right-2.5 top-[19px] size-1.5 rounded-full bg-signal" />
