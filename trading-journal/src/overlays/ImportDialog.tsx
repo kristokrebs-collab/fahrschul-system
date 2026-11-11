@@ -1,0 +1,437 @@
+import { AnimatePresence, motion } from "motion/react";
+import { useRef, useState, type ChangeEvent } from "react";
+import { ConnectSlot } from "@/connect/ConnectSlot";
+import { backupShotInfo, restoreShotsFromBackupReport } from "@/journal/screenshots/backupShots";
+import type { ZipBackup } from "@/journal/screenshots/backupZip";
+import { fmt } from "@/lib/format";
+import { openScreenshotImport } from "@/journal/ocr/store";
+import { MotionNumber } from "@/motion/MotionNumber";
+import { Sheet } from "@/motion/Sheet";
+import { StaggerItem } from "@/motion/Stagger";
+import { TextRoll } from "@/motion/TextRoll";
+import { spring, tween } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
+import { Button } from "@/primitives/Button";
+import { Segmented } from "@/primitives/Segmented";
+import { pushToast } from "@/store/uiStore";
+import { importBackup, parseBackup, previewText, type ImportMode, type ImportPreview, type ImportResult } from "@/store/backup";
+import { BinDelete, useBinDelete } from "@/motion/BinDelete";
+import { useConfirmFocus } from "@/motion/HoldConfirm";
+
+export const IMPORT_STRINGS = {
+  title: "Backup importieren",
+  intro: "Wähle eine JSON-Datei aus dem Export oder ein ZIP „Backup mit Bildern“. Vor dem Schreiben legt das Journal einen Snapshot des aktuellen Stands an.",
+  file: "Backup-Datei",
+  choose: "Datei wählen",
+  chosen: (name: string) => `Datei: ${name}`,
+  mode: "Modus",
+  merge: "Zusammenführen",
+  replace: "Ersetzen",
+  mergeHelp: "Trades und Ablesungen nach ID zusammenführen, bei Konflikt gewinnt der neuere Stand. Grundlagen nach ID mergen, Einstellungen bleiben.",
+  replaceHelp: "Alles aus dem Backup übernehmen. Der aktuelle Stand wird vorher gesichert.",
+  confirm: "Alles ersetzen?",
+  yes: "Ja",
+  no: "Nein",
+  cancel: "Abbrechen",
+  run: "Importieren",
+  running: "Importiert …",
+  failed: "Import fehlgeschlagen",
+  trades: "Trades",
+  setups: "Grundlagen",
+  readings: "Ablesungen",
+  exportedAt: "exportiert am",
+  readError: "Datei konnte nicht gelesen werden",
+  tooBig: (mb: number) => `Die Datei ist größer als ${mb} MB – das ist kein Backup dieses Journals.`,
+  csvLead: "Trades aus einer Tabelle oder einem Börsen-Export (Bitunix, Binance, Bybit, OKX …)?",
+  csv: "CSV importieren",
+  autoLead: "Oder lieber automatisch? Verbinde deine Börse, dann holt das Journal die Trades selbst (nur Lesen).",
+  shotLead: "Oder ein Screenshot deiner Order- / Positionshistorie? Die Texterkennung läuft nur auf deinem Gerät.",
+  shot: "Screenshot importieren",
+} as const;
+
+/** P11 CSV import (mapping assistant, duplicates check) – the sheet lives in the app's ExchangeHost; works without cloud. */
+export function openCsvImportSheet(): void {
+  void import("@/exchanges/store").then((m) => m.openCsvImport());
+}
+
+export const IMPORT_MODES: readonly { v: ImportMode; label: string }[] = [
+  { v: "merge", label: IMPORT_STRINGS.merge },
+  { v: "replace", label: IMPORT_STRINGS.replace },
+];
+
+/** Pictures in the file (Review F08). */
+export const IMPORT_SHOT_STRINGS = {
+  embedded: (n: number) => `inkl. ${n === 1 ? "1 Screenshot" : `${n} Screenshots`} – sie kommen auf dieses Gerät.`,
+  missing: (n: number) =>
+    `${n === 1 ? "1 Screenshot ist" : `${n} Screenshots sind`} nicht enthalten – nur Verweise. Die Bilder liegen auf dem Gerät, von dem das Backup stammt („Backup mit Bildern“ unter Einstellungen → Daten nimmt sie mit).`,
+  /** A ZIP lists the pictures it could not carry. */
+  zipMissing: (n: number) => `${n === 1 ? "1 Screenshot war" : `${n} Screenshots waren`} beim Export nicht erreichbar und ${n === 1 ? "fehlt" : "fehlen"} im ZIP.`,
+  zipEmbedded: (n: number) =>
+    `inkl. ${n === 1 ? "1 Screenshot" : `${n} Screenshots`} als Original – jede Datei wird vor dem Speichern gegen die Prüfsumme im Manifest sowie auf Bildformat und Größe geprüft. Das zeigt, dass die Dateien unversehrt sind, nicht dass das Backup von dir stammt: importiere nur Backups, die du selbst erstellt hast. Vorhandene Screenshots werden nicht überschrieben.`,
+} as const;
+
+/** Largest JSON backup the import reads into memory (old ones carry base64 pictures); a ZIP's manifest and journal have their own caps (`backupZip.ts`). */
+export const IMPORT_MAX_JSON_BYTES = 200 * 1024 * 1024;
+
+type Parsed = { ok: true; text: string; preview: ImportPreview; shots: { embedded: number; missing: number }; zip?: ZipBackup } | { ok: false; error: string };
+
+/** A chosen file that is (or is named like) a ZIP – the JSON path never sees it. */
+const isZipName = (f: File) => /\.zip$/i.test(f.name) || /zip/i.test(f.type);
+
+export interface ImportDialogProps {
+  open: boolean;
+  onClose: () => void;
+  /** Called after a successful import (the `Daten` card refreshes its backup list). */
+  onDone?: (result: ImportResult) => void;
+  /** Injected reader for tests (defaults to `File.text()`). */
+  readFile?: (file: File) => Promise<string>;
+}
+
+/**
+ * `Backup importieren` (Plan 8.5, Sheet 540 px): file input `.json` → `parseBackup` preview
+ * (`{n} Trades, {m} Grundlagen, {k} Ablesungen · exportiert am {date}`, counts as `MotionNumber`) →
+ * mode `Zusammenführen | Ersetzen` → inline `Alles ersetzen? Ja / Nein` → `importBackup` with a
+ * progress bar. Toasts (`Backup importiert` / `Import fehlgeschlagen`) come from the store.
+ *
+ * Motion: the body blocks cascade in (`StaggerItem`), the preview counts up from 0, the progress bar glides on
+ * `spring.bar` with a shimmer band while busy and turns win-green at 100 %, and `Importieren` in `Ersetzen` mode is
+ * a `HoldConfirm` (a click still asks `Alles ersetzen?`, holding it imports right away).
+ */
+export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogProps) {
+  const [fileName, setFileName] = useState("");
+  const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [mode, setMode] = useState<ImportMode>("merge");
+  const [confirm, setConfirm] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const reduced = useReducedFx();
+  const { trigger: runTrigger, no: confirmNo } = useConfirmFocus(confirm);
+
+  // Reset on open (render-phase state adjustment instead of an effect).
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setFileName("");
+      setParsed(null);
+      setMode("merge");
+      setConfirm(false);
+      setProgress(null);
+    }
+  }
+
+  async function onFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setConfirm(false);
+    try {
+      if (!isZipName(file) && file.size > IMPORT_MAX_JSON_BYTES) {
+        setParsed({ ok: false, error: IMPORT_STRINGS.tooBig(Math.round(IMPORT_MAX_JSON_BYTES / (1024 * 1024))) });
+        return;
+      }
+      if (isZipName(file)) {
+        // „Backup mit Bildern“ (ZIP): manifest + journal + original files (lazy chunk)
+        const m = await import("@/journal/screenshots/backupZip");
+        let zip: ZipBackup;
+        try {
+          zip = await m.readBackupZip(file);
+        } catch (e) {
+          setParsed({ ok: false, error: e instanceof Error ? e.message : IMPORT_STRINGS.readError });
+          return;
+        }
+        const res = parseBackup(zip.journalText);
+        setParsed(res.ok ? { ok: true, text: zip.journalText, preview: res.preview, shots: m.zipShotInfo(zip), zip } : { ok: false, error: res.path ? `${res.path}: ${res.error}` : res.error });
+        return;
+      }
+      const text = await (readFile ? readFile(file) : file.text());
+      const res = parseBackup(text);
+      setParsed(res.ok ? { ok: true, text, preview: res.preview, shots: backupShotInfo(text) } : { ok: false, error: res.path ? `${res.path}: ${res.error}` : res.error });
+    } catch {
+      setParsed({ ok: false, error: IMPORT_STRINGS.readError });
+    }
+  }
+
+  /** `close` false: the delete pill closes the dialog itself once its ring closed (`bin`). Resolves `false` when the import failed. */
+  async function run(close = true): Promise<boolean> {
+    if (!parsed?.ok) return false;
+    setProgress(15);
+    const tick = setInterval(() => setProgress((p) => (p == null ? p : Math.min(85, p + 10))), 120);
+    try {
+      const result = await importBackup(parsed.text, { mode });
+      // pictures a "Backup mit Bildern" carries go back into this device's store (Review F08)
+      if (result.ok && parsed.zip) {
+        const m = await import("@/journal/screenshots/backupZip");
+        const told = m.restoreSummary(await m.restoreShotsFromZip(parsed.zip));
+        if (told) pushToast({ ...told, duration: 9000 });
+      } else if (result.ok && shots.embedded > 0) {
+        const told = (await import("@/journal/screenshots/restoreGuard")).restoreSummary(await restoreShotsFromBackupReport(parsed.text));
+        if (told && told.kind === "error") pushToast({ ...told, duration: 9000 });
+      }
+      clearInterval(tick);
+      setProgress(100);
+      if (result.ok) {
+        if (close) {
+          onDone?.(result);
+          onClose();
+        } else imported.current = result;
+        return true;
+      }
+      setParsed({ ok: false, error: result.error ?? IMPORT_STRINGS.failed });
+      setProgress(null);
+      setConfirm(false);
+      return false;
+    } catch {
+      clearInterval(tick);
+      setProgress(null);
+      return false;
+    }
+  }
+  const shots = parsed?.ok ? parsed.shots : { embedded: 0, missing: 0 };
+  const busy = progress != null && progress < 100;
+  const canRun = Boolean(parsed?.ok) && !busy;
+  // „Alles ersetzen“ (Runde 13): the delete pill – what is there now goes into the bin – plays once the replace was confirmed (a hold or „Ja“);
+  // its spinner is this very import, a failure brings the pill back (the dialog already says why)
+  const imported = useRef<Parameters<NonNullable<ImportDialogProps["onDone"]>>[0] | null>(null);
+  const bin = useBinDelete(
+    async () => {
+      if (!(await run(false))) throw new Error(IMPORT_STRINGS.failed);
+    },
+    {
+      done: () => {
+        const r = imported.current;
+        imported.current = null;
+        if (r) onDone?.(r);
+        onClose();
+      },
+    },
+  );
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      size="md"
+      title={IMPORT_STRINGS.title}
+      // nothing typed here to lose: a chosen file is picked again in a second (no "Änderungen verwerfen?")
+      dismissGuard={false}
+      footer={
+        <>
+          <span className="flex-1" />
+          <Button onClick={onClose} disabled={busy}>
+            {IMPORT_STRINGS.cancel}
+          </Button>
+          {mode === "replace" && confirm ? (
+            <motion.span
+              className="flex flex-wrap items-center gap-2 text-[12.5px] text-(--color-danger-text)"
+              role="alert"
+              initial={reduced ? false : { opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ default: tween.fade, scale: spring.pop }}
+            >
+              {IMPORT_STRINGS.confirm}
+              <Button
+                size="sm"
+                variant="danger"
+                onClick={() => {
+                  setConfirm(false);
+                  bin.start();
+                }}
+                disabled={!canRun}
+              >
+                {IMPORT_STRINGS.yes}
+              </Button>
+              <Button ref={confirmNo} size="sm" onClick={() => setConfirm(false)}>
+                {IMPORT_STRINGS.no}
+              </Button>
+            </motion.span>
+          ) : mode === "replace" ? (
+            <BinDelete ref={runTrigger} bin={bin} disabled={!canRun && !bin.busy} onAsk={() => setConfirm(true)}>
+              {IMPORT_STRINGS.run}
+            </BinDelete>
+          ) : (
+            <Button variant="primary" disabled={!canRun} onClick={() => void run()} aria-busy={busy || undefined}>
+              <TextRoll mode="roll" text={busy ? IMPORT_STRINGS.running : IMPORT_STRINGS.run} />
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="grid gap-4">
+        <StaggerItem>
+          <p className="text-[13px] text-mute">{IMPORT_STRINGS.intro}</p>
+        </StaggerItem>
+
+        <StaggerItem className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-ink-950/40 px-3.5 py-2.5">
+          <span className="text-[12.5px] text-mute">{IMPORT_STRINGS.csvLead}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              onClose();
+              openCsvImportSheet();
+            }}
+            disabled={busy}
+            data-testid="import-csv"
+          >
+            {IMPORT_STRINGS.csv}
+          </Button>
+        </StaggerItem>
+
+        <StaggerItem className="grid gap-2" data-testid="import-connect">
+          <span className="text-[12.5px] text-mute">{IMPORT_STRINGS.autoLead}</span>
+          <ConnectSlot service="binance-futures" onBeforeOpen={onClose} />
+          <ConnectSlot service="bitunix" onBeforeOpen={onClose} />
+        </StaggerItem>
+
+        <StaggerItem className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-ink-950/40 px-3.5 py-2.5">
+          <span className="text-[12.5px] text-mute">{IMPORT_STRINGS.shotLead}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              onClose();
+              openScreenshotImport();
+            }}
+            disabled={busy}
+            data-testid="import-shot"
+          >
+            {IMPORT_STRINGS.shot}
+          </Button>
+        </StaggerItem>
+
+        <StaggerItem className="flex flex-wrap items-center gap-3">
+          <input ref={inputRef} type="file" accept=".json,.zip,application/json,application/zip" aria-label={IMPORT_STRINGS.file} onChange={onFile} className="sr-only" />
+          <Button onClick={() => inputRef.current?.click()} disabled={busy}>
+            {IMPORT_STRINGS.choose}
+          </Button>
+          {fileName && (
+            <motion.span key={fileName} className="truncate font-mono text-[12px] text-mute" initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={tween.fade}>
+              {IMPORT_STRINGS.chosen(fileName)}
+            </motion.span>
+          )}
+        </StaggerItem>
+
+        <AnimatePresence mode="popLayout" initial={false}>
+          {parsed?.ok && (
+            <motion.div
+              key="preview"
+              layout
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, transition: tween.exit }}
+              transition={spring.layout}
+              style={{ borderRadius: 12 }}
+              className="grid gap-3 rounded-xl border border-line bg-ink-950/50 p-4"
+              data-testid="import-preview"
+            >
+              <dl className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    [IMPORT_STRINGS.trades, parsed.preview.trades],
+                    [IMPORT_STRINGS.setups, parsed.preview.setups],
+                    [IMPORT_STRINGS.readings, parsed.preview.readings],
+                  ] as const
+                ).map(([label, n]) => (
+                  <div key={label}>
+                    <dt className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-faint">{label}</dt>
+                    <dd className="num font-mono text-[17px] font-medium">
+                      <MotionNumber value={n} decimals={0} countOnReveal />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="text-[12.5px] text-mute" data-testid="import-preview-text">
+                {previewText(parsed.preview)}
+              </p>
+              {shots.embedded > 0 && (
+                <p className="text-[12px] text-mute" data-testid="import-shots">
+                  {parsed.zip ? IMPORT_SHOT_STRINGS.zipEmbedded(shots.embedded) : IMPORT_SHOT_STRINGS.embedded(shots.embedded)}
+                </p>
+              )}
+              {shots.missing > 0 && (
+                <p className="text-[12px] text-warn" data-testid="import-shots-missing">
+                  {parsed.zip ? IMPORT_SHOT_STRINGS.zipMissing(shots.missing) : IMPORT_SHOT_STRINGS.missing(shots.missing)}
+                </p>
+              )}
+              {parsed.preview.exportedAt && <span className="sr-only">{`${IMPORT_STRINGS.exportedAt} ${fmt.date(new Date(parsed.preview.exportedAt))}`}</span>}
+            </motion.div>
+          )}
+          {parsed && !parsed.ok && (
+            <motion.p
+              key="error"
+              layout
+              role="alert"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: tween.exit }}
+              transition={spring.layout}
+              style={{ borderRadius: 12 }}
+              className="rounded-xl border border-loss/30 bg-loss/[0.07] px-3 py-2 text-[13px] text-loss"
+            >
+              {IMPORT_STRINGS.failed}: {parsed.error}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        <StaggerItem className="grid gap-1.5">
+          <span id="import-mode-label" className="label">
+            {IMPORT_STRINGS.mode}
+          </span>
+          <Segmented
+            aria-labelledby="import-mode-label"
+            value={mode}
+            onChange={(m) => {
+              setMode(m);
+              setConfirm(false);
+            }}
+            options={IMPORT_MODES}
+          />
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+              key={mode}
+              className="text-[11px] text-faint"
+              initial={reduced ? false : { opacity: 0, y: 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: tween.exit }}
+              transition={tween.fade}
+            >
+              {mode === "merge" ? IMPORT_STRINGS.mergeHelp : IMPORT_STRINGS.replaceHelp}
+            </motion.span>
+          </AnimatePresence>
+        </StaggerItem>
+
+        {progress != null && <ImportProgress value={progress} />}
+      </div>
+    </Sheet>
+  );
+}
+
+/**
+ * Import progress (`role="progressbar"`): the fill glides to each new value on `spring.bar` (transform only), a
+ * pre-rendered shimmer band sweeps across the filled part while the import runs (it lives inside the fill, so it
+ * never runs ahead of the progress), and the fill crossfades to win-green when complete.
+ * Reduced motion: the fill jumps, no band.
+ */
+function ImportProgress({ value }: { value: number }) {
+  const reduced = useReducedFx();
+  const done = value >= 100;
+  return (
+    <div
+      role="progressbar"
+      aria-label={IMPORT_STRINGS.running}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(value)}
+      className="relative h-1.5 overflow-hidden rounded-full bg-white/[0.06]"
+    >
+      <motion.div
+        className="absolute inset-0 origin-left rounded-full bg-fg"
+        initial={reduced ? false : { scaleX: 0 }}
+        animate={{ scaleX: value / 100 }}
+        transition={reduced ? { duration: 0 } : spring.bar}
+      >
+        {!reduced && !done && <span aria-hidden="true" className="pointer-events-none absolute inset-0 animate-fx-shimmer bg-gradient-to-r from-transparent via-ink-950/35 to-transparent" />}
+        <motion.span className="absolute inset-0 rounded-full bg-win" initial={false} animate={{ opacity: done ? 1 : 0 }} transition={reduced ? { duration: 0 } : tween.crossfade} />
+      </motion.div>
+    </div>
+  );
+}

@@ -1,0 +1,67 @@
+{
+ "source": "https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=future&expired=false",
+ "fetchedAt": "2026-10-25T22:55Z",
+ "note": "Antwort der öffentlichen Deribit-API, nur die Felder instrument_name, expiration_timestamp, settlement_period; das Perpetual ist weggelassen. Die Monatsverfälle (settlement_period month) sind jeweils der letzte Freitag 08:00 UTC.",
+ "instruments": [
+  {
+   "instrument": "BTC-26OCT26",
+   "expiration_timestamp": 1793001600000,
+   "settlement_period": "day"
+  },
+  {
+   "instrument": "BTC-27OCT26",
+   "expiration_timestamp": 1793088000000,
+   "settlement_period": "day"
+  },
+  {
+   "instrument": "BTC-28OCT26",
+   "expiration_timestamp": 1793174400000,
+   "settlement_period": "day"
+  },
+  {
+   "instrument": "BTC-29OCT26",
+   "expiration_timestamp": 1793260800000,
+   "settlement_period": "day"
+  },
+  {
+   "instrument": "BTC-30OCT26",
+   "expiration_timestamp": 1793347200000,
+   "settlement_period": "month"
+  },
+  {
+   "instrument": "BTC-6NOV26",
+   "expiration_timestamp": 1793952000000,
+   "settlement_period": "week"
+  },
+  {
+   "instrument": "BTC-13NOV26",
+   "expiration_timestamp": 1794556800000,
+   "settlement_period": "week"
+  },
+  {
+   "instrument": "BTC-27NOV26",
+   "expiration_timestamp": 1795766400000,
+   "settlement_period": "month"
+  },
+  {
+   "instrument": "BTC-25DEC26",
+   "expiration_timestamp": 1798185600000,
+   "settlement_period": "month"
+  },
+  {
+   "instrument": "BTC-26MAR27",
+   "expiration_timestamp": 1806048000000,
+   "settlement_period": "month"
+  },
+  {
+   "instrument": "BTC-25JUN27",
+   "expiration_timestamp": 1813910400000,
+   "settlement_period": "month"
+  },
+  {
+   "instrument": "BTC-24SEP27",
+   "expiration_timestamp": 1821772800000,
+   "settlement_period": "month"
+  }
+ ]
+}

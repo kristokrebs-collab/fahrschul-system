@@ -1,0 +1,8 @@
+{
+  "source": "Bitunix app, Vertragsaufträge › Positionshistorie, transcribed from the picture bitunix-positionshistorie-1.jpg by hand (the user's own screenshot, 2026-10-24); the third card is cut off at the bottom and must NOT become a trade",
+  "trades": [
+    { "pair": "BTC/USDT", "side": "long", "qty": 0.0224, "entry": 81214.3, "exit": 80658.0, "pnl": -14.66565175, "leverage": 5, "openTime": "2026-10-22 17:07:22", "closeTime": "2026-10-24 15:44:24" },
+    { "pair": "BTC/USDT", "side": "long", "qty": 0.0118, "entry": 81724.5, "exit": 81494.8, "pnl": -3.61625864, "leverage": 8, "openTime": "2026-10-22 11:30:53", "closeTime": "2026-10-22 15:47:07" }
+  ],
+  "incomplete": [{ "pair": "BTC/USDT", "side": "long", "leverage": 13, "pnl": -5.91388763 }]
+}

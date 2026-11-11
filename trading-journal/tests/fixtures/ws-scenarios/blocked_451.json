@@ -1,0 +1,19 @@
+{
+  "name": "blocked_451",
+  "description": "Binance blocked (451 without CORS → TypeError), Bybit reachable → fallback chain.",
+  "baseTime": 1790762400000,
+  "rest": {
+    "mode": "blocked_451",
+    "bybit": "ok"
+  },
+  "ws": {
+    "steps": [
+      {
+        "t": 50,
+        "type": "close",
+        "code": 1006
+      }
+    ],
+    "reconnect": "fail"
+  }
+}
