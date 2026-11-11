@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ChartPlaceholder } from "@/chart/ChartPlaceholder";
 import { useIntroLanded } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
@@ -6,7 +6,8 @@ import { DotMatrix } from "@/motion/DotMatrix";
 import { canObserveInView, observeInView } from "@/motion/inView";
 import { Typewriter } from "@/motion/pulse/Typewriter";
 import { Quiet, useRichFx } from "@/motion/rich";
-import { tween } from "@/motion/tokens";
+import { stagedIn } from "@/motion/stagedIn";
+import { stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { EMPTY_ART_FLOW_H, EMPTY_ART_H, EMPTY_ART_W, pickArt, type EmptyArtKind } from "@/primitives/emptyArt";
 import { EMPTY_GLYPH, EMPTY_GLYPH_FRAMES } from "@/primitives/emptyGlyph";
@@ -79,6 +80,13 @@ export function EmptyState({ title, text, action, line = EMPTY_LINE, chart, art,
       if (inView) setSeen(true);
     });
   }, [reduced, hasAction]);
+  // rich pages: picture, title, text and the action arrive one after the other, a beat after the card they stand in (before, the whole
+  // block was there in one frame – the first thing a new journal shows). The overview and the cockpit keep the plain block.
+  const body = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!rich || reduced || !body.current) return;
+    return stagedIn(Array.from(body.current.children), { delay: stagger.lead, step: 0.07 });
+  }, [rich, reduced]);
   // the line types once: first time in view AND after the surrounding intro cell landed (no observer → at once)
   const typeNow = landed && (seen || reduced || !canObserveInView());
 
@@ -87,7 +95,7 @@ export function EmptyState({ title, text, action, line = EMPTY_LINE, chart, art,
       <span ref={ants} aria-hidden="true" className="fx-ants data-[idle]:before:[animation-play-state:paused]" style={ANTS_STYLE} />
       {/* a chart without data: a calm breathing line in the bottom padding (absolute – the box keeps its height), rich pages only */}
       {chart && <ChartPlaceholder className="pointer-events-none absolute inset-x-6 bottom-1.5 hidden [[data-rich]_&]:grid" lineClassName="h-4" />}
-      <div className="grid justify-items-center gap-2">
+      <div ref={body} className="grid justify-items-center gap-2" data-empty-body="">
         {rich ? (
           // takes the flow height of the dot glyph (33 px), the 64 × 40 picture is centred in it and overhangs – so a card whose
           // height was reserved for the glyph does not grow when the page turns rich

@@ -6,13 +6,15 @@
  * sample, interval and verdict). Tiles count up (`MotionNumber countOnReveal`) and roll their sample size
  * (`RollingDigits`).
  */
-import { memo } from "react";
+import { memo, useLayoutEffect, useRef } from "react";
 import { EDGE_CLEAR_P, explainRatio, metricText, pText, RATIO_LABELS, ratioVerdict, SIG_LABEL, type Metric, type RatioKey, type RatioReport, type Significance } from "@/domain/analytics";
 import { cn } from "@/lib/cn";
 import { n0, n1 } from "@/lib/format";
 import { MorphCard, MorphTitle } from "@/motion/MorphCard";
 import { TextPrism } from "@/motion/pulse/TextPrism";
 import { RollingDigits } from "@/motion/RollingDigits";
+import { useRichFx } from "@/motion/rich";
+import { stagedIn } from "@/motion/stagedIn";
 import { radius } from "@/motion/tokens";
 import { Card } from "@/primitives/Card";
 import { DotFigure } from "@/primitives/DotUnit";
@@ -88,6 +90,15 @@ function edgeVerdict(m: Metric): Significance {
 }
 
 export function KennzahlenHero({ rep, cur, n }: { rep: RatioReport; cur: string; n: number }) {
+  // the nine tiles arrive one after the other, once (before, all nine shared one fade while the tiles of other pages were staggered).
+  // Opacity and a short rise of each tile itself; a tile that is opened meanwhile simply finishes its entrance.
+  const tiles = useRef<HTMLUListElement>(null);
+  const rich = useRichFx();
+  const hasTiles = n > 0;
+  useLayoutEffect(() => {
+    if (!rich || !tiles.current) return;
+    return stagedIn(Array.from(tiles.current.children), { delay: 0.12, step: 0.045 });
+  }, [rich, hasTiles]);
   const sharpe = rep.metrics.sharpe;
   const sv = ratioVerdict(sharpe);
   const edge = rep.metrics.edge;
@@ -166,7 +177,7 @@ export function KennzahlenHero({ rep, cur, n }: { rep: RatioReport; cur: string;
               </div>
             )}
           </div>
-          <ul className="grid min-w-0 grid-cols-2 content-start gap-2 sm:grid-cols-3" aria-label="Kennzahlen">
+          <ul ref={tiles} className="grid min-w-0 grid-cols-2 content-start gap-2 sm:grid-cols-3" aria-label="Kennzahlen">
             {HERO_TILES.map((k, i) => (
               <RatioTile key={k} m={rep.metrics[k]} rep={rep} cur={cur} index={i} />
             ))}

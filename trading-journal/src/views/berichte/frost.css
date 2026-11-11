@@ -497,6 +497,21 @@
     transform: scale(0.4);
   }
 }
+/* The closing is a short sequence, not one frame (Bewegungsprüfung Runde 14): the check draws, THEN the word says „abgeschlossen“,
+   THEN the way back („Wieder öffnen“, the row after the ritual) appears. Only right after the tap (`data-fresh`) – a day that is merely
+   shown as closed has nothing to play. Opacity and a short rise; under reduced motion the global rule makes it immediate. */
+.fr-said[data-fresh] {
+  animation: fr-said 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.28s backwards;
+}
+.fr-ritual:has(.fr-check[data-fresh]) + div > button {
+  animation: fr-said 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.6s backwards;
+}
+@keyframes fr-said {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+}
 
 /* ------------------------------------------------------------------ Frag dein Journal */
 

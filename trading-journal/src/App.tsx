@@ -17,6 +17,7 @@ import { MotionTierHost } from "@/app/MotionTierHost";
 import { SetupEditor, TradeDetail } from "@/app/overlays";
 import { PageHost } from "@/app/PageHost";
 import { PageSkeleton } from "@/app/PageSkeleton";
+import { PageSuspense } from "@/app/PageSuspense";
 import { isLazyPage, lazyView, OverviewView, PAGE_FEATURE, preloadPage, SettingsView, SetupsView, TradesView, type LazyPage } from "@/app/pages";
 import { installViewportInset } from "@/app/pwa";
 import { ScenarioWatcher } from "@/app/ScenarioWatcher";
@@ -30,7 +31,7 @@ import { useEntitlement } from "@/billing/entitlements";
 import { billingActive } from "@/billing/store";
 import type { Feature } from "@/billing/types";
 import { CloudSyncHost } from "@/cloud/CloudSyncHost";
-import { markKnownVisitor, useEntryGate } from "@/cloud/gate";
+import { markKnownVisitor, setGatePreload, useEntryGate } from "@/cloud/gate";
 import { bootCloud } from "@/cloud/runtime";
 import { useCloudSession } from "@/cloud/session";
 import { Celebrate, celebrateFrom } from "@/motion/Celebrate";
@@ -57,7 +58,10 @@ const SharedView = lazy(() => import("@/views/community/SharedView").then((m) =>
 const BillingBanner = lazy(() => loadChunk(() => import("@/billing/ui/BillingBanner").then((m) => ({ default: m.BillingBanner }))));
 
 /** Konto-Pflicht: the entry gate and the public pricing page for a signed-out visitor (only in a build with the cloud, `src/cloud/gate.ts`). */
-const EntryGate = lazy(() => import("@/app/gate/EntryGate"));
+const loadEntryGate = () => import("@/app/gate/EntryGate");
+const EntryGate = lazy(loadEntryGate);
+// signing out warms the gate's chunk before the app leaves (`warmGate` in `cloud/gate.ts`): no blank screen between the two
+setGatePreload(() => void loadEntryGate().catch(() => undefined));
 
 /** The Showroom's panel, simulated payment page and mail knob (Paket S): present only in a build with the flag – the import is folded away otherwise. */
 const ShowroomHost = __TJ_SHOWROOM__ ? lazy(() => import("@/showroom/ui/ShowroomHost")) : null;
@@ -112,7 +116,7 @@ function LazyPageView({ page }: { page: LazyPage }) {
 
 /** One of the original tabs that left the first load (`pages.ts`): its chunk is fetched at idle, so this skeleton is rarely seen. */
 function deferredTab(page: Page, view: ReactNode): ReactNode {
-  return <Suspense fallback={<PageSkeleton page={page} />}>{view}</Suspense>;
+  return <PageSuspense page={page}>{view}</PageSuspense>;
 }
 
 function pageContent(page: Page): ReactNode {
@@ -128,9 +132,9 @@ function pageContent(page: Page): ReactNode {
   }
   if (!isLazyPage(page)) return <OverviewView />;
   const body = (
-    <Suspense fallback={<PageSkeleton page={page} />}>
+    <PageSuspense page={page}>
       <LazyPageView page={page} />
-    </Suspense>
+    </PageSuspense>
   );
   const feature = PAGE_FEATURE[page];
   return feature ? (

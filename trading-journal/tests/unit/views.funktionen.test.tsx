@@ -171,6 +171,18 @@ describe("Funktionen page", () => {
     expect(view()).toBe("tiles");
   });
 
+  it("one letter is no question yet: the tiles stay (the first keystroke used to swap the page for 'nichts'), the second letter searches", () => {
+    renderPage();
+    fireEvent.change(search(), { target: { value: "r" } });
+    expect(view()).toBe("tiles");
+    expect(screen.queryByText("Dazu steht nichts in der Liste")).toBeNull();
+    fireEvent.change(search(), { target: { value: "ri" } });
+    expect(view()).toBe("search");
+    // surrounding spaces do not make a second letter
+    fireEvent.change(search(), { target: { value: " r " } });
+    expect(view()).toBe("tiles");
+  });
+
   it("says 'nichts' honestly and offers the assistant", () => {
     renderPage();
     fireEvent.change(search(), { target: { value: "zzzqqq" } });

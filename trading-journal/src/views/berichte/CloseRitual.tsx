@@ -110,7 +110,10 @@ export function CloseRitual({ testid, items, dots, dotsText, closed, ring, busy,
           </svg>
         </button>
         <div className="grid min-w-0 gap-0.5">
-          <b className="text-[14px] font-semibold">{closed ? action.done : action.label}</b>
+          {/* right after the tap the word follows the check: it rises in a beat after the stroke began (`fr-said`), instead of swapping in the tap's frame */}
+          <b key={closed ? "done" : "open"} className="fr-said text-[14px] font-semibold" data-fresh={fresh && closed ? "" : undefined}>
+            {closed ? action.done : action.label}
+          </b>
           <span className="text-[12.5px] text-mute">{closed ? "" : action.hint}</span>
         </div>
       </div>

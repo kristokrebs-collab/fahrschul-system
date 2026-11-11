@@ -99,7 +99,9 @@ export function FunktionenView({ className }: { className?: string }) {
   const shown = hits.slice(0, RESULT_MAX);
   const weak = shown.length > 0 && shown[0]!.score < STRONG_HIT;
   const current = groupId ? grouped.find((g) => g.group.id === groupId) : undefined;
-  const view = query ? "search" : current ? "group" : "tiles";
+  // one letter is no question yet (the search reads words from two letters on): the tiles stay until there is one – before, the first
+  // keystroke swapped the whole page for „Dazu steht nichts in der Liste“ and the second brought the results (Bewegungsprüfung Runde 14)
+  const view = query.length >= 2 ? "search" : current ? "group" : "tiles";
   const status = (f: FeatureEntry) => availabilityOf(f, { open: mode === "open", plan: plan.plan, signedIn });
   const upgrade = (f: FeatureEntry): void => openUpgrade(f.gate, status(f).plan);
   // the staggered fade-in belongs to the rich page; elsewhere (and under reduced motion) everything is simply there

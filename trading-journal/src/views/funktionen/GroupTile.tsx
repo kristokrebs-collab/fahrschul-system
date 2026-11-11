@@ -1,11 +1,13 @@
 /**
  * One task of a trader's day as a large, calm tile: icon, name, one sentence, how many functions and whether they are all
  * finished (a green dot) or some are partial (an amber dot, said in words next to it). A tap opens the group's list.
- * Static: the only motion is the border on hover and the staggered fade-in the page gives each tile.
+ * Calm: the border on hover, a slight give under a press and the staggered fade-in the page gives each tile.
  */
 import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
 import { useRichFx } from "@/motion/rich";
+import { pressScale } from "@/motion/tokens";
+import { usePressable } from "@/motion/usePressable";
 import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useHoverTilt } from "@/primitives/hoverTilt";
 import { Icon } from "@/primitives/icons";
@@ -28,8 +30,11 @@ export function GroupTile({ group, items, onOpen, onIntent, className }: GroupTi
   const rich = useRichFx();
   const mouse = useMediaQuery("(hover: hover) and (pointer: fine)", false);
   const tilt = useHoverTilt(2.5, rich && mouse);
+  // a tap answers: the tile gives a little under the finger (before, only the hover colours changed – nothing on a phone)
+  const press = usePressable({ scale: pressScale.surface });
   const tile = (
-    <button
+    <motion.button
+      {...press}
       type="button"
       onClick={() => onOpen(group.id)}
       onPointerEnter={() => onIntent?.(group.id)}
@@ -68,7 +73,7 @@ export function GroupTile({ group, items, onOpen, onIntent, className }: GroupTi
         </span>
         <span className="text-[13px] leading-snug text-mute">{group.lead}</span>
       </span>
-    </button>
+    </motion.button>
   );
   if (!rich || !mouse) return tile;
   return (

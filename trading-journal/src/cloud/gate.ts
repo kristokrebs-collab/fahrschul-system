@@ -108,3 +108,22 @@ export function useEntryGate(): GateState {
   const page = useUi((s) => s.page);
   return gateOf({ enabled, phase, needsMfa, restoring: enabled && (hasStoredSession() || hasAuthCallback()), share, page, known: enabled ? knownVisitor() : true });
 }
+
+/**
+ * The gate's window is a chunk of its own. Signing out swaps the whole app for it; without the chunk at hand the screen stood empty
+ * until it arrived (measured ≈ 300 ms on a local build, longer over a real network – Bewegungsprüfung Runde 14). The shell registers how
+ * to fetch it, the sign-out warms it before the session ends, so app and gate change hands without a blank frame in between.
+ */
+let gatePreload: (() => void) | null = null;
+export function setGatePreload(fn: (() => void) | null): void {
+  gatePreload = fn;
+}
+/** Fetches the gate's chunk ahead of time (a no-op without a registered loader; a failed download is the gate's own business later). */
+export function warmGate(): void {
+  try {
+    gatePreload?.();
+  } catch {
+    // never in the way of signing out
+  }
+}
+

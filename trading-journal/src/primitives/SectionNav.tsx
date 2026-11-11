@@ -12,11 +12,14 @@
  * jumps instead of scrolling, no pulse. While mounted it tells the document how tall it is (`--section-nav-h`), so that
  * `scroll-padding-top` (base.css) keeps every scroll target – from the nav, from "Alle Funktionen", from the search – clear of it.
  */
+import { motion } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { revealSection } from "@/app/reveal";
 import { cn } from "@/lib/cn";
 import { canObserveInView } from "@/motion/inView";
 import { prefersReducedMotion } from "@/motion/pulse/engine";
+import { stagedIn } from "@/motion/stagedIn";
+import { pressScale, spring } from "@/motion/tokens";
 import { SECTION_NAV_BOX } from "@/primitives/sectionNavBox";
 
 export interface SectionNavItem {
@@ -164,6 +167,9 @@ function useActiveSection(items: readonly SectionNavItem[], nav: RefObject<HTMLE
   return { active, missing: lostFor.key === key ? lostFor.ids : NONE };
 }
 
+/** A chip answers a press like every label-sized control (`pressScale.label` on `spring.press`); before, only its hover colours changed. */
+const CHIP_TAP = { scale: pressScale.label };
+
 export function SectionNav({ items, label = "Inhalt", className }: { items: readonly SectionNavItem[]; label?: string; className?: string }) {
   const nav = useRef<HTMLElement>(null);
   const strip = useRef<HTMLUListElement>(null);
@@ -267,7 +273,19 @@ export function SectionNav({ items, label = "Inhalt", className }: { items: read
     return () => ro?.disconnect();
   }, [active, shownKey]);
 
-  if (shown.length < 2) return null;
+  // the chips build up from the left, once, when the strip first stands (before, the strip and all its chips were there in one frame –
+  // on Einstellungen and Berichte it popped in half a second after the page). The BUTTONS move, not their `li`: the plate above reads
+  // `offsetLeft` of a chip, and a transformed `li` would become what that is measured from.
+  const hasStrip = shown.length >= 2;
+  const built = useRef(false);
+  useLayoutEffect(() => {
+    if (!hasStrip || built.current || !strip.current) return;
+    built.current = true;
+    if (prefersReducedMotion()) return;
+    stagedIn(strip.current.querySelectorAll("[data-section-chip]"), { step: 0.035, rise: 6, duration: 0.3 });
+  }, [hasStrip]);
+
+  if (!hasStrip) return null;
   return (
     <nav
       ref={nav}
@@ -286,7 +304,9 @@ export function SectionNav({ items, label = "Inhalt", className }: { items: read
             const on = it.id === active;
             return (
               <li key={it.id} className="shrink-0">
-                <button
+                <motion.button
+                  whileTap={CHIP_TAP}
+                  transition={spring.press}
                   type="button"
                   onClick={(e) => go(it, e.detail === 0)}
                   aria-current={on ? "location" : undefined}
@@ -297,7 +317,7 @@ export function SectionNav({ items, label = "Inhalt", className }: { items: read
                   )}
                 >
                   {it.label}
-                </button>
+                </motion.button>
               </li>
             );
           })}

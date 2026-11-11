@@ -128,7 +128,8 @@ export function OutageNotice({ className }: { className?: string }) {
         <strong className="font-semibold text-fg">{BILLING.outageTitle}</strong>
         <span className="text-mute"> – {BILLING.outageText}</span>
       </span>
-      <Button size="sm" loading={busy} onClick={retry} className="pointer-coarse:min-h-11" data-testid="billing-outage-retry">
+      {/* phone: the button takes its own line (full width) – beside the text it squeezed the sentence into a narrow column */}
+      <Button size="sm" loading={busy} onClick={retry} className="max-sm:w-full pointer-coarse:min-h-11" data-testid="billing-outage-retry">
         {busy ? BILLING.outageRetrying : BILLING.outageRetry}
       </Button>
     </motion.div>

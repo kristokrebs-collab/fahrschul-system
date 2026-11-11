@@ -314,6 +314,29 @@ test.describe("Preise & Abo", () => {
     expect(errors).toEqual([]);
   });
 
+  test("the server does not answer: the page says „Tarife gerade nicht erreichbar“ (not „nicht eingerichtet“), „Erneut versuchen“ brings the shop back", async ({ page }, info) => {
+    const { errors } = await setup(page);
+    // an outage of the billing function (registered last = asked first); it recovers when `down` is cleared
+    let down = true;
+    await page.route(/\/api\/v1\/billing\/status/, (route) => (down ? route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "unavailable", message: "Service Unavailable" } }) }) : route.fallback()));
+    await openPage(page, PREISE_URL, "Preise");
+    const note = page.getByTestId("billing-outage");
+    await expect(note).toContainText("Tarife gerade nicht erreichbar", { timeout: 20_000 });
+    await expect(note).not.toContainText(/eingerichtet|freigeschaltet/);
+    await expect(page.getByTestId("billing-closed")).toHaveCount(0);
+    // the plans are still on the page (list prices)
+    for (const p of ["free", "pro", "premium", "team"]) await expect(page.getByTestId(`plan-${p}`)).toBeVisible();
+    await expectNoHorizontalScroll(page);
+    await shot(page, info, "outage");
+    // the server is back: one press, the note leaves and the shop is open
+    down = false;
+    await page.getByTestId("billing-outage-retry").click();
+    await expect(note).toHaveCount(0, { timeout: 20_000 });
+    await expect(page.getByTestId("preise-view")).toHaveAttribute("data-mode", "open");
+    await expect(page.getByTestId("cta-pro")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test("without cloud: no abos in this version, everything unlocked", async ({ page }, info) => {
     const { errors } = await setup(page);
     await openPage(page, "/#preise", "Preise");

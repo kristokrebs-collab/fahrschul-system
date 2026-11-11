@@ -3,6 +3,7 @@
  * complete on every device and after an import. Recent unopened reports carry "neu" (seen markers in
  * `settings.coach.reports.seen`, `NEW_DAYS`); the shown one is marked. Eight rows, then "Alle anzeigen".
  */
+import { motion } from "motion/react";
 import { useState } from "react";
 import { KIND_REPORT, type ArchiveEntry, type ReportKind } from "@/domain/reports";
 import { cn } from "@/lib/cn";
@@ -10,6 +11,8 @@ import { textLink } from "@/lib/textLink";
 import { pct0, signed } from "@/lib/format";
 import { Badge } from "@/primitives/Badge";
 import { Card } from "@/primitives/Card";
+import { pressScale } from "@/motion/tokens";
+import { usePressable } from "@/motion/usePressable";
 import { useBerichteUi } from "./berichteStore";
 import { Rows } from "@/chart/rows";
 
@@ -25,6 +28,8 @@ export function ArchiveCard({ archive, kind, current, cur, now, className }: { a
   const [all, setAll] = useState(false);
   const rows = all ? archive : archive.slice(0, SHOW);
   const fresh = archive.filter((a) => isNew(a, now)).length;
+  // a row answers a tap (a slight give) – before, only the hover tint did, and a phone has no hover
+  const press = usePressable({ scale: pressScale.surface });
   return (
     <Card title="Archiv" note={archive.length ? `${archive.length} ${KIND_REPORT[kind]}${archive.length === 1 ? "" : "e"}${fresh ? ` · ${fresh} neu` : ""}` : undefined} className={className} data-testid="report-archive">
       {archive.length === 0 ? (
@@ -35,7 +40,8 @@ export function ArchiveCard({ archive, kind, current, cur, now, className }: { a
             const active = a.period.key === current;
             return (
               <li key={a.period.key} data-lift className="border-b border-line/60 last:border-b-0">
-                <button
+                <motion.button
+                  {...press}
                   type="button"
                   onClick={() => setPeriod(a.period.key)}
                   aria-current={active ? "true" : undefined}
@@ -59,7 +65,7 @@ export function ArchiveCard({ archive, kind, current, cur, now, className }: { a
                   <span className={cn("num font-mono text-[12.5px]", a.net > 0 ? "text-win" : a.net < 0 ? "text-loss" : "text-mute")}>
                     {signed(a.net, 0)} {cur}
                   </span>
-                </button>
+                </motion.button>
               </li>
             );
           })}

@@ -18,6 +18,7 @@ import { ApiError, apiFetch, setAccessTokenProvider } from "./api";
 import { AUTH_LINK_UNUSABLE, authErrorCodeOf, authErrorText, type AuthErrorText } from "./authErrors";
 import { readCallback, takeBootFragmentError } from "./callbackUrl";
 import { cloudConfig, type OAuthProvider } from "./env";
+import { warmGate } from "./gate";
 import { primeOpsFlags } from "./flags";
 import { ACCOUNT_PRIVACY_KEYS, onPrivacyChange, parsePrivacy, setPrivacy, usePrivacy, type PrivacyPrefs } from "./privacy";
 import { openAuthSheet, SIGNED_OUT, useCloudSession } from "./session";
@@ -355,6 +356,8 @@ export async function undoTakeover(): Promise<boolean> {
 }
 
 export async function signOutScope(scope: "local" | "global" | "others"): Promise<ActionResult> {
+  // this device is about to be signed out: the gate that replaces the app is fetched now, not after the app is gone
+  if (scope !== "others") warmGate();
   try {
     if (scope !== "local") auditEvent(scope === "others" ? "auth.sessions.revoke" : "auth.signout.all");
     else auditEvent("auth.signout");

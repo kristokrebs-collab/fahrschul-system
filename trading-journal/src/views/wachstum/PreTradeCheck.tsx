@@ -7,13 +7,13 @@
  * mm:ss" on `nowMv`, no render per second). Advice only – nothing is blocked.
  */
 import { motion, useTransform } from "motion/react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { clockText } from "@/domain/risk";
 import { preTradeChecklist, readiness, READINESS_LABEL, type CheckIn, type Level5 } from "@/domain/psych";
 import type { BehaviorEvent } from "@/domain/coach/events";
 import { cn } from "@/lib/cn";
 import { useNowMv } from "@/motion/clock";
-import { ConfidenceMeter } from "@/motion/fx";
+import { ConfidenceMeter, SpotlightSweep } from "@/motion/fx";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
 import { processDone } from "@/motion/processFeedback";
 import { StatusPill } from "@/motion/StatusPill";
@@ -60,8 +60,13 @@ export function PreTradeCheck({ checkin, mood, events, todayKey, className }: Pr
     const complete = checklist.length > 0 && checklist.every((x) => (x.id === id ? ticked[id] !== true : ticked[x.id] === true));
     const wasComplete = checklist.length > 0 && checklist.every((x) => ticked[x.id] === true);
     toggleTick(todayKey, id);
-    if (complete && !wasComplete) processDone("checklist");
+    if (complete && !wasComplete) {
+      processDone("checklist");
+      // the same process moment, seen on the card itself: one band of light crosses the word (once per completion, never in a loop)
+      setSwept((n) => n + 1);
+    }
   };
+  const [swept, setSwept] = useState(0);
   const r = useMemo(
     () => readiness({ checkin, mood, checklist, ticked, limits: report.rows.length ? report : null, overrideUntil: override?.until ?? null, events, now: base.now }),
     [checkin, mood, checklist, ticked, report, override, events, base.now],
@@ -73,7 +78,8 @@ export function PreTradeCheck({ checkin, mood, events, todayKey, className }: Pr
   return (
     <Card title={WACHSTUM.ready.title} data-testid="growth-ready" data-state={r.state} className={className}>
       <div className="grid gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <SpotlightSweep play={swept} playOnView={false} tone="win" />
           <div className="grid gap-2">
             <DotMatrixText text={WORD[r.state]} width={6} align="left" tone={TONE[r.state]} size={5} gap={2} label={READINESS_LABEL[r.state]} />
             <span className={cn("text-[13px] font-semibold", r.state === "ready" ? "text-win" : r.state === "pause" ? "text-signal" : "text-warn")} data-testid="growth-ready-label">

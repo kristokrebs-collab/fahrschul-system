@@ -102,3 +102,18 @@
     animation: none;
   }
 }
+
+/* A native <details> on a rich page (20 of them: „Wie lese ich das?“, „Mehr: Volumenfilter …“, plan steps, ledger …): what it reveals
+   arrives – a short fade and 4 px – instead of standing there in one frame while only the chevron turned (Bewegungsprüfung Runde 14).
+   `Fold` has its own motion and is left out; closing stays the browser's (instant). `backwards`: nothing is held after the run. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-rich] details[open]:not(.group\/fold) > :not(summary) {
+    animation: rich-det-in 0.2s cubic-bezier(0, 0, 0.58, 1) backwards;
+  }
+}
+@keyframes rich-det-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
