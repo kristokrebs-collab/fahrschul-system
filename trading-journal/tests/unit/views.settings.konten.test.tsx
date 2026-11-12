@@ -135,7 +135,10 @@ describe("SettingsView · Konten", () => {
     const onTest = vi.fn(async () => ["topTraderAccountsLongShort: 3 Werte · Felder: longPercentage=58.4"]);
     render(<SettingsView onTestHyblock={onTest} />);
     fireEvent.click(screen.getByRole("button", { name: "Verbindung testen" }));
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("3 Werte"));
+    // by its text, not `getByRole("status")`: the page loads more cards after the first paint (the data archive carries a status line
+    // of its own), and on a loaded runner that card was there before the answer – "Found multiple elements with the role status"
+    const line = await screen.findByText(/topTraderAccountsLongShort: 3 Werte/);
+    expect(line.closest('[role="status"]')).not.toBeNull();
     expect(onTest).toHaveBeenCalledWith({ endpoints: ["topTraderAccountsLongShort", "whaleRetailDelta"], params: { coin: "BTC", exchange: "binance_perp_stable", timeframe: "1h", limit: 3 } });
     expect(screen.getByText("Nur dieser Browser")).toBeInTheDocument();
     expect(screen.getByText("2 Trades gespeichert · 2 Grundlagen · 1 Grundregeln")).toBeInTheDocument();

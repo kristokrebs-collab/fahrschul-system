@@ -55,6 +55,9 @@ function seed(now: number, opts: { reached?: boolean; pause?: boolean } = {}): S
   trades.push(trade({ id: "u1", date: local(now - 30 * 3_600_000), exitDate: local(now - 29 * 3_600_000), notes: "" }));
   trades.push(trade({ id: "live", status: "open", date: local(now - 60 * MIN), exit: null, notes: "" }));
   if (opts.pause) {
+    // a win before the two losses: the streak the pause names is exactly these two on every weekday (on a Thursday the seed's
+    // Wednesday losses of yesterday ran straight into them: "4 Verluste in Folge" – the suite was red one day a week)
+    trades.push(trade({ id: "p0", date: local(now - 3 * 3_600_000), exitDate: local(now - 2 * 3_600_000) }));
     trades.push(trade({ id: "p1", date: local(now - 40 * MIN), exitDate: local(now - 20 * MIN), exit: 99, size: 2000 }));
     trades.push(trade({ id: "p2", date: local(now - 15 * MIN), exitDate: local(now - 5 * MIN), exit: 99, size: 2000 }));
   }
