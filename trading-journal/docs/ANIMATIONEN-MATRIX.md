@@ -1,0 +1,538 @@
+# Animationen-Matrix – alle 177 Inventarpunkte
+
+Stand: 2026-10-31, nach Runde 10 (Zweig `claude/dreamy-dirac-uwi1be`, Commit `7b7d81d`); fortgeschrieben am 2026-11-08 für Runde 12, Paket C (Abschnitt „Runde 12 – Paket C“ unten, die Zeilen 27, 35, 55 und 129 und die Zusatzpunkte Z2, Z7 bis Z9) und Paket F2 (Frost: Abschnitt „Runde 12 – Paket F2“ und die Zusatzpunkte Z11 bis Z13). Der Nutzer hat im Master-Prompt verlangt:
+„Jeder der 177 Inventarpunkte muss einzeln geprüft und dokumentiert werden.“ Diese Datei ist die Antwort: eine Zeile je Nummer, geprüft gegen den Code in
+`trading-journal/` (Pfade unten sind relativ dazu), ohne Beschönigung. Wo etwas nicht belegt werden konnte, steht das in der Zeile und am Ende der Datei.
+
+Die Vollständigkeit (alle 177 Nummern genau einmal, jeder Status aus der erlaubten Liste) prüft `tests/unit/docs.animationenMatrix.test.ts`. Der Test sagt
+nichts darüber, ob eine Zeile inhaltlich stimmt; das kann nur der Blick in den genannten Code.
+
+## Zusammenfassung
+
+| Status | Punkte | Bedeutung |
+|---|---|---|
+| vorhanden | 44 | war schon da, Runde 9 und 10 haben es nicht verändert |
+| wiederhergestellt/verbessert | 23 | existierte, ist durch Runde 9 oder 10 besser (siehe Hinweis zum Wort „wiederhergestellt“ unten) |
+| neu eingebaut | 21 | gab es nicht, ist in Runde 9 bis 12 dazugekommen (teils sinngemäß, die Zeile sagt es) |
+| bewusst nicht | 65 | passt nicht zu einem Trading-Journal, würde Lesbarkeit, Leistung oder die Startseite verletzen, oder braucht Dienste, Videos und WebGL |
+| offen | 3 | sinnvoll, noch nicht gebaut |
+| nicht prüfbar | 21 | Quelle R: die Originaldatei lag nie vor und im Code steht kein Nachbau unter diesem Namen |
+| **zusammen** | **177** | |
+
+In der App sind 88 von 177 Punkten (44 schon vorher, 23 verbessert, 21 neu). 65 sind begründet nicht gebaut,
+3 sind offen, 21 lassen sich ohne die Originale nicht beurteilen. (Runde 12 holt zwei Punkte aus „nicht prüfbar“ in „neu eingebaut“: 27 Radial Share und 129 Thinking Orbs – beide gab es schon seit Runde 11, die Zeilen waren veraltet.)
+
+Nach Quelle (V = Code oder Technik-Anleitung im Skill-Bestand, R = nur referenziert, N = nur Konzept/Titel):
+
+| Quelle | Punkte | vorhanden | wiederhergestellt/verbessert | neu eingebaut | bewusst nicht | offen | nicht prüfbar |
+|---|---|---|---|---|---|---|---|
+| V | 123 | 25 | 19 | 17 | 59 | 3 | 0 |
+| R | 46 | 19 | 4 | 2 | 0 | 0 | 21 |
+| N | 8 | 0 | 0 | 2 | 6 | 0 | 0 |
+
+Zu Quelle R (Zahlen mit dem Stand von Runde 12): Im Bestand liegt von der Sammlung `pulse-motion` nur `motion-graphics`, `fintech-glass` und `relay-lime`; die übrigen Vorlagen-Dateien (in
+`INVENTAR.md` aufgeführt) sind nicht mehr da. Wo die App einen Port aus früheren Runden hat (`src/motion/pulse/*`, README dort), steht der Port als
+Beleg und die Zeile heißt „vorhanden“. Ein Abgleich mit der Vorlage selbst war nicht möglich. Wo es weder Vorlage noch Port gibt, heißt die Zeile „nicht prüfbar“.
+
+## Wie die Tabelle zu lesen ist
+
+- **Status** (nur diese Werte): `vorhanden`, `wiederhergestellt/verbessert`, `neu eingebaut`, `bewusst nicht`, `offen`, `nicht prüfbar`.
+- **Hinweis zu „wiederhergestellt“:** Belegbar ist nur „verbessert“. In keinem Fall habe ich nachweisen können, dass eine Animation entfernt und dann zurückgeholt wurde
+  (Befund im Abschnitt „Frühere Animationen“). Der Wert heißt so, weil der Auftrag ihn so vorgibt.
+- **Sinngemäß** in einer Begründung heißt: die App hat eine leichtere oder andere Form derselben Idee, nicht die Technik der Vorlage. **Ohne Vorlage gedeutet** heißt: der Name steht im
+  Inventar, eine Beschreibung gibt es nicht, die Zeile ist meine Lesart.
+- **Stelle im Code:** Datei oder Komponente, in der es steht; „–“ heißt, es gibt nichts. Jede Zeile mit `vorhanden`, `wiederhergestellt/verbessert` oder `neu eingebaut` nennt eine Stelle.
+- **Entscheidung:** `bleibt` (so lassen), `bleibt (nur reiche Seiten)` (nur unter `[data-rich]`, siehe Leitplanken), `nicht bauen`, `später bauen`, `Original anfordern`.
+- Zusammengehörende Punkte (Button-Familie 9 bis 19, Text 65 bis 81, Video 138 bis 148) haben je eine eigene Zeile, die Begründung verweist teils auf die erste.
+- Doppelte Namen im Inventar bleiben doppelt: 32 und 121 (Orbiting Avatars), 58 und 108 (Sticky Stacking Cards), 19 und 115 (Magnetic Hover), 22 und 175 (Theme Toggle), 5 und 42 (Sprach-Auswahl).
+
+Belege für Runde 9 und 10 (Commits im Zweig). Die Zuordnung folgt der Reihenfolge der Commits: ab `2e8982f` (`data-rich`) ist Runde 10, die Commits davor vom selben Tag sind Runde 9; die Commits selbst tragen keine Rundennummer.
+
+| Stufe | Commit | Inhalt |
+|---|---|---|
+| Runde 9 | `d4c6e4c` | Buttons auf ein kleines System (`Button`, `chipClass`), „Mehr anzeigen“ (`Fold`) |
+| Runde 9 | `a7fda14`, `862801f`, `cbe81b6` | kurzes Trade-Formular, Navigation in vier Gruppen mit Seitenleiste ab 768 px, Feinschliff |
+| Runde 9 | `79d2716` | Aktien › Branchen-Trend mit Fächer-Canvas (10.000 Pfade aus einer Labor-Datei) |
+| Runde 10 | `2e8982f`, `d1fcddd` | `data-rich` auf allen Seiten außer Übersicht und Cockpit, CSS-Budget 52 KiB |
+| Runde 10 | `560adde`, `79b7c5f` | reiche Seiten: Seitenlicht, Geisterwort, Titelwörter, Karten-Tilt, Diagonalwelle, Leerzustands-Bilder |
+| Runde 10 | `78a4fd7`, `d6477e2` | Bedienelemente: Button-Zustände, Glanz, Rollen, Magnet, Chip-Häkchen, Suchfeld-×, Kopieren, Schritt-Feld, Toast-Staffel |
+| Runde 10 | `fb6c458` | Diagramme, Zahlen, Listen: Monte-Carlo-Fächer als Canvas, `CountText`, `Rows`, `ChartPlaceholder` |
+| Runde 10 | `3b77e4c` | Markt › Einordnung: Karte „Top-Trader: Netto Long/Short“ |
+| Runde 10 | `da7bbfc` | Rahmen: Seitenleiste mit Blick über die Seite, Zeichnen der Symbole, untere Leiste, Menü als Blatt, Burger, Kurs als Zählwerk, Sonne/Mond |
+
+## Offen und sinnvoll (nach Nutzen für den Nutzer)
+
+1. **10.000 Läufe im Analyse-Monte-Carlo** (Zusatzpunkt 4): die App rechnet dort 2.000 Läufe; 10.000 × 250 Trades blieben unter der Zellgrenze `MC_CELL_CAP` (4 Mio.), Laufzeit auf Handys wäre vorher zu messen.
+2. **Logo als Pfad, der sich zeichnet** (Nr. 83, Zusatzpunkt 2): braucht zuerst einen Entwurf, denn das Kopfzeilen-Logo ist das Schriftzeichen ₿; die Navigationssymbole zeichnen sich schon.
+3. **Gleiten in Listen nach Löschen oder Sortieren** auf weiteren reichen Seiten (`LayoutCascade` statt der entfernten App-Gruppe, Commit `9266b0b`): nur gezielt und mit Messung, denn die Gruppe wurde wegen ihrer Messkosten abgeschafft (Tablet-Seitenwechsel p95 38 bis 61 auf 13 bis 15 ms).
+4. **Rand-Lauf an der einen Hervorhebung je Seite** (Nr. 17): `Button run` ist gebaut, wird aber an keiner Stelle gesetzt.
+5. **Bildzoom in der Screenshot-Kachel** (Nr. 56): ein leichter Zoom im Rahmen, passend zum Wechsel von grau zu Farbe.
+6. **Hover-Decode für ein bis zwei Navigationswörter** (Nr. 75): `TextScramble scrambleOnHover` kann es schon.
+7. **Originale nachliefern**, falls einer der 23 Punkte „nicht prüfbar“ gewünscht ist (zuerst 1, 27, 128, 129, 153): ohne Vorlage ließe sich nichts ehrlich nachbauen.
+
+## Leitplanken
+
+- **Startseite (Übersicht) und Cockpit bleiben unverändert** in Inhalt und Aussehen. Der Rahmen (Seitenleiste, untere Leiste, Menü, Kopfzeile) darf sich ändern.
+  Laut `src/app/README.md` („Bewegung im Rahmen“, Pixelvergleich) war das Cockpit nach Runde 10 in allen vier Ansichten (dunkel und hell, mobil und Desktop) im Inhalt pixelgleich;
+  bei der Übersicht weichen nur Live-Zellen ab (Kurs, 24-h-Linie, Order-Flow, Countdown). Ich habe diesen Vergleich für die Matrix nicht neu gemessen.
+- **`data-rich`:** `PageHost` setzt das Attribut auf jede Seiten-Ebene außer Übersicht und Cockpit (`isRichPage` in `src/motion/rich.ts`, `RichContext` für Portale). Neue reiche Effekte stehen in
+  CSS als `[data-rich] …` oder in Komponenten, die nur dort eingebunden sind (`useRich()` / `useRichFx()`; Bausteine, die auch auf der Übersicht stehen, fragen den DOM erst im Effekt,
+  `isRich(el)` in `src/chart/rich.ts`). Sheets und Dialoge liegen außerhalb der Seite und bekommen die reichen Feinheiten nicht. Zeilen mit „nur reiche Seiten“ folgen dieser Regel.
+- **Budgets** (`scripts/bundleBudget.mjs`, KiB gzip): JS-Erstladung 800, CSS-Erstladung 52 (seit Runde 12, Paket C: 52,5; gemessen 52,1), ein Lazy-Chunk 120, Haupt-Chunk `index` 575. Für Runde 10 galt je Auftrag höchstens +4 KiB Erstlade-JS und
+  +1,5 KiB CSS; alles Größere ist ein eigener Lazy-Chunk (`PageAura`, `EmptyArt`, `TraderNetCard`). Ich habe kein neues Build gemessen.
+- **Reduced Motion:** `useReducedFx()` und `MotionRoot` (`reducedMotion="user"`) zeigen den Endzustand sofort; `src/styles/base.css` setzt CSS-Dauern auf nahe null; Schleifen starten nicht
+  (`tests/e2e/motion-global.spec.ts`, `tests/e2e/shell-motion.spec.ts`). Mit `html[data-safe-fx]` (Samsung Internet oder `?safefx=1`) entfallen Weichzeichner und `backdrop-filter`.
+- **Weitere Regeln, die in „bewusst nicht“ den Ausschlag geben:** nur `transform`, `opacity`, `filter`, `clip-path`; keine Dauerschleife ohne Pause außerhalb des Bildes oder bei verdecktem Tab (`useIdleGate`);
+  nichts verdeckt Zahlen; kein Layout-Springen (`tests/e2e/layout-shift.spec.ts`); Tippflächen mindestens 44 px (`tests/e2e/hitbox.ts`); Hauptaktionen („Trade eintragen“, Speichern, Bezahlen, Löschen) behalten Form
+  und Wirkung (`fx={false}`); keine erfundenen Zahlen (Zahlenbänder zeigen nur echte Werte); keine neuen Abhängigkeiten.
+
+## Zusatzpunkte des Nutzers
+
+| Nr. | Punkt | Stand | Belege und Grenzen |
+|---|---|---|---|
+| Z1 | Einklappbare Sidebar | erledigt | Ab 768 px steht die Seitenleiste (`src/app/Sidebar.tsx`): Fuß-Knopf „Seitenleiste einklappen / ausklappen“ (`SIDEBAR_STRINGS`), Wahl `auto`, `open`, `closed` in `uiStore.sidebar` (je Browser gemerkt), Gruppenköpfe falten ihre Zeilen. Runde 10 lässt die schmale Leiste bei Maus, Fokus oder Berührung über die Seite „blicken“ (`src/app/useSidebarPeek.ts`, `src/styles/shell-motion.css`). Tests: `tests/unit/app.sidebar.test.tsx`, `tests/unit/app.shellMotion.test.tsx`, `tests/e2e/shell-motion.spec.ts`. |
+| Z2 | Sequenzielle SVG-Logo-Animation | teilweise | Gezeichnet werden die **Navigationssymbole** der Seitenleiste (Runde 12 neu gefasst, Messung im Abschnitt „Runde 12 – Paket C“): einmal je **Seitenaufruf** (vorher je Sitzung), erst wenn die Intro-Bühne weg ist (vorher lief sie darunter, unsichtbar), die Zeilen blenden von oben nach unten 80 ms versetzt mit je 420 ms ein (Paket S, Nutzerwunsch „etwas stärker“: 14 px Weg, minimaler Weichzeichner), die **Glyphen zeichnen strikt nacheinander** (ein Glyph ist fertig, bevor der nächste startet: 80 ms je Glyph, die Striche eines Glyphs teilen sich den Platz; `sidebarSequence` und `applySidebarSequence` in `src/app/shellFx.ts`, `sb-draw` in `src/styles/shell-motion.css`, `pathLength="1"`). Nicht bei Hover, Seitenwechsel oder erneutem Rendern; mit „weniger Bewegung“ steht alles sofort da. Die untere Leiste zeichnet das Symbol beim Wechsel neu (0,46 s). Das Kopfzeilen-Logo ist das Schriftzeichen ₿ und kein Pfad; dafür zeichnet die Logo-Sequenz (`src/app/logoSeq.ts`) seine Striche nacheinander. Offen: ein Logo als Pfad (Nr. 83). |
+| Z3 | Frühere Animationen wiederherstellen | Befund: nichts ersatzlos entfernt | Siehe Abschnitt „Frühere Animationen“: sechs belegte Abschaltungen oder Vereinfachungen, überwiegend aus Leistungsgründen und meist mit Messwert im Commit; keine gelöschte Animation. |
+| Z4 | 10.000-Pfade-Simulation (Canvas) | teilweise | **Anzeige ja:** `FanChart` in `src/views/aktien/branchen/charts.tsx` (Aktien › Branchen-Trend › „Ergebnis eines Laufs prüfen“) zeigt 10.000 simulierte Pfade aus einer `megatest.json` des Python-Labors als Canvas: Bänder 5, 25, 50, 75, 95 % aus allen Pfaden, nur eine Stichprobe als Linien, Log-Skala, Einzeichnen von links, Fadenkreuz. Die App rechnet die Pfade nicht selbst (die Karte sagt es). **In der App gerechnet:** Analyse › Monte Carlo mit 2.000 Läufen (`MC_RUNS` in `src/domain/analytics/montecarlo.ts`, `src/views/analyse/MonteCarloCard.tsx`, Fächer-Canvas `fanDraw.ts` mit 120 Linien); die Zeile der Karte nennt ehrlich „2000 Läufe“. Offen: 10.000 Läufe in der App. |
+| Z5 | Wal-/Top-Trader-Anzeige | erledigt | Übersicht: Karte `src/views/overview/TopTraderCard.tsx` und die Plakette im Long-Signal (`TraderNetSection.tsx`). Runde 10: große Karte „Top-Trader: Netto Long/Short“ auf Markt › Einordnung (`src/views/markt/TraderNetCard.tsx`, Canvas `TraderNetPlot.tsx`: Fläche um die Nulllinie, Preislinie, Pfeil am letzten Umschlag, Ring, Fadenkreuz, Zeitraum-Umschalter; Tests `tests/unit/views.markt.traderNet.test.tsx`, `tests/e2e/trader-net-markt.spec.ts`). Ehrlich benannt: Es sind die Top-Trader-Konten der Börse Binance (obere 20 % nach Einsatz), **keine On-Chain-Wale**; in der Oberfläche heißt es „Top-Trader (Binance)“, „Wale“ steht nur im Hilfesatz (verneint) und als Suchwort im Funktionsfinder (`src/app/features.ts`). Der Verlauf reicht rund 30 Tage zurück. |
+| Z6 | Quick Reply Pills (im Inventar bei Nr. 95 genannt, ohne eigene Nummer) | vorhanden | Antwort-Pillen im Coach-Chat (`src/views/coach/ChatCard.tsx`, `suggestQuestions`, Folgefragen). |
+| Z7 | Ladezustände im Stil des Voice Ring | zurückgenommen (Rücknahme R3, Runde 12) | Die Variante `ring` (`ringMath.ts`, `VoiceRingCanvas.tsx`, Dev-Seite `dev/ring.*`) ist wieder entfernt: der Nutzer fand die Lader vorher hochwertiger. Jeder Einbauort zeigt wieder das Punktbild von `cd8655d4`: Coach-Chat und Assistent nur `TextShimmer` „Coach denkt …“ (`CoachStream.tsx`), Zeitmaschine `calc` mit „Rechnet“ (`TimeMachineCard.tsx`), Top-Trader-Karte `search` (`TraderNetCard.tsx`), Screenshot-Import `calc` / `plan` (`ExtractSheet.tsx`, `OcrImportSheet.tsx`). Tests wieder wie vorher: `tests/unit/motion.fx.test.tsx`, `tests/unit/views.timemachine.test.tsx`, `tests/unit/views.markt.traderNetWal.test.tsx`; `tests/unit/motion.ring.test.tsx` ist mit dem Code gegangen. |
+| Z8 | Teilen-Fächer nach „Share Button Animation“ | erledigt | Siehe Zeile 27. Unverändert bleibt das behobene Scroll- und Schließverhalten (der Fächer geht zu, sobald sich der Auslöser um mehr als 1 px bewegt; ein Scroll, der ihn stehen lässt, schließt nicht). Neu in Runde 12: ein Zeiger, der beim Öffnen noch auf dem Auslöser ruht, wählt nichts (die Chips fliegen unter ihm hervor; Hover wählt erst nach 360 ms), und der Fokus, der von selbst in den Fächer springt, zählt nicht als Wahl – die Beschriftung fragt „Kanal wählen“, bis eine Taste oder der Zeiger wählt. Tests: `tests/unit/motion.radialShare.test.tsx` (23), `tests/e2e/interaktionen.spec.ts` „Radial Share“ (6 je Projekt). |
+| Z9 | Suche nach Tätigkeiten | erledigt | Die Suche (Seitenleiste „Seiten suchen“, Menü-Finder, Seite „Funktionen“, globale Suche mit `/`) antwortet auf „Trade suchen“ (→ das Suchfeld der Trade-Liste, der Cursor steht darin), „Screenshot finden“ (→ Bild-Originale und Hashes), „Alarm konfigurieren“ (→ Alarme & Zustellprotokoll), „Simulation öffnen“ (→ Zeitmaschine) – jeweils als erster Treffer. Dafür: Absichten in `src/app/features.ts`, Anker `trades-search` auf dem Suchfeld (`TradeFilters.tsx`), eine zu allgemeine Absicht der Seite „Handelsplan“ entschärft (`pageTargets.ts`). Das Suchfeld ist bereits eine Glas-/Clay-Fläche (`.sf-box`: Blur, innere Lichter und Schatten, 12 px Radius). `/` öffnet die globale Suche mit dem Cursor im Feld, Escape leert und schließt sie (beides gab es schon). Tests: `tests/unit/app.searchTasks.test.ts`, `tests/e2e/funktionsfinder.spec.ts` (GOALS), `tests/e2e/suche-aufgaben.spec.ts`. |
+| Z10 | „Flip“-Erklärung (Runde 12, Paket W) | nur noch Text (Rücknahme R4) | Feld „Was ist ein Flip?“ oben in der Top-Trader-Karte (`src/views/markt/FlipExplainer.tsx`, Lazy-Chunk): Überschrift und Definition, der Flip-Satz aus dem Verlauf der Karte („Flip am … erstmals netto Short, Preis seit dem Flip …“, sonst „Kein Flip …“ oder der ehrliche Leerzustand), Quelle · Kohorte · Messzeit, Einordnung, „Wie lese ich das?“, „Bei Flip benachrichtigen“. **Entfernt:** der eigene Echtdaten-Chart, die Schema-Spalte (drei erfundene, mit Catmull-Rom geglättete Kurven) und die Legende des Charts – samt aller Bewegung des Felds. Der Chart der Karte selbst (`TraderNetPlot`) ist unverändert wie vor W. Platz neu gemessen (`flipExplainerReserve.ts`, `MarktView.tsx`). Belege: `tests/unit/views.markt.flipExplainer.test.tsx`, `tests/e2e/flip-explainer.spec.ts` (CLS ≤ 0,02). |
+| Z11 | Journal-Karte im Milchglas-Look mit Riesenwort „REVIEW“ (Runde 12, Paket F2; ohne eigene Nummer im Inventar) | erledigt, mit echten Daten | Berichte › „Einträge durchgehen“ (`src/views/berichte/JournalCard.tsx`, Modell `src/domain/reports/entries.ts`, Stil `src/views/berichte/frost.css` als Lazy-CSS): Pille „Eintrag 06 von 12“ (Index aus der echten Liste des Zeitraums), Umriss-Ziffer, Setup- und Tag-Chips aus dem Trade, R und Netto aus den gespeicherten Werten (Verlust rot, ohne Stopp kein R und der Satz dazu), Review-Stand; das Riesenwort steht gepunktet (Doto) als Pseudo-Inhalt hinter der Karte und wird von ihr überlappt. **Bewegung** (einmal): Wort steigt in 0,9 s (ease-out), Karte federt mit leichtem Überschwinger ein (0,8 s), ein Schritt tauscht den Eintrag mit 18 px Versatz (0,38 s, ease-out); Reduced Motion = Endzustand sofort. Blättern: Knöpfe (44 px), ← → Home End, Wischen (`swipeStep`), kein Umlauf. Belege: `tests/unit/frost.domain.test.ts`, `tests/unit/views.frost.test.tsx`, `tests/e2e/frost-f2.spec.ts`, `docs/audit/img-frost/`. Grenze: Chip „Plan vorher / Stopp gehalten“ des Prototyps gibt es nicht – die App speichert keinen Zeitpunkt des Plans. |
+| Z12 | „Heute abschließen“ mit Haken-Knopf, Ring, Haptik und Ton (Runde 12, Paket F2; ohne eigene Nummer im Inventar) | erledigt, mit dem Wochenabschluss zusammengelegt | `src/views/berichte/CloseRitual.tsx` (ein Baustein für Tag und Woche), `DayCloseCard.tsx`, `domain/growth/dayClose.ts`: der Haken zeichnet sich (0,45 s), ein Ring verlässt den Knopf (0,8 s) **nur wenn der Abschluss erledigt war**, die sieben Wochenpunkte federn (`fr-pop`). Vibration und Ton sind dieselbe Einstellung wie in Einstellungen › Bewegung (`processFeedback.ts`) und **aus**. Belohnt wird nur Prozess (Wächter-Test); Reduced Motion: kein Ring, keine Vibration. Belege: `tests/unit/psych.guard.test.ts` Block 6, `tests/unit/frost.domain.test.ts`, `tests/unit/views.frost.test.tsx`, `tests/e2e/frost-f2.spec.ts`. Grenze: nicht auf einem echten Gerät gespürt (Vibration gegen eine nachgebaute Schnittstelle geprüft). |
+| Z13 | „Frag dein Journal“: Suchleiste, Schimmer, drei Karten aus der Mitte (Runde 12, Paket F2; ohne eigene Nummer) | erledigt, verdichtet (Rücknahme R3) | `src/views/berichte/AskJournalCard.tsx` (Lazy-Chunk), Auswertung `src/domain/ask` und `src/domain/coach/nlq/audit.ts`, Fragetypen in `docs/FRAG-DEIN-JOURNAL.md`. Seit der Rücknahme steht die Leiste offen (kein einzelner Punkt mitten in einer leeren Fläche), die Bühne reserviert keine Leerfläche mehr (Karte so dicht wie die übrigen Berichte-Karten, Reserve 328 / 242 px), der Lader ist nur die kleine Schimmerzeile „Durchsuche n Trades …“ während einer laufenden Antwort. **Bewegung:** Schimmer (0,52 s, echte Zahl, bewusste Pause), die drei Karten fahren gestaffelt (70 ms) aus der Mitte auf (0,62 s); Reduced Motion: sofort. Belege: `tests/unit/ask.test.ts`, `tests/unit/views.frost.test.tsx`, `tests/e2e/frost-f2.spec.ts`. |
+| Z14 | Teilen-Fächer 1:1 nach „Share Button Animation“ (Runde 13) | erledigt | `src/motion/RadialShare.tsx`, `radialLayout.ts`, `vorbild2.ts` (`shareFan`). **Gemessen am Nachbau** (Playwright, Telefon 390 px, je Bild mitgeschrieben): Pille → Nabe steht nach 187 ms (Vorbild 175–220; Feder k 670 / c 44), Scheiben 48 px auf r = 92,1 px (1,92 Ø), 46° Teilung, 90 % des Wegs nach 454 / 504 / 554 ms (Staffel 50 ms, Vorbild 51–53), Überschwingen 3,3–3,4 % (Vorbild 3,3–3,6); Wahl: Druck 0,83, Ring 1,0 → 1,45, Flut vom Klickpunkt, Beschriftung „Kopiere …“ +72 ms (+63), Einsammeln +373 (+363), Nabe +571 (+563), Ergebnis „Bericht kopiert“ +772 (+763), Flut zurück +905 (+897), Haken +1006 (+997) – die gemessenen Zeiten zählen ab dem Drücken, das Vorbild ab dem Klick (≈ 20 ms später). Die gewählte Scheibe fährt ohne Überschwingen in die Mitte. **Abweichungen:** unsere Ziele sind keine Marken (Kopieren, Bild/Datei, Link, PDF, Weitergeben) – Farben aus `--palette-1…5`, nicht Markenfarben; die Scheiben sind dunkel (unser Thema) mit dem Glas-Rand statt weiß; ein weicher Grund unter dem Fächer, weil er über einer Seite aufgeht (das Video hat eine leere Bühne); Ziele, die ein eigenes Fenster öffnen (Link → Teilen-Blatt, PDF → Druck, Weitergeben → System), schließen den Fächer nach der Flut, statt „kopiert“ zu sagen; Schließen (✕, außen, Esc, Tab) und der Rückweg zur Pille fehlen im Video: kurze Umkehr des Auffächerns (160 ms, 25 ms Staffel). Erfolg nur, wenn das Ziel `true` meldet; Fehler sagt „Hat nicht geklappt“ und der Toast des Ziels nennt den Grund. |
+| Z15 | Löschknopf 1:1 nach „Delete Button – The Bin Eats The Label“ (Runde 13) | erledigt, hinter der Bestätigung | `src/motion/BinDelete.tsx`, `vorbild2.ts` (`binEat`), eingebaut in Trade-Editor, Trade-Detail, Setup-Editor, Import („Alles ersetzen“). **Sicherheitsregel:** der Eimer frisst erst nach der Bestätigung (Halten 1,2 s oder „Ja, löschen“); der Spinner ist das echte Löschen (mindestens 415 ms, nie ein gespielter Erfolg); ein Fehler bringt die Pille zurück und der Aufrufer sagt warum; verlässt die Pille die Seite vor dem Spinner, wird das bestätigte Löschen trotzdem ausgeführt (genau einmal). **Gemessen** (Trade-Detail, 390 px): Druck 0,973 → 1,02, Deckel 40° (Feder k 700 / c 42), Buchstaben 85 ms gestaffelt, je 580 ms Flug, Spinner ab +2063 ms (Vorbild +1925 bei 6 Buchstaben; „Löschen“ hat 7: +85 → 2010), Ring schließt nach dem Löschen ab +2516 (Spinner 453 ms, Mindestdauer 415), Fehlerlauf (Speicher lehnt nach 600 ms ab): Spinner +2049, zurück zur Pille +2650 = 601 ms später. **Abweichungen:** Rot (Signal/Danger-Verlauf, weißer Text ≥ 4,5 : 1) statt Lila; nach Erfolg schließt unser Dialog (das Element ist weg) – den Rückweg zur Pille gibt es nur, wo der Knopf bleibt (Fehler). Rückgängig (`TrashHost`) unverändert: es gilt weiter für Screenshots/Entwürfe; Trades hatten nie ein Rückgängig. |
+| Z16 | Glas-Rezept für Navigation, Knöpfe und Schalter (Runde 13) | erledigt | Siehe Abschnitt „Runde 13 – Paket G“. Weichzeichner nur auf kleinen Flächen (Glas-Pille am Handy, „Inhalt“-Streifen gar nicht (ab Runde 13a: deckende Tönung, weil der Weichzeichner über die ganze Breite jedes Öffnen auf der Seite neu malen ließ – Auswahllisten auf 2-Kern-Rechnern ohne GPU über 200 ms), Seitenleiste nur beim Blick); gemessen auf der Übersicht 390 px (Chromium, Telefon-Projekt): Weichzeichner-Fläche 7,3 % des Bildschirms (nur die Glas-Pille, wie vorher), **keine langen Aufgaben** (> 50 ms) beim Drücken des Segment-Reglers, beim erneuten Tippen auf den aktiven Reiter der Leiste und beim Scrollen (vorher ebenso 0). Der Wechsel Gesamt/Makro/Scalp erzeugt 94–145 ms lange Aufgaben – vorher wie nachher gleich, es ist das Neurechnen der Übersicht, keine Animation. Zahlen in Knöpfen werden nie weichgezeichnet. Budgets: Erstladung JS 661,8 / 800 KiB, CSS 52,5 / 52,5 KiB (52,497; Grenze nicht angehoben). |
+
+## Runde 12 – Paket C: Seitenleiste, Ladezustände, Teilen, Suche
+
+Stand 2026-11-08. Quelle der Aufträge: Launch-Audit-Auftrag (Abschnitte 4, 5, 7) und die Aufnahmen des Nutzers: „Glassy SideBar V5“ (Instagram), „Share Button Animation“ (Instagram), „Voice Ring“ (libraries.dev, Chrome). Von den Aufnahmen ist nur das **Verhalten** übernommen, kein Quelltext (Näheres in `docs/KOMPONENTEN-QUELLEN.md`).
+
+**Warum der Nutzer die Einblend-Folge der Seitenleiste nicht gesehen hat** (gemessen mit Playwright/Chromium 1440 × 900, jedes Bild der Seitenleiste mitgeschrieben; die Maschine rendert ohne GPU, daher nur etwa 20 Bilder je Sekunde, die Zeiten selbst sind die der Animationen):
+
+| Zeit nach dem Laden | vorher (Stand `13bbb7d`) | nachher |
+|---|---|---|
+| 0,65 s | Seitenleiste da, `data-draw="run"`, Intro-Bühne deckt die App (`data-intro-covered`) | Seitenleiste da, `data-draw="wait"`, Zeilen unsichtbar, keine Animation läuft |
+| 0,7 s bis 2,2 s | Welle und Zeichnen laufen **unter der Bühne** | wartet |
+| 3,1 s | `data-draw` weg, Sitzungs-Flag `tj2-sb-draw` gesetzt – in dieser Sitzung nie wieder | wartet noch |
+| 5,2 s | Bühne hebt sich: die Seitenleiste steht fertig da, nichts war zu sehen | Bühne hebt sich, `data-draw="run"` startet im selben Augenblick |
+| 5,3 s bis 6,6 s | – | Zeilen blenden von oben nach unten ein, Glyph für Glyph gezeichnet |
+| 7,4 s | – | `data-draw` weg, alles ruht gezeichnet |
+
+Ursache: Die Seitenleiste las die Phase des Intros einmal beim Aufbau (`useState`-Start). Beim ersten Rendern steht die Phase noch auf „off“ – `IntroHost`, der letzte Knoten der Hülle, setzt „stage“ erst in seinem Layout-Effekt –, also startete die Folge sofort und war unter der Bühne unsichtbar und verbraucht. Behoben durch `introCoversApp` / `introPendingAtBoot` (`src/intro/introBoot.ts`): die Folge wartet, solange die Bühne die App deckt **oder gleich decken wird** (einmal entschieden, bevor das Intro sein Sitzungs-Flag schreibt), und solange der Tab verborgen ist. Zweite Ursache: Die Symbole zeichneten nicht nacheinander (640 ms je Strich, 46 ms Versatz: etwa 14 Symbole gleichzeitig). Jetzt hat jedes Glyph seinen eigenen Platz (`sidebarSequence`, rein und getestet). Dritte Ursache: „einmal je Sitzung“ – ein Neuladen im selben Tab zeigte nichts mehr; jetzt **einmal je Seitenaufruf** (Modulzustand: kein Neustart bei Hover, Seitenwechsel, erneutem Rendern oder Größenwechsel über 768 px). Ausfallsicher: nach 20 s Wartezeit zeigt die Leiste ihre Zeilen einfach, mit „weniger Bewegung“ steht alles sofort da.
+
+Messung der Folge (nachher, Reihenfolge und Takt): Zeilen 80 ms versetzt, je 420 ms (Paket S; vorher 52 / 300); 19 Glyphs, 80 ms je Glyph, Glyph n + 1 beginnt erst, wenn Glyph n fertig ist (deklarierte Zeiten der laufenden Animationen und die Bilder des Browsers, `tests/e2e/sidebar-sequenz.spec.ts`). Die Feder des Aktiv-Indikators (`spring.layout`) ist unverändert. Die untere Glas-Leiste am Handy bleibt; ihre Symbole kommen weiterhin von links nach rechts (30 ms Versatz, `stagger.cards`), einmal je Sitzung – jetzt mit einem Test.
+
+Was sich geändert hat (Datei | früher | geändert | Funktion | visuell | mobile | Tastatur | Test):
+
+| Datei | früher | geändert | Funktion | visuell | mobile | Tastatur | Test |
+|---|---|---|---|---|---|---|---|
+| `src/app/Sidebar.tsx`, `src/app/shellFx.ts`, `src/intro/introBoot.ts`, `src/styles/shell-motion.css` | Folge startete bei Mount, unter der Bühne; Flag je Sitzung; Symbole überlappten | wartet auf die sichtbare App, einmal je Seitenaufruf, strikte Glyph-Folge aus reiner Zeitleiste | Reihenfolge, Einmaligkeit, Warten auf die Bühne und auf den Tab | Zeilen 80 ms / 420 ms, Glyphs 80 ms, Glanz am Ende jedes Glyphs | nur ab 768 px (Handy: untere Leiste unverändert) | – | `tests/unit/app.sidebarSequence.test.tsx`, `tests/e2e/sidebar-sequenz.spec.ts` |
+| `src/app/Sidebar.tsx`, `src/app/SidebarParts.tsx` | `aria-label` auf Zeilen, kein Tooltip | `title` an Zeilen und Fußknöpfen, solange die Namen nicht offen sind | Tooltip und Name für Icon-only-Zustände | nativer Tooltip | Langdruck öffnet die Namen wie zuvor | Fokus öffnet die Namen wie zuvor | `tests/unit/app.sidebarSequence.test.tsx` |
+| `src/motion/ThinkingOrb.tsx` | drei Punktbilder | (Variante `ring` – mit der Rücknahme R3 wieder entfernt) | Ladezustand ohne Dauerschleife, ohne Layoutsprung | Punktkugel / Wolke / Kreisbahn wie in `cd8655d4` | gleich | – | `tests/unit/motion.fx.test.tsx` |
+| `src/motion/fx/CoachStream.tsx`, `TimeMachineCard.tsx`, `TraderNetCard.tsx`, `ExtractSheet.tsx`, `OcrImportSheet.tsx` | `TextShimmer` allein / Punktbild | (Ring – zurückgenommen, R3: wieder das Punktbild bzw. der Schimmer von vorher) | siehe Z7 | siehe Z7 | gleich | – | die genannten Unit- und E2E-Tests |
+| `src/motion/RadialShare.tsx`, `radialLayout.ts` (`captionSide`), `RadialShareButton.tsx`, `ExportCard.tsx` | dunkle Chips, Wort im Auslöser | Glas-Chips, Kreuz im Auslöser, Beschriftung mit `detail` je Ziel, Zeiger-Schonfrist | siehe Z8 | Chip-Drehung beim Auffächern (Feder `spring.pop`) | Touch und Klemmung am Rand unverändert | Pfeile, Home, End, Esc, Tab unverändert | `tests/unit/motion.radialShare.test.tsx`, `tests/e2e/interaktionen.spec.ts` |
+| `src/app/features.ts`, `pageTargets.ts`, `TradeFilters.tsx` | „Trade suchen“ führte zur Seite Handelsplan, „Simulation öffnen“ zu „Branchen-Papier“ | Absichten ergänzt, Feldanker | siehe Z9 | – | Menü-Finder am Handy | `/`, Esc | `tests/unit/app.searchTasks.test.ts`, `tests/e2e/suche-aufgaben.spec.ts` |
+
+Nicht geändert und nicht angefasst (Auftrag): Anmelde-Sheet, Bezahlfenster und Kaufstrecke (Paket B), Aufbau von Startseite und Cockpit, „Trade eintragen“. Offen: keine Messung auf einem echten Gerät (nur Chromium ohne GPU). Der Ring ist mit der Rücknahme R3 wieder entfernt.
+
+## Runde 12 – Paket F2: Frost (Journal-Karte, Heute abschließen, Frag dein Journal)
+
+Stand 2026-11-08. Quelle: Prototyp der Schwester-Sitzung (`prototypes/trading-journal-frost/`: Konzept und Optik; dort Vanilla JS mit simulierten Daten – hier neu gebaut, mit echten Daten, in unseren Tokens). Die drei Karten stehen in Berichte, im Lazy-Chunk der Seite; die Erstladungs-CSS blieb bei 52,3 KiB (das Frost-CSS ist ein eigener Lazy-Stylesheet-Chunk, `BerichteView-*.css`), die Erstladungs-JS bei 656,9 KiB (die Fragenleiste ist ein eigener Chunk, `AskJournalCard-*.js`, 5,5 KiB gzip). Easing: Eintritt ease-out, Federn mit leichtem Überschwinger (`cubic-bezier(0.34, 1.3 – 1.56, 0.64, 1)` als Annäherung an `spring.pop` / `spring.enter`), nichts linear außer dem Schimmer-Verlauf; Reduced Motion setzt alle Dauern auf 0 (`base.css`), die JS-Pause des Schimmers entfällt (`useReducedFx`). Zeilen Z11 bis Z13 oben. Nicht angefasst: Startseite, Cockpit, „Trade eintragen“.
+
+| Datei | früher | geändert | Funktion | visuell | mobile | Tastatur | Test |
+|---|---|---|---|---|---|---|---|
+| `src/views/berichte/JournalCard.tsx`, `src/domain/reports/entries.ts` | – (neu) | Journal-Karte mit Riesenwort | Index „n von m“, Chips, R, Review-Stand | Milchglas, Umriss-Ziffer, Wort hinter der Karte | Wischen, 44-px-Knöpfe, Karte 640 px hoch | ← → Home End | `frost.domain.test.ts`, `views.frost.test.tsx`, `frost-f2.spec.ts` |
+| `src/views/berichte/CloseRitual.tsx`, `DayCloseCard.tsx`, `WeekCloseCard.tsx`, `src/domain/growth/dayClose.ts` | großer Knopf „Rückblick abschließen“ im Wochenabschluss | ein Abschluss-Ritus für Tag und Woche | Prozess-Liste, Haken-Knopf, Wochenpunkte, zwei Kanäle (aus) | Haken zeichnet sich, Ring nur bei erledigtem Prozess | Knopf 64 px | Tab, Enter | `psych.guard.test.ts`, `frost.domain.test.ts`, `views.frost.test.tsx`, `frost-f2.spec.ts` |
+| `src/views/berichte/AskJournalCard.tsx`, `src/domain/ask/*`, `src/domain/coach/nlq/audit.ts` | – (neu; der Coach-Chat bleibt) | Suchleiste mit drei Karten | geschlossener Satz an Fragetypen, lokal, ohne Raten | Leiste aus der Mitte, Schimmer, Karten fahren auf | Karten untereinander | Enter, Tab | `ask.test.ts`, `views.frost.test.tsx`, `frost-f2.spec.ts` |
+| `src/motion/processFeedback.ts` | fünf Prozess-Ereignisse | sechstes: `dayClose` | – | – | – | – | `psych.guard.test.ts` |
+
+Offen: keine Messung auf einem echten Gerät; die Wirkung (Disziplin) ist nicht gemessen.
+
+## Runde 12 – Rücknahme R: eingekreiste Stellen zurück ins Original
+
+Stand 2026-11-08. Der Nutzer hat in der Deploy-Vorschau fünf Stellen eingekreist („ändert das bitte wieder ins Original“); alles nicht Eingekreiste bleibt (Seitenleisten-Folge, Übersicht/Cockpit, „Trade eintragen“, Strategiesuche F1, Berichte-Karten F2, Psychologie P, Einrichtungs-Assistent). Basis für „Original“: `4df73667` (vor Paket B), `cd8655d4` (vor Paket C), `f6232015` (vor Paket W).
+
+| Punkt | zurück | bewusst behalten |
+|---|---|---|
+| R1 Anmelde-/Registrier-Sheet | Aussehen und Bewegung wie `4df73667`: kein Markenstreifen, keine Klinge (`AuthBlade.tsx` entfernt), keine Bestellkarte (`OrderContext.tsx` entfernt), keine Zusatzlinks und -zeilen; der Moduswechsel ist wieder das sofortige `AuthMorph`-Gleiten; Antwort auf „Erneut senden“ wieder als Toast | neutrale Registrier-Antwort (AUTH-03, Text im Mail-Schritt), `?order=` an jedem Mail-Link (AUTH-06), Offline-Hinweis, „E-Mail nicht bestätigt“ → Mail-Schritt, 60 s Wartezeit (Ratenlimit des Servers), Einrichtungs-Assistent; `MorphHeight` hält die Border-Box-Höhe (unsichtbarer Fix: ohne ihn lief das Blatt bei jedem Wechsel eine eigene Mini-Skalierung) |
+| R2 Bestellfenster | wie `4df73667`: eine Spalte, keine Plan-Karte, kein Ablaufband, keine Zahlungsbühne (`PayStage.tsx` entfernt), Kaufknopf mit Orbs (`loader="orbs"`) | Pflichtangaben waren im alten Fenster schon da (Knopf „Zahlungspflichtig bestellen“, Preis, Verlängerung, Kündigung, Steuer); `PlanCardArt.tsx` bleibt nur für die Ergebnisseite (Preise-Seite nicht angefasst) |
+| R3 Lader | Punktbilder von `cd8655d4` an allen Einbauorten; Voice-Ring-Code entfernt; „Frag dein Journal“ dicht (offene Leiste, keine reservierte Leerfläche, Lader nur während einer Antwort) | – |
+| R4 Flip-Erklärung | eigener Chart, Schema-Spalte und Legende entfernt | Überschrift, Definition, Flip-Satz, Quelle/Kohorte/Messzeit, Einordnung, „Wie lese ich das?“, Alarm-Link |
+| R6 Leerzustände | Kreisbahn nirgends mehr; statisches Punkte-∅ wo `pickArt` sie wählte | „Linie“ und „Punkte sammeln sich“ bleiben |
+
+Glättung (Zusatz R7): in den Paketen C, W, B, S, F1, F2 und P kam genau eine glättende Kurve dazu – die Catmull-Rom-Kurven der Flip-Schema-Spalte (`smoothPath`); sie ist mit R4 weg. Alle übrigen Charts zeichnen gerade Segmente (Recharts ohne `type="monotone"`, Canvas mit `lineTo`). Die „Parabeln“ der Vorschau kamen aus erfundenen Daten: der synthetische Markt des Showrooms (R5: jetzt echte Marktdaten) und das Demo-Journal mit stetigem Plus (R7: streut jetzt unregelmäßig, Verlustphase, Ausreißer, weiter als Demo markiert).
+
+## Runde 13 – Paket V: Anmeldung und Bezahlfenster 1:1 nach der Referenzaufnahme
+
+Stand 2026-11-08. Der Nutzer verlangt einen 1:1-Nachbau von Aufbau und Bewegung zweier Aufnahmen (nur Schrift, Farben, Wortlaut eigen); gemessen in `docs/audit/V-VORBILD.md`, Tokens in `src/motion/vorbild.ts`.
+Ersetzt R1/R2 für diese beiden Fenster (`AuthMorph.tsx`, `OrderSheet.tsx`, `PayButton.tsx` entfernt).
+
+| Punkt | Bewegung | Werte |
+|---|---|---|
+| V1 Anmelden ↔ Registrieren | ein Lauf des dunklen Bands über die Karte, innere Ebene gegenläufig, harter Tausch im gedeckten Fenster, Einlauf gestaffelt | 900 ms `cubic-bezier(0.5,0.14,0.3,1)`; Tausch 342 / 387 ms; Text +20/+80/+140 ms, 14/12/10 px; Zeilen 45 ms; Fokuslinie +250; Knopf +270; Fuß +390; reduziert 150 ms Überblendung |
+| V2 Kartenwende | CVC-Fokus dreht die Karte, Verlassen dreht zurück | 290 ms `cubic-bezier(0.3,0,0.3,1)`, Perspektive 3,6 × Kartenbreite |
+| V2 Bestätigen | Formular aus, Karte in die Mitte, Ring, Glanz alle 500 ms, Puls; Erfolg erst nach Serverbestätigung | Formular 100 ms; Flug 300 ms `cubic-bezier(0.22,1,0.36,1)`, Skala 1,08; Ring 300 ms/Umdrehung; Fehler: Karte zurück 300 ms |
+
+
+
+Gesucht wurde im ganzen Verlauf des Projekts (613 Commits mit `trading-journal`, 2026-09-30 bis 2026-10-31) mit den Suchworten animation, motion, Physik/physics, Pulse, entfernt, vereinfacht
+(und englisch removed, dropped, simplif, no longer), außerdem nach gelöschten Dateien unter `src` und nach entfernten `@keyframes`-Zeilen. **Ergebnis: Keine Animation wurde ersatzlos gelöscht.**
+Gelöscht wurden nur drei Dateien (`FeatureCard.tsx`, `overviewScenario.ts`, `signals/whale.ts`), keine davon eine Animation. Belegt sind folgende Abschaltungen oder Vereinfachungen:
+
+| Commit (Datum) | Was | Art und Grund | Stand |
+|---|---|---|---|
+| `86b69dd` (2026-10-01) | Progressive Weichzeichner-Bänder unter Dock und Kopfzeile: Baustein `EdgeBlur` steht, die Bänder sind leer (`BOTTOM_BANDS`, `TOP_BANDS`) | nie eingeschaltet; „off for perf“, verlorene Frames im Scrollen 130 auf 58 (Nr. 142) | bewusst aus |
+| `9266b0b`, `4031f9a` (2026-10-08) | App-weite `LayoutGroup` entfernt: ein `layout`-Element gleitet nicht mehr mit, wenn sich ein anderes verschiebt; Morphs bleiben, `LayoutCascade` gilt für Blätter, Dialoge, Einstellungen | Leistung: Tablet-Seitenwechsel p95 38 bis 61 auf 13 bis 15 ms | bewusst; gezielte Rückkehr offen (Liste oben, Punkt 3) |
+| `ec8c61c`, `b1ab457`, `f9b392e`, `0646bf5` (2026-10-08) | Samsung-sichere Effekte (`html[data-safe-fx]`): kein Weichzeichner bei Eintritten und Seitenwechsel, kein `backdrop-filter`, kein maskierter Glanz am Kopfknopf, kein Rauschfilm, kein Toast-Glühen | nur bei Samsung Internet oder `?safefx=1`; sonst unverändert | bedingt, bewusst |
+| `549cf28` (2026-10-08) | Die „24 Stunden“-Linie zeichnet sich nur noch einmal je Sitzung ein | vorher bei jeder Rückkehr zur Übersicht (Fehler) | behoben |
+| `622a3d4` (2026-10-08) | Der rote Lesefortschritt der Kopfzeile folgt dem Scroll exakt statt mit Feder-Nachlauf | Umbau auf Scroll-Zeitleiste (Compositor) | bewusst |
+| `da7bbfc` (2026-10-31) | Menü-Einblendung gestrafft: letzte Zeile nach 0,6 s statt bis 1,8 s; schmale Seitenleiste ohne Tooltips (die Namen kommen mit dem Blick) | Runde 10, Test `app.commandNav.test.tsx` absichtlich angepasst | bewusst |
+
+Ohne sichtbare Änderung umgebaut: `62919ba` (Tempo-Weichzeichner der Kurs-Ziffern als vorgeweichte Kopie statt wachsendem Radius), `420cf6b` (Dock-Markierung gleitet auf dem Compositor statt als geteilter Layout-Morph).
+`PageSwitch` wird von der Hülle nicht mehr benutzt (`PageHost` hat es ersetzt), bleibt aber im Barrel.
+
+Grenzen: Auf das ursprüngliche Bundle, auf das Code-Kommentare verweisen („Bundle `Kw`“, „`i2`“, „`aT`“), hatte ich keinen Zugriff; ob dort eine Animation stand, die nie übernommen wurde, ist nicht prüfbar. Das
+`dashboard.html` im Repo-Wurzelordner habe ich auftragsgemäß nicht angesehen.
+
+## Runde 13 – Paket G: Glas für Navigation und Bedienelemente; „Share Button“ und „Delete Button“ 1:1
+
+Stand 2026-11-09. Auftrag des Nutzers: (1) Navigation und (4) Knöpfe & Schalter bekommen einen Glas-Look und Bewegungen „ähnlich wie die Videos“
+(alle bisherigen Referenzaufnahmen), dazu zwei Teile 1:1 nach Aufnahmen: der Teilen-Fächer (A) und der Löschknopf, dessen Eimer das Wort frisst (B).
+Gemessen sind beide Aufnahmen in der Spezifikation der Sitzung (`vorbild2/SPEC.md`: jedes Originalbild mit Zeitstempel, Kurven per Least-Squares);
+die Werte stehen in `src/motion/vorbild2.ts`. Nicht angefasst (Auftrag): Startseite/Übersicht und Cockpit im Aufbau, Karten, Blätter/Dialoge,
+Aufbau und Ablauf des Trade-Editors, die Einblend-Folge der Seitenleiste.
+
+**Ein Glas-Rezept** (Tokens in `src/styles/shell-motion.css`, dunkel und hell): `--gl-tint` (rgb(10 12 20 / 0,8)), `--gl-rim` (1-px-Rand, oben hell →
+unten dunkel), `--gl-face` / `--gl-on` (Fläche, aktiv), `--gl-in` (dünne Innenkante), `--gl-glow` (Glühen nur am aktiven Element, im Signalrot),
+`--gl-blur` (14 px, nur kleine Flächen). Klassen `.glass` (Fläche + Rand + Innenkante) und `.glass-on` (aktiv, mit Glühen).
+
+| Datei | früher | geändert | Bewegung / Werte | mobile | Tastatur / a11y | Test |
+|---|---|---|---|---|---|---|
+| `src/styles/shell-motion.css` (`.dock-glass`, `.dock-plate`) | Glas-Pille aus Einzelwerten | dieselbe Pille aus dem Rezept: Tönung, Verlaufsrand, Innenkante; die Platte mit Rand und rotem Glühen | Sprung der Platte unverändert (`spring.layout` k 380 / c 34, FLIP auf dem Compositor) – „der Sprung zum nächsten Punkt ist mega“ | Weichzeichner nur auf der kleinen Pille | 44-px-Ziele unverändert | `tests/unit/app.dockGlass.test.tsx`, `tests/e2e/shell-frame.spec.ts` |
+| `src/app/Sidebar.tsx` (`.sb-mark`) | Platte `bg-white/[0.07]` | `.glass-on`: Verlaufsrand, Innenkante, Glühen | Gleiten und Dehnen unverändert; Einblend-Folge unverändert | – | Fokusringe der Zeilen unverändert sichtbar | `tests/e2e/shell-motion.spec.ts`, `tests/e2e/sidebar-sequenz.spec.ts` |
+| `src/primitives/SectionNav.tsx` („Inhalt“) | deckender Streifen, aktiver Chip mit hellem Rand | Glas-Streifen (`.sn-glass`, deckende Tönung ohne Weichzeichner), eine Glas-Platte gleitet zum Chip des Abschnitts im Blick | 420 ms `cubic-bezier(0.16, 1, 0.3, 1)` (expo-out, ohne Überschwingen); Erstplatzierung, Größenänderung, Schriftwechsel ohne Gleiten | ohne Weichzeichner (volle Breite über scrollender Seite) | eigener Fokusring je Chip; Reduced Motion springt | `tests/unit/primitives.sectionNav.test.tsx`, `tests/e2e/seiten-a.spec.ts` |
+| `src/primitives/Button.tsx` | Sekundär: Fläche 5 %, Linie; Druck 0,96 | Sekundär `.glass`, Ghost mit Innenkante beim Hover, Primär mit leisem Glühen; Danger unverändert rot | Druck 0,97 und zurück auf `spring.press`; Laden (Spinner, Breite bleibt) und Erfolg (Haken zeichnet) wie bisher | – | Fokusring über dem Glas (`--ring-glow-btn`) | `tests/unit/primitives.button.test.tsx` |
+| `src/primitives/Segmented.tsx`, `src/motion/Switch.tsx`, Kopf-Knöpfe (`Header.tsx`, `DisplayActions.tsx`, `AssistantButton.tsx`) | Daumen/Spur/Kachel mit Linie | `.glass` (Daumen auf `ink-750`, Spur, Kacheln); Daumen des Schalters mit Innenkante | Bewegungen unverändert (Daumen-Feder, Dehnung) | – | unverändert | `tests/unit/primitives.segmented.test.tsx` |
+| `src/motion/RadialShare.tsx`, `radialLayout.ts` (A, 1:1) | Knopf bleibt Knopf, Glas-Chips 68 px Bogen, `spring.pop`, Wahl schließt sofort + Toast | die Pille wird zur Nabe, „+“ zeichnet und dreht zum ✕, fünf (bei uns 3–4) Scheiben auf dem gemessenen Halbkreis, Wahl spielt in der Komponente zu Ende | siehe Z14 | Klemmung/Drehung am Rand unverändert | Menü-Muster unverändert; Nabe ist ein Knopf außerhalb des Menüs; Live-Region | `tests/unit/motion.radialShare.test.tsx`, `tests/e2e/interaktionen.spec.ts` |
+| `src/motion/BinDelete.tsx`, `HoldButton.tsx` (`useHoldPress`) (B, 1:1) | `HoldConfirm` mit Füllbalken und Haken | Löschpille mit Eimer: erst bestätigen (Halten oder „Ja, löschen“), dann frisst der Eimer das Wort, Scheibe + Spinner = echtes Löschen | siehe Z15 | 44 px auf Touch | Name „Löschen“ bleibt, `aria-busy`, Live-Region „Wird gelöscht …“ / „Gelöscht“ | `tests/unit/motion.binDelete.test.tsx`, `tests/unit/overlays.*.test.tsx`, `tests/e2e/trades.spec.ts` |
+
+Belege: Vergleichsbögen Video | Nachbau `vorbild2/vergleich-a.png`, `vorbild2/vergleich-b.png`, Vorher/Nachher `glass/before/*.png`, `glass/after/*.png`
+(1692 × 978 und 390 × 844, dunkel und hell) im Scratchpad der Sitzung.
+
+## Runde 13 – Bewegungsprüfung: Aufbau nacheinander, Ausgänge mit Absicht
+
+Stand 2026-11-10. Auftrag des Nutzers: das Gerüst bleibt, Einstiege sollen sich **nacheinander aufbauen**, Ausgänge sollen **gehen statt verschwinden**. Grundlage war eine Messung in der laufenden App (Showroom-Build, 1440 × 900 und 390 × 844 Touch, dazu ein Durchgang mit reduzierter Bewegung): etwa 90 Interaktionen, je Bild `getAnimations()`, Deckkraft, `transform` und DOM-Präsenz. Dauern stammen aus den Definitionen, der Browser belegt Reihenfolge, Präsenz und Abruptheit (die Sandbox teilt sich 4 Kerne). Keiner der 177 Punkte ändert dadurch seinen Status; die Zeilen der Matrix bleiben wie sie sind.
+
+| Stelle | Gemessen vorher | Jetzt | Datei | Beleg |
+| --- | --- | --- | --- | --- |
+| Bezahlfenster, Auftritt | 173 Knoten in einem Bild bei Deckkraft 1, keine Bewegung | Abdunklung und Rahmen blenden ein (0,2 s, Rahmen von 98,5 %), dann Kopf, Karte, Bestellung, Formular im Abstand von 45 ms (Deckkraft + 10 px) | `src/billing/purchase/pay/payWindow.css` (`pw-in-*`, im Lazy-Chunk) | Browser: Reihenfolge 70 / 115 / 160 / 205 ms gemessen; `tests/unit/motion.round13.test.tsx` |
+| Bezahlfenster, Ausgang | bei Escape im selben Bild entfernt | blendet aus und weicht leicht zurück (`tween.exitSurface`, 0,18 s ease-in), **dann** schließt die Bestellung; die Bühne wird nicht zurückgesetzt, solange sie sichtbar ist; eine laufende Zahlung schließt weiterhin nie | `src/billing/purchase/PayWindow.tsx` (`close`) | Browser: Deckkraft 1 → 0,12 über ≈ 190 ms, danach entfernt (Desktop und Handy); Test wie oben |
+| Einrichtungs-Assistent, „Zurück“ | **Fehler:** der alte Schritt verließ die Bühne nach links wie der neue hereinkam (beide −x) | der gehende Schritt liest die Richtung im Moment des Wechsels (`custom` + Varianten): vor = nach links, zurück = nach rechts | `src/onboarding/wizard/SetupWizard.tsx` (`STEP_SWAP`) | Browser: zurück → alter Schritt +12 px, neuer von −20 px; `tests/unit/onboarding.wizard.test.tsx` |
+| Einrichtungs-Assistent, Schritte | ein Block (29 Knoten) von x 20; „Zurück“-Knopf sprang herein und heraus | Titel, Text, Auswahl, Aktion steigen im Abstand von 45 ms ein; „Zurück“ blendet ein und aus | `src/onboarding/wizard/wizard.css` (Lazy-Chunk), `SetupWizard.tsx` | Browser: drei Stücke bei 424 ms auf 0,80 / 0,56 / 0,12 |
+| Entscheidungsgrundlagen, Karten | 5 Karten und die Kachel „Neue“ standen sofort da, nur Listen und Balken in den Karten bewegten sich (`initial={false}` auf der Präsenz) | Karten steigen nacheinander ein (`stagger.cards`, die Karte hatte die Bewegung schon definiert), die Kachel schließt die Folge mit einer Blende | `src/views/setups/SetupsView.tsx` | Browser: bei 352 ms Karte 1 / 3 / 5 auf 0,87 / 0,64 / 0,26 |
+| Suche (`/`), Ausgang | Auftritt mit rotem Vorhang (520 ms), Ausgang nur Deckkraft 120 ms linear | Fläche hebt sich weg (−8 px, 98,5 %) auf `tween.exitSurface` | `src/search/GlobalSearch.tsx` | Browser: 1 → 0,23 über ≈ 160 ms mit y −6 |
+| Nachgeladene Karten (`Later`: Einstellungen, Analyse, Berichte, Wachstum) | Platzhalter und Karte tauschten in einem Bild | die Zelle hellt beim Landen einmal auf (0,35 → 1, `tween.fade`); auf der Einstellungsseite landen die Karten in Seitenreihenfolge, die Seite baut sich Karte für Karte auf | `src/primitives/Later.tsx` | Browser: 14 Landungen in Reihenfolge über ≈ 750 ms; `tests/unit/primitives.later.test.tsx` |
+| Landingpage (Erstbesuch der Startseite, neu) | gab es nicht – der erste Bildschirm war das Registrierungsformular | die Aussage baut sich Stück für Stück auf (Etikett, zwei Titelzeilen, Text, Knöpfe, Zusage: 70 ms Abstand, 12 px, 0,5 s ease-out), daneben das Beispiel-Journal: fünf Zeilen landen nacheinander (130 ms Abstand, von links), die Ergebnislinie zeichnet sich (1,1 s, `clip-path`), dann die zwei Lesezeilen; weiter unten Schritte, Vergleich, FAQ und Schlussaufruf mit dem vorhandenen `Reveal`, die Tarifkarten mit ihrem vorhandenen Austeilen. Nur Deckkraft, `transform`, `clip-path`; jedes Stück einmal, nichts läuft in Schleife | `src/app/gate/Landing.tsx`, `landing.css` (Lazy-Chunk) | Browser (Cloud-Build, 1440 px): Aussage 0 – 0,5 s, Zeilen 0,5 – 1,5 s, Linie 1,25 – 2,35 s, Lesezeilen ab 2,05 s, Ruhe nach ≈ 2,7 s; reduzierte Bewegung: alles im ersten Bild in Ruhe; `tests/unit/app.landing.test.tsx`, `tests/e2e/gate.spec.ts` |
+
+**Leitlinie dieser Runde (nichts Neues erfunden, das Bestehende zu Ende geführt).** These, wie sie der Frost-Prototyp des Nutzers vorgibt (`prototypes/trading-journal-frost/THESIS.md` im Zweig `claude/vigilant-edison-iz0c2n`): *Das Journal belohnt Disziplin, nicht Glück; Eintritt ease-out, Austritt ease-in, nichts linear; was sich bewegt, zeigt einen Vorgang.* Sie deckt sich mit der Designthese der App (`DESIGN.md`: „Ein schwarzes Messinstrument im Nothing-Stil … Bewegung meldet Zustände, sie schmückt nicht“). Das eine Signature-Element bleibt das der App (`DESIGN.md`: der Live-Box-zu-Box-Chart mit Punktmatrix-Glühen; im Labor die „Kristallisation“ der Strategiesuche als dessen Frost-Gegenstück). Diese Runde fügt kein weiteres hinzu, sie sorgt dafür, dass große Flächen kommen und gehen wie der Rest.
+
+**Zwei Sichtdurchgänge** (Bilder gelesen, nicht nur Zahlen): Durchgang 1 nach dem Einbau (Assistent, Grundlagen, Bezahlfenster auf Desktop und Handy): Fund „Schließen-✕ des Bezahlfensters auf dem Handy weiß auf weiß“ (behoben, siehe `docs/audit/STATUS.md`, Nachtrag Runde 13). Durchgang 2 am neu gebauten Stand: das ✕ in beiden Themen sichtbar und bedienbar; alle 19 Seiten bei 1440 px und bei 390 px durchgesehen (erster Bildschirm): kein Überlauf quer, nichts abgeschnitten oder überdeckt, keine Skriptfehler.
+
+**Landingpage – These, Signatur, Sichtdurchgänge.** *These:* Die Seite verkauft nicht, sie führt die Messung vor: links steht die Behauptung („Hör auf zu raten. Fang an zu messen.“), rechts wird sie im Kleinen eingelöst – fünf Trades, eine Linie, zwei Zeilen, die sagen, welche Art zu handeln verdient hat. Das ist dieselbe These wie im Rest der App (*das Journal belohnt Disziplin, nicht Glück*), nur vor der Anmeldung. *Signatur-Element:* das Beispiel-Journal, das sich selbst liest (Zeilen landen, die Linie zeichnet sich, die Lesezeilen kommen als Schluss); es ist als „Beispielansicht“ beschriftet und rechnet auf. Sonst nichts Neues: Schrift, Farben und Bausteine sind die vorhandenen – die Aussage im Schnitt des Anmeldefensters (helle Zeile, Akzentzeile kursiv), Etiketten und Zahlen in der Mono-Schrift, Schrittnummern in der Punktschrift, Akzent `--color-signal`, die Tarifkarten 1:1 von der Preisseite. *Vorgehen:* erst die Seite im Dev-Server gebaut und angesehen, dann Tests und Doku. *Durchgang 1* (Dev-Server, 1440 und 390 px, Bilder gelesen): die Seite stürzte beim ersten Rendern ab (das Fakten-Laufband misst seine eigene Breite, und die Rasterspalte durfte mit dem Inhalt wachsen – Endlosschleife; Spalten jetzt `minmax(0, 1fr)`); „Long/Short“ waren ungleich breit, die Grundlagen standen dadurch nicht untereinander (feste Mindestbreite); auf dem Handy fiel zuerst die Grundlage weg, also genau die Spalte, um die es geht (jetzt fällt die Richtung weg); im Schlussaufruf blieb ein einzelnes Wort in der letzten Zeile (`text-wrap: pretty`). *Durchgang 2* (gebauter Cloud-Build, dazu Tablet, Hell-Modus, reduzierte Bewegung, abgelaufener Mail-Link): bildweise gemessen kamen die Lesezeilen erst nach dem Ende der Linie und wirkten nachgeschoben (Beginn von 2,25 s auf 2,05 s vorgezogen, sie treffen jetzt mit dem Linienende ein); ein Browser mit lokalem Journal las den Hinweis „bleibt erhalten“ erst ganz unten im Fuß (steht jetzt beim ersten Knopf); Hell-Modus und Tablet ohne Befund.
+
+Neuer Takt: `tween.exitSurface` (0,18 s, ease-in `[.4, 0, 1, 1]`) für den Ausgang **großer** Flächen. Kleines (Chips, Zeilen, Streifen) behält `tween.exit` (0,12 s linear). Reduzierte Bewegung: überall sofort im Endzustand (CSS-Auftritte über die globale Regel in `base.css`, die JS-Wege über `useReducedFx`).
+
+**Bewusst nicht angefasst** (gemessen und für gut befunden, oder geschützt): Anmeldefenster (12 Elemente im Abstand von 45 bis 60 ms, kein Layoutsprung), Intro und Seitenleisten-Welle, Seitenwechsel (`PageHost`), Menü, Trade speichern / löschen / filtern, Trade-Detail-Morph, `MorphSelect`, Falten, Themenwechsel, Teilen-Fächer. „Trade eintragen“ und sein Blatt bleiben nach der Leitplanke unverändert, deshalb auch der Ausgang des Handy-Blatts (blendet am Ort aus) und die Neusortierung der Trades-Tabelle (Zeilen bauen sich neu auf, ohne eigenen Ausgang). **Entschieden und entfernt** (Betreiber, 10.11.2026: „kein Konfetti“; `docs/PSYCHOLOGIE.md` Abschnitt 6, Punkt 1): beim Speichern eines Gewinn-Trades läuft kein Konfetti-Stoß mehr.
+
+## Runde 14 – Bewegungsprüfung: was noch als Block ankam
+
+Stand 2026-11-11. Auftrag des Nutzers unverändert: das Gerüst bleibt, Einstiege sollen sich **nacheinander aufbauen**, Ausgänge **gehen statt verschwinden**. Ein unabhängiger Prüfer hat die laufende App neu vermessen (Showroom-Build und Build ohne Cloud, 1440 × 900 und 390 × 844 Touch; etwa 95 Interaktionen, je Bild Deckkraft, `transform`, DOM-Präsenz). Andere Läufe teilten sich die vier Kerne, deshalb sind Dauern grob; Reihenfolge, Präsenz und „ein Bild bei Deckkraft 1“ sind belastbar. Nachgemessen am neu gebauten Stand mit demselben Verfahren. Keiner der 177 Punkte ändert seinen Status.
+
+| Stelle | Gemessen vorher | Jetzt | Datei | Beleg |
+| --- | --- | --- | --- | --- |
+| Nachgeladene Seiten (15 Funktionsseiten, dazu Trades, Grundlagen, Einstellungen) | Platzhalter und Seite tauschten in einem Bild; Kopf und Leiste standen sofort bei Deckkraft 1, während die Karten darunter schon ihren Auftritt hatten | war der Platzhalter zu sehen, hellt die Seite einmal auf (Deckkraft 0,35 → 1, `tween.fade`, dieselbe Landung wie `Later`); eine Seite, deren Teil schon da ist, bekommt nichts dazu – der Seitenwechsel selbst ist unberührt | `src/app/PageSuspense.tsx`, `src/App.tsx` | Browser (gedrosseltes Netz): 0,35 → 0,44 → 0,67 → 0,85 → 1 über ≈ 270 ms; `tests/unit/motion.round14.test.tsx` |
+| „Inhalt“-Leiste | Leiste und alle Chips in einem Bild (Einstellungen +588 ms, Berichte +713 ms nach der Seite) | die Chips kommen von links nacheinander (35 ms Abstand, 6 px, 0,3 s), einmal, wenn die Leiste zum ersten Mal steht. Bewegt werden die Knöpfe, nicht ihre `li` (die Platte liest `offsetLeft` eines Chips) | `src/primitives/SectionNav.tsx` | Browser (Wachstum): sechs Chips bei +100 ms auf 0,84 / 0,77 / 0,63 / 0,34 / 0 / 0 |
+| Leerzustände (reiche Seiten) | Bild, Titel, Text und Knopf standen ab dem ersten Bild gemeinsam da – der erste Eindruck eines neuen Journals | Bild, Titel, Text, Knopf nacheinander (70 ms Abstand, 8 px, 0,42 s), einen Takt nach ihrer Karte. Übersicht und Cockpit behalten den schlichten Block | `src/primitives/EmptyState.tsx` | Browser (Build ohne Cloud, `#trades`): 0,72 / 0,26 / 0 bei +400 ms |
+| Kennzahl-Kacheln der Analyse | alle neun auf einer Kurve | gestaffelt (45 ms Abstand) | `src/views/analyse/KennzahlenHero.tsx` | Browser: bei +960 ms 0,99 / 0,98 / 0,96 / 0,91 / 0,80 / 0,61 / 0,27 / 0 / 0 |
+| Native `<details>` (20 Stellen: „Wie lese ich das?“, „Mehr: Volumenfilter …“ …) | Inhalt in einem Bild, nur der Pfeil drehte sich | der Inhalt blendet ein (0,2 s, 4 px); `Fold` ist ausgenommen, Schließen bleibt das des Browsers | `src/motion/rich/rich.css` (Lazy-CSS der reichen Seiten) | Browser (Handelsplan): 0,26 → 1 über ≈ 175 ms |
+| Abschluss-Ritus („Heute abschließen“, Wochenabschluss) | das Wort wechselte im Bild des Tipps, „Wieder öffnen“ sprang bei +69 ms herein | eine Folge: der Haken zeichnet sich, dann steigt das Wort ein (ab 0,28 s), dann der Weg zurück (ab 0,6 s). Nur direkt nach dem Tipp; ein nur angezeigter abgeschlossener Tag spielt nichts | `src/views/berichte/CloseRitual.tsx`, `frost.css` (Lazy-CSS) | Browser: Wort 0 bis +282 ms, 1 bei +614 ms; „Wieder öffnen“ 0,19 bei +614 ms, 1 bei +875 ms |
+| „Bereit für den nächsten Trade?“ (Wachstum) | beim letzten Haken nur der Ring des Kästchens | ist die Checkliste vollständig, läuft **einmal** ein leises Lichtband über die Checkliste (`SpotlightSweep`, `tween.sweep`) – nicht über das Urteil darüber, das ohne Check-in weiter „offen“ sagen kann; derselbe Prozess-Moment wie die ruhige Rückmeldung „Checkliste vollständig“, nie in Schleife | `src/views/wachstum/PreTradeCheck.tsx` | Browser: das Band läuft nach dem fünften Haken einmal von links nach rechts durch (−210 px → +690 px in ≈ 0,9 s) und ruht außerhalb der Karte; es ist bewusst zart, auf einem Standbild kaum zu sehen |
+| Druck auf Kacheln und Zeilen | `Button` gibt nach (0,97), Funktionen-Kachel, Archivzeile und Leisten-Chip blieben bei 1,000 – auf dem Handy ohne jede Antwort | geben nach (`pressScale.surface` 0,985, Chips `pressScale.label` 0,97, `spring.press`) | `GroupTile.tsx`, `ArchiveCard.tsx`, `SectionNav.tsx` | Browser: Kachel `matrix(0.985, …)` unter dem Zeiger |
+| Abmelden | die App verschwand in einem Bild, ≈ 300 ms leerer Bildschirm, dann das Anmeldefenster | das Abmelden lädt das Fenster vor (`warmGate`), bevor die Sitzung endet | `src/cloud/gate.ts`, `client.ts`, `src/App.tsx` | Test wie oben |
+| Funktionen-Suche | der erste Buchstabe tauschte die ganze Seite gegen „Dazu steht nichts in der Liste“, der zweite brachte die Treffer | die Kacheln bleiben, bis zwei Buchstaben da sind (die Suche liest Wörter erst ab zwei) | `src/views/funktionen/FunktionenView.tsx` | `tests/unit/views.funktionen.test.tsx`; Browser |
+
+**Ein echter Fehler aus derselben Familie (behoben):** die Markierung der Seitenleiste saß nach jedem direkten Laden oder Neuladen neben ihrer Zeile und blieb dort bis zum nächsten Seitenwechsel (bei „Berichte“ 415 px daneben). Während der Einblend-Welle ist jedes `li` der Liste ein eigener Bezugsrahmen (sein Auftritt bewegt `transform`), die Zeile meldet dann `offsetTop` 0. Die Position wird jetzt über die ganze `offsetParent`-Kette bis zur Liste gelesen (`offsetTopWithin`, `src/app/Sidebar.tsx`). Beleg: `tests/e2e/shell-motion.spec.ts` („direkt auf einer Seite geladen …“), am alten Stand rot (415 statt < 16), am neuen grün. Daraus die Regel für `stagedIn`: bewegt wird das Stück selbst, nie ein Elternteil von etwas, das vermessen wird.
+
+**Neuer Baustein:** `src/motion/stagedIn.ts` – Stücke, die nacheinander ankommen: je Stück eine native Animation (Deckkraft und ein kurzer Anstieg, ease-out, `fill: backwards`, also nur versteckt, solange es wartet), ohne React-Zustand und ohne Layout-Lesen. Ohne Web Animations passiert nichts und alles steht einfach da. Reduzierte Bewegung: die Aufrufer starten ihn dann nicht.
+
+**Gemessen und für gut befunden (nicht angefasst):** Anmeldefenster, globale Suche, Konto-Fenster, Toast-Insel, Grundlagen- und Tarifkarten, Sortieren und Filtern der Trades, `MorphSelect`, Trade-Detail am Desktop, `Later`-Karten der Einstellungen, Teilen-Fächer, Zeitraumwechsel der Berichte, Handy-Blätter.
+
+**Gefunden und bewusst nicht geändert:**
+
+- Ausgang der Blätter am Desktop (Kopf und Fuß blenden linear in 120 ms, dann der Rest) und am Handy (so lang wie der Auftritt): `Sheet` trägt auch „Trade bearbeiten“, das nach der Leitplanke unverändert bleibt. Ein eigener Ausgang nur für die übrigen Blätter wäre ein Schalter an einem geteilten Baustein – nicht in dieser Runde.
+- Die Platte der „Inhalt“-Leiste animiert ihre Breite (420 ms): absolut positioniert, verschiebt nichts; eine erklärte Ausnahme von „nur transform“.
+- Grundlagen filtern: die bleibenden Karten wirken beim Filter „Scalp“ sprunghaft; die Messung hatte 115 ms Bildabstand, der Befund ist nicht sicher genug für einen Eingriff.
+- Der Kopf der Berichte ändert beim Wechsel Woche → Monat seine Höhe in einem Schritt (Inhalt, keine Bewegung).
+
+**Nicht gemessen:** Bestell- und Bezahlfenster (das Demo-Konto hat schon Premium), Upgrade-, Review- und CSV-Blatt, Canvas-Charts und Zahlenrollen (für einen DOM-Messer unsichtbar), echte Geräte.
+
+## Die Matrix
+
+Spalten: Nr · Name · Quelle · Status · Stelle im Code · Entscheidung · Begründung.
+
+### A. Suchfelder, Eingaben, Formulare
+
+| Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
+|---|---|---|---|---|---|---|
+| 1 | Flip Search | R | nicht prüfbar | – | Original anfordern | Die Originaldatei lag nie vor und unter diesem Namen steht kein Code im Projekt; Suchen läuft über die Autocomplete-Suche (Nr. 2). |
+| 2 | Autocomplete Search | R | vorhanden | `src/motion/pulse/Autocomplete.tsx` (Trades-Suche `src/views/trades/TradeFilters.tsx`, Symbolfeld `src/views/settings/SymbolField.tsx`) | bleibt | Gruppierte Vorschläge mit Tastatur und Zieh-Auswahl laufen an sechs Stellen (Port, Original nicht mehr im Bestand). |
+| 3 | Selectable Chip Group | V | wiederhergestellt/verbessert | `src/primitives/chip.ts`, `src/styles/controls.css` (`.fx-chip`) | bleibt | Ein/Aus-Pillen (`chipClass`) gab es schon, Runde 10 fügt das aufspringende Häkchen-Abzeichen an der Ecke hinzu, ohne dass etwas im Fluss rückt. |
+| 4 | Auto-Height Summary | V | vorhanden | `src/views/trades/AutoHeight.tsx` (genutzt in `src/overlays/TradeEditor.tsx`, `src/overlays/SignalSection.tsx`) | bleibt | Eine einzige Box federt ihre Höhe, der Inhalt darunter wird geschoben statt zu springen. |
+| 5 | Morphing Language Selector | R | wiederhergestellt/verbessert | `src/motion/pulse/MorphSelect.tsx`, `src/styles/controls.css` | bleibt | Die Auswahllisten (27 Dateien) bekamen in Runde 10 gestaffelte Zeilen, einen gleitenden Marker und ein gezeichnetes Häkchen; die Öffnen-Logik blieb unberührt. |
+| 6 | Uiverse Inputs | R | nicht prüfbar | – | Original anfordern | Der Uiverse-Katalog (lokaler Klon) lag nie vor; das eigene Feld `src/primitives/Input.tsx` (Fokusring, Puls, Lösch-×) lässt sich nicht gegen eine Vorlage prüfen. |
+| 7 | Uiverse Forms | R | nicht prüfbar | – | Original anfordern | Keine Vorlage im Bestand; das Formularverhalten (Beschriftung, Schütteln bei Fehler) steht in `src/primitives/Field.tsx`, aber nicht als Abgleich. |
+| 8 | Uiverse Toggles | R | nicht prüfbar | – | Original anfordern | Keine Vorlage im Bestand; der eigene Schalter `src/motion/Switch.tsx` (elastischer Daumen) ist nicht gegen sie geprüft. |
+
+### B. Buttons
+
+| Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
+|---|---|---|---|---|---|---|
+| 9 | Liquid Metal Button | V | bewusst nicht | – | nicht bauen | Ein Metallverlauf auf dem Knopf widerspricht der ruhigen Nothing-Sprache und dem Papier-Theme (Kontrast); Hauptaktionen bleiben unverändert. |
+| 10 | Sweep Shine Button | V | neu eingebaut | `src/primitives/Button.tsx`, `src/styles/controls.css` (`[data-fx~="shine"]`); älterer Glanz des Kopfknopfs: `src/styles/shiny-cta.css` | bleibt (nur reiche Seiten) | Ein Lichtstreifen läuft beim Überfahren über Primär- und Sekundärknöpfe (nur Maus, nur `[data-rich]`); Hauptaktionen sind mit `fx={false}` ausgenommen. |
+| 11 | Halo Pill Button | V | neu eingebaut | `src/app/Dock.tsx` (`fab-halo`), `src/styles/shell-motion.css` | bleibt | Sinngemäß: die Mitte „Trade“ der unteren Leiste lässt höchstens achtmal je Seitenaufruf ein Halo atmen, Form und Aktion bleiben gleich. |
+| 12 | Jewel Pill Button | V | bewusst nicht | – | nicht bauen | Ein glänzender Edelstein-Knopf würde neben „Trade eintragen“ als zweite Hauptaktion wirken und passt nicht zu einem nüchternen Journal. |
+| 13 | Text Roll Button | V | neu eingebaut | `src/primitives/Button.tsx` (`btn-roll`), `src/styles/controls.css`; `src/primitives/CopyButton.tsx` | bleibt (nur reiche Seiten) | Sekundärknöpfe mit reinem Text rollen beim Überfahren in eine Kopie, und „Kopieren“ rollt zu „Kopiert“. |
+| 14 | Rotating Arrow Chip | V | bewusst nicht | – | nicht bauen | Ein drehender Pfeil-Chip ließe schlichte Textlinks wie Hauptknöpfe aussehen; die Links der App bleiben Links. |
+| 15 | Sliding Fill Button | V | bewusst nicht | – | nicht bauen | Der Farbwisch ist für Redaktionsseiten gedacht; hier hellt Hover nur die Fläche auf (Button-System, DESIGN.md Etappe 1c), und eine Füllung gibt es nur als Halte-Fortschritt in `src/motion/HoldButton.tsx`. |
+| 16 | Hard Offset Shadow Button | V | bewusst nicht | – | nicht bauen | Ein harter Schlagschatten ist das Gegenteil von Haarlinien und flachen Flächen dieser Designsprache. |
+| 17 | Animated Gradient Border | V | vorhanden | `src/primitives/BorderBeam.tsx` (18 Stellen, z. B. `src/primitives/Card.tsx`, `src/views/coach/TodayCard.tsx`) | bleibt | Eine Randlicht-Runde je Ereignis; die Option `run` am Button existiert, wird aber an keiner Stelle gesetzt. |
+| 18 | Conic Spin Ring | V | vorhanden | `src/styles/shiny-cta.css` (Kopfknopf „Trade eintragen“, `src/app/NewTradeButton.tsx`) | bleibt | Die konische Kante dreht nur bei Hover und Fokus, im Ruhezustand läuft nichts. |
+| 19 | Magnetic Hover Button | V | wiederhergestellt/verbessert | `src/primitives/Magnetic.tsx` (Kopfzeile, Dock, `NewTradeButton`), neu `src/motion/buttonMagnet.ts` | bleibt | Den Magnet gab es für die Hauptknöpfe; Runde 10 fügt den feinen Zug (höchstens 4 px) für große Primär- und Sekundärknöpfe reicher Seiten hinzu. |
+| 20 | Button → Pay | V | neu eingebaut | `src/primitives/Button.tsx` (`status`, `.fx-check`), `src/primitives/useActionStatus.ts` | bleibt (nur reiche Seiten) | Laden, dann gezeichnetes Häkchen, dann zurück bei gleicher Größe; die Kreis-Verwandlung der Vorlage fehlt absichtlich, weil „Bezahlen“ seine Form behält (`fx={false}`). |
+| 21 | Confetti Burst Button | V | wiederhergestellt/verbessert | `src/motion/Celebrate.tsx`, `src/motion/fx/celebrate.ts`; Auslöser z. B. `src/overlays/TradeEditor.tsx` | bleibt | Konfetti für Gewinn, Serie und Rekord gab es schon; Runde 10 fügt die kleine Stufe `mini` für Meilenstein-Toasts hinzu. |
+| 22 | Theme Toggle | V | wiederhergestellt/verbessert | `src/app/CommandNav.tsx` (`GlyphTheme`), `src/app/themeTransition.ts` | bleibt | Hell/Dunkel gab es mit wachsendem Kreis; Runde 10 dreht Sonne und Mond ineinander und dehnt den Kreis auf 620 ms. |
+| 23 | Replay Button | V | vorhanden | `src/intro/introStore.ts` (`replayIntro`: Logo-Klick, Einstellungen „Intro jetzt abspielen“); Replay-Knöpfe je Effekt in `dev/pulse-fx.tsx` | bleibt | Für Nutzer wiederholbar sind das Intro und die Trade-Wiedergabe; Replay-Knöpfe je Effekt gibt es nur in den Entwickler-Galerien. |
+| 24 | Uiverse Buttons | R | nicht prüfbar | – | Original anfordern | Der Uiverse-Katalog lag nie vor; ein Abgleich mit dem Button-System (`src/primitives/Button.tsx`) ist nicht möglich. |
+| 25 | Magic UI Buttons | R | nicht prüfbar | – | Original anfordern | Keine Vorlage im Bestand; der Eigenbau `BorderBeam` und der Kopfknopf `shiny-cta` sind nicht dagegen geprüft. |
+| 26 | Hyper-Stack Buttons | R | nicht prüfbar | – | Original anfordern | Keine Vorlage im Bestand, daher kein Abgleich. |
+
+### C. Teilen, Soziales
+
+| Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
+|---|---|---|---|---|---|---|
+| 27 | Radial Share | R | neu eingebaut | `src/motion/RadialShare.tsx`, `src/motion/radialLayout.ts` (Trade-Detail `src/social/ui/RadialShareButton.tsx`, Berichte `src/views/berichte/ExportCard.tsx`) | bleibt | Der frühere Eintrag („kein Radialmenü im Code“) war seit Runde 11 veraltet: der Fächer steht, mit Tastatur, Touch und Klemmung am Bildrand. Runde 12 überarbeitete ihn nach der Aufnahme „Share Button Animation“ (Instagram, Aufnahme des Nutzers – Verhalten, kein Quelltext); Runde 13 baut ihn danach 1:1 nach (Pille → Nabe mit ✕, gemessener Halbkreis, Flut, Einsammeln, Haken – Zusatzpunkt Z14). Die Vorlage der Quelle R lag nie vor; das Video ist die einzige Referenz. Das Fenster `ShareSheet.tsx` bleibt der Weg für „Link“. |
+| 28 | Copy-to-Clipboard | V | wiederhergestellt/verbessert | `src/primitives/CopyButton.tsx` (u. a. `src/views/community/SharesCard.tsx`, `src/views/labor/PineCard.tsx`) | bleibt | Kopieren gab es als Einzellösungen, Runde 10 bündelt es: Symbol wird zum Häkchen, das Wort rollt, die Breite bleibt, ein Fehlschlag schüttelt. |
+| 29 | Animated Contact Card | V | bewusst nicht | – | nicht bauen | Die App hat keine Kontaktkarte; ein Kartenzauber ohne Inhalt wäre bloße Zierde. |
+| 30 | Overlapping Avatar Cluster | V | bewusst nicht | – | nicht bauen | Die Community zeigt Pseudonyme als Punktmuster (`src/social/ui/Monogram.tsx`) und keine Gesichter; ein Avatar-Haufen suggerierte Mitgliederzahlen. |
+| 31 | Social Proof Pill | V | bewusst nicht | – | nicht bauen | Die Zahlenbänder zeigen nur echte Werte („nie erfundene Nutzerzahlen“, `src/views/preise/StatsMarquee.tsx`), eine Pille mit Gesichtern gäbe es nur mit erfundenen Daten. |
+| 32 | Orbiting Avatars | V | bewusst nicht | – | nicht bauen | Der Ring der App (`src/motion/pulse/OrbitSpread.tsx`, Coach-Profil) kreist Eigenschaften statt Gesichter, Avatare gibt es nicht. |
+| 33 | Motion Footer | R | vorhanden | `src/app/Footer.tsx` (`Marquee`, `DancingSvgWord`) | bleibt | Laufband mit Statistik und Umriss-Wortmarke stehen im Fuß; das Band pausiert außerhalb des Bildes. |
+
+### D. Navigation, Menüs
+
+| Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
+|---|---|---|---|---|---|---|
+| 34 | Floating Pill Navigation | V | vorhanden | `src/app/Dock.tsx` | bleibt | Am Handy schwebt die Kapsel unten (mit Lupe am Mauszeiger); die Kopfzeile oben bleibt eine durchgehende Leiste. |
+| 35 | Expanding Glass Capsule | V | neu eingebaut | `src/app/Sidebar.tsx`, `src/app/useSidebarPeek.ts`, `src/styles/shell-motion.css` | bleibt | Sinngemäß: die schmale Leiste öffnet sich bei Absicht über die Seite auf 256 px, ohne die Seite zu verschieben (Glas, solange sie offen über der Seite liegt). Runde 12: die Einblend-Folge beim Öffnen der Website (Zusatzpunkt Z2) läuft jetzt sichtbar und strikt nacheinander. |
+| 36 | Burger Morph | V | neu eingebaut | `src/app/Burger.tsx`, `src/styles/shell-motion.css` | bleibt | Drei Balken werden zum Kreuz, solange das Menü offen ist (reines CSS auf `translate`/`rotate`). |
+| 37 | Staggered Menu Overlay | V | wiederhergestellt/verbessert | `src/app/CommandNav.tsx` (`CONFIG.delays`) | bleibt | Die gestaffelte Einblendung gab es nach der Vorlage; Runde 10 strafft sie, die letzte Zeile startet nach 0,6 s statt 1,8 s. |
+| 38 | Animated Navigation Drawer | V | vorhanden | `src/app/CommandNav.tsx` (Wisch von links ab 768 px, `wipeMs` 800) | bleibt | Das Menü fährt ab 768 px als Fläche von links herein, mit Fokusfalle und Escape. |
+| 39 | Mobile Bottom Sheet | V | wiederhergestellt/verbessert | `src/app/CommandNav.tsx` (Blatt am Handy, Ziehen am Kopf schließt), `src/motion/Sheet.tsx` | bleibt | Blätter von unten gab es für Editoren; Runde 10 macht auch „Mehr“ zu einem Blatt mit Ziehen zum Schließen. |
+| 40 | Animated Dock | R | wiederhergestellt/verbessert | `src/app/Dock.tsx` | bleibt | Das Dock mit Lupe gab es; Runde 10 zeichnet das Symbol beim Wechsel neu und lässt die Mitte ab und zu glänzen. |
+| 41 | Immersive Full-Screen Navigation | R | wiederhergestellt/verbessert | `src/app/CommandNav.tsx`, `src/motion/pulse/FullscreenWipe.tsx` | bleibt | Der schwarze Wisch mit gestaffelten Links stammt aus der Vorlage; Runde 10 straffte den Eintritt und gab dem Finder im Menü federnde Treffer mit gleitender Auswahl. |
+| 42 | Morphing Language Menu | R | wiederhergestellt/verbessert | `src/motion/pulse/MorphSelect.tsx` | bleibt | Dieselbe Vorlage wie Nr. 5 und derselbe Baustein, mit den Runde-10-Verbesserungen dort beschrieben. |
+| 43 | Auto-Cycling Index List | V | bewusst nicht | – | nicht bauen | Eine sich selbst weiterschaltende Liste lenkt von Zahlen ab, und es gibt keine Bildfolge, die sie begleiten würde. |
+| 44 | Seamless Card Slider | V | bewusst nicht | – | nicht bauen | Ein Karussell versteckt Inhalt; Karten stehen im Raster, nur reine Textbänder laufen als `Marquee`. |
+| 45 | Mobile Scroll-Snap Rail | V | bewusst nicht | – | nicht bauen | Tarifkarten stehen am Handy untereinander, damit der Vergleich ohne verstecktes Wischen sichtbar bleibt; eine einrastende Reihe gibt es nur in der Zeitleiste (`src/motion/pulse/MilestoneRail.tsx`). |
+| 46 | Depth Carousel | V | bewusst nicht | – | nicht bauen | Drei bis sechs Produkte mit eigener Farbe gibt es hier nicht, und ein Karussell wäre für Journal-Daten das falsche Muster. |
+| 47 | Background Color Crossfade | V | bewusst nicht | – | nicht bauen | Die Seitenfarbe folgt dem Theme, und Signalrot ist die einzige Akzentfarbe (DESIGN.md, Farbrollen); Farbwechsel je Karte wären ein zweites System. |
+
+### E. Karten, Widgets
+
+| Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
+|---|---|---|---|---|---|---|
+| 48 | Liquid Glass Surface | V | bewusst nicht | – | nicht bauen | Weichzeichner hinter Flächen kostet Rechenzeit (Dock-Bänder bewusst aus, `src/app/BottomFade.tsx`) und fällt im Samsung-Modus weg; Karten bleiben bei Haarlinie und Schleier. |
+| 49 | Frosted Glass UI | V | bewusst nicht | – | nicht bauen | Gleicher Grund wie Nr. 48; Text auf Daten-Karten soll nicht von einem Hintergrund abhängen. |
+| 50 | Glass Chips | V | bewusst nicht | – | nicht bauen | Die Pillen sind flach (`chipClass`), Glas darauf brächte Kontrastprobleme im hellen Theme. |
+| 51 | Glass Accent Badge | V | bewusst nicht | – | nicht bauen | `src/primitives/Badge.tsx` bleibt flach mit Tonfarbe; Glas würde Gewinn/Verlust-Töne verwässern. |
+| 52 | Glass Numbered Panel | V | bewusst nicht | – | nicht bauen | Nummerierte Schritte gibt es im Handelsplan als einfache Leiste, ein Glaspanel brächte keinen Gewinn. |
+| 53 | Glass Contact Card | V | bewusst nicht | – | nicht bauen | Keine Kontaktkarte in der App (siehe Nr. 29). |
+| 54 | Media Card Hover | V | vorhanden | `src/journal/screenshots/ShotThumb.tsx`, `src/views/setups/SetupCard.tsx` | bleibt | Screenshots und Setup-Karten reagieren beim Überfahren (grau zu Farbe, Notch-Scheibe, leichte Neigung); Icon-Pille und Bildzoom der Vorlage fehlen (Nr. 55, 56). |
+| 55 | Icon-to-Label Pill | V | vorhanden | `src/app/Dock.tsx` (`DOCK_CONFIG`, Beschriftung steigt auf), `src/app/Sidebar.tsx` (Namen beim Blick) | bleibt | Symbole zeigen ihren Namen erst bei Absicht, im Dock als aufsteigende Beschriftung, in der Seitenleiste mit dem Öffnen. Runde 12: in der schmalen Leiste tragen Zeilen und Fußknöpfe zusätzlich `aria-label` und Tooltip (`title`), der Tooltip nur, solange die Namen nicht offen sind (offen sagen es die Wörter selbst). |
+| 56 | Image Zoom Card | V | offen | – | später bauen | Ein leichter Zoom im Rahmen der Screenshot-Kachel wäre eine natürliche Ergänzung zur Farbe beim Überfahren, ist aber nirgends gebaut. |
+| 57 | Frosted Hover Veil | V | neu eingebaut | `src/primitives/Card.tsx` (Frost-Schleier, Zeile um 290) | bleibt (nur reiche Seiten) | Ein weicher Schleier und eine Lichtkante oben legen sich beim Überfahren mit der Maus auf die Karte (nur Deckkraft). |
+| 58 | Sticky Stacking Cards | V | bewusst nicht | – | nicht bauen | Gestapelte, kleiner werdende Karten würden Zahlen verdecken, die man vergleichen will. |
+| 59 | Draggable Widget Grid | R | vorhanden | `src/motion/pulse/WidgetGrid.tsx` (Cockpit „Anordnen“ `src/views/cockpit/CockpitView.tsx`, Markt-Kacheln `src/views/overview/MarketLive.tsx`) | bleibt | Halten zum Anheben, Ziehen, Werfen und Einrasten laufen im Cockpit, in den Markt-Kacheln und in der Regelliste. |
+| 60 | Notched Project Card | R | vorhanden | `src/motion/pulse/NotchedFrame.tsx` (`src/views/setups/SetupCard.tsx`, `src/journal/screenshots/ShotThumb.tsx`) | bleibt | Karten mit Kerbe tragen Setups, Screenshots und Tarife. |
+| 61 | Product Timeline | R | vorhanden | `src/motion/pulse/MilestoneRail.tsx` (`src/views/wachstum/GoalCard.tsx`, `src/journal/ui/FillsTimeline.tsx`) | bleibt | Die Leiste zeichnet sich Stück für Stück bei Zielen, Ausführungen und im Rundgang. |
+| 62 | In-Page Product Mockup | V | bewusst nicht | – | nicht bauen | Die App ist das Produkt; ein nachgebautes Fenster als Bild gäbe es nur auf einer Werbeseite, die es hier nicht gibt. |
+| 63 | Uiverse Cards | R | nicht prüfbar | – | Original anfordern | Der Uiverse-Katalog lag nie vor, die eigene `Card` (`src/primitives/Card.tsx`) ist nicht dagegen geprüft. |
+| 64 | Cards Shuffle | N | bewusst nicht | – | nicht bauen | Nur der Titel eines Karussell-Bildes ist bekannt (`pulse-motion/references/motion-graphics.md`: „noch nicht gebaut“, Code nie gesehen); Karten austeilen gibt es (`CardSpread`), Mischen hätte keinen Zweck. |
+
+### F. Text, Schrift
+
+| Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
+|---|---|---|---|---|---|---|
+| 65 | Staggered Blur Rise | V | vorhanden | `src/motion/Reveal.tsx`, `src/motion/Stagger.tsx` | bleibt | Karten und Dialoginhalte steigen aus leichter Unschärfe gestaffelt auf und enden bei `filter: none`. |
+| 66 | Settle-Zoom Media | V | bewusst nicht | – | nicht bauen | Es gibt keine Hero-Bilder oder -Videos, die sich setzen könnten. |
+| 67 | Animated Entrance System | V | vorhanden | `src/motion/Reveal.tsx` (`RevealGroup`), `src/motion/Stagger.tsx` | bleibt | Ein Vokabular für alle Eintritte; ohne Bewegung oder ohne Beobachter erscheint alles sofort, nie eine leere Seite. |
+| 68 | Word-by-Word Blur | V | vorhanden | `src/views/setups/PageHeader.tsx` (`WORD_FROM`) | bleibt | Die Titelwörter steigen nacheinander aus 4 px Unschärfe auf. |
+| 69 | Masked Line Pull-Up | V | neu eingebaut | `src/views/setups/PageHeader.tsx` (`PULL_CLIP`) | bleibt (nur reiche Seiten) | Auf reichen Seiten werden die Titelwörter aus einer Zeilenmaske hochgezogen. |
+| 70 | Soft Word Rise | V | vorhanden | `src/views/setups/PageHeader.tsx`, `src/cloud/ui/AuthCard.tsx` | bleibt | Wörter heben sich 10 px auf `spring.enter`. |
+| 71 | Character Cascade | V | vorhanden | `src/primitives/SplitText.tsx` (Abschnittstitel der Analyse), `src/motion/pulse/AsciiCascade.tsx` | bleibt | Buchstaben steigen einmal je Sitzung auf, Entschlüsseln gibt es für die Wortmarke. |
+| 72 | Animated Shine Text | V | vorhanden | `src/motion/TextShimmer.tsx` | bleibt | Ein Lichtband läuft über kurze Ladetexte und pausiert außerhalb des Bildes. |
+| 73 | Metallic Gradient Text | V | bewusst nicht | – | nicht bauen | Metallschrift senkt den Kontrast und passt nicht zur Plex- und Doto-Schrift der App. |
+| 74 | Scramble Text | V | vorhanden | `src/motion/TextScramble.tsx` (16 Stellen, z. B. `src/views/overview/MarketPanel.tsx`) | bleibt | Entschlüsseln läuft an Stellen mit Aussage (Paar und Quelle, Codes, Vorschläge). |
+| 75 | Hover Decode Text | V | offen | `src/motion/TextScramble.tsx` (Option `scrambleOnHover`, ungenutzt) | später bauen | Der Baustein kann es schon, aber keine Stelle schaltet es ein; sinnvoll nur für ein bis zwei Navigationswörter. |
+| 76 | Typewriter Text | V | vorhanden | `src/motion/pulse/Typewriter.tsx`, `src/motion/fx/CoachStream.tsx` | bleibt | Getippt wird die Datenzeile im Intro, die Treffer-Zeile in Leerzuständen und die Antwort des Coaches. |
+| 77 | Animated Caret | V | vorhanden | `src/motion/pulse/Typewriter.tsx`, `src/motion/fx/CoachStream.tsx` | bleibt | Der Cursor blinkt 500 ms an und 500 ms aus, ohne Zeilen umzubrechen; in der Coach-Antwort hört er nach dreimal auf. |
+| 78 | Depth-of-Field Text | V | vorhanden | `src/motion/Reveal.tsx` (`REVEAL_FROM` mit Unschärfe), `src/views/setups/PageHeader.tsx` | bleibt | Texte und Karten werden beim Eintritt von unscharf zu scharf (ohne Unschärfe im Samsung-Modus). |
+| 79 | Rotating Word Slot | V | bewusst nicht | – | nicht bauen | Wechselnde Wörter ohne Anlass lenken ab; echte Wertwechsel rollt schon `src/motion/TextRoll.tsx`. |
+| 80 | Scroll Word Reveal | V | bewusst nicht | – | nicht bauen | Text, der sich erst beim Scrollen lesbar färbt, verschlechtert Lesbarkeit und Suchen im Text; die App hat keine Manifest-Absätze. |
+| 81 | Scroll Character Reveal | V | bewusst nicht | – | nicht bauen | Gleicher Grund wie Nr. 80. |
+| 82 | Giant Ghost Word | V | neu eingebaut | `src/motion/rich/PageAura.tsx`, `src/motion/rich/rich.css` (`ghost`, an 13 Seitenköpfen gesetzt) | bleibt (nur reiche Seiten) | Ein Geisterwort (7 % Tinte) steht ab 1100 px hinter der Kopfzeile; die Umriss-Wortmarke im Fuß (`DancingSvgWord`) gab es schon. |
+| 83 | SVG Wordmark Assembly | V | offen | – | später bauen | Die Wortmarke im Kopf ist das Schriftzeichen ₿ und kein Pfad; gezeichnet werden nur die Navigationssymbole (Zusatzpunkt 2), ein aufgebautes Logo bräuchte erst einen Entwurf. |
+| 84 | Count-Up Statistics | V | wiederhergestellt/verbessert | `src/motion/MotionNumber.tsx` (`countOnReveal`), `src/chart/CountText.tsx` | bleibt | Kennzahlen zählten schon beim ersten Sehen, Runde 10 zählt auch fertig formatierte Textzahlen und rollt bei Änderung. |
+| 85 | Counter Preloader | V | bewusst nicht | – | nicht bauen | Ein Zählwerk als Ladebild wäre eine Verzögerung ohne Nutzen; Laden zeigt Platzhalter in Endgröße. |
+| 86 | Number Roll / Odometer | V | wiederhergestellt/verbessert | `src/motion/RollingDigits.tsx`, `src/app/HeaderTicker.tsx` | bleibt | Den Zählwerk-Baustein gab es für den Live-Kurs; Runde 10 setzt auch den Kopfzeilen-Kurs darauf. |
+| 87 | Words → Kinetic | V | neu eingebaut | `src/views/setups/PageHeader.tsx` (`PULL_CLIP`), `src/motion/fx/SplitFlap.tsx` | bleibt (nur reiche Seiten) | Sinngemäß: Wortzeilen schieben aus der Maske, in den Berichten klappen Zeichen wie eine Anzeigetafel. |
+| 88 | Dancing Letters | R | vorhanden | `src/motion/pulse/DancingLetters.tsx` (Kopfzeile bei Hover, Fuß) | bleibt | Die Buchstaben der Wortmarke tanzen bei Hover. |
+| 89 | Text ASCII Cascade | R | vorhanden | `src/motion/pulse/AsciiCascade.tsx` (Kopfzeile, `src/views/preise/PricingHero.tsx`, Intro) | bleibt | Die Wortmarke entschlüsselt sich ab dem ersten Zeichen. |
+| 90 | Text Morphing | R | vorhanden | `src/motion/pulse/TextMorph.tsx` (`StatusPill`-Beschriftungen, `src/journal/filters/JournalFilterBar.tsx`) | bleibt | Beschriftungen gehen über statt zu springen. |
+| 91 | Text Prism Split | R | vorhanden | `src/motion/pulse/TextPrism.tsx` (`src/views/overview/Hero.tsx`, `src/views/analyse/KennzahlenHero.tsx`) | bleibt | Das Prisma liegt nur mit Maus über der großen Netto-Zahl. |
+| 92 | Pixel Text Fill | R | vorhanden | `src/motion/pulse/PixelTextFill.tsx` (`src/views/setups/LeadFill.tsx`) | bleibt | Seitenuntertitel füllen sich einmal je Sitzung mit rotem Funken. |
+| 93 | Tactile Highlight | R | vorhanden | `src/motion/pulse/TactileHighlight.tsx` (13 Dateien) | bleibt | Schlüsselwörter bekommen eine Markierung mit Griff. |
+| 94 | Text Animate | R | vorhanden | `src/motion/pulse/Typewriter.tsx` (Pack `text-animate`) | bleibt | Die getippte Zeile im Intro und in Leerzuständen stammt aus dieser Vorlage. |
+| 95 | Glyph Portal | R | vorhanden | `src/motion/pulse/GlyphZoom.tsx`, `src/intro/portal.ts` (`src/social/ui/ShareSheet.tsx`, `src/views/cockpit/CockpitView.tsx`) | bleibt | Der Kameraflug in einen Buchstaben läuft im Intro, beim Teilen-Bild und bei neuen Cockpit-Widgets. |
+
+### G. Scroll-Effekte, Seitenabschnitte
+
+| Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
+|---|---|---|---|---|---|---|
+| 96 | Viewport Staggered Reveal | V | wiederhergestellt/verbessert | `src/motion/Reveal.tsx` (52 Dateien, Runde 10: `wave`) | bleibt | Das Einblenden beim Sichtbarwerden gab es überall, Runde 10 gibt Kachelraster eine Diagonalwelle statt Zeile für Zeile. |
+| 97 | Directional Corner Decoration | V | bewusst nicht | – | nicht bauen | Eckzierrat, der aus der Scrollrichtung hereinfährt, ist Dekoration ohne Aussage für Datenkarten. |
+| 98 | Sticky Cinematic Stage | V | bewusst nicht | – | nicht bauen | Eine festgepinnte Bühne über viele Bildschirmhöhen kostet Rechenzeit und verhindert das schnelle Springen zwischen Abschnitten. |
+| 99 | Split-Frame Parting | V | bewusst nicht | – | nicht bauen | Gehört zur Pinned-Bühne (Nr. 98) und hat ohne Fotos nichts, was sich teilen könnte. |
+| 100 | Scroll Depth-of-Field | V | neu eingebaut | `src/motion/rich/core.css` (`.rich-depth`), `src/views/analyse/ui.tsx` | bleibt (nur reiche Seiten) | Abschnittstitel steigen beim Hereinscrollen 14 px auf und verlieren 2 px Unschärfe, rein über die Scroll-Zeitleiste ohne Skript. |
+| 101 | Scroll Tint Transition | V | bewusst nicht | – | nicht bauen | Ein Farbwechsel des Hintergrunds je Abschnitt wäre ein zweites Farbsystem neben Hell/Dunkel. |
+| 102 | Panel Slide-Over | V | bewusst nicht | – | nicht bauen | Seiten wechseln per Gleiten (`src/app/PageHost.tsx`); ein Hero-Panel, das sich über ein Bild schiebt, gibt es nicht. |
+| 103 | Scattered Gallery | V | bewusst nicht | – | nicht bauen | Verstreute Bilder passen nicht zu Tabellen und Kennzahlen; Screenshots laufen im Reel (`src/journal/screenshots/ShotReel.tsx`). |
+| 104 | Blend Outro | V | bewusst nicht | – | nicht bauen | Ein Überblendungs-Abspann am Seitenende hätte keinen Inhalt. |
+| 105 | Pinned Heading | V | bewusst nicht | – | nicht bauen | Lange Seiten haben stattdessen die klebende Abschnittsleiste „Inhalt“ (`src/primitives/SectionNav.tsx`), die ohne gepinnte Überschrift auskommt. |
+| 106 | Counter-Drifting Columns | V | bewusst nicht | – | nicht bauen | Gegenläufig driftende Spalten würden Zahlen beim Lesen bewegen. |
+| 107 | Single-Element Parallax | V | bewusst nicht | – | nicht bauen | Scroll-Parallax bewegt Inhalt gegen den Blick; auf Daten-Seiten stört das. |
+| 108 | Sticky Stacking Cards | V | bewusst nicht | – | nicht bauen | Doppelt zu Nr. 58, gleicher Grund. |
+| 109 | Opposing Marquee Rows | V | bewusst nicht | – | nicht bauen | Einfache Laufbänder gibt es (`src/motion/pulse/Marquee.tsx`, Fuß, Preise, Community); gegenläufig und an den Scroll gekoppelt würden sie Ticker-Zahlen unlesbar machen. |
+| 110 | 3D Tilted Text Crawl | V | bewusst nicht | – | nicht bauen | Ein schräg wegkriechender Text ist ein Film-Abspann und hat in einem Journal keinen Platz. |
+| 111 | Parallax Strip Slider | R | vorhanden | `src/motion/pulse/StripWipe.tsx` (`src/views/markt/BoxChartCard.tsx`, `src/views/berichte/ReportHero.tsx`) | bleibt | Zehn Streifen lösen die alte Kurve beim Intervall- und Zeitraumwechsel ab. |
+| 112 | Product Launch Hero | R | vorhanden | `src/motion/pulse/LaunchGrid.tsx` (`src/views/preise/PricingHero.tsx`, Rundgang) | bleibt | Der Aufbau mit Punktraster und fliegenden Karten steht auf Preise und im Einstieg. |
+| 113 | Slanted Spread Hero | R | vorhanden | `src/motion/pulse/CardSpread.tsx` (`src/views/preise/PlanGrid.tsx`) | bleibt | Karten werden aus einem schrägen Stapel ins Raster ausgeteilt. |
+| 114 | Reel Collage | R | vorhanden | `src/motion/pulse/ReelWindow.tsx` (`src/journal/screenshots/ShotReel.tsx`, `src/views/setups/StrategyBlock.tsx`) | bleibt | Harte Schnitte und eine zusammenklappende Zeile zeigen Screenshots und Beispiel-Setups. |
+
+### H. 3D, Zeiger, besondere Interaktionen
+
+| Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
+|---|---|---|---|---|---|---|
+| 115 | Magnetic Hover | V | wiederhergestellt/verbessert | `src/primitives/Magnetic.tsx`, `src/motion/buttonMagnet.ts` | bleibt | Dieselbe Technik wie Nr. 19: Kopfzeile und Dock zogen schon, Runde 10 fügt den Zug für große Knöpfe reicher Seiten hinzu. |
+| 116 | Pointer Parallax Layers | V | vorhanden | `src/primitives/HeroBackdrop.tsx` (Hero der Übersicht) | bleibt | Sinngemäß: Raster und Lichtfleck des Heros bewegen sich gegenläufig zum Zeiger; Foto-Ebenen gibt es nicht. |
+| 117 | Spotlight Reveal | V | vorhanden | `src/primitives/Card.tsx`, `src/primitives/glowField.ts` | bleibt | Sinngemäß: ein Lichtfleck und ein Näherungsbogen folgen dem Zeiger über Karten (höchstens vier zugleich); eine Maske über zwei Bilder gibt es nicht. |
+| 118 | Cursor Image Trail | V | bewusst nicht | – | nicht bauen | Eine Bilderspur hinter dem Zeiger hat keine Bilder, und sie würde Zahlen überdecken. |
+| 119 | Exclusion Blend Cursor | V | bewusst nicht | – | nicht bauen | Ein Mischmodus über der ganzen Oberfläche kostet Rechenzeit und verändert Gewinn/Verlust-Farben. |
+| 120 | Custom Cursor | V | bewusst nicht | – | nicht bauen | Ein eigener Zeiger ersetzt Systemverhalten und hilft weder Touch noch Screenreadern. |
+| 121 | Orbiting Avatars | V | bewusst nicht | – | nicht bauen | Doppelt zu Nr. 32, gleicher Grund. |
+| 122 | Sand Dissolve Transition | V | vorhanden | `src/motion/fx/DissolveOut.tsx` (`src/views/setups/ClassifyCard.tsx`, `src/exchanges/ui/SyncInbox.tsx`, `src/cloud/ui/PixelDissolve.tsx`) | bleibt | Sinngemäß: ein Pixelzerfall mit festen Zufallswerten statt SVG-Turbulenz, eingesetzt beim Entfernen von Zeilen und Karten, nicht als Bildwechsel. |
+| 123 | Real 3D Model Hero | V | bewusst nicht | – | nicht bauen | Braucht WebGL und ein neues Paket, was Erstlade-Budget und Regel „keine neuen Abhängigkeiten“ verbieten; ein 3D-Objekt trüge keine Information. |
+| 124 | Animated Shader Background | V | neu eingebaut | `src/motion/rich/PageAura.tsx`, `src/motion/rich/rich.css` | bleibt (nur reiche Seiten) | Sinngemäß ohne Shader: zwei sehr langsame Lichtflecke als CSS, die außerhalb des Bildes pausieren. |
+| 125 | Pointer Chroma Blob | V | neu eingebaut | `src/motion/rich/PageAura.tsx` | bleibt (nur reiche Seiten) | Sinngemäß: ein Spotlight folgt der Maus hinter der Kopfzeile, ohne Farbbrechung und ohne WebGL. |
+| 126 | Fluted Glass Shader | V | bewusst nicht | – | nicht bauen | Braucht einen Shader auf Bitmaps (schwer) und es gibt kein Bild, das er brechen könnte. |
+| 127 | Cinematic Orbit Hero | R | vorhanden | `src/motion/pulse/OrbitSpread.tsx` (`src/views/coach/ProfileCard.tsx`), Intro | bleibt | Das Coach-Profil fächert sich zu einem Ring, den man mit ←/→ dreht. |
+| 128 | Light and Depth | R | nicht prüfbar | – | Original anfordern | Original nie vorgelegen und kein Port mit diesem Namen im Code; was daran erinnert (Seitenlicht, Kartenkante), ist ohne Vorlage nicht zuordenbar. |
+| 129 | Thinking Orbs | R | neu eingebaut | `src/motion/ThinkingOrb.tsx` (`ThinkingOrbCanvas.tsx`, `orbMath.ts`, `orbLoop.ts`) | bleibt | Der frühere Eintrag („kein Port im Code“) war seit Runde 11 veraltet: drei Punktbilder (Kugel, Wolke, Kreisbahn) als Ladezeichen, Referenz die Aufnahme „Thinking Orbs“ (libraries.dev, kein Quelltext). Der Voice Ring aus Runde 12 (Z7) ist mit der Rücknahme R3 wieder entfernt; alle Einbauorte zeigen die Punktbilder wie vorher. |
+| 130 | Agent Trace | R | vorhanden | `src/motion/pulse/ScrubTimeline.tsx`, `src/chart/replay.ts`, `src/chart/EquityChart.tsx` | bleibt | Ziehbare Wiedergabe mit Spuren steht bei Kurve, Trades, Labor und Monte-Carlo-Läufen. |
+| 131 | Glass Tilt | N | neu eingebaut | `src/primitives/Card.tsx` (`tilt`), `src/primitives/hoverTilt.ts` | bleibt (nur reiche Seiten) | Nur der Titel ist bekannt; sinngemäß neigt sich eine Karte um bis zu 3° zum Zeiger mit mitlaufendem Glanz (Glas gibt es nicht). |
+| 132 | Globe Arcs | N | bewusst nicht | – | nicht bauen | Nur der Titel ist bekannt (Code nie gesehen), und die App hat keine Orts- oder Verbindungsdaten, die Bögen zeigen könnten. |
+| 133 | Shape Morph | N | bewusst nicht | – | nicht bauen | Nur der Titel ist bekannt; eine Form, die sich verwandelt, trüge keine Aussage (Karte zu Dialog gibt es als `MorphCard`). |
+| 134 | Grid Wave | N | neu eingebaut | `src/motion/Reveal.tsx` (`wave`), `src/motion/rich.ts` (`gridCell`), `src/motion/fx/HeatGridReveal.tsx` | bleibt (nur reiche Seiten) | Nur der Titel ist bekannt; sinngemäß laufen Kachelraster in einer Diagonalwelle ein, die Heatmap kaskadiert vom besten Feld. |
+| 135 | Ribbon Twist | N | bewusst nicht | – | nicht bauen | Nur der Titel ist bekannt; ein verdrehtes Band ist reine Zierde. |
+| 136 | Liquid Merge | N | bewusst nicht | – | nicht bauen | Nur der Titel ist bekannt; verschmelzende Tropfen haben keinen Datenbezug (der Flüssigkeitsmesser `LiquidGauge` zeigt Auslastung). |
+| 137 | Phone Explode | N | bewusst nicht | – | nicht bauen | Nur der Titel ist bekannt; eine auseinanderfliegende Geräte-Zeichnung wäre ein Werbebild. |
+
+### I. Video, Hintergründe, Motion Graphics
+
+| Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
+|---|---|---|---|---|---|---|
+| 138 | Cinematic Background Video | V | bewusst nicht | – | nicht bauen | Die App spielt kein Video; es würde Daten, Akku und Erstlade-Budget kosten und Zahlen hinterlegen. |
+| 139 | Seamless Video Loop | V | bewusst nicht | – | nicht bauen | Setzt Hintergrundvideo voraus (Nr. 138). |
+| 140 | Video Frame Art Direction | V | bewusst nicht | – | nicht bauen | Setzt Hintergrundvideo voraus (Nr. 138). |
+| 141 | Edge Blend Scrim | V | vorhanden | `src/app/BottomFade.tsx` (Verlauf hinter dem Dock), Schatten der Kopfzeile in `src/app/Header.tsx` | bleibt | Sinngemäß: Verläufe schützen den Text unter Dock und Kopfzeile, ohne Video. |
+| 142 | Progressive Bottom Blur | V | bewusst nicht | `src/app/BottomFade.tsx` (`EdgeBlur`, `BOTTOM_BANDS = []`), `src/app/Header.tsx` (`TOP_BANDS = []`) | nicht bauen | Der Baustein steht, die Bänder sind absichtlich leer (Leistung, „perf-01“: verlorene Frames im Scrollen 130 auf 58); er war seit dem ersten Commit (86b69dd) nie eingeschaltet. |
+| 143 | Cursor Video Scrub | V | bewusst nicht | – | nicht bauen | Setzt Video voraus (Nr. 138). |
+| 144 | Dual Video Scrub | V | bewusst nicht | – | nicht bauen | Setzt Video voraus (Nr. 138). |
+| 145 | Scroll Video Scrub | V | bewusst nicht | – | nicht bauen | Setzt Video voraus (Nr. 138) und ist die schwerste Technik der Liste. |
+| 146 | Boomerang Video | V | bewusst nicht | – | nicht bauen | Setzt Video voraus (Nr. 138). |
+| 147 | Crossfade Video Switcher | V | bewusst nicht | – | nicht bauen | Setzt mehrere Videos voraus (Nr. 138). |
+| 148 | Adaptive Text Tone | V | bewusst nicht | – | nicht bauen | Der Ton wechselt nur über Video; Schrift und Hintergrund folgen hier dem Theme (Hell/Dunkel). |
+| 149 | Gradient → Flow | V | neu eingebaut | `src/motion/rich/PageAura.tsx`, `src/motion/rich/rich.css` | bleibt (nur reiche Seiten) | Sinngemäß: weich fließende Lichtflecke (26 und 34 s) hinter der Kopfzeile, nicht der Kegelverlauf der Vorlage. |
+| 150 | Particles → Form | V | neu eingebaut | `src/motion/rich/EmptyArt.tsx` (`burst`), `src/motion/rich/art.css` | bleibt (nur reiche Seiten) | Sinngemäß: zwölf Punkte fliegen im Leerzustand zu einem Ring zusammen; ein Logo aus Partikeln gibt es nicht. |
+| 151 | Rings → Orbit | V | bewusst nicht | – (Rücknahme R6: `orbit` aus `src/motion/rich/EmptyArt.tsx` entfernt) | nicht bauen | Die Kreisbahn in Leerzuständen („Noch kein Plan“, „Keine Muster“ …) hat der Nutzer eingekreist; wo `pickArt` sie wählte, steht jetzt das statische Punkte-∅ des EmptyState von vor `560adde5` (`dots`, kein laufendes Bild, gleiche 33-px-Flusshöhe). Das Coach-Profil (`OrbitSpread`) ist davon unberührt. |
+| 152 | Line → Draw | V | wiederhergestellt/verbessert | `src/motion/fx/EquityDraw.tsx`, `src/primitives/Sparkline.tsx`, `src/motion/rich/EmptyArt.tsx` (`draw`) | bleibt | Linien zeichneten sich schon; Runde 10 fügt das Bild im Leerzustand und die atmende Platzhalter-Linie (`src/chart/ChartPlaceholder.tsx`) hinzu. |
+
+### J. Weitere Designsysteme
+
+| Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
+|---|---|---|---|---|---|---|
+| 153 | Magic Primitives | R | nicht prüfbar | – | Original anfordern | Original nie vorgelegen und kein Port mit diesem Namen; ein Abgleich mit `BorderBeam` oder Rippeln wäre geraten. |
+| 154 | Glass Look | R | nicht prüfbar | – | Original anfordern | Original nie vorgelegen. Seit Runde 13 haben Navigation, Knöpfe und Schalter ein eigenes Glas-Rezept (Zusatzpunkt Z16); Karten und Datenflächen bleiben ohne Glas (Nr. 48 bis 53). |
+| 155 | Fintech Glass | V | bewusst nicht | – | nicht bauen | Ein Stil-Paket mit Glaskacheln und gedimmten Anfangswörtern, das neben der einen Designsprache (DESIGN.md) ein zweites System wäre. |
+| 156 | Relay Lime | V | bewusst nicht | – | nicht bauen | Limettengelb als Handlungsfarbe widerspricht Signalrot als einziger Akzentfarbe (DESIGN.md, Farbrollen). |
+| 157 | Air | R | nicht prüfbar | – | Original anfordern | Stil-Datei nie vorgelegen; als Stil ohnehin nicht Teil der einen Designsprache. |
+| 158 | Apple España | R | nicht prüfbar | – | Original anfordern | Stil-Datei nie vorgelegen; als Stil ohnehin nicht Teil der einen Designsprache. |
+| 159 | Apple Foldable | R | nicht prüfbar | – | Original anfordern | Stil-Datei nie vorgelegen; als Stil ohnehin nicht Teil der einen Designsprache. |
+| 160 | Dala | R | nicht prüfbar | – | Original anfordern | Stil-Datei nie vorgelegen; als Stil ohnehin nicht Teil der einen Designsprache. |
+| 161 | Factory | R | nicht prüfbar | – | Original anfordern | Stil-Datei nie vorgelegen; als Stil ohnehin nicht Teil der einen Designsprache. |
+| 162 | Origin Financial | R | nicht prüfbar | – | Original anfordern | Stil-Datei nie vorgelegen; als Stil ohnehin nicht Teil der einen Designsprache. |
+| 163 | Oryzo AI | R | nicht prüfbar | – | Original anfordern | Stil-Datei nie vorgelegen; als Stil ohnehin nicht Teil der einen Designsprache. |
+| 164 | Slush | R | nicht prüfbar | – | Original anfordern | Stil-Datei nie vorgelegen; als Stil ohnehin nicht Teil der einen Designsprache. |
+| 165 | Structured | R | nicht prüfbar | – | Original anfordern | Stil-Datei nie vorgelegen; als Stil ohnehin nicht Teil der einen Designsprache. |
+| 166 | Superhuman | R | nicht prüfbar | – | Original anfordern | Stil-Datei nie vorgelegen; als Stil ohnehin nicht Teil der einen Designsprache. |
+
+### K. Trading-Diagramme, Dashboard
+
+| Nr | Name | Q | Status | Stelle im Code | Entscheidung | Begründung |
+|---|---|---|---|---|---|---|
+| 167 | Animated Fan Chart | V | wiederhergestellt/verbessert | `src/views/analyse/MonteCarloCard.tsx`, `src/views/analyse/fanDraw.ts`, `src/views/analyse/FanCursor.tsx`; Branchen-Trend `src/views/aktien/branchen/charts.tsx` | bleibt | Den Fächer gab es als Canvas; Runde 10 zeichnet auf reichen Seiten eine Szene (Bänder, 120 Linien, Median mit Glühen) und liest per Fadenkreuz ab. |
+| 168 | Animated Percentile Bands | V | wiederhergestellt/verbessert | `src/views/analyse/fanDraw.ts`, `src/views/aktien/branchen/charts.tsx`, `src/views/timemachine/` (Fächer 90 und 50 %) | bleibt | Die Bänder 5, 25, 50, 75, 95 kommen aus allen Läufen und gab es im Fächer schon; Runde 10 malt sie auf reichen Seiten in die neue Canvas-Szene. |
+| 169 | Chart Drawing Reveal | V | wiederhergestellt/verbessert | `src/chart/EquityChart.tsx`, `src/views/markt/TraderNetPlot.tsx`, `src/views/analyse/fanDraw.ts` | bleibt | Kurven wischen einmal von links ein; neu in Runde 10 sind Fächer und Top-Trader-Fläche. |
+| 170 | Interactive Chart Crosshair | V | wiederhergestellt/verbessert | `src/views/analyse/FanCursor.tsx`, `src/views/markt/TraderNetPlot.tsx`, `src/views/aktien/branchen/charts.tsx` | bleibt | Fadenkreuz mit Zeiger, Touch und Pfeiltasten; Runde 10 ergänzt Fächer und Top-Trader-Karte. |
+| 171 | Chart Hover Tooltip | V | vorhanden | `src/chart/tooltip.tsx` | bleibt | Ablesefeld mit Rand und Schatten an Kerzen und Kurven. |
+| 172 | Animated Performance Counter | V | vorhanden | `src/views/overview/Hero.tsx` (`MotionNumber`, `TextPrism`) | bleibt | Die Netto-Zahl der Übersicht gleitet; die Startseite bleibt ohnehin unverändert. |
+| 173 | Animated Status Stamp | V | neu eingebaut | `src/primitives/Badge.tsx` (`data-pill`), `src/styles/rich.css` | bleibt (nur reiche Seiten) | Ohne Vorlage gedeutet: Statuspillen rasten beim Erscheinen mit kleinem Überschwingen ein (0,88 zu 1,04 zu 1). |
+| 174 | Staggered Dashboard Rows | V | wiederhergestellt/verbessert | `src/chart/rows.tsx` (`Rows`), `src/styles/rich.css`, `src/motion/Reveal.tsx` | bleibt | Karten stiegen schon gestaffelt auf; Runde 10 staffelt die ersten 12 Zeilen von Listen und Tabellen und hebt sie beim Überfahren. |
+| 175 | Dashboard Theme Toggle | V | wiederhergestellt/verbessert | `src/app/CommandNav.tsx`, `src/app/ThemeCard.tsx`, `src/app/themeTransition.ts` | bleibt | Dasselbe wie Nr. 22 (Sonne/Mond, Kreis 620 ms). |
+| 176 | Responsive Canvas Chart | V | wiederhergestellt/verbessert | `src/views/analyse/fanDraw.ts`, `src/views/markt/TraderNetPlot.tsx`, `src/views/aktien/branchen/charts.tsx` | bleibt | Canvas mit höchstens doppelter Pixeldichte, neu gemalt bei Größe und Theme; Runde 10 fügt zwei Flächen hinzu. |
+| 177 | Simulation Approval Button | V | vorhanden | `src/views/labor/SideCards.tsx` (`ReferenceCard`, `celebrateRecord`) | bleibt | Ohne Vorlage gedeutet: „Als Vergleich übernehmen“ nach einem Labor-Lauf feiert die Übernahme mit Konfetti und Toast. |
+
+## Frost F1 – „1.000 Varianten. Eine bleibt.“ (Zusatz, keiner der 177 Punkte)
+
+Die Frost-Kristallisation des Prototyps (`prototypes/trading-journal-frost`, nur Konzept, simulierte Daten) ist im Labor als echte Strategiesuche gebaut; die Zeilen oben bleiben unverändert.
+
+| Bewegung | Wo | Zustand |
+|---|---|---|
+| 1.000 Kurven werden gezeichnet, ein Scanner besucht jede Variante in ihrer echten Reihenfolge, der jeweils beste Score blitzt mint auf, der Rest tritt zurück (Eintritt ease-out, Austritt ease-in, nichts linear), die Siegerlinie wird dick und läuft gestrichelt in den Endtest-Bereich (20 %) | `src/views/labor/search/SearchCanvas.tsx`, `timeline.ts` (die Daten der Wiedergabe: `sceneOf`, `framePlan`, `flashSequence`) | neu eingebaut, Canvas ohne neue Abhängigkeit, eine endliche Wiedergabe von 7,2 s, kein Dauerloop |
+| Fortschritt mit echter Zahl („412 von 1.000 geprüft“) | `StrategySearchSection.tsx` (`Busy`), Zahl aus dem Lab-Worker (`search-progress`) | neu eingebaut, höchstens ~8 Aktualisierungen je Sekunde |
+| Ergebniskarte erscheint erst nach der Wiedergabe; Platz ist reserviert (Sichtbarkeit statt Einfügen, die Bühne hat feste Höhe) | `StrategySearchSection.tsx` | kein Layout-Sprung während der Wiedergabe |
+| Reduced Motion (`useReducedFx`) und „Überspringen“: Endzustand sofort | `SearchCanvas.tsx` | geprüft in `tests/unit/views.labor.search.test.tsx` |
+
+Belege, dass nichts erfunden ist: `tests/unit/views.labor.search.test.tsx` (die Szene hält dieselben Arrays wie das Ergebnis, die Blitze sind die Wechsel des laufenden Bestwerts, die gezeichneten Punkte liegen auf den Werten der Kurven). Die Wiedergabe zeigt eine fertig gerechnete Suche; sie ist eine Darstellung, kein Live-Rechnen.
+
+## Was nicht belegt werden konnte
+
+- **Die Originale der Quelle R** (46 Punkte, mit Port oder ohne): Die Dateien der Sammlung `pulse-motion` und der Kataloge (Uiverse, Magic UI, Hyper-Stack) liegen nicht im Bestand. Ein „vorhanden“ in R-Zeilen belegt nur, dass die App einen Port hat, nicht dass er der Vorlage gleicht.
+- **Punkte, die nur als Titel bekannt sind** (Quelle N, 8 Punkte): Von „Glass → tilt“ bis „Phone → explode“ kennt auch `motion-graphics.md` nur die Titel eines Instagram-Bildes; Code und Werte der Vorlage wurden nie gesehen. Die Zeilen 131 und 134 sind deshalb sinngemäß gelesen, die übrigen sechs (64, 132, 133, 135 bis 137) stehen auf „bewusst nicht“.
+- **Gedeutete Namen:** 173 (Animated Status Stamp) und 177 (Simulation Approval Button) stehen ohne Beschreibung im Inventar.
+- **Pixelvergleich Übersicht und Cockpit, Budgets, Tests:** hier nicht neu gemessen, gebaut oder ausgeführt (ausgeführt wurde nur `tests/unit/docs.animationenMatrix.test.ts`); die Angaben stammen aus den READMEs und dem Budget-Skript im Zweig.
+- **Echte Geräte:** Bewegung und Ruckeln auf Handy und Tablet sind nur über die Messwerte in den Commits belegt.

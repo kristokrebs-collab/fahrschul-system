@@ -1,0 +1,407 @@
+/* Strategiesuche „1.000 Varianten. Eine bleibt.“ – der Frost-Block (Titel, zwei Zähler, vier Stufen, die Bühne mit den echten Kurven,
+   Ergebnis über der Bühne, Fuß mit Nochmal / Neue Stichprobe). Liegt im Lazy-Chunk der Suche – kein Eintrag in der Erstladungs-CSS.
+   Farben nur aus den Tokens (Schleier = `--veil-rgb`: im Hellen wird er zu Tinte), Gewinn-Grün nur als Datenfarbe des Siegers. Eintritt
+   ease-out, Feder mit leichtem Überschwinger; `base.css` setzt unter „Bewegung reduzieren“ jede Dauer auf 0. */
+
+.sx-frost {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: 0;
+  padding: 22px 22px 18px;
+  border-radius: 28px;
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.14);
+  background-color: var(--color-ink-850);
+  background-image:
+    radial-gradient(42% 60% at 6% 0%, color-mix(in srgb, var(--color-win) 9%, transparent), transparent 70%),
+    radial-gradient(40% 50% at 100% 18%, rgb(var(--veil-rgb, 255 255 255) / 0.05), transparent 70%),
+    linear-gradient(150deg, rgb(var(--veil-rgb, 255 255 255) / 0.06), rgb(var(--veil-rgb, 255 255 255) / 0.02) 60%, rgb(var(--veil-rgb, 255 255 255) / 0.05));
+  box-shadow:
+    inset 0 1px 0 rgb(var(--veil-rgb, 255 255 255) / 0.16),
+    0 24px 60px -30px rgb(0 0 0 / calc(0.7 * var(--shade, 1)));
+  overflow: clip;
+}
+
+.sx-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 18px;
+}
+.sx-title {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 56px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  color: var(--color-fg);
+  text-wrap: balance;
+}
+.sx-lead {
+  margin: 10px 0 0;
+  max-width: 62ch;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--color-mute);
+}
+.sx-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.sx-stat {
+  min-width: 132px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.16);
+  background: rgb(var(--veil-rgb, 255 255 255) / 0.04);
+}
+.sx-stat span {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+.sx-stat b {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg);
+  transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sx-stat b[data-pop="1"] {
+  animation: sx-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes sx-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.1);
+    color: var(--color-win);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.sx-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.sx-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.16);
+  background: rgb(var(--veil-rgb, 255 255 255) / 0.06);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--color-mute);
+  transition:
+    background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sx-pill[data-state="done"] {
+  color: var(--color-fg);
+}
+.sx-pill[data-state="on"] {
+  color: var(--color-ink-950);
+  background: var(--color-win);
+  border-color: var(--color-win);
+}
+
+.sx-stage {
+  position: relative;
+}
+.sx-plot {
+  position: relative;
+  aspect-ratio: 16 / 7;
+  border-radius: 20px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-ink-950) 62%, transparent);
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.06);
+}
+.sx-plot canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.sx-zone {
+  position: absolute;
+  top: 10px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+  pointer-events: none;
+}
+.sx-zone small {
+  display: block;
+  font-size: 11px;
+  text-transform: none;
+}
+.sx-zone[data-side="a"] {
+  left: 14px;
+}
+.sx-zone[data-side="b"] {
+  right: 14px;
+  text-align: right;
+}
+.sx-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 56px 20px 20px;
+  text-align: center;
+}
+
+/* das Ergebnis über der Bühne (unten rechts; schmal darunter) */
+.sx-result {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: min(330px, calc(100% - 28px));
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.16);
+  background-color: color-mix(in srgb, var(--color-ink-850) 82%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--veil-rgb, 255 255 255) / 0.16),
+    0 24px 50px -24px rgb(0 0 0 / calc(0.7 * var(--shade, 1)));
+  opacity: 0;
+  transform: translate3d(0, 18px, 0) scale(0.96);
+  transition:
+    opacity 0.45s cubic-bezier(0.55, 0.08, 0.4, 0.95),
+    transform 0.45s cubic-bezier(0.55, 0.08, 0.4, 0.95);
+  pointer-events: none;
+}
+@supports (backdrop-filter: blur(1px)) {
+  .sx-result {
+    background-color: color-mix(in srgb, var(--color-ink-850) 58%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    backdrop-filter: blur(18px) saturate(1.2);
+  }
+}
+.sx-result[data-in="1"] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: auto;
+}
+.sx-result h3 {
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+.sx-result h3 i {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--color-win);
+}
+.sx-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 13px;
+  color: var(--color-mute);
+}
+.sx-row b {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--color-fg);
+}
+.sx-verdict {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.18);
+  color: var(--color-fg);
+}
+.sx-verdict[data-ok="1"] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--color-win) 16%, transparent);
+  color: var(--color-win);
+}
+.sx-result p {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-faint);
+}
+
+.sx-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+.sx-foot > small {
+  max-width: 80ch;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-faint);
+}
+.sx-foot > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* „Was machen wir wann?“ */
+.sx-plan {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sx-plan li {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr;
+  gap: 4px 14px;
+  padding: 9px 0;
+  border-top: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.08);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-fg);
+}
+.sx-plan li > span:first-child {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+  padding-top: 2px;
+}
+
+.sx-bars {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.sx-cell {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.1);
+  background: rgb(var(--veil-rgb, 255 255 255) / 0.03);
+}
+.sx-cell span {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+.sx-cell b {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg);
+}
+.sx-cell small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--color-faint);
+}
+.sx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.sx-table th,
+.sx-table td {
+  padding: 6px 8px;
+  border-top: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.08);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sx-table th {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+.sx-table th:first-child,
+.sx-table td:first-child {
+  text-align: left;
+}
+.sx-table td {
+  font-family: var(--font-mono);
+  color: var(--color-fg);
+}
+.sx-table td:first-child {
+  font-family: var(--font-sans);
+}
+.sx-table tr[data-win="1"] td:first-child {
+  color: var(--color-win);
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .sx-frost {
+    padding: 18px 16px 16px;
+    border-radius: 24px;
+  }
+  .sx-plot {
+    aspect-ratio: 4 / 3.6;
+  }
+  .sx-result {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    margin-top: 12px;
+  }
+  .sx-plan li {
+    grid-template-columns: 1fr;
+  }
+  .sx-bars {
+    grid-template-columns: 1fr;
+  }
+}
