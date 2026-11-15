@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Autocomplete</title>
+<style>
+/* =====================================================================
+   CONFIG - alle Look- und Motion-Werte (zum "Hochdrehen" hier aendern)
+   Die Komponente animiert NUR opacity + transform per CSS-Transition
+   (zeitbasiert, bildratenunabhaengig, Compositor) - kein JS-Takt noetig.
+   ===================================================================== */
+:root {
+  /* Buehne */
+  --stage-bg: #131313;               /* gemessene Buehnenfarbe */
+  --stage-shift-y: 140px;            /* verschiebt den Block nach unten (Video: Eingabe sitzt bei y=287 von 673) */
+
+  /* Eingabefeld */
+  --field-w: 288px;                  /* Breite Feld */
+  --field-h: 41px;                   /* Hoehe Feld inkl. Rand */
+  --field-bg: #1f1f1f;
+  --field-border: #3a3a3a;           /* 1px Rand im Ruhezustand */
+  --field-border-focus: #444444;     /* Rand bei Fokus */
+  --focus-ring: #484848;             /* 3px Fokusring (Box-Shadow, ausserhalb) */
+  --focus-ring-w: 3px;
+  --field-radius: 8px;
+  --field-px: 16px;                  /* Innenabstand links/rechts */
+  --field-font: 16px;
+  --text: #f8f8f8;                   /* Eingabetext / Listentext */
+  --muted: #878787;                  /* Platzhalter + Hinweis darunter */
+
+  /* Dropdown-Panel */
+  --panel-w: 286px;
+  --panel-top: 47px;                 /* Abstand Panel-Oberkante zu Feld-Oberkante */
+  --panel-bg: #1f1f1f;
+  --panel-border: #353535;
+  --panel-radius: 8px;
+  --panel-pad: 7px;                  /* Innenabstand der Liste */
+  --panel-glow: 0 10px 40px rgba(255,255,255,.05); /* sehr dezenter heller Schein */
+  --row-h: 39px;                     /* Zeilenhoehe -> 4 Zeilen = 172 px Panel */
+  --row-px: 12px;                    /* + Panel-Padding = 21 px Textabstand */
+  --row-radius: 6px;
+  --row-font: 14px;
+  --row-active: #2a2a2a;             /* Hover/Tastatur-Markierung */
+  --empty-h: 43px;                   /* Hoehe "No frameworks found." */
+
+  /* Hinweis unter dem Feld */
+  --hint-top: 60px;                  /* Oberkante Hinweiszeile relativ zur Feld-Oberkante */
+
+  /* Motion */
+  --dur-ring: 150ms;                 /* Fokusring ein/aus */
+  --dur-in: 90ms;                    /* Panel erscheint (Fade + Scale) */
+  --dur-out: 80ms;                   /* Panel verschwindet */
+  --dur-hint: 90ms;                  /* Hinweis blendet ein/aus (gegenlaeufig zum Panel) */
+  --ease-in: cubic-bezier(.2, .8, .2, 1);   /* ease-out-Charakter, schneller Start */
+  --ease-out: cubic-bezier(.4, 0, 1, 1);    /* ease-in beim Verschwinden */
+  --ease-ring: cubic-bezier(.4, 0, .2, 1);
+  --panel-scale-from: .92;           /* Startgroesse beim Erscheinen (0.92 -> 1) */
+
+  --font: Inter, Geist, Roboto, "Helvetica Neue", Arial, "Liberation Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--stage-bg);
+  font-family: var(--font);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  margin-top: var(--stage-shift-y);
+  height: calc(100% - var(--stage-shift-y));
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+html { background: var(--stage-bg); }
+
+/* ----- COMPONENT CSS ------------------------------------------------- */
+.ac {
+  position: relative;
+  width: calc(var(--field-w) + 80px);       /* Platz fuer Ring + Schein */
+  height: 240px;
+  contain: layout paint;
+  font-family: var(--font);
+}
+.ac-field {
+  position: absolute; left: 50%; top: 0;
+  width: var(--field-w); height: var(--field-h);
+  margin-left: calc(var(--field-w) / -2);
+}
+.ac-input {
+  display: block; width: 100%; height: 100%; margin: 0;
+  padding: 0 var(--field-px);
+  background: var(--field-bg);
+  color: var(--text);
+  caret-color: var(--text);
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  font: 400 var(--field-font)/1 var(--font);
+  outline: none;
+  box-shadow: 0 0 0 0 var(--focus-ring);
+  transition: box-shadow var(--dur-ring) var(--ease-ring), border-color var(--dur-ring) var(--ease-ring);
+}
+.ac-input::placeholder { color: var(--muted); opacity: 1; }
+.ac-input:focus { border-color: var(--field-border-focus); box-shadow: 0 0 0 var(--focus-ring-w) var(--focus-ring); }
+
+.ac-hint {
+  position: absolute; left: 50%; top: var(--hint-top);
+  width: var(--field-w); height: 40px; margin-left: calc(var(--field-w) / -2);
+  padding: 0 var(--field-px); line-height: 40px;
+  font-size: var(--field-font); color: var(--muted);
+  white-space: nowrap; pointer-events: none; user-select: none; -webkit-user-select: none;
+  opacity: 1; transition: opacity var(--dur-hint) linear;
+}
+.ac.is-open .ac-hint { opacity: 0; }
+
+.ac-panel {
+  position: absolute; left: 50%; top: var(--panel-top);
+  width: var(--panel-w); margin-left: calc(var(--panel-w) / -2);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-glow);
+  transform-origin: 50% 0;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transform: scale(var(--panel-scale-from)) translateZ(0);
+  transition: opacity var(--dur-out) var(--ease-out), transform var(--dur-out) var(--ease-out), visibility 0s linear var(--dur-out);
+}
+.ac.is-open .ac-panel {
+  opacity: 1; visibility: visible; pointer-events: auto;
+  transform: scale(1) translateZ(0);
+  transition: opacity var(--dur-in) var(--ease-in), transform var(--dur-in) var(--ease-in), visibility 0s;
+}
+.ac-list { list-style: none; margin: 0; padding: var(--panel-pad); }
+.ac-opt {
+  height: var(--row-h); display: flex; align-items: center;
+  padding: 0 var(--row-px); border-radius: var(--row-radius);
+  font-size: var(--row-font); color: var(--text);
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+}
+.ac-opt[aria-selected="true"] { background: var(--row-active); }
+.ac-empty {
+  height: var(--empty-h); display: flex; align-items: center; justify-content: center;
+  font-size: var(--row-font); color: var(--text);
+  user-select: none; -webkit-user-select: none;
+}
+.ac-opt[hidden] { display: none; }
+.ac-panel:not([data-mode="list"]) .ac-list { display: none; }
+.ac-panel[data-mode="list"] .ac-empty { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ac-input, .ac-hint, .ac-panel, .ac.is-open .ac-panel { transition: none; }
+  .ac-panel { transform: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- COMPONENT:START -->
+<div class="ac" id="ac" data-ac>
+  <div class="ac-field">
+    <input class="ac-input" type="text" role="combobox" aria-expanded="false" aria-autocomplete="list"
+           aria-controls="ac-listbox" autocomplete="off" autocapitalize="off" spellcheck="false"
+           aria-label="Search a framework" placeholder="Search a framework">
+  </div>
+  <div class="ac-hint" aria-hidden="true">Search a framework</div>
+  <div class="ac-panel" data-mode="empty">
+    <ul class="ac-list" id="ac-listbox" role="listbox" aria-label="Frameworks"></ul>
+    <div class="ac-empty" role="status">No frameworks found.</div>
+  </div>
+</div>
+<!-- COMPONENT:END -->
+
+<script>
+/* =====================================================================
+   CONFIG - Logik-Tokens (Motion-Dauern/Easing siehe CSS-Variablen oben)
+   ===================================================================== */
+const AC_CONFIG = {
+  HINT_TEXT: 'Search a framework',      // Platzhalter + Hinweiszeile
+  EMPTY_TEXT: 'No frameworks found.',   // Leerzustand
+  MATCH: 'includes'                     // 'includes' | 'startsWith'
+};
+
+/* ----- COMPONENT JS --------------------------------------------------- */
+function initAutocomplete(root, opts) {
+  opts = opts || {};
+  const C = Object.assign({}, AC_CONFIG, opts.config || {});
+  const items = opts.items || [];
+  const onSelect = opts.onSelect || function () {};
+  const input = root.querySelector('.ac-input');
+  const hint = root.querySelector('.ac-hint');
+  const panel = root.querySelector('.ac-panel');
+  const list = root.querySelector('.ac-list');
+  const empty = root.querySelector('.ac-empty');
+  input.placeholder = C.HINT_TEXT; hint.textContent = C.HINT_TEXT; empty.textContent = C.EMPTY_TEXT;
+
+  let open = false, shown = [], active = -1;
+  const optEls = [];                               // Zeilen einmal erzeugen, nur Sichtbarkeit/Text aendern
+  items.forEach(function (label, i) {
+    const li = document.createElement('li');
+    li.className = 'ac-opt'; li.setAttribute('role', 'option'); li.id = 'ac-opt-' + i;
+    li.textContent = label; li.hidden = true;
+    list.appendChild(li); optEls.push(li);
+  });
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)');
+
+  function filter(q) {
+    q = q.trim().toLowerCase();
+    return items.filter(function (s) {
+      s = s.toLowerCase();
+      return C.MATCH === 'startsWith' ? s.startsWith(q) : s.indexOf(q) !== -1;
+    });
+  }
+  function renderContent() {                       // Wechsel Liste <-> Leerzustand ist bewusst sofort (wie im Video)
+    shown = filter(input.value);
+    optEls.forEach(function (li, i) { li.hidden = shown.indexOf(items[i]) === -1; li.removeAttribute('aria-selected'); });
+    panel.dataset.mode = shown.length ? 'list' : 'empty';
+    active = -1; input.removeAttribute('aria-activedescendant');
+  }
+  function setOpen(v) {
+    if (v === open) return;
+    open = v;
+    root.classList.toggle('is-open', v);
+    input.setAttribute('aria-expanded', v ? 'true' : 'false');
+    if (!(reduce && reduce.matches)) {             // will-change nur waehrend der Animation
+      panel.style.willChange = 'opacity, transform';   // wird bei transitionend wieder entfernt
+    }
+  }
+  function visibleOpts() { return optEls.filter(function (li) { return !li.hidden; }); }
+  function highlight(i) {
+    const vis = visibleOpts(); if (!vis.length) return;
+    active = (i + vis.length) % vis.length;
+    vis.forEach(function (li, k) { li.setAttribute('aria-selected', k === active ? 'true' : 'false'); });
+    input.setAttribute('aria-activedescendant', vis[active].id);
+  }
+  function choose(label) {
+    input.value = label; setOpen(false); onSelect(label);
+  }
+
+  input.addEventListener('input', function () {
+    if (input.value.length === 0) { setOpen(false); return; }
+    renderContent();
+    setOpen(true);
+  });
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (!open && input.value) { renderContent(); setOpen(true); } else highlight(active + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (open) highlight(active - 1); }
+    else if (e.key === 'Enter') { if (open && active >= 0) { e.preventDefault(); choose(visibleOpts()[active].textContent); } }
+    else if (e.key === 'Escape') { if (open) { e.preventDefault(); setOpen(false); } }
+  });
+  panel.addEventListener('mousedown', function (e) { e.preventDefault(); });        // Fokus bleibt im Feld
+  list.addEventListener('click', function (e) {
+    const li = e.target.closest('.ac-opt'); if (li) choose(li.textContent);
+  });
+  if (window.matchMedia && matchMedia('(hover: hover)').matches) {
+    list.addEventListener('pointerover', function (e) {
+      const li = e.target.closest('.ac-opt'); if (!li) return;
+      const vis = visibleOpts(); highlight(vis.indexOf(li));
+    });
+  }
+  panel.addEventListener('transitionend', function (e) { if (e.propertyName === 'opacity') panel.style.willChange = ''; });
+  input.addEventListener('blur', function () { setOpen(false); });
+
+  return {
+    open: function () { renderContent(); setOpen(true); },
+    close: function () { setOpen(false); },
+    setValue: function (v) { input.value = v; },
+    getValue: function () { return input.value; },
+    isOpen: function () { return open; },
+    input: input
+  };
+}
+
+/* ----- DEMO: exakt der Video-Inhalt ------------------------------------ */
+window.ac = initAutocomplete(document.getElementById('ac'), {
+  items: ['Next.js', 'Remix', 'SvelteKit', 'Vite']
+});
+</script>
+</body>
+</html>

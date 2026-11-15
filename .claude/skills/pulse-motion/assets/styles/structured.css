@@ -1,0 +1,21 @@
+/* Structured — „Renaissance-Galerie auf Spachtelpapier“ (mixed: Putty-Hell ↔ Ink-Dunkel). Einsatz: <section data-style="structured"> (+ _base.css) */
+[data-style="structured"] {
+  /* Marke */
+  --st-putty: #c4c3b6; --st-ink: #000000; --st-bone: #e7e5e4; --st-chalk: #ebebeb; --st-vellum: #dfdcd5;
+  --st-graphite: #595855; --st-ash: #808080; --st-paper: #ffffff;
+  --st-muted: #444340;   /* abgeleitet: etwas dunkler als Graphite, damit Sekundärtext auf Putty AA (≥4.5:1) erreicht */
+  /* Semantik-Schicht (helle Sektion; dunkle Sektion: data-tone="ink" setzt die Werte um) */
+  --s-bg: var(--st-putty); --s-surface: var(--st-bone); --s-fg: var(--st-ink); --s-fg-muted: var(--st-muted);
+  --s-border: var(--st-vellum); --s-border-strong: var(--st-ink); --s-accent: var(--st-ink); --s-link: var(--st-ink);
+  --s-action-bg: var(--st-ink); --s-action-fg: var(--st-paper);
+  --s-radius-card: 9px; --s-radius-btn: 28.8px; --s-card-pad: 24px; --s-card-border: 0;
+  --s-btn-pad: 9px 17px; --s-btn-weight: 400;
+  --s-font-ui: 'Helvetica Now', 'Inter', 'Neue Haas Grotesk', 'Helvetica Neue', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-display: 'Davinci', 'Canela', 'Tiempos Headline', 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --s-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s-display-weight: 500; --s-display-leading: 0.84; --s-display-tracking: -0.009em; --s-body-weight: 400;
+  --s-ease: ease; --s-dur: .2s;
+  /* Extras: Display so groß, dass er am Viewport-Rand abgeschnitten wird (374px, −3.37px) */
+  --st-wordmark-size: 374px; --st-wordmark-tracking: -3.37px; --st-hex: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%);
+}
+[data-style="structured"][data-tone="ink"] { --s-bg: var(--st-ink); --s-surface: #111; --s-fg: var(--st-paper); --s-fg-muted: var(--st-ash); --s-border: #2a2a2a; --s-border-strong: var(--st-paper); --s-action-bg: var(--st-paper); --s-action-fg: var(--st-ink); --s-accent: var(--st-paper); --s-link: var(--st-paper); }

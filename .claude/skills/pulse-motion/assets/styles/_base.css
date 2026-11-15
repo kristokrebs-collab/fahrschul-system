@@ -1,0 +1,17 @@
+/* _base.css — gemeinsame Helfer für alle Style-Schnipsel (assets/styles/<slug>.css).
+   Jeder Style definiert nur Variablen im Scope [data-style="<slug>"]; diese Datei macht daraus nutzbare Klassen.
+   Nur transform/opacity werden animiert (120-Hz-tauglich). Styles dürfen verschachtelt werden (Insel-Prinzip):
+   Helferklassen sind global und lesen die Variablen des NÄCHSTEN data-style-Elements (auch wenn es das Element selbst ist). */
+[data-style] { background: var(--s-bg); color: var(--s-fg); font-family: var(--s-font-ui); font-weight: var(--s-body-weight, 400); -webkit-font-smoothing: antialiased; }
+.s-display { font-family: var(--s-font-display); font-weight: var(--s-display-weight); line-height: var(--s-display-leading); letter-spacing: var(--s-display-tracking); text-transform: var(--s-display-case, none); margin: 0; }
+.s-eyebrow { font-family: var(--s-font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--s-fg-muted); }
+.s-muted { color: var(--s-fg-muted); }
+.s-card { color: var(--s-card-fg, var(--s-fg)); background: var(--s-surface); border: var(--s-card-border, 1px solid var(--s-border)); border-radius: var(--s-radius-card); padding: var(--s-card-pad, 24px); box-shadow: none; }
+.s-btn { display: inline-flex; align-items: center; gap: 8px; padding: var(--s-btn-pad, 12px 18px); border-radius: var(--s-radius-btn); background: var(--s-action-bg); color: var(--s-action-fg); border: var(--s-btn-border, 0); font: inherit; font-weight: var(--s-btn-weight, 500); text-transform: var(--s-btn-case, none); letter-spacing: var(--s-btn-tracking, 0); cursor: pointer; transition: opacity var(--s-dur, .2s) var(--s-ease, ease), transform var(--s-dur, .2s) var(--s-ease, ease); }
+.s-btn:hover { opacity: .88; }
+.s-btn:active { transform: scale(.98); }
+.s-btn--ghost { background: transparent; color: var(--s-fg); border: 1px solid var(--s-border-strong, var(--s-fg)); }
+.s-link { color: var(--s-link, var(--s-accent)); text-underline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { [data-style] * { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+.s-card .s-muted { color: var(--s-card-muted, var(--s-fg-muted)); }
+.s-card .s-eyebrow { color: var(--s-card-muted, var(--s-fg-muted)); }
