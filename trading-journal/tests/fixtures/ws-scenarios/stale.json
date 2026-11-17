@@ -1,0 +1,45 @@
+{
+  "name": "stale",
+  "description": "REST works, WS opens and then goes silent → ws_silent, label 'Zuletzt HH:mm · veraltet'.",
+  "baseTime": 1790762400000,
+  "rest": {
+    "mode": "ok"
+  },
+  "ws": {
+    "steps": [
+      {
+        "t": 50,
+        "type": "open"
+      },
+      {
+        "t": 100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 100
+        }
+      },
+      {
+        "t": 1100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 1100
+        }
+      },
+      {
+        "t": 2100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 2100
+        }
+      },
+      {
+        "t": 3000,
+        "type": "silence"
+      }
+    ],
+    "reconnect": "silent"
+  }
+}

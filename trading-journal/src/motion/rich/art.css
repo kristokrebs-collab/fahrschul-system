@@ -1,0 +1,100 @@
+/* motion-exception: rich-art – ambient, stroke offset of one line. Runde 10 – empty-state art: a line that draws itself, points that gather into a ring (the orbit is gone, Rücknahme R6). Loaded with the lazy
+   `EmptyArt` chunk. Transform / opacity (and the stroke offset of the drawn line, a paint); slow cycles with a long rest;
+   paused under [data-idle] (off screen / hidden tab); not animated under prefers-reduced-motion. */
+.rich-art {
+  display: block;
+  overflow: visible;
+}
+.rich-art * {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.rich-art__axis {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.28;
+  stroke-width: 1;
+}
+.rich-art__line {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  animation: rich-draw 6.5s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+.rich-art__end {
+  fill: var(--color-signal);
+  animation: rich-end 6.5s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+.rich-art__spark {
+  fill: var(--color-fg);
+}
+.rich-art__spark {
+  animation: rich-gather 7s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0s) infinite;
+}
+.rich-art[data-idle] * {
+  animation-play-state: paused;
+}
+@keyframes rich-draw {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+  }
+  28%,
+  82% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  95%,
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes rich-end {
+  0%,
+  26% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  34% {
+    transform: scale(1.6);
+    opacity: 1;
+  }
+  40%,
+  82% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  95%,
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@keyframes rich-gather {
+  0% {
+    transform: translate(var(--fx, 0), var(--fy, 0)) scale(0.5);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  34%,
+  76% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  92%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rich-art * {
+    animation: none;
+  }
+}

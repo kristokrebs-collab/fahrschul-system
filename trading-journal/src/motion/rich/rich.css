@@ -1,0 +1,119 @@
+/* motion-exception: rich-aura – ambient drift, transform only, paused off screen. Runde 10 – styles of the rich-page effects. Loaded WITH the lazy chunks that import it (page aura, empty-state art, …),
+   never with the first load. Everything is transform / opacity; every loop pauses under [data-idle] (off screen or hidden
+   tab) and is off under prefers-reduced-motion (the components do not mount then; the media query is the second belt). */
+
+/* ---- page aura: two slow light spots behind a page header, a pointer spotlight, an optional ghost word ---- */
+.rich-aura {
+  position: absolute;
+  inset: -14px -8px;
+  z-index: -10;
+  overflow: clip;
+  pointer-events: none;
+  border-radius: 28px;
+  container-type: size;
+}
+.rich-aura__a,
+.rich-aura__b {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+}
+.rich-aura__a {
+  left: -4%;
+  top: -34%;
+  width: 46%;
+  height: 160%;
+  background: radial-gradient(closest-side, color-mix(in oklab, var(--color-signal) 7%, transparent), transparent);
+  animation: rich-drift-a 26s ease-in-out infinite alternate;
+}
+.rich-aura__b {
+  right: 4%;
+  top: -24%;
+  width: 40%;
+  height: 140%;
+  background: radial-gradient(closest-side, rgb(var(--veil-rgb, 255 255 255) / 0.05), transparent);
+  animation: rich-drift-b 34s ease-in-out infinite alternate;
+}
+:root[data-theme="light"] .rich-aura__a {
+  background: radial-gradient(closest-side, color-mix(in oklab, var(--color-signal) 4%, transparent), transparent);
+}
+/* on paper the veil ink is dark: a grey cloud would read as a smudge, so the neutral spots are fainter there */
+:root[data-theme="light"] .rich-aura__b {
+  background: radial-gradient(closest-side, rgb(var(--veil-rgb, 255 255 255) / 0.025), transparent);
+}
+:root[data-theme="light"] .rich-aura__spot {
+  background: radial-gradient(closest-side, rgb(var(--veil-rgb, 255 255 255) / 0.04), transparent);
+}
+.rich-aura__spot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(var(--veil-rgb, 255 255 255) / 0.07), transparent);
+  will-change: transform;
+}
+.rich-aura[data-idle] .rich-aura__a,
+.rich-aura[data-idle] .rich-aura__b {
+  animation-play-state: paused;
+}
+@keyframes rich-drift-a {
+  to {
+    transform: translate3d(16%, 10%, 0) scale(1.12);
+  }
+}
+@keyframes rich-drift-b {
+  to {
+    transform: translate3d(-18%, 6%, 0) scale(0.92);
+  }
+}
+.rich-aura__ghost {
+  display: none;
+}
+@media (min-width: 1100px) {
+  .rich-aura__ghost {
+    display: block;
+    position: absolute;
+    left: 44%;
+    bottom: 10px;
+    /* the word is as tall as the header (the aura is a size container: cqh = its height), never taller than the box */
+    font: 700 clamp(48px, 70cqh, 112px) / 0.8 var(--font-sans);
+    letter-spacing: -0.045em;
+    white-space: nowrap;
+    color: transparent;
+    -webkit-text-stroke: 1px rgb(var(--veil-rgb, 255 255 255) / 0.07);
+    animation: rich-ghost-in 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+  }
+  .rich-aura__ghost::before {
+    content: attr(data-ghost);
+  }
+}
+@keyframes rich-ghost-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rich-aura__a,
+  .rich-aura__b,
+  .rich-aura__ghost {
+    animation: none;
+  }
+}
+
+/* A native <details> on a rich page (20 of them: „Wie lese ich das?“, „Mehr: Volumenfilter …“, plan steps, ledger …): what it reveals
+   arrives – a short fade and 4 px – instead of standing there in one frame while only the chevron turned (Bewegungsprüfung Runde 14).
+   `Fold` has its own motion and is left out; closing stays the browser's (instant). `backwards`: nothing is held after the run. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-rich] details[open]:not(.group\/fold) > :not(summary) {
+    animation: rich-det-in 0.2s cubic-bezier(0, 0, 0.58, 1) backwards;
+  }
+}
+@keyframes rich-det-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}

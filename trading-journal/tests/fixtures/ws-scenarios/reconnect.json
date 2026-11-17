@@ -1,0 +1,284 @@
+{
+  "name": "reconnect",
+  "description": "WS closes once (1006), reconnect succeeds after backoff and resumes the heartbeat.",
+  "baseTime": 1790762400000,
+  "rest": {
+    "mode": "ok"
+  },
+  "ws": {
+    "steps": [
+      {
+        "t": 50,
+        "type": "open"
+      },
+      {
+        "t": 100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 100
+        }
+      },
+      {
+        "t": 1100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 1100
+        }
+      },
+      {
+        "t": 2100,
+        "type": "close",
+        "code": 1006
+      }
+    ],
+    "reconnect": "ok",
+    "reconnectSteps": [
+      {
+        "t": 50,
+        "type": "open"
+      },
+      {
+        "t": 100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 100
+        }
+      },
+      {
+        "t": 1100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 1100
+        }
+      },
+      {
+        "t": 2100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 2100
+        }
+      },
+      {
+        "t": 3100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 3100
+        }
+      },
+      {
+        "t": 4100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 4100
+        }
+      },
+      {
+        "t": 5100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 5100
+        }
+      },
+      {
+        "t": 6100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 6100
+        }
+      },
+      {
+        "t": 7100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 7100
+        }
+      },
+      {
+        "t": 8100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 8100
+        }
+      },
+      {
+        "t": 9100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 9100
+        }
+      },
+      {
+        "t": 10100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 10100
+        }
+      },
+      {
+        "t": 11100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 11100
+        }
+      },
+      {
+        "t": 12100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 12100
+        }
+      },
+      {
+        "t": 13100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 13100
+        }
+      },
+      {
+        "t": 14100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 14100
+        }
+      },
+      {
+        "t": 15100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 15100
+        }
+      },
+      {
+        "t": 16100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 16100
+        }
+      },
+      {
+        "t": 17100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 17100
+        }
+      },
+      {
+        "t": 18100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 18100
+        }
+      },
+      {
+        "t": 19100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 19100
+        }
+      },
+      {
+        "t": 20100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 20100
+        }
+      },
+      {
+        "t": 21100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 21100
+        }
+      },
+      {
+        "t": 22100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 22100
+        }
+      },
+      {
+        "t": 23100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 23100
+        }
+      },
+      {
+        "t": 24100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 24100
+        }
+      },
+      {
+        "t": 25100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 25100
+        }
+      },
+      {
+        "t": 26100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 26100
+        }
+      },
+      {
+        "t": 27100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 27100
+        }
+      },
+      {
+        "t": 28100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 28100
+        }
+      },
+      {
+        "t": 29100,
+        "type": "message",
+        "fixture": "binance-ws-markPrice.json",
+        "patch": {
+          "data.E": 29100
+        }
+      }
+    ]
+  }
+}
