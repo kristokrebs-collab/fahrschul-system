@@ -46,6 +46,7 @@ seconds unless noted. Additions over the bundle set:
 | `spring.pageEnter` | `spring.enter` + `restDelta 3.125, restSpeed 12.5` | `PageHost` string-keyframe slide (Motion springs string keyframes over 0…100: = 0.5 px / 2 px·s⁻¹ on the 16 px slide, settles ≈ 0.42 s) |
 | `spring.island` | `{400, 30}` | dynamic-island size morphs (trades count pill) |
 | `tween.exitSurface` (Runde 13) | `.18 s` ease-in `[.4, 0, 1, 1]` | the exit of a LARGE surface: payment window, global search panel, a phone sheet that leaves without a hand-back morph. Small things (chips, rows, strips) keep `tween.exit` (0.12 s linear) |
+| `tween.sheetLeave` / `tween.dimLeave` / `tween.sheetDrop` (Runde 16) | `.18 s` after `.08 s` / `.26 s` / `.3 s`, all ease-in `[.4, 0, 1, 1]` | `Sheet` without a morph, `exitStyle="leave"` (default; every sheet but „Trade eintragen / bearbeiten“, which passes `classic`): desktop – contents fade on `tween.exit`, the emptied panel sinks 24 px away while the dim layer takes the whole way; phone – the sheet drops out with its contents inside, shorter than its `sheetIos` entrance |
 | `tween.sheetBody` | `.3 s ease.out` | `Sheet` body after the morph |
 | `tween.check` / `tween.checkToast` | `.25 s` / `.35 s delay .15` | drawn checks, toast check mark |
 | `tween.toastExit` / `tween.toastText` | `.22 s` / `tween.fade` + `delay .12` | toast island exit / text fade + win-value roll start |
@@ -148,9 +149,12 @@ Card → 620 px dialog morph (Plan 2.5 "Morph-Dialog"), portal-less, with focus 
 
 ### `Sheet`
 `{ open; onClose; title; size?: "md"|"lg"; layoutId?; headerExtra?; footer?; children; className?; onOpened?; handoff?; dismissGuard?;
-onDismissAttempt? }` – overlay `z-[60]`, panel `role="dialog"` `layoutRoot` `borderRadius 28`, body `layoutScroll`, focus trap, scroll
+onDismissAttempt?; exitStyle?: "leave"|"classic" }` – overlay `z-[60]`, panel `role="dialog"` `layoutRoot` `borderRadius 28`, body `layoutScroll`, focus trap, scroll
 lock, isolated outside (`a11y.ts`), Escape. With `layoutId` (`new-trade`, `setup-card-{id}`) the panel morphs on `spring.sheet`; without, desktop
-`{y 40, scale .98}` on `spring.sheet`, mobile `y 100%` on `tween.sheetIos`. The body is a stagger parent (`StaggerItem`). A sliding
+`{y 40, scale .98}` on `spring.sheet`, mobile `y 100%` on `tween.sheetIos`. Exit without a morph (`exitStyle`, Runde 16): `leave`
+(default) – desktop: contents fade, the emptied panel sinks away accelerating (`tween.sheetLeave`) while the dim takes the whole way
+(`tween.dimLeave`); phone: the sheet drops out with its contents inside (`tween.sheetDrop`); `classic` – the exit before Runde 16, only
+the trade editor passes it (guard rail). The body is a stagger parent (`StaggerItem`). A sliding
 sheet keeps its shadow on the panel (it only moves by transform). The source must be `visibility:hidden` while open. The footer pads by
 `var(--safe-bottom, env(safe-area-inset-bottom))`, so it clears a browser bar laid over the page bottom.
 - Swipe to dismiss (`useSwipeDismiss`, touch / pen at every width): handle = the header row + grabber `[data-sheet-handle]`

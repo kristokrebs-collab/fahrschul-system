@@ -1433,6 +1433,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
       footer={footer}
       dismissGuard={() => dirty}
       onDismissAttempt={() => setConfirmDiscard(true)}
+      // guard rail: „Trade eintragen / bearbeiten“ keeps its exit exactly as it was (Runde 16 changed the default of the other sheets)
+      exitStyle="classic"
     >
       <form id="trade-form" ref={formRef} onSubmit={onSubmit} noValidate>
         {/* while `Felder anpassen` is open the form stays mounted (state, live check, validation) but hidden */}

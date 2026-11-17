@@ -50,6 +50,16 @@ export interface SheetProps {
    * "Änderungen verwerfen?" strip above the footer (`Verwerfen` closes, `Weiter bearbeiten` stays).
    */
   onDismissAttempt?: (via: DismissVia) => void;
+  /**
+   * How a sheet WITHOUT a morph leaves when it is closed (not swiped – a fling keeps its own physics).
+   * `leave` (default, Runde 16): desktop – contents fade, then the emptied panel sinks away on an accelerating curve
+   * (`tween.sheetLeave`) while the dim layer takes the whole way (`tween.dimLeave`); phone – the sheet drops out with its
+   * contents inside (`tween.sheetDrop`, shorter than the entrance).
+   * `classic`: the exit as it was before Runde 16 (panel 0.12 s linear after the contents, dim 0.12 s; phone: emptied panel on
+   * `tween.sheetIos`). Only „Trade eintragen / bearbeiten“ asks for it – its form, animation and flow stay unchanged (guard rail).
+   * A morphing sheet (`layoutId`) is the same in both.
+   */
+  exitStyle?: "leave" | "classic";
 }
 
 /** What tried to close a sheet. */
@@ -62,6 +72,12 @@ export const SHEET_DISCARD_COPY = { ask: "Änderungen verwerfen?", discard: "Ver
 interface Flung extends SwipeDismissInfo {
   distance: number;
 }
+/**
+ * What the exit variants get as `custom`: a `Flung` (swiped away: everything rides out opaque on the release velocity), `"ride"`
+ * (a phone sheet that drops out with its contents inside, Runde 16) or nothing (contents fade first, then the panel).
+ */
+type ExitMode = Flung | "ride" | null | undefined;
+const isFlung = (m: ExitMode): m is Flung => typeof m === "object" && m !== null;
 /** The morphed body starts revealing ≈ 65 % into the morph (OV-06): never a blank panel landing, never a body over a small one. */
 const BODY_REVEAL_MS = bodyRevealDelay(spring.sheet) * 1000;
 
@@ -72,7 +88,7 @@ const WIDTH: Record<NonNullable<SheetProps["size"]>, string> = { md: "sm:max-w-[
 const BODY_MORPH: Variants = {
   [STAGGER_HIDDEN]: { opacity: 0, y: 8 },
   [STAGGER_SHOWN]: { opacity: 1, y: 0, transition: withSectionStagger({ duration: 0.25, ease: tween.sheetBody.ease }) },
-  gone: (f: Flung | null | undefined) => (f ? KEEP : { opacity: 0, transition: tween.exit }),
+  gone: (f: ExitMode) => (f ? KEEP : { opacity: 0, transition: tween.exit }),
 };
 /**
  * Slide-in body: the panel itself moves, the body only orchestrates its `StaggerItem`s – they start a beat
@@ -81,7 +97,7 @@ const BODY_MORPH: Variants = {
 const BODY_SLIDE: Variants = {
   [STAGGER_HIDDEN]: {},
   [STAGGER_SHOWN]: { transition: { delayChildren: sectionDelay(tween.body.delay) } },
-  gone: (f: Flung | null | undefined) => (f ? KEEP : { opacity: 0, transition: tween.exit }),
+  gone: (f: ExitMode) => (f ? KEEP : { opacity: 0, transition: tween.exit }),
 };
 
 interface Readiness {
@@ -101,7 +117,7 @@ const PANEL_EXIT = { ...tween.exit, delay: tween.exit.duration };
  * release velocity. Exit label of everything inside the sheet; the AnimatePresence `custom` is the `Flung` or null.
  */
 const KEEP: TargetAndTransition = { opacity: 1, transition: { duration: 0 } };
-const CONTENT_VARIANTS: Variants = { gone: (f: Flung | null | undefined) => (f ? KEEP : CONTENT_EXIT) };
+const CONTENT_VARIANTS: Variants = { gone: (f: ExitMode) => (f ? KEEP : CONTENT_EXIT) };
 
 /**
  * Bottom sheet on mobile / centred dialog from `sm` (Bundle `Y$`, Plan 2.5 "Sheet"). Portal-less,
@@ -127,7 +143,7 @@ const CONTENT_VARIANTS: Variants = { gone: (f: Flung | null | undefined) => (f ?
  * lifted – with the focus return – after the exit. `layoutRoot` sits on the fixed overlay, never on the morphing
  * panel (Motion forces a layoutRoot node's own layout animation to `type: false`, which killed the morph).
  */
-export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra, footer, children, className, onOpened, handoff, dismissGuard, onDismissAttempt }: SheetProps) {
+export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra, footer, children, className, onOpened, handoff, dismissGuard, onDismissAttempt, exitStyle = "leave" }: SheetProps) {
   const desktop = useIsDesktop();
   const reduced = useReducedFx();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -220,9 +236,21 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
   // close: head, body and footer fade first (CONTENT_EXIT), the panel – by then an empty opaque surface – after them,
   // so a fading panel never shows its text over the page's text. Swiped away (`custom` = Flung): everything stays
   // opaque and the column flies out on the release velocity.
-  const panelExit: TargetAndTransition = morph ? { opacity: 0, scale: 0.98, transition: PANEL_EXIT } : desktop ? { y: 30, opacity: 0, scale: 0.98, transition: PANEL_EXIT } : { y: "100%", transition: tween.sheetIos };
-  const panelVariants: Variants = { gone: (f: Flung | null | undefined) => (f ? KEEP : panelExit) };
-  const columnVariants: Variants = { gone: (f: Flung | null | undefined) => (f ? flingExit(f, { distance: f.distance, reduced }) : {}) };
+  // Runde 16 (`exitStyle`): a sheet without a morph LEAVES – desktop: the emptied panel sinks away accelerating while the dim takes the
+  // whole way; phone: the sheet drops out with its contents inside, shorter than it came. `classic` keeps the old exit (trade editor).
+  const leave = exitStyle === "leave" && !morph;
+  const panelExit: TargetAndTransition = morph
+    ? { opacity: 0, scale: 0.98, transition: PANEL_EXIT }
+    : desktop
+      ? leave
+        ? { y: 24, opacity: 0, scale: 0.98, transition: tween.sheetLeave }
+        : { y: 30, opacity: 0, scale: 0.98, transition: PANEL_EXIT }
+      : { y: "100%", transition: leave ? tween.sheetDrop : tween.sheetIos };
+  const dimExit = leave ? (desktop ? tween.dimLeave : tween.sheetDrop) : tween.exit;
+  /** `custom` of the exit: the fling, or "ride" for the phone sheet that keeps its contents on the way out. */
+  const exitMode: ExitMode = flung ?? (leave && !desktop ? "ride" : null);
+  const panelVariants: Variants = { gone: (f: ExitMode) => (isFlung(f) ? KEEP : panelExit) };
+  const columnVariants: Variants = { gone: (f: ExitMode) => (isFlung(f) ? flingExit(f, { distance: f.distance, reduced }) : {}) };
   const enterExit: HTMLMotionProps<"div"> = morph
     ? { transition: { layout: spring.sheet } }
     : desktop
@@ -237,7 +265,7 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
     // a fixed overlay: its exit never moves a sibling, so no app-wide re-render once it has left
     <NoLayoutCascade>
       <AnimatePresence
-        custom={flung}
+        custom={exitMode}
         onExitComplete={() => {
           setReadiness((r) => (r.exiting ? { ...r, exiting: false } : r));
           // the flung column was left off-screen: back to rest while nothing is mounted
@@ -262,7 +290,7 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
                 className="pointer-events-none absolute inset-0"
                 initial={{ opacity: handoff && !reduced ? handoff.backdropFrom : 0 }}
                 animate={{ opacity: 1 }}
-                exit={{ opacity: 0, transition: tween.exit }}
+                exit={{ opacity: 0, transition: dimExit }}
                 transition={tween.fade}
               >
                 {/* the swipe dims through this inner layer, so enter/exit and drag opacity multiply */}

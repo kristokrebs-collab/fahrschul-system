@@ -56,6 +56,13 @@ export const tween = {
   // blink at that size; this one accelerates out (ease-in) and is still shorter than the surface's entrance. Small things keep `exit`.
   exitSurface: { duration: 0.18, ease: [0.4, 0, 1, 1] as [number, number, number, number] },
   sheetIos: { duration: 0.5, ease: ease.ios }, // NEW: mobile bottom sheet without layoutId
+  // Runde 16: a sheet that LEAVES instead of blinking out (`Sheet`, every sheet but „Trade eintragen / bearbeiten“). Desktop: the contents
+  // fade first (`exit`), the emptied panel follows a beat later on the `exitSurface` curve (`sheetLeave`), and the dim layer takes the
+  // whole way (`dimLeave` = delay + duration of `sheetLeave`) – before, the dim was gone while the panel still stood at full opacity.
+  // Phone: the sheet drops out with its contents inside, accelerating (`sheetDrop`) – shorter than its 0.5 s entrance.
+  sheetLeave: { duration: 0.18, delay: 0.08, ease: [0.4, 0, 1, 1] as [number, number, number, number] },
+  dimLeave: { duration: 0.26, ease: [0.4, 0, 1, 1] as [number, number, number, number] },
+  sheetDrop: { duration: 0.3, ease: [0.4, 0, 1, 1] as [number, number, number, number] },
   body: { delay: 0.12, duration: 0.25, ease: ease.out }, // dialog body
   libDefault: { duration: 0.45, ease: [0.4, 0, 0.1, 1] as [number, number, number, number] },
   crossfade: { duration: 0.2, ease: "easeOut" }, // NEW: opacity crossfades (tone layers)
