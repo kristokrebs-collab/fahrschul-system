@@ -5,9 +5,10 @@
  */
 import { chipClass } from "@/primitives/chip";
 import { AnimatePresence, motion } from "motion/react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { isFilterActive, type LibraryFilter } from "@/domain/strategy";
 import { cn } from "@/lib/cn";
+import { Arrive } from "@/motion/Arrive";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
@@ -34,6 +35,10 @@ export interface LibraryBarProps {
 
 export function LibraryBar({ filter, onChange, facets, onCompare, comparable }: LibraryBarProps) {
   const active = isFilterActive(filter);
+  // the facet row normally stands from the start and arrives with the page; only a row that APPEARS later (a library without tags,
+  // markets or timeframes: the first filter brings „Filter zurücksetzen“) rises in
+  const hasRow = facets.tags.length > 0 || facets.markets.length > 0 || facets.tfs.length > 0 || active;
+  const [rowFromStart] = useState(hasRow);
   const toggle = (list: readonly string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   return (
     <div className="grid gap-2.5" data-testid="setup-library">
@@ -51,8 +56,8 @@ export function LibraryBar({ filter, onChange, facets, onCompare, comparable }: 
           {LIBRARY_STRINGS.compare}
         </Button>
       </div>
-      {(facets.tags.length > 0 || facets.markets.length > 0 || facets.tfs.length > 0 || active) && (
-        <div className="flex flex-wrap items-center gap-1.5">
+      {hasRow && (
+        <Arrive play={!rowFromStart} className="flex flex-wrap items-center gap-1.5">
           {facets.tags.map((t) => (
             <Chip key={`t-${t}`} on={filter.tags.includes(t)} onClick={() => onChange({ ...filter, tags: toggle(filter.tags, t) })}>
               # {t}
@@ -77,7 +82,7 @@ export function LibraryBar({ filter, onChange, facets, onCompare, comparable }: 
               </motion.span>
             )}
           </AnimatePresence>
-        </div>
+        </Arrive>
       )}
     </div>
   );

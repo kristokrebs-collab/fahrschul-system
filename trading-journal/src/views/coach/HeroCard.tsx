@@ -9,6 +9,7 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { TradingScore, WeeklyLesson } from "@/domain/coach";
 import { cn } from "@/lib/cn";
+import { Arrive } from "@/motion/Arrive";
 import { NumberCascade } from "@/motion/fx/NumberCascade";
 import { useFirstInView } from "@/motion/inView";
 import { PixelTextFill } from "@/motion/pulse/PixelTextFill";
@@ -60,6 +61,9 @@ export function Lesson({ lesson, className }: { lesson: WeeklyLesson; className?
   useEffect(() => {
     if (phase === "fill" && seen) markLesson(key);
   }, [phase, seen, key]);
+  // the lesson the card arrived with: it comes in with the card's own reveal, only a lesson that replaces it plays an entrance
+  const lessonKey = lesson.lines.join("|");
+  const [arrivedWith] = useState(lessonKey);
   const text = "text-[clamp(20px,5.6vw,30px)] font-semibold leading-[1.12] tracking-[-0.025em] text-fg";
   return (
     <div ref={ref} className={className} data-testid="coach-lesson" data-source={lesson.source}>
@@ -68,11 +72,12 @@ export function Lesson({ lesson, className }: { lesson: WeeklyLesson; className?
         {phase === "fill" && !reduced ? (
           <PixelTextFill as="p" lines={lesson.lines} playOnMount={false} play={seen} onDone={() => setPhase("marker")} className={text} />
         ) : (
-          <p className={text}>
+          // a lesson that REPLACES another (account switch, a new week) rises in; the first one arrives with its card
+          <Arrive as="p" key={lessonKey} play={lessonKey !== arrivedWith} className={text}>
             {lesson.lines.map((l, i) => (
               <LessonLine key={i} line={l} highlight={lesson.highlight} active={phase === "marker" ? true : undefined} />
             ))}
-          </p>
+          </Arrive>
         )}
       </div>
     </div>

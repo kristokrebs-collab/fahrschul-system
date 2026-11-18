@@ -142,7 +142,11 @@ export function JournalFilterBar({ filter, extra, sort, onExtraChange, onExtraRe
             })}
           </AnimatePresence>
           {naming ? (
-            <input
+            // the field takes the button's place: it grows in like a saved view's chip instead of standing there in one frame
+            <motion.input
+              initial={reduced ? false : { opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ scale: spring.pop, opacity: tween.fade }}
               autoFocus
               aria-label="Name der Ansicht"
               placeholder="Name, z. B. Breakouts London"

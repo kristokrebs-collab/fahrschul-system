@@ -174,7 +174,14 @@ function BackupsSection() {
                 {b.size ? <span className="ml-2 font-mono text-[11px] text-faint">{Math.max(1, Math.round(b.size / 1024))} KB</span> : null}
               </span>
               {ask === b.day ? (
-                <span className="inline-flex flex-wrap items-center gap-2 text-[12px] text-mute" role="alert">
+                // the question takes the button's place: it grows in like the same question in Einstellungen › Daten (`BackupRow`)
+                <motion.span
+                  className="inline-flex flex-wrap items-center gap-2 text-[12px] text-mute"
+                  role="alert"
+                  initial={reduced ? false : { opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ default: tween.fade, scale: spring.pop }}
+                >
                   {DATA_CARD.restoreAsk}
                   <Button size="sm" variant="primary" disabled={busy} onClick={() => void restore(b.day)}>
                     Ja
@@ -182,7 +189,7 @@ function BackupsSection() {
                   <Button size="sm" onClick={() => setAsk(null)}>
                     Nein
                   </Button>
-                </span>
+                </motion.span>
               ) : (
                 <HoldConfirm size="sm" variant="secondary" disabled={busy} onAsk={() => setAsk(b.day)} onConfirm={() => void restore(b.day)}>
                   {DATA_CARD.restore}

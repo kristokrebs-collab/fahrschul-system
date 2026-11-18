@@ -17,6 +17,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import type { MirrorLayers } from "@/chart/mirror";
 import { biasTestsOf, compareAnswers, DIRECTION_LABEL, DIRECTIONS, draftGaps, isOpen, isRevealed, OUTCOMES, summarize, type BiasContext, type BiasSurface, type BiasTest, type Direction, type OutcomeValue } from "@/domain/biasTest";
 import { cn } from "@/lib/cn";
+import { Arrive } from "@/motion/Arrive";
 import { Switch } from "@/motion/Switch";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -453,7 +454,7 @@ export function MirrorPanel({ surface, capture, layers = LAYER_ORDER, tradeId, c
       <LayerChips surface={surface} available={layers} locked={running} />
       {running && <p className="-mt-1 text-[11.5px] text-faint">{BIAS.layersLocked}</p>}
       {layers.includes("rsi") && effective.view.flipped && effective.view.layers.rsi && (
-        <div className="grid gap-1" data-testid="bias-rsi-option">
+        <Arrive className="grid gap-1" data-testid="bias-rsi-option">
           <label className="flex min-h-9 cursor-pointer items-center gap-3 text-[12.5px] pointer-coarse:min-h-11">
             <input
               type="checkbox"
@@ -466,7 +467,7 @@ export function MirrorPanel({ surface, capture, layers = LAYER_ORDER, tradeId, c
             {BIAS.rsiMirror}
           </label>
           <span className="text-[11.5px] text-faint">{BIAS.rsiMirrorNote}</span>
-        </div>
+        </Arrive>
       )}
       <TestPanel surface={surface} capture={capture} />
       <div className="grid gap-2">
