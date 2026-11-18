@@ -1,0 +1,136 @@
+[
+  {
+    "route": "#preise",
+    "element": "Einen Sitz mehr",
+    "prio": "–",
+    "note": "kein Defekt, durch Test belegt (nur Mock): `tests/e2e/kaufstrecke.spec.ts` klickt „Einen Sitz mehr“ und erwartet danach 4 Sitze und 76 € in der Bestellübersicht (mobil und Desktop, je zweimal grün). Warum der Crawl keine Änderung sah, ist nicht geklärt (die Zahl steckt in einem Ziffern-Zähler)."
+  },
+  {
+    "route": "#funktionen",
+    "element": "Demo ausprobieren",
+    "prio": "–",
+    "note": "kein Defekt, von Hand geprüft (Probe, Default-Build, 1440 px): Der Klick öffnet einen Dialog (vorher keiner, danach einer, mehr Text). Der Crawl erkannte den Dialog nicht."
+  },
+  {
+    "route": "#studio",
+    "element": "Neue Strategie",
+    "prio": "–",
+    "note": "kein Defekt, am Quelltext und Test geprüft: `newDraft()` setzt den Editor auf einen leeren Entwurf zurück (`src/views/studio/studioStore.ts`); bei bereits leerem Editor ändert sich nichts Sichtbares (von Hand: Seite unverändert). Wirkung nach einer gespeicherten Strategie prüft `tests/e2e/studio.spec.ts` (in diesem Paket nicht ausgeführt)."
+  },
+  {
+    "route": "#markt",
+    "element": "Zum Datenarchiv",
+    "prio": "P2",
+    "note": "offen, Ursache unklar: Der Crawl-Klick scheitert reproduzierbar (verdeckt/instabil, 390 und 1440 px). Die Knöpfe funktionieren in `tests/e2e/archive.spec.ts` (Markt-Mock, mobil und Desktop, je zweimal grün: Klick auf „Zum Datenarchiv“ und `squeeze-tune`). Von Hand im lokalen Build ohne Marktdaten erscheinen sie nicht (anderer Kartenzustand)."
+  },
+  {
+    "route": "#markt",
+    "element": "Börsenhistorie nachladen",
+    "prio": "P2",
+    "note": "offen, wie „Zum Datenarchiv“: im Crawl nicht klickbar; Abdeckung durch `tests/unit/views.markt.squeeze.history.test.tsx` (Klick auf `squeeze-empty-history-btn`), im Browser nicht von Hand bestätigt."
+  },
+  {
+    "route": "#markt",
+    "element": "Schwellen einstellen",
+    "prio": "P2",
+    "note": "offen, wie „Zum Datenarchiv“: im Crawl nicht klickbar; `tests/e2e/archive.spec.ts` klickt `squeeze-tune` und prüft, dass die Schwellen die Lesart ändern (grün)."
+  },
+  {
+    "route": "#preise",
+    "element": "Tarif im Detail",
+    "prio": "P0",
+    "repariert": true,
+    "note": "Im Modus „off“ (Build ohne Cloud, also die gehostete Vorschau) rendert BillingHost nichts (src/billing/ui/BillingHost.tsx: `if (!active) return null`), der Button rief openDetail() auf, ein Sheet dazu wird nie gemountet = toter Button auf der Preisseite (drei Karten). Behoben in src/views/preise/PlanGrid.tsx (Button nur außerhalb von „off“); Test tests/unit/billing.ui.test.tsx („without cloud …“); Vorher/Nachher von Hand: Build ohne Cloud zeigte 3 Buttons, der Stand mit Korrektur 0. Die gehostete Vorschau trägt noch den alten Stand."
+  },
+  {
+    "route": "#plan",
+    "element": "Übernehmen",
+    "prio": "P2",
+    "repariert": true,
+    "note": "addCustom() kehrt bei leerem Feld still zurück (src/views/plan/EntryStep.tsx): Knopf ohne Rückmeldung. Behoben: Knopf ist bei leerem Feld deaktiviert; Test tests/unit/views.plan.rules.test.tsx. Der Crawl lief vor der Änderung."
+  },
+  {
+    "route": "Shell",
+    "element": "Lokaler Modus",
+    "prio": "–",
+    "note": "Crawl-Artefakt: ein direkter Klick auf einer frisch geladenen Seite öffnet das Panel (von Hand bei 390 und 1440 px geprüft, Panel erscheint); der Fehlschlag im Crawl kam von einer noch laufenden Übergangsanimation nach dem vorherigen Klick."
+  },
+  {
+    "route": "#overview",
+    "element": "„1W“",
+    "prio": "–",
+    "note": "kein Defekt, von Hand geprüft: Der Klick auf 1m wählt 1W (der Zeitraum wird auf 7 Tage begrenzt), ein zweiter Klick auf die gewählte Pille ändert nichts; aus 1M heraus wechselt 1W (src/views/overview/ChartCard.tsx)."
+  },
+  {
+    "route": "#settings",
+    "element": "Journal-Start",
+    "prio": "–",
+    "note": "kein Defekt, von Hand geprüft: Das Datumsfeld nimmt „2026-01-05“ an und behält den Wert; die Pfeiltaste in einem leeren Datumsfeld ergibt (Browser-Verhalten) noch keinen vollständigen Wert."
+  },
+  {
+    "route": "#overview",
+    "element": "radio „Long“",
+    "prio": "–",
+    "note": "kein Defekt des Klicks, geprüft: Die Konsolenzeile (502) stammt aus dem Lauf gegen die gehostete Vorschau bei 1440 px und gehört zum Börsendaten-Feed (Netlify-Proxy /api/binance, Binance antwortet 451/502), nicht zur Long/Short-Auswahl. Im lokalen Build und im Cloud-Build tritt sie nicht auf."
+  },
+  {
+    "route": "#overview",
+    "element": "radio „Short“",
+    "prio": "–",
+    "note": "Artefakt einer Neuauslieferung der Vorschau, geprüft: Der Fehlerrahmen („Hier ist etwas schiefgelaufen … Neu laden“) kam nach `Failed to fetch dynamically imported module …/DeferredHosts-DyUaglEk.js`. Die Vorschau wurde während des Audits neu ausgeliefert (index.html verweist heute auf index-hep9kwqx.js, zu Beginn auf index-DUTCTlvp.js); der alte Chunk-Pfad antwortet jetzt mit HTML und Status 200 (SPA-Rückfall), also ein veralteter Tab. Die App zeigt dafür den Fehlerrahmen mit „Neu laden“ (behandelt, kein Datenverlust). Lokaler Build und Cloud-Build: kein Fehler."
+  },
+  {
+    "route": "Overlay menu",
+    "element": "„Alles“",
+    "prio": "–",
+    "note": "kein Defekt, am Quelltext geprüft: Filter-Chip des Suchfelds (`src/primitives/SearchField.tsx`, `aria-pressed={chipValue === c.id}`); „Alles“ ist die Voreinstellung, ein erneuter Klick setzt denselben Wert."
+  },
+  {
+    "route": "#risiko",
+    "element": "Preisschock",
+    "prio": "–",
+    "note": "kein Defekt, am Quelltext geprüft: Schieberegler mit `onInput` (`src/views/risiko/ScenarioCard.tsx`); der Klick in die Mitte ergibt den Ausgangswert 0, also keine sichtbare Änderung. Die Voreinstellungs-Chips daneben wurden mit angeklickt."
+  },
+  {
+    "route": "#aktien",
+    "element": "SEITE",
+    "prio": "P2",
+    "note": "Fehlerrahmen nur im lokalen Build ohne Netlify-Funktionen (vite preview kennt /api/v1/* nicht: 404 für congress/industry/stocks); in der gehosteten Vorschau liefern dieselben Pfade 200 und der Rahmen fehlt. Zielflächen bei 390 px: die Chip-Leiste „section-nav“ scrollt waagerecht (ul 698 px breit in 299 px), „DCF-Rechner“ liegt bei x=376 teils außerhalb des Fensters, daher Trefferfläche 0 (von Hand gemessen), der Datei-Eingang „megatest.json“ ist ein verstecktes 1×1-Feld. Kein Defekt, aber Chips außerhalb des Fensters sind ohne Wischen nicht sichtbar."
+  },
+  {
+    "route": "#funktionen",
+    "element": "SEITE",
+    "prio": "P1",
+    "note": "echt, nicht aus der Sandbox: Der Börsen-Proxy der Vorschau antwortet bei `GET /api/binance/fapi/v1/time` mit HTTP 451 und dem Binance-Text „Service unavailable from a restricted location“ (mit curl nachgemessen, die Antwort stammt von Binance, nicht aus dem Browser). Binance sperrt die Ausgangsadresse des Netlify-Proxys. `netlify.toml` nennt den Fall selbst („set the functions region to the EU if both are blocked“). Folge: Marktdaten aus Binance fehlen auf der gehosteten Vorschau, die Seiten fangen es mit Leerzuständen ab. Betreiber: Region bzw. EU-Weg klären (siehe STATUS.md Abschnitt 8)."
+  },
+  {
+    "route": "#konto",
+    "element": "„Impressum“",
+    "prio": "–",
+    "note": "Crawl-Artefakt, von Hand geprüft (Probe auf lokalem Build, 1440 und 390 px): Der Link liegt am Seitenende (y≈1200), nach dem Scrollen öffnet der Klick den Dialog „Impressum“ (zweimal geprüft). Der Crawl-Klick scheiterte, weil das Element außerhalb des Fensters lag und die Seite weiterlief."
+  },
+  {
+    "route": "#overview",
+    "element": "SEITE",
+    "prio": "P2",
+    "note": "Zielgrößen auf 390 px: „Ersten Trade eintragen“ misst 152×30 bis 171×38 px (Vorgabe der App 44 px, WCAG 2.2 AA verlangt 24 px). Die Startseite ist nicht Teil dieses Pakets. Die „Request mit Fehlerstatus“-Zeilen sind 404 von /api/v1/* im lokalen Build ohne Funktionen und Börsenfeeds der Sandbox."
+  },
+  {
+    "route": "Overlay rechtliches",
+    "element": "SEITE",
+    "prio": "P2",
+    "note": "Der Opener des Crawls (Seitenleisten-Knopf „Rechtliches“) ist bei 390 px nicht vorhanden und bei 1440 px nicht immer sichtbar; Impressum, Datenschutz, AGB sind über die Fußzeile erreichbar und öffnen (Journey 4, `tests/audit/journeys.spec.ts`, 390 und 1440 px). Die Seitenleiste gehört nicht zu diesem Paket."
+  },
+  {
+    "route": "Overlay suche",
+    "element": "„Schließen“",
+    "prio": "–",
+    "note": "kein Defekt, von Hand geprüft (Probe, lokaler Build, 390 und 1440 px): Suche öffnen, „Trade eintragen“ wählen, „Schließen“ klicken: der Dialog schließt, keine Rückfrage. Die Crawl-Zeile entstand im Wechsel zweier Dialoge."
+  },
+  {
+    "route": "Shell",
+    "element": "„Übersicht“ [header]",
+    "prio": "P2",
+    "note": "offen, nicht von Hand bestätigt: Knopf im Kopf der Startseite (leeres Journal); der Klick auf die bereits geöffnete Seite ändert nichts Sichtbares. Gewünscht wäre Scroll nach oben oder `aria-current`."
+  }
+]

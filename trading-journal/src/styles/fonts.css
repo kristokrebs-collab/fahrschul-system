@@ -1,0 +1,56 @@
+/*! IBM Plex Sans, IBM Plex Mono © 2017 IBM Corp. · Doto © 2024 The Doto Project Authors · SIL Open Font License 1.1 (fonts/OFL-*.txt) */
+
+/*
+ * Embedded fonts (decision 24): no Google Fonts request. Same faces, weights and display as the former
+ * fonts.googleapis.com link (Doto 700–900, IBM Plex Mono 400 / 500 / 600, IBM Plex Sans 400–700, swap), as woff2
+ * next to this file: the web builds serve them as hashed assets, the single-file builds inline them as data: URIs.
+ *
+ * Built from the google/fonts sources (ofl/ibmplexsans, ofl/ibmplexmono, ofl/doto) with fontTools: Plex Sans instanced
+ * at wdth 100 and limited to wght 400–700, Doto instanced at ROND 0 (whole wght axis), Plex Mono static; glyph set =
+ * exactly what Google's `latin` subset of each family mapped (Latin, Latin-1, general punctuation, €, ™, ↑ ↓ −) plus
+ * ✓ U+2713 for Plex (Doto has none) and the three characters the app showed from Google's other subsets: Δ U+0394 and
+ * с U+0441 (the verbatim lightweight-charts notice) in Plex Sans, ₿ U+20BF (header logo) in Plex Mono; layout features
+ * as Google's (ccmp dnom frac kern liga mark numr; Mono without kern / liga), hinting kept. Outlines and advances are
+ * identical to the previously served files at every used weight. `unicode-range` = the Google latin range plus those
+ * characters: everything else (→ ≥ ⚠ ✕ ▲ …) falls back to the system font exactly as before.
+ */
+@font-face {
+  font-family: "Doto";
+  font-style: normal;
+  font-weight: 700 900;
+  font-display: swap;
+  src: url("./fonts/Doto-wght.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/IBMPlexMono-400.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+20BF, U+2122, U+2191, U+2193, U+2212, U+2215, U+2713, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/IBMPlexMono-500.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+20BF, U+2122, U+2191, U+2193, U+2212, U+2215, U+2713, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/IBMPlexMono-600.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+20BF, U+2122, U+2191, U+2193, U+2212, U+2215, U+2713, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/IBMPlexSans-wght.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+0394, U+0441, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+2713, U+FEFF, U+FFFD;
+}

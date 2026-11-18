@@ -1,0 +1,48 @@
+{
+  "trades": [
+    {
+      "pair": "XRP/USDT",
+      "side": "long",
+      "qty": 1333,
+      "entry": 0.5319,
+      "exit": 0.5338,
+      "pnl": 1.68035314,
+      "leverage": null,
+      "openTime": "2026-10-23 08:18:08",
+      "closeTime": "2026-10-24 15:22:57"
+    },
+    {
+      "pair": "ETH/USDT",
+      "side": "short",
+      "qty": 1.056,
+      "entry": 3383.08,
+      "exit": 3394.74,
+      "pnl": -16.60738675,
+      "leverage": null,
+      "openTime": "2026-10-22 06:36:41",
+      "closeTime": "2026-10-23 06:21:53"
+    },
+    {
+      "pair": "BTC/USDT",
+      "side": "long",
+      "qty": 0.0146,
+      "entry": 80073.4,
+      "exit": 80362.5,
+      "pnl": 2.81544152,
+      "leverage": null,
+      "openTime": "2026-10-21 06:15:28",
+      "closeTime": "2026-10-22 04:11:13"
+    },
+    {
+      "pair": "SOL/USDT",
+      "side": "long",
+      "qty": 16.6,
+      "entry": 166.78,
+      "exit": 166.06,
+      "pnl": -15.2670864,
+      "leverage": null,
+      "openTime": "2026-10-19 21:40:23",
+      "closeTime": "2026-10-21 04:54:36"
+    }
+  ]
+}

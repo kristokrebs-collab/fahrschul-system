@@ -1,0 +1,222 @@
+/**
+ * Runs a lab job without blocking the page (P07):
+ * - web builds: a fresh inline module worker per run (`lab.worker.ts`, `?worker&inline` – no extra file); cancelling
+ *   terminates it at once;
+ * - single-file builds, `file:` pages, browsers without `Worker`, or a worker that fails to start / crashes: the same
+ *   job (`createLabJob`) in idle chunks (`requestIdleCallback`, else 8 ms timer slices), so no frame waits on it.
+ * Identical results either way (the job is deterministic). Progress is reported at most once per slice.
+ */
+import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
+import type { ExtraJobInput, ExtraResult } from "../lab/extras/job";
+import type { SearchJobInput, SearchPhase, SearchResult } from "../lab/search/types";
+import { createLabJob, type LabJobInput, type LabPhase, type LabResult } from "./job";
+import type { LabRequest, LabResponse } from "./labProtocol";
+
+export type LabRunMode = "auto" | "idle";
+
+/** Fortschritt der Strategiesuche: `done` von `total` Varianten der laufenden Phase. */
+export interface SearchProgress {
+  progress: number;
+  phase: SearchPhase;
+  done: number;
+  total: number;
+}
+
+export interface LabRunOptions {
+  signal?: AbortSignal;
+  mode?: LabRunMode;
+  onProgress?: (progress: number, phase: LabPhase) => void;
+  /** Strategiesuche: Fortschritt mit der echten Zahl der geprüften Varianten */
+  onSearchProgress?: (p: SearchProgress) => void;
+}
+
+const FALLBACK_SLICE_MS = 8;
+/** A worker that sends nothing for this long is given up (fallback to idle chunks). */
+export const LAB_WORKER_SILENCE_MS = 20_000;
+
+const abortError = (): Error => Object.assign(new Error("aborted"), { name: "AbortError" });
+export const isLabAbort = (e: unknown): boolean => e instanceof Error && e.name === "AbortError";
+
+let workerBroken = false;
+let seq = 0;
+
+export function labWorkerAllowed(): boolean {
+  return !workerBroken && typeof Worker !== "undefined" && !IS_FILE_BUILD && !isFileProtocol();
+}
+
+class WorkerFailed extends Error {}
+
+/** The request without its id (the runner numbers the runs). */
+type LabRequestBody = { kind: "run"; input: LabJobInput } | { kind: "extra"; input: ExtraJobInput } | { kind: "search"; input: SearchJobInput };
+
+async function viaWorker<R>(body: LabRequestBody, o: LabRunOptions): Promise<R> {
+  let W: new (opts?: { name?: string }) => Worker;
+  try {
+    W = (await import("./lab.worker?worker&inline")).default;
+  } catch {
+    workerBroken = true;
+    throw new WorkerFailed("no worker");
+  }
+  if (o.signal?.aborted) throw abortError();
+  return new Promise<R>((resolve, reject) => {
+    let w: Worker;
+    try {
+      w = new W({ name: "tj-labor" });
+    } catch {
+      workerBroken = true;
+      reject(new WorkerFailed("worker could not start"));
+      return;
+    }
+    const id = ++seq;
+    let silence: ReturnType<typeof setTimeout> | undefined;
+    let settled = false;
+    const done = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(silence);
+      o.signal?.removeEventListener("abort", onAbort);
+      try {
+        w.terminate();
+      } catch {
+        /* gone */
+      }
+      fn();
+    };
+    const arm = () => {
+      clearTimeout(silence);
+      silence = setTimeout(() => done(() => reject(new WorkerFailed("silent"))), LAB_WORKER_SILENCE_MS);
+    };
+    const onAbort = () => done(() => reject(abortError()));
+    o.signal?.addEventListener("abort", onAbort, { once: true });
+    w.onmessage = (e: MessageEvent<LabResponse>) => {
+      const m = e.data;
+      if (m.id !== id) return;
+      arm();
+      if (m.kind === "progress") o.onProgress?.(m.progress, m.phase);
+      else if (m.kind === "search-progress") o.onSearchProgress?.({ progress: m.progress, phase: m.phase, done: m.done, total: m.total });
+      else if (m.kind === "done" || m.kind === "extra-done" || m.kind === "search-done") done(() => resolve(m.result as R));
+      else done(() => reject(new Error(m.message)));
+    };
+    w.onerror = () => {
+      workerBroken = true;
+      done(() => reject(new WorkerFailed("worker error")));
+    };
+    arm();
+    const msg: LabRequest = { ...body, id };
+    w.postMessage(msg);
+  });
+}
+
+type Deadline = { timeRemaining(): number };
+type IdleHost = { requestIdleCallback?: (cb: (d: Deadline) => void, o?: { timeout: number }) => number };
+
+function nextSlice(cb: (deadlineMs: number) => void): void {
+  const host = globalThis as IdleHost;
+  if (typeof host.requestIdleCallback === "function") {
+    host.requestIdleCallback((d) => cb(performance.now() + Math.max(4, d.timeRemaining() - 1)), { timeout: 200 });
+    return;
+  }
+  setTimeout(() => cb(performance.now() + FALLBACK_SLICE_MS), 0);
+}
+
+/** A stepped job (the lab job or the extra job). */
+interface SteppedJob<R> {
+  step(deadline: number): boolean;
+  progress(): number;
+  phase(): LabPhase;
+  result(): R;
+}
+
+function runIdleJob<R>(job: SteppedJob<R>, o: LabRunOptions): Promise<R> {
+  return new Promise((resolve, reject) => {
+    const slice = (deadline: number) => {
+      if (o.signal?.aborted) return reject(abortError());
+      let finished: boolean;
+      try {
+        finished = job.step(deadline);
+      } catch (e) {
+        return reject(e instanceof Error ? e : new Error(String(e)));
+      }
+      if (finished) return resolve(job.result());
+      o.onProgress?.(job.progress(), job.phase());
+      nextSlice(slice);
+    };
+    nextSlice(slice);
+  });
+}
+
+/** The job in idle chunks on the main thread. */
+export function runLabIdle(input: LabJobInput, o: LabRunOptions = {}): Promise<LabResult> {
+  return runIdleJob(createLabJob(input), o);
+}
+
+/** Worker when allowed, else (or when the worker fails) idle chunks – the same for every kind of job. */
+async function execute<R>(body: LabRequestBody, idle: () => Promise<R>, o: LabRunOptions): Promise<R> {
+  if (o.signal?.aborted) throw abortError();
+  if (o.mode !== "idle" && labWorkerAllowed()) {
+    try {
+      return await viaWorker<R>(body, o);
+    } catch (e) {
+      if (isLabAbort(e)) throw e;
+      if (!(e instanceof WorkerFailed)) throw e;
+      // worker unavailable → idle chunks below
+    }
+  }
+  return idle();
+}
+
+/** Runs the lab job: worker when allowed, else (or when the worker fails) idle chunks. */
+export function runLab(input: LabJobInput, o: LabRunOptions = {}): Promise<LabResult> {
+  return execute<LabResult>({ kind: "run", input }, () => runLabIdle(input, o), o);
+}
+
+/**
+ * Runs the extra job (stress scenarios / filter comparison, F20 / F17) the same way. The job module is loaded on demand,
+ * so a page that never opens those cards never pays for it.
+ */
+export function runExtra(input: ExtraJobInput, o: LabRunOptions = {}): Promise<ExtraResult> {
+  return execute<ExtraResult>(
+    { kind: "extra", input },
+    async () => {
+      const { createExtraJob } = await import("../lab/extras/job");
+      return runIdleJob(createExtraJob(input), o);
+    },
+    o,
+  );
+}
+
+/**
+ * Runs the strategy search („1.000 Varianten. Eine bleibt.“) the same way: the lab worker with real progress messages
+ * (`onSearchProgress`: „412 von 1.000 geprüft“), else idle chunks; cancelling terminates the worker / stops the chunks.
+ * The search module is loaded on demand (the idle path) – a page that never opens the search never pays for it.
+ */
+export function runSearch(input: SearchJobInput, o: LabRunOptions = {}): Promise<SearchResult> {
+  return execute<SearchResult>(
+    { kind: "search", input },
+    async () => {
+      const { createSearchJob } = await import("../lab/search/job");
+      const job = createSearchJob(input);
+      return runIdleJob(
+        {
+          step: (d) => job.step(d),
+          progress: () => job.progress(),
+          phase: () => "overfit" as LabPhase,
+          result: () => job.result(),
+        },
+        {
+          ...o,
+          onProgress: () => {
+            const c = job.checked();
+            o.onSearchProgress?.({ progress: job.progress(), phase: c.phase, done: c.done, total: c.total });
+          },
+        },
+      );
+    },
+    o,
+  );
+}
+
+/** Test hook: forget a recorded worker failure. */
+export function __resetLabRunner(): void {
+  workerBroken = false;
+}
