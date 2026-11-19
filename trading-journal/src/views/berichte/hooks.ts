@@ -11,11 +11,16 @@ import { tradeTime } from "@/lib/dates";
 import { useCoachBase, useMinuteClock } from "@/views/coach/hooks";
 import { useBerichteUi } from "./berichteStore";
 
-/** The period to show: the chosen key, else the newest finished one with trades, else the last finished one. */
-export function resolvePeriod(kind: ReportKind, key: string | null, archive: readonly ArchiveEntry[], now: number): ReportPeriod {
+/**
+ * The period to show: the chosen key, else the newest finished one with trades. With no finished period that has trades, the RUNNING
+ * one when it has trades (`runningHasTrades`), else the last finished one. Funktionsprüfung Runde 18: a journal whose trades all lie in
+ * the running year opened „Jahr“ on the year before – „Keine abgeschlossenen Trades in diesem Zeitraum“, the way back disabled –
+ * while every trade was one click on „Nächster Zeitraum“ away. The same held for the first week of a new journal.
+ */
+export function resolvePeriod(kind: ReportKind, key: string | null, archive: readonly ArchiveEntry[], now: number, runningHasTrades = false): ReportPeriod {
   const chosen = key ? periodFromKey(key) : null;
   if (chosen && chosen.kind === kind) return chosen;
-  return archive[0]?.period ?? lastComplete(kind, now);
+  return archive[0]?.period ?? (runningHasTrades ? periodOf(kind, now) : lastComplete(kind, now));
 }
 
 const BUCKET: Readonly<Record<ReportKind, ReportKind | "trade">> = { day: "trade", week: "day", month: "day", quarter: "week", year: "month" };
@@ -47,7 +52,12 @@ export function useReportPage() {
   const key = useBerichteUi((s) => s.key);
   const { view, settings, days, events } = base;
   const archive = useMemo(() => reportArchive(view.list, settings, kind, now), [view.list, settings, kind, now]);
-  const period = useMemo(() => resolvePeriod(kind, key, archive, now), [kind, key, archive, now]);
+  const runningHasTrades = useMemo(() => {
+    if (archive.length) return false; // not needed: a finished period with trades wins
+    const running = periodOf(kind, now);
+    return view.list.some((t) => t.result !== "open" && +tradeTime(t) >= running.from && +tradeTime(t) < running.to);
+  }, [archive, kind, now, view.list]);
+  const period = useMemo(() => resolvePeriod(kind, key, archive, now, runningHasTrades), [kind, key, archive, now, runningHasTrades]);
   const report = useMemo(() => buildReport({ list: view.list, settings, days, events, start: view.start, currency: settings.currency, period, now }), [view.list, settings, days, events, view.start, period, now]);
   const bars = useMemo(() => periodBars(report), [report]);
   return { ...base, now, kind, period, report, archive, bars };

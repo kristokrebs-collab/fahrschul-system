@@ -143,6 +143,25 @@ describe("short trade form – an error opens the group and jumps to the field",
     for (const g of GROUPS) expect(groupButton(g.title)).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("an open position in the short form: the message names „Noch offen“ and the group that holds the status opens with it (Runde 18)", async () => {
+    mount();
+    type("Einstieg", "80000");
+    type("Größe (USDT)", "8000");
+    // a control in a closed (inert) group has no accessible name yet: found by its text
+    const status = screen.getAllByRole("radio", { hidden: true }).find((r) => r.textContent === "Noch offen")!;
+    expect(hidden(status)).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("oder den Status auf „Noch offen“ stellen");
+    await waitFor(() => expect(hidden(status)).toBe(false));
+    expect(groupButton("Details")).toHaveAttribute("aria-expanded", "true");
+    expect(saveTrade).not.toHaveBeenCalled();
+    // the way the message names works: one tap, save
+    fireEvent.click(status);
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(saveTrade).toHaveBeenCalledTimes(1));
+    expect(saveTrade.mock.calls[0]?.[0]).toMatchObject({ status: "open", entry: 80000, exit: null });
+  });
+
   it("an error of the execution block (incomplete fill) opens `Ausführung`", async () => {
     mount();
     type("Einstieg", "80000");

@@ -180,7 +180,7 @@ export function GoalSheet() {
         </StaggerItem>
         <StaggerItem as="section" className="grid gap-3.5" aria-label={G.custom}>
           <span className="label !text-[10px]">{picked ? "Anpassen" : G.custom}</span>
-          <Field label={G.titleLabel} htmlFor="goal-title" invalidKey={invalid && !f.title.trim() ? invalid : null}>
+          <Field label={G.titleLabel} htmlFor="goal-title" invalidKey={invalid && !f.title.trim() ? invalid : null} error={invalid && !f.title.trim() ? G.errTitle : undefined}>
             <Input id="goal-title" value={f.title} onChange={(e) => upd({ title: e.target.value })} maxLength={120} data-testid="goal-title" />
           </Field>
           <div className="grid gap-3.5 sm:grid-cols-2">
@@ -198,7 +198,7 @@ export function GoalSheet() {
               </Field>
             )}
             {f.metric !== "custom" && (
-              <Field label={G.target} htmlFor="goal-target" suffix={PCT(f.metric) || f.metric === "riskPerTradePct" || f.metric === "lossDayPct" ? "%" : undefined} invalidKey={invalid && !(num(f.target) >= 0) ? invalid : null} help={f.metric === "tradesPerDay" ? "Obergrenze – eine Mindestzahl an Trades gibt es hier nicht." : undefined}>
+              <Field label={G.target} htmlFor="goal-target" suffix={PCT(f.metric) || f.metric === "riskPerTradePct" || f.metric === "lossDayPct" ? "%" : undefined} invalidKey={invalid && !(num(f.target) >= 0) ? invalid : null} error={invalid && !(num(f.target) >= 0) ? G.errTarget : undefined} help={f.metric === "tradesPerDay" ? "Obergrenze – eine Mindestzahl an Trades gibt es hier nicht." : undefined}>
                 <Input id="goal-target" inputMode="decimal" value={f.target} onChange={(e) => upd({ target: e.target.value })} data-testid="goal-target" />
               </Field>
             )}
@@ -207,7 +207,7 @@ export function GoalSheet() {
             <Field label={G.period}>
               <Segmented<GoalPeriod> aria-label={G.period} options={PERIODS} value={f.period} onChange={(period) => upd({ period, hold: String(HOLD_DEFAULT[period]) })} />
             </Field>
-            <Field label={G.hold} htmlFor="goal-hold" invalidKey={invalid && !(num(f.hold) >= 1) ? invalid : null}>
+            <Field label={G.hold} htmlFor="goal-hold" invalidKey={invalid && !(num(f.hold) >= 1) ? invalid : null} error={invalid && !(num(f.hold) >= 1) ? G.errHold : undefined}>
               <Input id="goal-hold" inputMode="numeric" value={f.hold} onChange={(e) => upd({ hold: e.target.value })} data-testid="goal-hold" />
             </Field>
           </div>

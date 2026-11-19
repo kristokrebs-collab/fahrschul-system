@@ -132,7 +132,9 @@ export const EDITOR_MESSAGES = {
   /** a year nobody traded in ("26" typed as the year reads as the year 26) or far ahead – the field shows 10.11.26 either way */
   dateRange: "Bitte das Datum prüfen: Das Jahr liegt außerhalb des plausiblen Bereichs (vierstellig eingeben, z. B. 2026).",
   entry: "Bitte einen Einstiegspreis angeben.",
-  exit: "Bitte Ausstieg angeben oder P&L manuell eintragen.",
+  // names the third way out (Funktionsprüfung Runde 18): in the short form the status sits in the closed group „Details“, and a new
+  // user who wanted to note an OPEN position was told to enter an exit or a P&L – neither exists yet. The group opens with the message.
+  exit: "Bitte Ausstieg angeben oder P&L manuell eintragen – oder den Status auf „Noch offen“ stellen.",
   size: "Bitte Positionsgröße angeben oder P&L manuell eintragen.",
   chart: "Der Chart-Link muss mit https:// beginnen.",
   huge: "Eine der Zahlen ist unplausibel groß. Bitte prüfe Preise, Größe und Gebühren.",
@@ -876,6 +878,12 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         // the field may sit in a closed group: open it, then focus the control (no page jump – only the sheet body scrolls)
         const target = field ? { field: field as FieldId, dom: `f-${field}` } : journalProblemTarget(problem);
         if (target) jumpTo(target.field, target.dom);
+        // „… oder den Status auf Noch offen stellen“: the control the message names is on screen with it (its group opens; the focus stays
+        // on the exit field)
+        if (problem === EDITOR_MESSAGES.exit) {
+          const g = groupOf(layout, "status");
+          if (g) setOpenGroups((o) => (o.includes(g) ? o : [...o, g]));
+        }
       };
       const problem = validateRecord(rec, d.chart, t.j);
       if (problem) {
@@ -989,7 +997,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         if (busyShown) setSaving(false);
       }
     },
-    [rec, d, t, checking, trade, draft, baseline, closeEditor, reduced, jumpTo],
+    [rec, d, t, checking, trade, draft, baseline, closeEditor, reduced, jumpTo, layout],
   );
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {

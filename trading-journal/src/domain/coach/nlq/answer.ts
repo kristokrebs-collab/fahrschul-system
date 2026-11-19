@@ -22,6 +22,7 @@ import { behaviorReport, behaviorTrend, triggerOf } from "../behaviors";
 import { accountOf, fin, median } from "../shared";
 import { auditAnswer } from "./audit";
 import { METRIC_LABEL, type MetricKey } from "./lexicon";
+import type { GroupDim } from "./lexicon";
 import { DIM_LABEL, assetBase, type Filter, type Intent, type Period } from "./parse";
 
 export type Tone = "win" | "loss" | "fg" | "mute";
@@ -225,6 +226,7 @@ const scopeText = (intent: Intent, filters: readonly Filter[] = intent.filters):
 };
 
 /** "in allen Trades" / "in Long · Montag" (the scope inside a sentence). */
+const capitalise = (t: string): string => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
 const inScope = (intent: Intent): string => (intent.filters.length || intent.period ? `in ${scopeText(intent)}` : "in allen Trades");
 
 const newestIds = (ts: readonly EnrichedTrade[], k = 6): string[] => [...ts].sort((a, b) => +tradeTime(b) - +tradeTime(a)).slice(0, k).map((t) => t.id);
@@ -251,7 +253,8 @@ function empty(intent: Intent): Answer {
     intent,
     kind: "empty",
     title: scopeText(intent),
-    text: intent.filters.length || intent.period ? `Für ${scopeText(intent)} gibt es keine abgeschlossenen Trades.` : "Es gibt noch keine abgeschlossenen Trades.",
+    // the scope is a label („Letzte Woche“, „Long · Letzter Monat“): set as a heading, it needs no case („Für Letzte Woche …“)
+    text: intent.filters.length || intent.period ? `${capitalise(scopeText(intent))}: keine abgeschlossenen Trades.` : "Es gibt noch keine abgeschlossenen Trades.",
     facts: [],
     trades: [],
     chart: null,
@@ -314,6 +317,36 @@ function rowMetric(metric: MetricKey, row: BreakdownRow): number | null {
   }
 }
 
+/** „1 Trade“ / „5 Trades“. */
+const tradeCount = (n: number): string => `${n} ${n === 1 ? "Trade" : "Trades"}`;
+
+/** Grammatical gender of the dimension nouns (`DIM_LABEL`), for „Bester Wochentag“ / „Schwächste Session“ / „Bestes Setup“. */
+const DIM_GENDER: Readonly<Record<GroupDim, "m" | "f" | "n">> = {
+  setup: "n",
+  session: "f",
+  weekday: "m",
+  hour: "f",
+  asset: "n",
+  month: "m",
+  leverage: "m",
+  timeframe: "m",
+  emotion: "n",
+  side: "f",
+  account: "n",
+  conviction: "f",
+  regime: "f",
+  strength: "f",
+  tag: "m",
+  exchange: "f",
+  hold: "f",
+};
+
+/** The follow-up question that asks for the other end of the ranking – a phrase the parser reads back (`SORT_BEST` / `SORT_WORST`). */
+export function superlative(sort: "best" | "worst", dim: GroupDim): string {
+  const end = { m: "er", f: "e", n: "es" }[DIM_GENDER[dim]];
+  return `${sort === "best" ? "Best" : "Schwächst"}${end} ${DIM_LABEL[dim]}`;
+}
+
 const VERDICT_SCORE: Record<string, number> = { klar: 85, tendenz: 60, offen: 35, wenig: 15 };
 
 function groupAnswer(intent: Intent, data: AnswerData): Answer {
@@ -325,14 +358,26 @@ function groupAnswer(intent: Intent, data: AnswerData): Answer {
   const rows = bd.rows.filter((r) => !r.none).map((r) => ({ r, v: rowMetric(metric, r) })).filter((x): x is { r: BreakdownRow; v: number } => x.v != null && Number.isFinite(x.v));
   if (!rows.length) return { ...empty(intent), text: `Keine Trades mit ${DIM_LABEL[dim]}-Angabe ${inScope(intent)}.` };
   const ranked = rows.filter((x) => x.r.g.n >= ROW_MIN);
-  const pool = ranked.length ? ranked : rows;
+  // A ranking needs at least TWO groups (Funktionsprüfung Runde 18): with a single group of ≥ 3 trades the pool was that one group,
+  // and „An welchem Wochentag verliere ich am meisten?“ answered „Am schwächsten: So mit +864 USDT“ – the best day of the journal
+  // (Mo, Di, Do and Fr had fewer than three trades each). Then every group counts, and the small sample is said out loud.
+  const pool = ranked.length >= 2 ? ranked : rows;
   const worst = intent.sort === "worst";
   const top = [...pool].sort((a, b) => (worst ? a.v - b.v : b.v - a.v) || b.r.g.n - a.r.g.n)[0]!;
   const fmt = (v: number): string => (metric === "winRate" ? pct0(v) : metric === "avgR" || metric === "sumR" ? fmtR(v) : metric === "count" ? `${v}` : metric === "pf" ? fmtPf(v) : money(v, data.currency));
   const label = METRIC_LABEL[metric];
-  const head = `${worst ? "Am schwächsten" : "Am stärksten"} nach ${label}: ${top.r.label} mit ${fmt(top.v)} (${top.r.g.n} Trades).`;
+  // one group only: there is nothing to rank – say so instead of calling the only group „am schwächsten“ / „am stärksten“
+  const only = rows.length === 1;
+  const head = only
+    ? `Alle Trades ${inScope(intent)} liegen in einer Gruppe: ${top.r.label} mit ${fmt(top.v)} (${tradeCount(top.r.g.n)}). Für einen Vergleich pro ${DIM_LABEL[dim]} fehlt eine zweite.`
+    : `${worst ? "Am schwächsten" : "Am stärksten"} nach ${label}: ${top.r.label} mit ${fmt(top.v)} (${tradeCount(top.r.g.n)}).`;
   const sig = top.r.test.verdict;
-  const tail = sig === "klar" ? " Der Unterschied zum Rest hält dem Zufall stand." : sig === "tendenz" ? " Eine Tendenz – noch nicht sicher." : top.r.g.n < 5 ? " Achtung: sehr kleine Stichprobe." : " Statistisch noch offen.";
+  // asked for the weakest, and even the weakest is not in the red (money / R only): the honest half of the answer
+  const signed = metric === "net" || metric === "expectancy" || metric === "avgR" || metric === "sumR";
+  const noLoss = worst && !only && signed && top.v >= 0 ? " Keine Gruppe liegt im Minus." : "";
+  const tail =
+    noLoss +
+    (only ? "" : sig === "klar" ? " Der Unterschied zum Rest hält dem Zufall stand." : sig === "tendenz" ? " Eine Tendenz – noch nicht sicher." : top.r.g.n < 5 ? " Achtung: sehr kleine Stichprobe." : " Statistisch noch offen.");
   const unit: "R" | "money" | "pct" | "count" | "ratio" = metric === "winRate" ? "pct" : metric === "avgR" || metric === "sumR" ? "R" : metric === "count" ? "count" : metric === "pf" ? "ratio" : "money";
   const chartRows: ChartRow[] = [...rows]
     .sort((a, b) => (DIMENSIONS[dim].order ? 0 : b.v - a.v))
@@ -355,7 +400,7 @@ function groupAnswer(intent: Intent, data: AnswerData): Answer {
     trades: biggestIds(top.r.trades),
     chart: { type: "bars", unit, rows: chartRows },
     confidence: { score, label: confLabel, n: top.r.g.n, note: `Test gegen den Rest, FDR-korrigiert über ${bd.rows.length} Gruppen.` },
-    followUps: [worst ? `Bestes ${DIM_LABEL[dim]}` : `Schwächstes ${DIM_LABEL[dim]}`, `Win-Rate pro ${DIM_LABEL[dim]}`, `Ø R pro ${DIM_LABEL[dim]}`],
+    followUps: [superlative(worst ? "best" : "worst", dim), `Win-Rate pro ${DIM_LABEL[dim]}`, `Ø R pro ${DIM_LABEL[dim]}`],
   };
 }
 

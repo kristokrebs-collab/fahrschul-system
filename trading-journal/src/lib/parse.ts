@@ -2,19 +2,31 @@
  * Tolerant number parsing / input formatting – 1:1 port of bundle `rt`, `nt`, `XM` (21212–21236).
  */
 
+/** "81,230.5" / "1,234,567": commas in strict groups of three (see `parseNumber`). */
+const EN_GROUPED_DECIMAL = /^-?\d{1,3}(,\d{3})+\.\d*$/;
+const EN_GROUPED_INT = /^-?\d{1,3}(,\d{3}){2,}$/;
+
 /**
  * `rt`: "Komma oder Punkt, beides geht".
  * numbers pass through when finite; strings are trimmed and stripped of whitespace;
  * when the string contains "," every "." is removed and "," becomes "." ("85.900,5" → 85900.5);
  * otherwise `Number()` ("85.900" → 85.9, NOT 85900). Non-finite → null.
+ *
+ * Funktionsprüfung Runde 18 – the spellings that have only ONE reading are read that way (before, „81,230.5“ pasted from an English
+ * exchange page was saved as 81,2305 without a word, and „1,234,567.89“ was refused as „kein Einstiegspreis“):
+ * - commas that group by three before a decimal dot ("81,230.5", "1,234,567.89") → the commas group, the dot is the decimal point;
+ * - several commas that group by three and no dot ("1,234,567") → thousands;
+ * - apostrophes between digits ("81'230.5", Swiss) group like spaces.
+ * A single comma stays the decimal comma ("1,000" → 1, "81,23" → 81.23) and a single dot the decimal point, as before.
  */
 export function parseNumber(e: unknown): number | null {
   if (typeof e === "number") return isFinite(e) ? e : null;
   let t = String(e ?? "")
     .trim()
-    .replace(/\s/g, "");
+    .replace(/[\s'\u2019]/g, "");
   if (!t) return null;
-  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+  if (EN_GROUPED_DECIMAL.test(t) || EN_GROUPED_INT.test(t)) t = t.replace(/,/g, "");
+  else if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
   const r = Number(t);
   return isFinite(r) ? r : null;
 }

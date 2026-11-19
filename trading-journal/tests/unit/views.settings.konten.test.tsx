@@ -75,6 +75,23 @@ describe("SettingsView · Konten", () => {
     expect(useUi.getState().toasts.map((t) => t.title)).toContain("Einstellungen gespeichert");
   }, 15_000); // full page render + portal select: slow on a loaded CI box
 
+  it("„30.000“ as Startkapital: the field ASKS before a capital of 30 is saved – one tap takes thirty thousand (Runde 18)", async () => {
+    render(<SettingsView />);
+    const makro = screen.getByLabelText("Startkapital Makro") as HTMLInputElement;
+    expect(screen.queryByTestId("dot-hint-makro")).toBeNull();
+    fireEvent.change(makro, { target: { value: "30.000" } });
+    const hint = screen.getByTestId("dot-hint-makro");
+    expect(hint).toHaveTextContent("Gelesen als 30 – der Punkt gilt als Komma.");
+    fireEvent.click(screen.getByRole("button", { name: "30000 gemeint" }));
+    expect(makro.value).toBe("30000");
+    expect(screen.queryByTestId("dot-hint-makro")).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "Speichern" })[0] as HTMLElement);
+    await waitFor(() => expect(useJournal.getState().settings.capital.makro).toBe(30000));
+    // a spelling with one reading needs no question
+    fireEvent.change(makro, { target: { value: "30.000,5" } });
+    expect(screen.queryByTestId("dot-hint-makro")).toBeNull();
+  }, 15_000);
+
   it("unsaved edits survive leaving the page: the draft is back with its „Ungespeicherte Änderungen“ bar, a toast says where it waits", async () => {
     const first = render(<SettingsView />);
     fireEvent.change(screen.getByLabelText("Startkapital Makro"), { target: { value: "31000" } });

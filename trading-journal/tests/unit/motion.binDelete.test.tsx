@@ -77,7 +77,7 @@ describe("<BinDelete>", () => {
     expect(steps).toHaveLength(0);
   });
 
-  it("„Ja, löschen“: the bin eats the word first, the REAL deletion runs with the spinner, the ring closes, then `done`", async () => {
+  it("„Ja, löschen“: the REAL deletion starts with the confirmation (a reload mid-animation must not keep the item, Runde 18); the bin eats the word, the spinner waits for the answer, the ring closes, then `done`", async () => {
     let answer: () => void = () => {};
     const remove = vi.fn(() => new Promise<void>((r) => (answer = r)));
     const onDone = vi.fn();
@@ -87,9 +87,10 @@ describe("<BinDelete>", () => {
     const b = await screen.findByRole("button", { name: "Löschen" });
     await waitFor(() => expect(b).toHaveAttribute("data-bin", "eat"));
     expect(b).toHaveAttribute("aria-busy", "true");
-    // the letters fly one after another (85 ms apart) – and nothing is deleted while the bin eats
+    // the deletion is already on its way while the letters fly one after another (85 ms apart) – once, never again at the spinner
+    await waitFor(() => expect(remove).toHaveBeenCalledTimes(1));
     await pause(binFullAt(7) - 200);
-    expect(remove).not.toHaveBeenCalled();
+    expect(b).toHaveAttribute("data-bin", "eat");
     const flights = steps.filter((s) => s.keys.length === 5 && s.o.duration === binEat.flight);
     expect(flights.length).toBeGreaterThanOrEqual(5);
     // the pill turns into a disc (a clip of the face – the button keeps its box), then the spinner = the deletion

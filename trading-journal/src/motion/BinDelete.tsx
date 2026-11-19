@@ -18,7 +18,7 @@ export interface BinDeleteControl {
   start: () => void;
   /** Runs since the hook was created (a new start bumps it; the pill plays when it sees a new one). */
   run: number;
-  /** The real deletion, at most once per run; the pill calls it when its spinner starts (or at once, should it be gone). */
+  /** The real deletion of this run (started by `start`, at most once per run); the pill awaits it at its spinner. */
   perform: () => Promise<unknown>;
   /** After the ring closed (the caller closes the dialog, says „gelöscht“ …). */
   finish: () => void;
@@ -31,8 +31,8 @@ export interface BinDeleteControl {
 }
 
 /**
- * The run of a delete pill (Runde 13, reference „The Bin Eats The Label“): owns the REAL deletion, so it happens even when the pill is gone
- * before its spinner (the dialog was closed meanwhile). `remove` is the caller's deletion (its promise is what the spinner shows – never a
+ * The run of a delete pill (Runde 13, reference „The Bin Eats The Label“): owns the REAL deletion, which starts with the run (`start`) – it
+ * happens even when the pill is gone before its spinner (the dialog was closed meanwhile) or the page is reloaded mid-animation. `remove` is the caller's deletion (its promise is what the spinner shows – never a
  * fake success); `done` runs after the ring closed, `failed` when `remove` threw (the pill is back by then; `error` holds it until the next
  * start, the caller shows the message). One run at a time; `finish` / `fail` count once per run.
  */
@@ -51,6 +51,11 @@ export function useBinDelete(remove: () => Promise<unknown>, { done, failed }: {
     setError(null);
     setBusy(true);
     setRun((r) => r + 1);
+    // The REAL deletion starts with the confirmed run, not with the spinner (Funktionsprüfung Runde 18): the word is eaten for ≈ 1.5 s
+    // first, and until then nothing had been written – a reload or a closed tab right after „Ja, löschen“ kept the trade. The pill's
+    // spinner still shows this very promise (`perform` hands it out), so it never closes its ring on a deletion that failed.
+    st.current.running = Promise.resolve().then(() => fns.current.remove());
+    st.current.running.catch(() => {}); // the pill reports the failure when it reaches its spinner
   }, []);
   const perform = useCallback(() => {
     // only inside a confirmed run (a pill that leaves after its run ended must not delete again)
@@ -74,8 +79,8 @@ export function useBinDelete(remove: () => Promise<unknown>, { done, failed }: {
 }
 
 /**
- * Keeps showing the item a delete pill is removing while its run goes on: the store drops it at the spinner, the pill still has its ring to
- * close. `value` is what the store has now; `keep` = a run is going on for THIS item.
+ * Keeps showing the item a delete pill is removing while its run goes on: the store drops it right after the confirmation, the pill still
+ * has its word to eat and its ring to close. `value` is what the store has now; `keep` = a run is going on for THIS item.
  */
 export function useKept<T>(value: T | undefined, keep: boolean): T | undefined {
   const [kept, setKept] = useState(value);

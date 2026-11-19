@@ -8,7 +8,8 @@ import { accountView } from "@/domain/account";
 import { aggregate } from "@/domain/agg";
 import { detectBehaviors } from "@/domain/coach/events";
 import { answerIntent, askJournal, normalize, parseContextOf, parseQuestion, selectTrades, suggestQuestions, type AnswerData, type Intent } from "@/domain/coach/nlq";
-import { at, COACH_SETTINGS, coachJournal, enrichC } from "./coach.fixtures";
+import { superlative } from "@/domain/coach/nlq/answer";
+import { at, COACH_SETTINGS, coachJournal, ct, enrichC } from "./coach.fixtures";
 
 // Wednesday 2026-06-10 12:00 local
 const NOW = new Date(2026, 5, 10, 12).getTime();
@@ -228,5 +229,68 @@ describe("Makro vs. Scalp, Hebel 4x vs. 1x (Review F09)", () => {
     expect(a.kind).toBe("compare");
     expect(a.text).toMatch(/Makro|Scalp/);
     expect(a.text).not.toMatch(/keine abgeschlossenen Trades/);
+  });
+});
+
+/**
+ * Funktionsprüfung Runde 18 (desktop feature pass): the suggested question „An welchem Wochentag verliere ich am meisten?“ answered
+ * „Am schwächsten nach Netto-P&L: So mit +864 USDT (5 Trades)“ – the BEST day of that journal. Only Sunday had three trades or more,
+ * so the ranking pool was that one group, and its only member was both the strongest and the weakest.
+ */
+describe("Gruppen-Antworten: eine Rangfolge braucht mindestens zwei Gruppen (Runde 18)", () => {
+  // 2026-03-02 is a Monday (`at`): day 6 = So, 0 = Mo, 1 = Di, 3 = Do, 4 = Fr
+  const journal = [
+    ...[6, 13, 20, 27, 34].map((d, i) => ct(at(d), { id: `so${i}`, p: i === 0 ? 64 : 200 })), // So: 5 Trades, +864
+    ct(at(0), { id: "mo0", p: 150 }),
+    ct(at(7), { id: "mo1", p: 146 }), // Mo: 2 Trades, +296
+    ct(at(1), { id: "di0", p: 50 }), // Di: 1 Trade, +50
+    ct(at(3), { id: "do0", p: 12 }),
+    ct(at(10), { id: "do1", p: 10 }), // Do: 2 Trades, +22
+    ct(at(4), { id: "fr0", p: 0 }), // Fr: 1 Trade, 0
+  ];
+  const enriched = enrichC(journal);
+  const view = accountView(enriched, COACH_SETTINGS, "all", { now: () => NOW });
+  const data: AnswerData = { closed: view.closed, settings: COACH_SETTINGS, events: detectBehaviors({ trades: enriched, settings: COACH_SETTINGS }), now: NOW, currency: "USDT", start: view.start };
+
+  it("the weakest weekday is not the best one; that no day is in the red is said, and so is the small sample", () => {
+    const a = askJournal("An welchem Wochentag verliere ich am meisten?", data);
+    expect(a.kind).toBe("group");
+    const weakest = a.facts.find((f) => f.label === "Schwächste Gruppe")!;
+    expect(weakest.value).toBe("Fr");
+    expect(a.text).toMatch(/^Am schwächsten nach .*: Fr mit .*\(1 Trade\)\./);
+    expect(a.text).toContain("Keine Gruppe liegt im Minus.");
+    expect(a.text).toContain("sehr kleine Stichprobe");
+    expect(a.text).not.toContain("1 Trades");
+    // the other end still names Sunday
+    const best = askJournal("Bester Wochentag", data);
+    expect(best.facts.find((f) => f.label === "Stärkste Gruppe")!.value).toBe("So");
+    expect(best.text).toContain("(5 Trades)");
+  });
+
+  it("one group only: nothing is ranked, the answer says a second group is missing", () => {
+    const only = { ...data, closed: view.closed.filter((t) => t.id.startsWith("so")) };
+    const a = askJournal("An welchem Wochentag verliere ich am meisten?", only);
+    expect(a.text).toMatch(/liegen in einer Gruppe: So/);
+    expect(a.text).toContain("fehlt eine zweite");
+    expect(a.text).not.toMatch(/Am schwächsten/);
+  });
+
+  it("the follow-up chips are German the parser reads back: „Bester Wochentag“, „Schwächste Session“, „Bestes Setup“", () => {
+    expect(superlative("best", "weekday")).toBe("Bester Wochentag");
+    expect(superlative("worst", "weekday")).toBe("Schwächster Wochentag");
+    expect(superlative("worst", "session")).toBe("Schwächste Session");
+    expect(superlative("best", "setup")).toBe("Bestes Setup");
+    const a = askJournal("An welchem Wochentag verliere ich am meisten?", data);
+    expect(a.followUps[0]).toBe("Bester Wochentag");
+    for (const q of ["Bester Wochentag", "Schwächster Wochentag", "Schwächste Session", "Bestes Setup"]) {
+      const i = parseQuestion(q, parseContextOf(view.closed, data));
+      expect(i.groupBy, q).not.toBeNull();
+      expect(i.sort, q).toBe(q.startsWith("B") ? "best" : "worst");
+    }
+  });
+
+  it("an empty period reads as a heading, without a wrong case: „Letzte Woche: keine abgeschlossenen Trades.“", () => {
+    const a = askJournal("Win-Rate letzte Woche", { ...data, now: new Date(2027, 5, 1).getTime() });
+    expect(a.text).toBe("Letzte Woche: keine abgeschlossenen Trades.");
   });
 });

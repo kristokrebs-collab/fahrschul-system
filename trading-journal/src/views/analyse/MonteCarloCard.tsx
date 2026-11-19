@@ -413,7 +413,7 @@ export function MonteCarloCard({ view, cur, rich = false }: { view: AccountView;
                 <Stat label="Median" value={unitText(res.final.p50, unit, cur)} tone={softTone(res.final.p50)} sub={`nach ${res.horizon} Trades`} />
                 <Stat label="Schlechte 5 %" value={unitText(res.final.p5, unit, cur)} tone={softTone(res.final.p5)} sub="5. Perzentil" />
                 <Stat label="Gute 5 %" value={unitText(res.final.p95, unit, cur)} tone={softTone(res.final.p95)} sub="95. Perzentil" />
-                <Stat label="Max. DD (95 %)" value={unitText(-(ddQuantile(res, 0.95) ?? 0), unit, cur)} tone="text-loss" sub={res.longestLoss ? `bis ${res.longestLoss.p95} Verluste in Folge` : undefined} />
+                <Stat label="Max. DD (95 %)" value={unitText(-(ddQuantile(res, 0.95) ?? 0), unit, cur)} tone="text-loss" sub={res.longestLoss ? `bis ${Math.round(res.longestLoss.p95)} Verluste in Folge` : undefined} />
               </div>
               <DdRisk res={res} thresholds={thresholds} />
               {sample.length < 30 && <p className="text-[12px] text-warn">Aus {sample.length} Trades gezogen – ein grober Ausblick, belastbar ab etwa 30.</p>}

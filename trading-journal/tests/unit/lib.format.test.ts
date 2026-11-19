@@ -113,6 +113,23 @@ describe("lib/parse (bundle rt/nt/XM)", () => {
     expect(parseNumber(42)).toBe(42);
     expect(rt).toBe(parseNumber);
   });
+  it("spellings with only ONE reading are read that way (Runde 18: „81,230.5“ was saved as 81,2305, „1,234,567.89“ refused)", () => {
+    expect(parseNumber("81,230.5")).toBe(81230.5);
+    expect(parseNumber("82,000.25")).toBe(82000.25);
+    expect(parseNumber("1,234,567.89")).toBe(1234567.89);
+    expect(parseNumber("-1,234.5")).toBe(-1234.5);
+    expect(parseNumber("1,234,567")).toBe(1234567);
+    expect(parseNumber("81'230.5")).toBe(81230.5);
+    expect(parseNumber("81\u2019230,5")).toBe(81230.5);
+    // unchanged: a single comma is the decimal comma, a single dot the decimal point, German grouping as before
+    expect(parseNumber("1,000")).toBe(1);
+    expect(parseNumber("81,23")).toBe(81.23);
+    expect(parseNumber("81.230")).toBe(81.23);
+    expect(parseNumber("81.230,5")).toBe(81230.5);
+    expect(parseNumber("0,00001234")).toBe(0.00001234);
+    // commas that do not group by three are no English number: the old rule applies
+    expect(parseNumber("1,23.4")).toBe(1.234);
+  });
   it("formats numbers for inputs", () => {
     expect(toInputString(1234.5)).toBe("1234,5");
     expect(toInputString(4)).toBe("4");

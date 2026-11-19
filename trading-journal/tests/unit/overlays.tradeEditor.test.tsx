@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { Profiler } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MotionRoot } from "@/motion/MotionRoot";
-import { SAVE_BUSY_DELAY_MS, TradeEditor, defaultForm, invalidFieldOf, livePriceInput, plausibleTradeDate, resetForNext, toRecord, validateRecord, type TradeRecord } from "@/overlays/TradeEditor";
+import { EDITOR_MESSAGES, SAVE_BUSY_DELAY_MS, TradeEditor, defaultForm, invalidFieldOf, livePriceInput, plausibleTradeDate, resetForNext, toRecord, validateRecord, type TradeRecord } from "@/overlays/TradeEditor";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { SAMPLE, settings } from "./domain.fixtures";
@@ -44,7 +44,7 @@ describe("TradeEditor – pure helpers", () => {
     const base = defaultForm(settings(), "scalp");
     expect(validateRecord(toRecord({ ...base.d, date: "" }, base.t), "")).toBe("Bitte Datum angeben.");
     expect(validateRecord(toRecord(base.d, base.t), "")).toBe("Bitte einen Einstiegspreis angeben.");
-    expect(validateRecord(toRecord({ ...base.d, entry: "80.000" }, base.t), "")).toBe("Bitte Ausstieg angeben oder P&L manuell eintragen.");
+    expect(validateRecord(toRecord({ ...base.d, entry: "80.000" }, base.t), "")).toBe(EDITOR_MESSAGES.exit);
     expect(validateRecord(toRecord({ ...base.d, entry: "80000", exit: "81000" }, base.t), "")).toBe("Bitte Positionsgröße angeben oder P&L manuell eintragen.");
     expect(validateRecord(toRecord({ ...base.d, entry: "80000", pnlManual: "12,5" }, base.t), "")).toBeNull();
     expect(validateRecord(toRecord({ ...base.d, entry: "80000" }, { ...base.t, status: "open" }), "")).toBeNull();

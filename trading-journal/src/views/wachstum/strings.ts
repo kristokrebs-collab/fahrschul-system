@@ -79,6 +79,11 @@ export const WACHSTUM = {
     target: "Ziel",
     hold: "So oft in Folge",
     save: "Ziel speichern",
+    // what is wrong, at the field (Funktionsprüfung Runde 18: „Ziel speichern“ only shook the field – with „-999abc“ as the target
+    // and 0 repetitions the sheet stayed open without a word)
+    errTitle: "Bitte einen Titel angeben.",
+    errTarget: "Bitte eine Zahl ab 0 eingeben.",
+    errHold: "Mindestens 1 – eine ganze Zahl.",
     saved: "Ziel gespeichert",
     failed: "Ziel nicht gespeichert",
     dropped: "Ziel entfernt",

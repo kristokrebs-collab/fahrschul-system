@@ -297,8 +297,10 @@ export function Header() {
           <AssistantButton label="Assistent" className="xl:px-3 max-xl:size-tap" />
           <FullscreenButton className="max-lg:hidden xl:px-3 max-xl:size-tap" showLabel />
           <MenuButton />
-          {/* from 768 px the primary action stands at the top of the sidebar (the same button) – the header stays slim */}
-          <div className="md:hidden">
+          {/* from 768 px the primary action stands at the top of the sidebar (the same button) – the header stays slim.
+              Below 390 px it steps aside too (Funktionsprüfung Runde 18): with a live price the right-hand group was ≈ 36 px wider than the
+              row of a 360 px phone and lay over the logo; the same button is the centre of the dock, always on screen there. */}
+          <div className="md:hidden max-[389px]:hidden">
             <NewTradeButton className="max-sm:!px-3" labelClassName="max-sm:sr-only" />
           </div>
         </div>

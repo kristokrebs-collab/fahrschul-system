@@ -334,3 +334,29 @@ test("reduced motion: back closes the editor (guard included) and the navigation
   await expect(current(page, "overview")).toHaveCount(1);
   expect(errors, errors.join("\n")).toEqual([]);
 });
+
+test("„Lokaler Modus“ in the header: back closes the explanation first, the page behind stays; the next back switches the page (Runde 18)", async ({ page }) => {
+  const errors = collectErrors(page);
+  await seed(page);
+  await overviewThenTrades(page);
+  const panel = page.getByTestId("local-badge-panel");
+
+  await page.getByTestId("local-badge").click();
+  await expect(panel).toBeVisible();
+  await expect.poll(() => depth(page)).toBe(1);
+  await page.goBack();
+  await expect(panel).toBeHidden();
+  await expect.poll(() => depth(page)).toBe(0);
+  await expect(current(page, "trades")).toHaveCount(1);
+
+  // closed with its own button: the entry is consumed, the history does not grow
+  await page.getByTestId("local-badge").click();
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "Schließen" }).click();
+  await expect(panel).toBeHidden();
+  await expect.poll(() => depth(page)).toBe(0);
+
+  await page.goBack();
+  await expect(current(page, "overview")).toHaveCount(1);
+  expect(errors, errors.join("\n")).toEqual([]);
+});

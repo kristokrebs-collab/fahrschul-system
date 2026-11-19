@@ -64,7 +64,7 @@ export function StreakCard({ sr, riskPct }: { sr: StreakRisk; riskPct: number })
               </span>
             </div>
             <Metric label={S.mc} sub="Median · 95 %">
-              {sr.mc ? `${sr.mc.p50} · ${sr.mc.p95}` : "–"}
+              {sr.mc ? `${Math.round(sr.mc.p50)} · ${Math.round(sr.mc.p95)}` : "–"}
             </Metric>
             <Metric label={S.current} tone={curLoss ? "text-loss" : "text-win"}>
               {sr.current.kind ? `${sr.current.length} ${sr.current.kind === "loss" ? "Verluste" : "Gewinne"}` : "–"}

@@ -258,6 +258,15 @@ describe("berichte helpers", () => {
     expect(resolvePeriod("month", "2026-W40", [], now).key).toBe("2026-09");
   });
 
+  it("resolvePeriod: no finished period has trades but the running one does → the running one (Runde 18: „Jahr“ opened on an empty 2025)", () => {
+    const now = new Date(2026, 9, 12, 12).getTime();
+    expect(resolvePeriod("year", null, [], now, true).key).toBe("2026");
+    expect(resolvePeriod("year", null, [], now).key).toBe("2025");
+    expect(resolvePeriod("week", null, [], now, true).key).toBe("2026-W42");
+    // a chosen key always wins
+    expect(resolvePeriod("year", "2024", [], now, true).key).toBe("2024");
+  });
+
   it("periodBars: per trade for a day, per day for a week, per week for a quarter", () => {
     const list = enrichC(coachJournal(30, 3));
     const day = periodFromKey(list[0]!.date.slice(0, 10))!;

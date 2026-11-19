@@ -28,6 +28,7 @@ import { RadialShareButton } from "@/social/ui/RadialShareButton";
 import { JournalDetail } from "@/journal/ui/JournalDetail";
 import { deleteTradeWithShots } from "@/journal/screenshots/release";
 import { effectiveFees } from "@/domain/fills";
+import "./tradeDetail.css";
 
 /** P04 coach panel of this trade (grade, plan vs. execution, behaviours) – a lazy chunk, mounted once the morph settled. */
 const TradeCoachPanel = lazy(() => import("@/views/coach/TradeCoachPanel").then((m) => ({ default: m.TradeCoachPanel })));
@@ -577,7 +578,8 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
           </StaggerItem>
         )}
 
-        <StaggerItem className="flex flex-wrap items-center justify-between gap-2">
+        {/* on a phone this row stays at the sheet's bottom edge while the content scrolls (`tradeDetail.css`) */}
+        <StaggerItem data-detail-actions="" className="flex flex-wrap items-center justify-between gap-2">
           <span className="flex flex-wrap items-center gap-3">
             {/* P12: share as a picture (always) or a redacted link (cloud); R11: the targets open as a fan around the button */}
             <RadialShareButton trade={e} className={COARSE} />

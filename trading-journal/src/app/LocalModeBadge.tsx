@@ -1,5 +1,5 @@
 import { Popover as PopoverPrimitive } from "radix-ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocalBadgeOpen, useLocalModeCopy } from "@/app/LocalModeBanner";
 import { useIdleCycle } from "@/app/shellFx";
 import { openAuthSheet } from "@/cloud/session";
@@ -8,6 +8,7 @@ import { PulseDot } from "@/motion/PulseDot";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Icon } from "@/primitives/icons";
+import { openBackEntry } from "@/store/backStack";
 
 /** The badge's dot pulses again this long after the last time (ms). */
 const PULSE_EVERY_MS = 60_000;
@@ -29,7 +30,7 @@ export const LOCAL_BADGE = {
  * where it applies, the one button that fixes it (`Anmelden` / `Code eingeben`, or `Backup öffnen`). Shown only in local mode with a
  * working storage; without storage the red `Speichern nicht möglich.` banner stays (`LocalModeBanner`). Below 640 px only the dot
  * shows (the name stays in `aria-label`); the tap area is 44 × 44 px in every case. A Radix popover: focus moves in, Escape and a tap
- * outside close it, the focus returns to the badge.
+ * outside close it, the focus returns to the badge; the system back button closes it too (its own entry on the back stack).
  */
 export function LocalModeBadge({ className }: { className?: string }) {
   const show = useLocalBadgeOpen();
@@ -37,6 +38,12 @@ export function LocalModeBadge({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const reduced = useReducedFx();
   const round = useIdleCycle({ active: show && !open, firstMs: PULSE_EVERY_MS, everyMs: PULSE_EVERY_MS, max: 3 }, reduced);
+  // Android back closes the explanation first, like every other layer (Funktionsprüfung Runde 18: back switched the page behind it
+  // and the panel stayed open over the new page)
+  useEffect(() => {
+    if (!open) return;
+    return openBackEntry(() => setOpen(false));
+  }, [open]);
   if (!show) return null;
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>

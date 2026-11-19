@@ -1,4 +1,5 @@
 import { memo, type ReactNode } from "react";
+import { parseNumber, thousandsReading, toInputString } from "@/lib/parse";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import type { DraftTextKey, SettingsDraft } from "./draft";
@@ -25,6 +26,20 @@ export interface DraftFieldProps {
  */
 export const DraftField = memo(function DraftField({ id, label, help, numeric = true, draft, onChange, placeholder, changed = false, invalid = false }: DraftFieldProps) {
   const htmlFor = `s-${id}`;
+  // „30.000“ is read as 30 (one dot = the decimal point, as everywhere in the journal). Someone who means thirty thousand is ASKED,
+  // exactly like in the trade form – a Startkapital of 30 was saved without a word and the overview then read „+2.590 %“
+  // (Funktionsprüfung Runde 18). One tap takes the other reading; nothing is re-read silently.
+  const alt = numeric ? thousandsReading(draft[id]) : null;
+  const read = alt == null ? null : parseNumber(draft[id]);
+  const dotHint =
+    alt == null ? null : (
+      <span data-testid={`dot-hint-${id}`} className="text-mute">
+        {read == null ? "So nicht lesbar." : `Gelesen als ${toInputString(read)} – der Punkt gilt als Komma.`}{" "}
+        <button type="button" className="touch-hit font-medium text-fg underline underline-offset-2" onClick={() => onChange(id, String(alt))}>
+          {alt} gemeint
+        </button>
+      </span>
+    );
   return (
     <Field
       label={
@@ -34,7 +49,7 @@ export const DraftField = memo(function DraftField({ id, label, help, numeric = 
         </>
       }
       htmlFor={htmlFor}
-      help={help}
+      help={dotHint ?? help}
     >
       <Input id={htmlFor} numeric={numeric} value={draft[id] ?? ""} onChange={(e) => onChange(id, e.target.value)} autoComplete="off" placeholder={placeholder} invalid={invalid} />
     </Field>
