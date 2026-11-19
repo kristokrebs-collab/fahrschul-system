@@ -88,6 +88,14 @@ const viewport = (): { w: number; h: number } => {
  * fan and kept inside the screen; its words change HARD (as in the recording). Decorative – the live region next to the trigger and the trigger's
  * `aria-label` carry the same words – and it never takes a pointer.
  */
+/**
+ * The caption's own ground (Runde 18, seen on a phone): where controls stand right under the trigger – the trade detail's „Löschen ·
+ * Schließen · Bearbeiten“ – their words showed through the pool and ran into „Kanal wählen“. A soft plate of the ground colour behind
+ * the words only; the margins give back what the padding takes, so the words stand exactly where they stood. Inline: no new class in
+ * the first-load stylesheet.
+ */
+const CAPTION_PLATE = { padding: "3px 10px", margin: "-3px 0", borderRadius: 999, background: "color-mix(in srgb, var(--color-ink-950) 94%, transparent)" } as const;
+
 function Caption({ fan, text }: { fan: OpenFan; text: string }) {
   const side = captionSide(fan, { y: fan.oy }, { h: fan.vh }, RADIAL_HUB);
   if (!side) return null;
@@ -95,7 +103,9 @@ function Caption({ fan, text }: { fan: OpenFan; text: string }) {
   const top = side === "below" ? RADIAL_HUB / 2 + 12 : -(RADIAL_HUB / 2 + 12);
   return (
     <div aria-hidden="true" data-testid="radial-caption" data-side={side} className="pointer-events-none absolute w-0" style={{ left: dx, top }}>
-      <span className={cn("absolute left-0 w-max max-w-[260px] -translate-x-1/2 whitespace-nowrap text-[12px] font-medium leading-4 text-mute", side === "above" && "bottom-0")}>{text}</span>
+      <span className={cn("absolute left-0 w-max max-w-[260px] -translate-x-1/2 whitespace-nowrap text-[12px] font-medium leading-4 text-mute", side === "above" && "bottom-0")} style={CAPTION_PLATE}>
+        {text}
+      </span>
     </div>
   );
 }
