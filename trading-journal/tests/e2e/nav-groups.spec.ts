@@ -111,9 +111,19 @@ test.describe("Navigation in vier Gruppen", () => {
     await page.setViewportSize({ width: 320, height: 700 });
     await page.goto("/#overview");
     await expect(page.getByText("Netto-P&L").first()).toBeVisible();
-    const cta = page.locator("header").getByRole("button", { name: "Trade eintragen" });
+    // below 390 px the header's own „+“ steps aside (Runde 18: with a live price the header's right group lay over the logo at 360 px);
+    // the same action is the centre of the bar, always on screen – that is where it is reached here
+    await expect(page.locator("header").getByRole("button", { name: "Trade eintragen" })).toBeHidden();
+    const cta = page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" });
+    await expect(cta).toBeVisible();
     const box = await cta.boundingBox();
     expect(box && box.x >= 0 && box.x + box.width <= 320, `CTA ${JSON.stringify(box)} inside 320`).toBe(true);
+    // every control the header still shows ends inside the screen
+    for (const b of await page.locator("header").getByRole("button").all()) {
+      if (!(await b.isVisible())) continue;
+      const r = await b.boundingBox();
+      expect(r && r.x >= 0 && r.x + r.width <= 320, `header control ${JSON.stringify(r)} inside 320`).toBe(true);
+    }
     const bar = await page.getByRole("toolbar", { name: "Navigation" }).boundingBox();
     expect(bar && bar.x >= 0 && bar.x + bar.width <= 320, `bar ${JSON.stringify(bar)} inside 320`).toBe(true);
     await expectNoHorizontalScroll(page);

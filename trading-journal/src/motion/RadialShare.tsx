@@ -100,6 +100,11 @@ function Caption({ fan, text }: { fan: OpenFan; text: string }) {
   );
 }
 
+/** ms the open fan follows its trigger (a trigger pressed while its container was still arriving). */
+export const RADIAL_FOLLOW_MS = 700;
+/** px the trigger may be away from the fan's centre during that time: up to here the fan follows and a scroll is no "moved it" (an entrance rises ≤ 10 px). */
+export const RADIAL_FOLLOW_SLACK = 12;
+
 /**
  * Radial share (R11 · Runde 13: the reference „Share Button Animation“ rebuilt 1:1 – geometry, springs, times, curves measured frame by frame,
  * `motion/vorbild2.ts`). Nothing new is invented about WHAT is shared: every target calls the share logic that already exists (`@/social`,
@@ -120,7 +125,7 @@ function Caption({ fan, text }: { fan: OpenFan; text: string }) {
  *   caption says what it does. The live region next to the trigger says the busy word and the result.
  * - Reduced motion: no move – the hub and the discs are simply there, a choice says its result and the fan closes.
  * - The fan is a fixed layer in `<body>` (a dialog's scroll box cannot clip it), exempt from the dialog's inert rule (`data-radial-share`). A
- *   resize or a scroll that moves the trigger closes it.
+ *   resize or a scroll that moves the trigger closes it (for the first `RADIAL_FOLLOW_MS` the fan follows a trigger that is still arriving).
  */
 export function RadialShare({ targets, label = "Teilen", icon, prompt = "Kanal wählen", size = "sm", className, testId = "share-button" }: RadialShareProps) {
   const reduced = useReducedFx();
@@ -188,6 +193,35 @@ export function RadialShare({ targets, label = "Teilen", icon, prompt = "Kanal w
     movedIn.current = false;
   }, [open, firstEnabled]);
 
+  // The trigger can still be arriving when it is pressed (the last row of a staggered sheet rises in; on a slow phone that takes a
+  // while): its place was measured a few pixels early, the fan stood beside it and the next scroll event closed it (Funktionsprüfung
+  // Runde 18 – the trade detail's action row is on screen at once on a phone since then). For a moment after opening the fan follows
+  // its trigger; after that its place is fixed as before.
+  const followUntil = useRef(0);
+  useEffect(() => {
+    if (!open) return;
+    followUntil.current = performance.now() + RADIAL_FOLLOW_MS;
+    let raf = 0;
+    const tick = () => {
+      const r = trigger.current?.getBoundingClientRect();
+      if (r && r.width) {
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        // only the short way of an arrival is followed: a trigger that jumps (content mounting above it pushes the row down) leaves the
+        // fan where it opened, as before
+        setFan((f) => {
+          if (!f) return f;
+          const dx = Math.abs(f.ox - x);
+          const dy = Math.abs(f.oy - y);
+          return (dx > 0.5 || dy > 0.5) && dx <= RADIAL_FOLLOW_SLACK && dy <= RADIAL_FOLLOW_SLACK ? { ...f, ox: x, oy: y } : f;
+        });
+      }
+      if (performance.now() < followUntil.current) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [open]);
+
   // anything that moves the trigger closes the fan (its place was measured once). A scroll counts only when the trigger really moved: the
   // capture listener also hears scrolls that leave it where it is (the sticky section strip sliding its chip into view)
   const ox = fan?.ox;
@@ -198,7 +232,9 @@ export function RadialShare({ targets, label = "Teilen", icon, prompt = "Kanal w
     const moved = () => {
       const r = trigger.current?.getBoundingClientRect();
       if (!r || ox === undefined || oy === undefined) return close(false);
-      if (Math.abs(r.left + r.width / 2 - ox) > 1 || Math.abs(r.top + r.height / 2 - oy) > 1) close(false);
+      // while the fan still follows its trigger, the last steps of the trigger's own arrival are no "moved" (the next frame follows them)
+      const slack = performance.now() < followUntil.current ? RADIAL_FOLLOW_SLACK : 1;
+      if (Math.abs(r.left + r.width / 2 - ox) > slack || Math.abs(r.top + r.height / 2 - oy) > slack) close(false);
     };
     window.addEventListener("resize", away);
     window.addEventListener("scroll", moved, true);

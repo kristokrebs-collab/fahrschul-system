@@ -366,7 +366,11 @@ Zwei weitere Prüfer haben nachgeholt, was die ersten vier nicht erreicht hatten
 | Handelsplan: „Gespeichert am 18.11.2026 22:54 Uhr“ stand in der Zeitzone der Sitzung, ohne es zu sagen | P2 | Speicher- und Abrufzeit tragen ihr „(UTC−5)“ wie die Kerzen | `src/views/plan/TicketStep.tsx`, `SavedPlans.tsx` |
 | Labor: nach einer geänderten Regel blieb das alte Ergebnis stehen, nur das Wort des Knopfs wechselte | P2 | „Einstellungen geändert – das Ergebnis unten gehört noch zum vorigen Lauf“ | `src/views/labor/ConfigCard.tsx`; `tests/unit/views.labor*.test.tsx` |
 | Grundlagen-Editor: nach „+ Punkt hinzufügen“ fügte jedes Leerzeichen einen weiteren leeren Punkt an | P2 | der Fokus steht im neuen Punkt | `src/overlays/SetupEditor.tsx` |
+| Handy, Trade-Detail › „Teilen“: auf einem langsamen Gerät öffnete sich der Fächer neben dem Knopf und schloss sich sofort wieder (die Aktionszeile ist seit dieser Runde gleich im Bild und konnte angetippt werden, während sie noch einstieg). Gefunden von der CI (E2E „share link“, zweimal rot) | P2 | der Fächer folgt seinem Knopf für einen Moment an dessen Platz | `src/motion/RadialShare.tsx`; `tests/unit/motion.radialShare.test.tsx`; Browser: zehnmal unter Last grün (vorher 6 von 8) |
+| E2E „320 px: … ‚Trade eintragen‘ ist erreichbar“ rot: der Test suchte das „+“ der Kopfzeile, das unter 390 px seit dieser Runde zur Seite tritt | Test | der Test prüft, was er meint: die Aktion ist in der unteren Leiste erreichbar und im Bild, die Kopfzeile bleibt in 320 px | `tests/e2e/nav-groups.spec.ts` |
 
 Weiter offen aus dieser Welle, je einmal gesehen: im Labor die Anordnung der Entwürfe bei sehr vielen Versionen und die klebende Karte „Annahmen“, die bei 1024 px über die nächste reicht. Nicht geprüft bleiben Gutscheine, Kündigung und Widerruf gegen das echte Stripe sowie echte Geräte (wie in Abschnitt 8).
+
+Die CI des Stands `99f4db29` (der erste, dessen E2E-Lauf nicht von einem Folge-Push abgebrochen wurde) hatte drei rote E2E-Teile: die zwei Zeilen oben und eine Zeitmessung (`controls-inp`, „Auswahlliste“ 336 ms gegen die Grenze von 200 ms auf einem Runner, der für seinen Teil 47 statt rund 32 Minuten brauchte; lokal 56 ms). Die Messung ist nicht geändert.
 
 Stand nach der zweiten Welle: Typprüfung und Lint sauber, Unit-Tests 679 Dateien grün, Budget Erstladung JS 664,2 / 800 KiB, CSS 52,5 / 52,5 KiB.

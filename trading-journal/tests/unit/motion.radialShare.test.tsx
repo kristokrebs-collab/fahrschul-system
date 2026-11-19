@@ -276,6 +276,29 @@ describe("RadialShare", () => {
     strip.remove();
   });
 
+  it("a trigger pressed while it was still arriving: the fan follows it to its place instead of standing beside it and closing on the next scroll", async () => {
+    render(<Harness onSelect={vi.fn()} />);
+    const trigger = screen.getByTestId("share-button");
+    // the row rises in: pressed 7 px before its place
+    const at = { top: 107, left: 50 };
+    trigger.getBoundingClientRect = () => ({ x: at.left, y: at.top, left: at.left, top: at.top, width: 80, height: 32, right: at.left + 80, bottom: at.top + 32, toJSON: () => ({}) });
+    fireEvent.click(trigger);
+    const menu = await screen.findByRole("menu");
+    expect(menu.style.top).toBe("123px");
+    at.top = 100;
+    // a scroll event right then (the sheet settling) used to close the fan: the trigger was "moved"
+    act(() => {
+      document.body.dispatchEvent(new Event("scroll"));
+    });
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("menu").style.top).toBe("116px"));
+    expect(screen.getByTestId("radial-hub").parentElement!.style.top).toBe("116px");
+    // a jump is not an arrival (content mounting above the row pushes it down): the fan stays where it is
+    at.top = 460;
+    await new Promise((r) => setTimeout(r, 80));
+    expect(screen.getByRole("menu").style.top).toBe("116px");
+  });
+
   it("each target is 48 px, never below the 44 px touch minimum", async () => {
     render(<Harness onSelect={vi.fn()} />);
     fireEvent.click(screen.getByTestId("share-button"));
