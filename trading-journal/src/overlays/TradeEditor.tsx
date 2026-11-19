@@ -989,7 +989,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         if (busyShown) setSaving(false);
       }
     },
-    [rec, d, t, checking, trade, draft, closeEditor, reduced, jumpTo],
+    [rec, d, t, checking, trade, draft, baseline, closeEditor, reduced, jumpTo],
   );
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
