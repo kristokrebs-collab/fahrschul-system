@@ -1,0 +1,20 @@
+/*
+ * Trade-Detail on a phone (Funktionsprüfung Runde 18): the panel is taller than the screen (≈ 1 230 px of content in a 776 px sheet),
+ * and „Löschen · Schließen · Bearbeiten“ stood at its very end – on opening, the sheet showed no way to close or edit it except the
+ * swipe handle. The action row now stays at the bottom edge of the sheet while the content scrolls under it; at the end of the content
+ * it sits exactly where it always sat (its negative margins cancel the body's padding, so nothing jumps when it lets go).
+ * Desktop is unchanged: the dialog fits there, and the row is the last line of the content.
+ *
+ * Lazy CSS of the detail's own chunk – nothing in the first-load stylesheet.
+ */
+@media (max-width: 767.98px) {
+  [data-detail-actions] {
+    position: sticky;
+    bottom: 0;
+    z-index: 9;
+    margin: 0 -20px -20px;
+    padding: 10px 20px 14px;
+    background: var(--color-ink-850);
+    border-top: 1px solid var(--color-line);
+  }
+}

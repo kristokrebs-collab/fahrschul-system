@@ -1,0 +1,134 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SetupEditor, finalizeSetup, moveItem, upsertSetup } from "@/overlays/SetupEditor";
+import { bootJournal, resetJournal, useJournal } from "@/store/journalStore";
+import { useUi } from "@/store/uiStore";
+import { seedV0 } from "./store.fixture";
+
+describe("SetupEditor helpers", () => {
+  it("finalizeSetup trims, assigns an s_ id and drops empty checklist items", () => {
+    const out = finalizeSetup({ id: "", name: "  Neu ", desc: " d ", color: "#000", account: "both", checklist: [{ id: "c1", text: " a " }, { id: "c2", text: "  " }] });
+    expect(out.id.startsWith("s_")).toBe(true);
+    expect(out.name).toBe("Neu");
+    expect(out.desc).toBe("d");
+    expect(out.checklist).toEqual([{ id: "c1", text: "a" }]);
+  });
+  it("upsertSetup replaces by id or appends; moveItem reorders", () => {
+    const base = useJournal.getState().settings;
+    const s = { id: "s_bo", name: "x", desc: "", color: "#000", account: "scalp" as const, checklist: [] };
+    expect(upsertSetup({ ...base, setups: [s] }, { ...s, name: "y" }).setups.map((x) => x.name)).toEqual(["y"]);
+    expect(upsertSetup({ ...base, setups: [s] }, { ...s, id: "s_new" }).setups).toHaveLength(2);
+    expect(moveItem([1, 2, 3], 0, 1)).toEqual([2, 1, 3]);
+    expect(moveItem([1, 2, 3], 0, -1)).toEqual([1, 2, 3]);
+  });
+});
+
+describe("SetupEditor", () => {
+  beforeEach(async () => {
+    seedV0();
+    resetJournal();
+    await bootJournal({ autoBackup: false });
+    useUi.setState({ toasts: [], setupEditor: { open: false, fromTrade: false } });
+  });
+
+  it("creates a new setup with a checklist item and calls saveSettings", async () => {
+    const onClose = vi.fn();
+    const saveSpy = vi.fn(useJournal.getState().saveSettings);
+    useJournal.setState({ saveSettings: saveSpy });
+    render(<SetupEditor open onClose={onClose} />);
+    expect(screen.getByRole("dialog", { name: "Neue Entscheidungsgrundlage" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Bitte einen Namen angeben.");
+
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Mein Setup" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Scalp" }));
+    fireEvent.click(screen.getByRole("button", { name: "+ Punkt hinzufügen" }));
+    fireEvent.click(screen.getByRole("button", { name: "+ Punkt hinzufügen" }));
+    fireEvent.change(screen.getByLabelText("Punkt 1"), { target: { value: "Erster Punkt" } });
+    fireEvent.change(screen.getByLabelText("Punkt 2"), { target: { value: "Zweiter Punkt" } });
+    fireEvent.keyDown(screen.getByRole("button", { name: "Punkt 2 verschieben" }), { key: "ArrowUp" });
+    expect((screen.getByLabelText("Punkt 1") as HTMLInputElement).value).toBe("Zweiter Punkt");
+    fireEvent.click(screen.getByRole("radio", { name: "Farbe #c9975b" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(saveSpy).toHaveBeenCalledTimes(1));
+    const saved = saveSpy.mock.calls[0]?.[0];
+    const created = saved?.setups.find((s) => s.name === "Mein Setup");
+    expect(created).toMatchObject({ account: "scalp", color: "#c9975b" });
+    expect(created?.id.startsWith("s_")).toBe(true);
+    expect(created?.checklist.map((c) => c.text)).toEqual(["Zweiter Punkt", "Erster Punkt"]);
+    expect(created?.checklist.every((c) => c.id.startsWith("c"))).toBe(true);
+    // fixture setup s_bo + s_mtf (appended to legacy settings, other version's multi-TF setup) + the new one
+    await waitFor(() => expect(useJournal.getState().settings.setups).toHaveLength(3));
+    expect(useUi.getState().toasts.map((t) => t.title)).toContain("Grundlage angelegt");
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("„+ Punkt hinzufügen“: the new point's field takes the focus, so the next keys are its text and not more empty points (Runde 18)", () => {
+    render(<SetupEditor open onClose={() => {}} />);
+    const add = screen.getByRole("button", { name: "+ Punkt hinzufügen" });
+    fireEvent.click(add);
+    expect(document.activeElement).toBe(screen.getByLabelText("Punkt 1"));
+    fireEvent.click(add);
+    expect(document.activeElement).toBe(screen.getByLabelText("Punkt 2"));
+    expect(screen.queryByLabelText("Punkt 3")).toBeNull();
+  });
+
+  it("a name another Grundlage already carries is refused (spaces and case do not make a new name); the own name stays savable", async () => {
+    const saveSpy = vi.fn(useJournal.getState().saveSettings);
+    useJournal.setState({ saveSettings: saveSpy });
+    const taken = "Diesen Namen trägt schon eine andere Grundlage. Wähle einen eigenen, damit du sie in Filtern und Berichten auseinanderhältst.";
+    const fresh = render(<SetupEditor open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "  4h-breakout   über 85.900 " } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(taken);
+    expect(saveSpy).not.toHaveBeenCalled();
+    fresh.unmount();
+
+    // editing a Grundlage under its own name is no clash …
+    const onClose = vi.fn();
+    const own = render(<SetupEditor open setupId="s_bo" fromTrade onClose={onClose} />);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "4H-Breakout über 85.900 " } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(saveSpy).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalled();
+    own.unmount();
+
+    // … renaming it onto another one is
+    const other = useJournal.getState().settings.setups.find((x) => x.id === "s_mtf");
+    render(<SetupEditor open setupId="s_bo" fromTrade onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: other?.name ?? "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(taken);
+    expect(saveSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("edits an existing setup from the trade editor (no morph), shows usage and deletes with confirm", async () => {
+    const onClose = vi.fn();
+    render(<SetupEditor open setupId="s_bo" fromTrade onClose={onClose} />);
+    expect(screen.getByRole("dialog", { name: "Grundlage bearbeiten" })).toBeInTheDocument();
+    expect(screen.getByText("In 1 Trade verwendet")).toBeInTheDocument();
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("4H-Breakout über 85.900");
+
+    fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+    expect(screen.getByText("1 Trade verliert die Zuordnung.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Nein" }));
+    expect(screen.queryByText("1 Trade verliert die Zuordnung.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ja" }));
+    await waitFor(() => expect(useJournal.getState().settings.setups.map((x) => x.id)).toEqual(["s_mtf"]));
+    // Runde 13: the delete pill says „gelöscht“ once its ring closed (right after the write here – no Web Animations in jsdom)
+    await waitFor(() => expect(useUi.getState().toasts.map((t) => t.title)).toContain("Grundlage gelöscht"));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("a completed hold on a setup in use opens the usage warning instead of deleting", async () => {
+    render(<SetupEditor open setupId="s_bo" fromTrade onClose={vi.fn()} />);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Löschen" }), { button: 0 });
+    await screen.findByText("1 Trade verliert die Zuordnung.", undefined, { timeout: 4000 });
+    expect(useJournal.getState().settings.setups.map((x) => x.id)).toEqual(["s_bo", "s_mtf"]);
+    fireEvent.click(screen.getByRole("button", { name: "Ja" }));
+    await waitFor(() => expect(useJournal.getState().settings.setups.map((x) => x.id)).toEqual(["s_mtf"]));
+  });
+});

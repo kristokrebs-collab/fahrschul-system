@@ -1,0 +1,37 @@
+/*
+ * Print view of the Transaktionsbuch (F70): the same mechanism as the report's PDF (`../print.css`: `html.tj-report-printing`
+ * hides the app, `.report-print-root` is the white A4 page). Only the denser table is new.
+ */
+@media print {
+  .lp-table {
+    font-size: 7pt;
+  }
+  .lp-table th,
+  .lp-table td {
+    padding: 1.5pt 3pt;
+    vertical-align: top;
+  }
+  .lp-table tr {
+    break-inside: avoid;
+  }
+  .lp-flag {
+    display: block;
+    color: #8a4b00;
+    font-size: 6.5pt;
+  }
+  .lp-head {
+    display: grid;
+    gap: 2pt;
+    margin-bottom: 8pt;
+  }
+  .lp-note {
+    font-weight: 600;
+    border: 0.75pt solid #999;
+    border-radius: 3pt;
+    padding: 3pt 5pt;
+    margin: 4pt 0;
+  }
+  .lp-summary {
+    margin: 6pt 0 8pt;
+  }
+}

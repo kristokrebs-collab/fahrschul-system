@@ -1,0 +1,278 @@
+{
+ "at": "2026-11-08T06:27:35.145Z",
+ "observations": [
+  {
+   "journey": "J1",
+   "step": "Landing: was sieht der Erstbesucher auf /?",
+   "viewport": 390,
+   "result": "info",
+   "note": "Der erste Bildschirm ist die App selbst (Übersicht, h1 [\"Übersicht\"]), keine Landing-Seite. Anmelden-Pill: ja („Anmelden“). Leerzustand: „Dein Journal ist noch leer“. Werbetext/CTA „Kostenlos starten“ oder „Premium auswählen“ auf der Startseite: nein (nur über Seitenleiste „Preise“).",
+   "shot": "J1-390-01-erster-bildschirm.jpg"
+  },
+  {
+   "journey": "J1",
+   "step": "Preise erreichbar: Seitenleiste / Menü",
+   "viewport": 390,
+   "result": "info",
+   "note": "CTA-Beschriftungen der Karten (abgemeldet): hero-cta=„Pro wählen“; cta-free=„Kostenlos starten“; cta-pro=„Weiter zur Bestellung“; details-pro=„Tarif im Detail“; cta-premium=„Weiter zur Bestellung“; details-premium=„Tarif im Detail“; cta-team=„Weiter zur Bestellung“; details-team=„Tarif im Detail“",
+   "shot": "J1-390-02-preise.jpg"
+  },
+  {
+   "journey": "J1",
+   "step": "Preise: Monat↔Jahr, Jahres-Betrag sichtbar",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Premium/Jahr: „20 € 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 € pro Monat · 240 € jährlich · 2 Monate gratis · spart 48 € gegenüber 12 Monatszahlungen (−17 %)“ · Team/Jahr: „15,83 € 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 , 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 € pro Sitz und Monat · 190 € jährlich · 2 Monate gratis · spar“"
+  },
+  {
+   "journey": "J1",
+   "step": "Premium/Jahr wählen → Registrierung: wird die Wahl gezeigt und gemerkt?",
+   "viewport": 390,
+   "result": "lücke",
+   "note": "Dialog: [] Konto erstellen Passwort Magic Link Neu hier Ein Konto, alle Geräte. Dein Journal bleibt auch ohne Netz voll nutzbar. E-MAIL PASSWORT Ich akzeptiere die AGB und habe die Datenschutzerklärung gelesen. Passwort vergessen? Konto erstellen Deine Daten liegen verschlüsselt in der EU (Frankfurt). Expor. Gemerkt in sessionStorage: {\"target\":{\"kind\":\"order\",\"order\":\"premium.year.1\"},\"wait\":{\"on\":\"signedIn\"},\"label\":\"Bestellung\",\"at\":1794119123330}. Die Registrierung nennt die gewählte Bestellung: NEIN (kein Hinweis auf Tarif/Intervall im Registrierformular).",
+   "shot": "J1-390-03-registrierung-nach-premium.jpg"
+  },
+  {
+   "journey": "J1",
+   "step": "Registrierung: Pflichtfelder, Passwort anzeigen, Stärke, Fehler am Feld",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Passwort-Sichtbarkeit: Schalter vorhanden. Eingabe bleibt nach Fehler: ja. Rückmeldung: [] Konto erstellen Passwort Magic Link Neu hier Ein Konto, alle Geräte. Dein Journal bleibt auch ohne Netz voll nutzbar. E-MAIL Diese E-Mail-Adresse sieht nicht gültig aus. PASSWORT Zu kurz Ich akzeptiere die AGB und habe die Datenschutzerklärung gelesen. Pass"
+  },
+  {
+   "journey": "J1",
+   "step": "Registrierung abschicken (E-Mail-Bestätigung nötig, Mock)",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Konto im Mock angelegt: true. Zustand: [] Schau in dein Postfach Bestätige deine E-Mail neu@example.com mit dem Link, den wir dir geschickt haben. Danach bist du angemeldet. Öffne den Link am besten in diesem Browser. Erneut senden · 28 Sekunden 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 s Zurück zur Anmeldung. Erneut-senden-Knopf: „Erneut senden ·\n28 Sekunden\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n0\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n0\ns“ (Zähler zählt herunter; echtes Rate-Limit nur serverseitig = BLOCKED).",
+   "shot": "J1-390-04-bestaetigung-gesendet.jpg"
+  },
+  {
+   "journey": "J1",
+   "step": "Bestätigungslink in NEUEM Tab öffnen: bleibt die Tarifwahl erhalten?",
+   "viewport": 390,
+   "result": "lücke",
+   "note": "Tab 1 (Registrierung) hält sessionStorage[tj2-return-to] = {\"target\":{\"kind\":\"order\",\"order\":\"premium.year.1\"},\"wait\":{\"on\":\"signedIn\"},\"label\":\"Bestellung\",\"at\":1794119123330}. Im neuen Tab (so öffnet sich der Link aus der Bestätigungsmail) ist er: LEER – die vorgewählte Bestellung geht verloren. localStorage-Schlüssel zur Bestellung: keine. Die App erwartet den Link „in diesem Browser“, aber der Merker lebt nur im Tab und höchstens 30 Minuten (src/store/returnTo.ts, RETURN_TTL_MS)."
+  },
+  {
+   "journey": "J1",
+   "step": "Konto existiert schon: Registrieren mit bekannter E-Mail",
+   "viewport": 390,
+   "result": "info",
+   "note": "Rückmeldung bei bekannter E-Mail (Mock-Verhalten des Supabase-Nachbaus, kein Beweis für das echte Verhalten): [] Konto erstellen Passwort Magic Link Neu hier Ein Konto, alle Geräte. Dein Journal bleibt auch ohne Netz voll nutzbar. E-MAIL Zu dieser E-Mail gibt es schon ein Konto. Melde dich an. PASSWORT Stark Ich akzeptiere die AGB und habe die Datenschutzerklärung gelesen. Passwort vergessen? Konto erstelle",
+   "shot": "J1-390-05-bekannte-email.jpg"
+  },
+  {
+   "journey": "J1",
+   "step": "Anmelden mit bestehendem Konto aus der Bestellung heraus: kommt die Bestellung zurück?",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Nach dem Login zuerst: [] Willkommen WILLKOMMEN W I L L K O M M E N W I L L K O M M E N W I L L K O M M E N Alles synchron. Ab jetzt landet jed; nach „Los geht’s“: [] Deine Bestellung Prüfe die Angaben. Bestellt ist erst, wenn du unten auf den Button klickst – danach geht es zu Stripe, dort zahlst du. TARIF Trade Journal Premium Monatlich Jährlich −17 % Abrechnung jährlich Gesamtpreis 240 € 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 0 1 2 3 4 5 6 7 8 9 0 € pr. Bestellübersicht (Premium, Jahr, 240 €) kommt von selbst zurück: ja, erst nach dem Willkommen-Dialog.",
+   "shot": "J1-390-06-nach-login-bestellung.jpg"
+  },
+  {
+   "journey": "J1",
+   "step": "Bestellübersicht per Tastatur (UI-07): Tab bleibt im Dialog, Escape schließt, Fokus kehrt zurück",
+   "viewport": 390,
+   "result": "ok",
+   "note": "18 Tab-Schritte, davon außerhalb des Dialogs: 0; Reihenfolge: Schließen › Jährlich −17 % › Tarif im Detail › INPUT › AGB › Widerrufsbelehrung › Datenschutzerklärung › INPUT › Abbrechen › Zahlungspflichtig bestellen Weiter zu St; Escape schließt: true; Fokus danach auf: cta-premium",
+   "shot": "J1-390-07-bestellung-tastatur.jpg"
+  },
+  {
+   "journey": "J1",
+   "step": "Kauf abbrechen → freier Bereich weiter nutzbar",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Offene Dialoge nach Escape: keine; Tarif-Hinweis auf der Seite: Dein Tarif: Free"
+  },
+  {
+   "journey": "J4-vorschau",
+   "step": "overview: Rechtliches am Seitenende erreichbar (nicht verdeckt)",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Rechtliche Links am Ende: Impressum → ?rechtliches=impressum · Datenschutz → ?rechtliches=datenschutz · AGB → ?rechtliches=agb",
+   "shot": "J4-vorschau-390-overview-ende.jpg"
+  },
+  {
+   "journey": "J4-vorschau",
+   "step": "preise: Rechtliches am Seitenende erreichbar (nicht verdeckt)",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Rechtliche Links am Ende: Impressum → ?rechtliches=impressum · Datenschutz → ?rechtliches=datenschutz · AGB → ?rechtliches=agb",
+   "shot": "J4-vorschau-390-preise-ende.jpg"
+  },
+  {
+   "journey": "J4-vorschau",
+   "step": "konto: Rechtliches am Seitenende erreichbar (nicht verdeckt)",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Rechtliche Links am Ende: Impressum → ?rechtliches=impressum · Datenschutz → ?rechtliches=datenschutz · AGB → ?rechtliches=agb",
+   "shot": "J4-vorschau-390-konto-ende.jpg"
+  },
+  {
+   "journey": "J4-vorschau",
+   "step": "Impressum öffnen: Inhalt",
+   "viewport": 390,
+   "result": "info",
+   "note": "Direktlink /?rechtliches=impressum zeigt: [] Impressum Impressum Datenschutz AGB Widerruf Hinweise Anbieter PLATZHALTER Vom Betreiber auszufüllen: VITE_LEGAL_OPERATOR in den Netlify-Variablen setzen (siehe SETUP.md „Rechtliches“). Anschrift PLATZHALTER Vom Betreiber auszufüllen: VITE_LEGAL_ADDRESS in den Netlify-Variablen setzen (siehe SETUP.md „Rechtliches“). Kontakt PLATZHALTER Vom Betreiber auszufül",
+   "shot": "J4-vorschau-390-impressum.jpg"
+  },
+  {
+   "journey": "J4-lokal",
+   "step": "overview: Rechtliches am Seitenende erreichbar (nicht verdeckt)",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Rechtliche Links am Ende: Impressum → ?rechtliches=impressum · Datenschutz → ?rechtliches=datenschutz · AGB → ?rechtliches=agb",
+   "shot": "J4-lokal-390-overview-ende.jpg"
+  },
+  {
+   "journey": "J4-lokal",
+   "step": "preise: Rechtliches am Seitenende erreichbar (nicht verdeckt)",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Rechtliche Links am Ende: Impressum → ?rechtliches=impressum · Datenschutz → ?rechtliches=datenschutz · AGB → ?rechtliches=agb",
+   "shot": "J4-lokal-390-preise-ende.jpg"
+  },
+  {
+   "journey": "J4-lokal",
+   "step": "konto: Rechtliches am Seitenende erreichbar (nicht verdeckt)",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Rechtliche Links am Ende: Impressum → ?rechtliches=impressum · Datenschutz → ?rechtliches=datenschutz · AGB → ?rechtliches=agb",
+   "shot": "J4-lokal-390-konto-ende.jpg"
+  },
+  {
+   "journey": "J4-lokal",
+   "step": "Impressum öffnen: Inhalt",
+   "viewport": 390,
+   "result": "info",
+   "note": "Direktlink /?rechtliches=impressum zeigt: [] Impressum Impressum Datenschutz AGB Widerruf Hinweise Anbieter PLATZHALTER Vom Betreiber auszufüllen: VITE_LEGAL_OPERATOR in den Netlify-Variablen setzen (siehe SETUP.md „Rechtliches“). Anschrift PLATZHALTER Vom Betreiber auszufüllen: VITE_LEGAL_ADDRESS in den Netlify-Variablen setzen (siehe SETUP.md „Rechtliches“). Kontakt PLATZHALTER Vom Betreiber auszufül",
+   "shot": "J4-lokal-390-impressum.jpg"
+  },
+  {
+   "journey": "J4-cloud",
+   "step": "overview: Rechtliches am Seitenende erreichbar (nicht verdeckt)",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Rechtliche Links am Ende: Impressum → ?rechtliches=impressum · Datenschutz → ?rechtliches=datenschutz · AGB → ?rechtliches=agb",
+   "shot": "J4-cloud-390-overview-ende.jpg"
+  },
+  {
+   "journey": "J4-cloud",
+   "step": "preise: Rechtliches am Seitenende erreichbar (nicht verdeckt)",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Rechtliche Links am Ende: Impressum → ?rechtliches=impressum · Datenschutz → ?rechtliches=datenschutz · AGB → ?rechtliches=agb · Widerruf → ?rechtliches=widerruf · Hinweise → ?rechtliches=hinweise · Verträge hier kündigen → ?kuendigen · Vertrag widerrufen → ?widerruf · Impressum → ?rechtliches=impressum · Datenschutz → ?rechtliches=datenschutz · AGB → ?rechtliches=agb · Verträge hier kündigen → ?kuendigen",
+   "shot": "J4-cloud-390-preise-ende.jpg"
+  },
+  {
+   "journey": "J4-cloud",
+   "step": "konto: Rechtliches am Seitenende erreichbar (nicht verdeckt)",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Rechtliche Links am Ende: Impressum → ?rechtliches=impressum · Datenschutz → ?rechtliches=datenschutz · AGB → ?rechtliches=agb · Widerruf → ?rechtliches=widerruf · Hinweise → ?rechtliches=hinweise · Impressum → ?rechtliches=impressum · Datenschutz → ?rechtliches=datenschutz · AGB → ?rechtliches=agb · Verträge hier kündigen → ?kuendigen",
+   "shot": "J4-cloud-390-konto-ende.jpg"
+  },
+  {
+   "journey": "J4-cloud",
+   "step": "Impressum öffnen: Inhalt",
+   "viewport": 390,
+   "result": "info",
+   "note": "Direktlink /?rechtliches=impressum zeigt: [] Impressum Impressum Datenschutz AGB Widerruf Hinweise Anbieter PLATZHALTER Vom Betreiber auszufüllen: VITE_LEGAL_OPERATOR in den Netlify-Variablen setzen (siehe SETUP.md „Rechtliches“). Anschrift PLATZHALTER Vom Betreiber auszufüllen: VITE_LEGAL_ADDRESS in den Netlify-Variablen setzen (siehe SETUP.md „Rechtliches“). Kontakt PLATZHALTER Vom Betreiber auszufül",
+   "shot": "J4-cloud-390-impressum.jpg"
+  },
+  {
+   "journey": "J0",
+   "step": "0,6 s nach dem Start",
+   "viewport": 390,
+   "result": "info",
+   "note": "Dialog „Intro“ sichtbar: 1",
+   "shot": "J0-390-00-0s6.jpg"
+  },
+  {
+   "journey": "J0",
+   "step": "2,5 s",
+   "viewport": 390,
+   "result": "info",
+   "note": "Intro noch da: true",
+   "shot": "J0-390-01-2s5.jpg"
+  },
+  {
+   "journey": "J0",
+   "step": "Intro vorbei, bedienbar?",
+   "viewport": 390,
+   "result": "lücke",
+   "note": "Erste Bedienelemente sichtbar nach 6.8 s (Sandbox, geteilte CPU); Intro noch sichtbar: true",
+   "shot": "J0-390-02-bedienbar.jpg"
+  },
+  {
+   "journey": "J0",
+   "step": "Intro nur einmal je Sitzung?",
+   "viewport": 390,
+   "result": "ok",
+   "note": "Zweiter Aufruf in derselben Sitzung zeigt das Intro: false"
+  },
+  {
+   "journey": "J0",
+   "step": "0,6 s nach dem Start",
+   "viewport": 768,
+   "result": "info",
+   "note": "Dialog „Intro“ sichtbar: 0",
+   "shot": "J0-768-00-0s6.jpg"
+  },
+  {
+   "journey": "J0",
+   "step": "2,5 s",
+   "viewport": 768,
+   "result": "info",
+   "note": "Intro noch da: true",
+   "shot": "J0-768-01-2s5.jpg"
+  },
+  {
+   "journey": "J0",
+   "step": "Intro vorbei, bedienbar?",
+   "viewport": 768,
+   "result": "lücke",
+   "note": "Erste Bedienelemente sichtbar nach 6.8 s (Sandbox, geteilte CPU); Intro noch sichtbar: true",
+   "shot": "J0-768-02-bedienbar.jpg"
+  },
+  {
+   "journey": "J0",
+   "step": "Intro nur einmal je Sitzung?",
+   "viewport": 768,
+   "result": "ok",
+   "note": "Zweiter Aufruf in derselben Sitzung zeigt das Intro: false"
+  },
+  {
+   "journey": "J0",
+   "step": "0,6 s nach dem Start",
+   "viewport": 1440,
+   "result": "info",
+   "note": "Dialog „Intro“ sichtbar: 1",
+   "shot": "J0-1440-00-0s6.jpg"
+  },
+  {
+   "journey": "J0",
+   "step": "2,5 s",
+   "viewport": 1440,
+   "result": "info",
+   "note": "Intro noch da: true",
+   "shot": "J0-1440-01-2s5.jpg"
+  },
+  {
+   "journey": "J0",
+   "step": "Intro vorbei, bedienbar?",
+   "viewport": 1440,
+   "result": "lücke",
+   "note": "Erste Bedienelemente sichtbar nach 7.1 s (Sandbox, geteilte CPU); Intro noch sichtbar: true",
+   "shot": "J0-1440-02-bedienbar.jpg"
+  },
+  {
+   "journey": "J0",
+   "step": "Intro nur einmal je Sitzung?",
+   "viewport": 1440,
+   "result": "ok",
+   "note": "Zweiter Aufruf in derselben Sitzung zeigt das Intro: false"
+  }
+ ]
+}

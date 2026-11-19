@@ -1,0 +1,43 @@
+/* Papierkorb (R11) – loaded with the lazy `TrashHost` chunk, never with the first load.
+   motion-exception: trash-countdown – a transform-only bar (scaleX 1 → 0) that runs ONCE per entry (the undo window) and stops
+   (`animation-play-state: paused`) while the pill is hovered / focused; the lid closes once. Nothing loops. */
+@keyframes trash-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes trash-lid {
+  0%,
+  45% {
+    transform: rotate(-28deg) translateY(-0.5px);
+  }
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+}
+.trash-bar {
+  transform-origin: left center;
+  animation-name: trash-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+[data-trash-pill][data-held] .trash-bar,
+[data-trash-pill][data-state="restoring"] .trash-bar {
+  animation-play-state: paused;
+}
+.trash-lid {
+  transform-box: fill-box;
+  transform-origin: 90% 100%;
+  animation: trash-lid 0.62s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trash-lid {
+    animation: none;
+  }
+  .trash-bar {
+    display: none;
+  }
+}

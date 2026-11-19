@@ -1,0 +1,64 @@
+/* Papier- und Tinten-Insel (Paket V): die zwei Fenster nach Vorbild (Anmeldekarte, Bezahlfenster) sehen in BEIDEN Themen gleich aus –
+   hell wie im Vorbild, das Band der Anmeldekarte dunkel. `.tj-paper` wiederholt die Werte des hellen Themas (themes.css
+   `:root[data-theme="light"]`), `.tj-ink` die des dunklen (tokens.css / „dark islands“) – synchron halten. Nur Tokens, keine neuen Farben;
+   Akzent bleibt `--color-signal` (folgt der Akzentwahl). Wird nur mit den Lazy-Chunks der beiden Fenster geladen. */
+/* ---------------------------------------------------------------- Papier-Insel (Werte des hellen Themas) */
+.tj-paper {
+  color-scheme: only light;
+  --color-ink-950: #f2f2f0;
+  --color-ink-900: #ebebe9;
+  --color-ink-850: #fdfdfc;
+  --color-ink-800: #f6f6f5;
+  --color-ink-750: #efefed;
+  --color-ink-700: #e6e6e4;
+  --color-line: #dfdfdc;
+  --color-line-2: #cfcfcb;
+  --color-fg: #121212;
+  --color-mute: #565656;
+  --color-faint: #6b6b6b;
+  --color-faint-line: #6b6b6b;
+  --color-steel: #1a1a1a;
+  --color-win: #0a783b;
+  --color-loss: #cc1e29;
+  --color-warn: #9a5b00;
+  --color-white: #0b0b0b;
+  --color-black: #ebebe9;
+  --veil-rgb: 11 11 11;
+  --veil-ink-rgb: 242 242 240;
+  --fg-rgb: 18 18 18;
+  --shade: 0.4;
+  --color-danger-text: #c0141f;
+  --color-primary-btn-to: #2c2c2c;
+  --shadow-btn-sheen: inset 0 1px 0 rgb(255 255 255 / 0.16);
+  --ring-focus-input: 0 0 0 3px rgb(0 0 0 / 0.06);
+  --ring-glow-input: 0 0 0 3px rgb(0 0 0 / 0.06), 0 0 24px rgb(0 0 0 / 0.04);
+  --ring-glow-invalid: 0 0 0 3px rgb(204 30 41 / 0.14), 0 0 22px rgb(204 30 41 / 0.1);
+  --ring-glow-btn: 0 0 0 2px rgb(242 242 240), 0 0 0 4px rgb(11 11 11 / 0.72), 0 0 22px rgb(11 11 11 / 0.1);
+  color: var(--color-fg);
+}
+
+/* Tinten-Insel (Werte des dunklen Themas = tokens.css / themes.css „dark islands“; synchron halten): das Band liegt in der Papier-Insel
+   und braucht seine Tinte zurück, in beiden Themen. */
+.tj-ink {
+  color-scheme: only dark;
+  --color-ink-950: #040404;
+  --color-ink-900: #0a0a0a;
+  --color-ink-850: #111;
+  --color-ink-800: #161616;
+  --color-ink-750: #1c1c1c;
+  --color-ink-700: #242424;
+  --color-line: #1f1f1f;
+  --color-line-2: #2c2c2c;
+  --color-fg: #f2f2f2;
+  --color-mute: #9b9b9b;
+  --color-faint: #8a8a8a;
+  --color-faint-line: #8a8a8a;
+  --color-white: #fff;
+  --color-black: #000;
+  --veil-rgb: 255 255 255;
+  --veil-ink-rgb: 4 4 4;
+  --fg-rgb: 242 242 242;
+  --shade: 1;
+  color: var(--color-fg);
+}
+
