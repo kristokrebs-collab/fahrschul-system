@@ -59,6 +59,19 @@ test.describe("Konto-Pflicht: das Tor vor der App", () => {
 
     await signup.getByLabel("E-Mail").fill(EMAIL);
     await signup.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
+    // the strength hint is ONE line, also with its longest word in front (Runde 18: „Sehr stark · Mindestens 10 Zeichen.“ broke
+    // into two on the landscape card, the second lay on the consent line) – the segments give way instead
+    await signup.getByLabel("Passwort", { exact: true }).fill("Ein-sehr-langes-Passwort-42!x");
+    const hint = await signup.locator(".aw-hint").evaluate((h) => {
+      const words = h.querySelector(":scope > span:last-child")!.getBoundingClientRect();
+      const seg = h.querySelector(".aw-seg")!.getBoundingClientRect();
+      return { text: h.textContent ?? "", lineH: parseFloat(getComputedStyle(h).lineHeight) || parseFloat(getComputedStyle(h).fontSize) * 1.5, wordsH: words.height, gap: words.left - seg.right, segW: seg.width };
+    });
+    expect(hint.text, "the hint names the strength").toMatch(/stark/i);
+    expect(hint.wordsH, `one line: ${JSON.stringify(hint)}`).toBeLessThan(hint.lineH * 1.6);
+    expect(hint.gap, "words and segments do not touch").toBeGreaterThanOrEqual(4);
+    expect(hint.segW, "the segments are still there").toBeGreaterThan(30);
+    await signup.getByLabel("Passwort", { exact: true }).fill(PASSWORD);
     const consent = signup.getByTestId("signup-consent").getByRole("checkbox");
     if (await consent.count()) await consent.check();
     await signup.getByRole("button", { name: "Konto erstellen", exact: true }).click();

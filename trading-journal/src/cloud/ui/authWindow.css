@@ -472,13 +472,21 @@ button.aw-ficon:focus-visible {
   font-size: max(11px, 1.95cqh);
   color: var(--color-mute);
 }
+/* the words never wrap (a second line lay on the consent line below – Runde 18): the segments give way instead, down to short dashes */
+.aw-hint > span:last-child {
+  flex: none;
+  white-space: nowrap;
+}
 .aw-seg {
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   gap: 1cqw;
 }
 .aw-seg span {
   display: block;
+  flex: 0 1 4cqw;
+  min-width: 1.4cqw;
   width: 4cqw;
   height: max(2px, 0.35cqh);
   border-radius: 999px;
@@ -689,6 +697,7 @@ button.aw-ficon:focus-visible {
   font-size: 11.5px;
 }
 .aw-card[data-orient="portrait"] .aw-seg span {
+  flex-basis: 9cqw;
   width: 9cqw;
   height: 2px;
 }

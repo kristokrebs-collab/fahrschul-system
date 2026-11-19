@@ -90,11 +90,17 @@ const viewport = (): { w: number; h: number } => {
  */
 /**
  * The caption's own ground (Runde 18, seen on a phone): where controls stand right under the trigger – the trade detail's „Löschen ·
- * Schließen · Bearbeiten“ – their words showed through the pool and ran into „Kanal wählen“. A soft plate of the ground colour behind
- * the words only; the margins give back what the padding takes, so the words stand exactly where they stood. Inline: no new class in
- * the first-load stylesheet.
+ * Schließen · Bearbeiten“ – their words showed through the pool and ran into „Kanal wählen“. A soft pool of the ground colour behind
+ * the words only: dense under them, fading out to every side (a plate with an edge cut the words beside it in half – second look).
+ * The margins give back what the padding takes, so the words stand exactly where they stood. Inline: no new class in the first-load
+ * stylesheet.
  */
-const CAPTION_PLATE = { padding: "3px 10px", margin: "-3px 0", borderRadius: 999, background: "color-mix(in srgb, var(--color-ink-950) 94%, transparent)" } as const;
+const CAPTION_PLATE = {
+  padding: "12px 36px",
+  margin: "-12px 0",
+  maxWidth: 332,
+  background: "radial-gradient(closest-side, color-mix(in srgb, var(--color-ink-950) 96%, transparent) 56%, transparent)",
+} as const;
 
 function Caption({ fan, text }: { fan: OpenFan; text: string }) {
   const side = captionSide(fan, { y: fan.oy }, { h: fan.vh }, RADIAL_HUB);
