@@ -129,6 +129,36 @@ test.describe("Navigation in vier Gruppen", () => {
     await expectNoHorizontalScroll(page);
   });
 
+  for (const width of [360, 320]) {
+    test(`${width} px mit Live-Preis: der Preis liegt nicht über dem Logo, nichts ragt aus der Kopfzeile (Runde 18)`, async ({ page }, info) => {
+      test.skip(!mobile(info.project.name), "phone only");
+      // a live price in the header: with the „+“ beside it the right-hand group was wider than the row and lay over the logo
+      await seed(page, { synth: {} });
+      await page.setViewportSize({ width, height: 740 });
+      await page.goto("/#trades");
+      const ticker = page.locator("[data-header-ticker]");
+      await expect(ticker).toBeAttached({ timeout: 20_000 });
+      if (width >= 360) {
+        await expect(ticker).toBeVisible({ timeout: 20_000 });
+        await expect.poll(async () => (await ticker.boundingBox())?.width ?? 0).toBeGreaterThan(20);
+        const logo = (await page.locator("header button").first().boundingBox())!;
+        const price = (await ticker.boundingBox())!;
+        expect(price.x, `price ${JSON.stringify(price)} right of the logo ${JSON.stringify(logo)}`).toBeGreaterThanOrEqual(logo.x + logo.width);
+      } else {
+        // below 360 px the price steps aside by design
+        await expect(ticker).toBeHidden();
+      }
+      for (const b of await page.locator("header").getByRole("button").all()) {
+        if (!(await b.isVisible())) continue;
+        const r = (await b.boundingBox())!;
+        expect(r.x >= 0 && r.x + r.width <= width, `header control ${JSON.stringify(r)} inside ${width}`).toBe(true);
+      }
+      // „Trade eintragen“ stays one tap away: the centre of the bar
+      await expect(page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" })).toBeVisible();
+      await expectNoHorizontalScroll(page);
+    });
+  }
+
   for (const theme of ["dark", "light"] as const) {
     test(`Barrierefreiheit der Leiste / Seitenleiste und der Kopfleiste (${theme})`, async ({ page }) => {
       await seed(page, { extra: { "tj2-theme": JSON.stringify(theme) } });
