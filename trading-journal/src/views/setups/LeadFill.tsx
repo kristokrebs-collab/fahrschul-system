@@ -11,6 +11,8 @@ export const LEAD_FILL = {
   /**
    * Marker side padding (em), cancelled by an equal negative margin: the word keeps its exact advance (identical
    * wrapping at the hand-off), the bar reaches a little into the spaces around it but never a neighbouring glyph.
+   * Where a glyph follows (or precedes) the word DIRECTLY – „… schwarz auf weiß, zum …“ – that side keeps its padding as real
+   * advance (no negative margin there, `markerEdges`): the bar lay over half of the comma (Funktionsprüfung Runde 18).
    */
   markerPad: 0.1,
   markerClass: "-mx-[0.1em]",
@@ -25,6 +27,18 @@ export interface LeadFillProps {
   /** ms before the ember starts (let the page enter first). */
   delayMs?: number;
   className?: string;
+}
+
+/**
+ * The marker's margins where a glyph touches the word: no negative margin on that side, so the bar's padding pushes the glyph clear
+ * instead of covering it. `undefined` when both neighbours are spaces (or the text's edge) – the class alone applies.
+ */
+export function markerEdges(text: string, at: number, length: number): { marginLeft?: number; marginRight?: number } | undefined {
+  const glyph = (ch: string | undefined) => ch !== undefined && !/\s/.test(ch);
+  const before = glyph(text[at - 1]);
+  const after = glyph(text[at + length]);
+  if (!before && !after) return undefined;
+  return { ...(before ? { marginLeft: 0 } : {}), ...(after ? { marginRight: 0 } : {}) };
 }
 
 function seen(key: string): boolean {
@@ -68,7 +82,14 @@ export function LeadFill({ text, storageKey, highlight, delayMs = 0, className }
   return (
     <p className={className}>
       {text.slice(0, at)}
-      <TactileHighlight tone="invert" active={phase === "marker" ? true : undefined} padX={LEAD_FILL.markerPad} tab={false} className={LEAD_FILL.markerClass}>
+      <TactileHighlight
+        tone="invert"
+        active={phase === "marker" ? true : undefined}
+        padX={LEAD_FILL.markerPad}
+        tab={false}
+        className={LEAD_FILL.markerClass}
+        style={markerEdges(text, at, highlight.length)}
+      >
         {highlight}
       </TactileHighlight>
       {text.slice(at + highlight.length)}

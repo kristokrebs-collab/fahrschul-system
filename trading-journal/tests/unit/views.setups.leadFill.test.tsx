@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { LeadFill } from "@/views/setups/LeadFill";
+import { LeadFill, markerEdges } from "@/views/setups/LeadFill";
 
 describe("LeadFill (page subtitle recipe)", () => {
   beforeEach(() => sessionStorage.clear());
@@ -30,6 +30,23 @@ describe("LeadFill (page subtitle recipe)", () => {
     expect(marker.style.padding).toBe("0px 0.1em");
     expect(marker.className).toContain("-mx-[0.1em]");
     expect(marker.querySelectorAll("i")).toHaveLength(1);
+  });
+
+  it("a glyph that touches the key word is pushed clear, not covered: that side has no negative margin (Runde 18: „… schwarz auf weiß, zum …“)", () => {
+    sessionStorage.setItem("tj2-fill-test", "1");
+    const text = "Tag, Woche, Monat, Quartal, Jahr – dein Trading schwarz auf weiß, zum Exportieren und Drucken.";
+    const { container } = render(<LeadFill text={text} storageKey="tj2-fill-test" highlight="schwarz auf weiß" />);
+    const marker = container.querySelector('[data-pulse="tactile-highlight"]') as HTMLElement;
+    // the comma follows directly: the right padding is real advance there; the left side (a space) keeps the class's negative margin
+    expect(marker.style.marginRight).toBe("0px");
+    expect(marker.style.marginLeft).toBe("");
+    expect(marker.className).toContain("-mx-[0.1em]");
+    // spaces (or the text's edge) on both sides: the class alone, no inline margin
+    expect(markerEdges("a wort b", 2, 4)).toBeUndefined();
+    expect(markerEdges("wort b", 0, 4)).toBeUndefined();
+    expect(markerEdges("a wort", 2, 4)).toBeUndefined();
+    expect(markerEdges("a „wort“ b", 3, 4)).toEqual({ marginLeft: 0, marginRight: 0 });
+    expect(markerEdges("a (wort b", 3, 4)).toEqual({ marginLeft: 0 });
   });
 
   it("without a matching key word it renders the plain lead", () => {

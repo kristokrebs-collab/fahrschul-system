@@ -75,6 +75,8 @@ export interface TactileHighlightProps {
    * that would cross the preceding text or a panel edge.
    */
   tab?: boolean;
+  /** Extra inline style of the marker's root (e.g. a margin on one side only, `LeadFill`). */
+  style?: CSSProperties;
 }
 
 interface Engine {
@@ -168,7 +170,7 @@ function createEngine(root: HTMLElement, bar: HTMLElement, tab: HTMLElement | nu
  * word to the left only for ~90 ms (aria-hidden, no layout). Without `playOnView`/`active` the marker is static.
  * Reduced motion: final state at once.
  */
-export function TactileHighlight({ children, tone = "invert", playOnView = false, active, onDone, className, padX = CONFIG.padXEm, tab: withTab = true }: TactileHighlightProps) {
+export function TactileHighlight({ children, tone = "invert", playOnView = false, active, onDone, className, padX = CONFIG.padXEm, tab: withTab = true, style }: TactileHighlightProps) {
   const reduced = useReducedFx();
   const landed = useIntroLanded();
   const rootRef = useRef<HTMLSpanElement | null>(null);
@@ -255,7 +257,7 @@ export function TactileHighlight({ children, tone = "invert", playOnView = false
   const t = CONFIG.tones[tone];
   const box: CSSProperties = { borderRadius: CONFIG.radius };
   return (
-    <span ref={rootRef} className={cn("relative inline-block whitespace-nowrap", className)} style={{ padding: `0 ${padX}em`, ...box }} data-pulse="tactile-highlight" data-tone={tone}>
+    <span ref={rootRef} className={cn("relative inline-block whitespace-nowrap", className)} style={{ padding: `0 ${padX}em`, ...box, ...style }} data-pulse="tactile-highlight" data-tone={tone}>
       {withTab && (
         <i
           ref={tabRef}
