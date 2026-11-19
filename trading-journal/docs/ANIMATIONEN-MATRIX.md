@@ -280,6 +280,32 @@ Stand 2026-11-11. Auftrag des Nutzers unverändert: das Gerüst bleibt, Einstieg
 
 **Nicht gemessen:** Bestell- und Bezahlfenster (das Demo-Konto hat schon Premium), Upgrade-, Review- und CSV-Blatt, Canvas-Charts und Zahlenrollen (für einen DOM-Messer unsichtbar), echte Geräte.
 
+## Runde 16 und 17 – Ausgänge der Blätter, Stücke an Ort und Stelle (nachgetragen)
+
+Stand 2026-11-19. Beide Runden haben ihre Messungen nur in den Commit-Texten hinterlassen; hier stehen sie, damit die Matrix vollständig ist. Keiner der 177 Punkte ändert seinen Status.
+
+| Runde | Stelle | Gemessen vorher | Jetzt | Datei | Beleg |
+| --- | --- | --- | --- | --- | --- |
+| Runde 16 | Blätter ohne Morph (40 Stück: Check-in, Rechtstexte, Tastenkürzel, Import, Upgrade, Assistent …) | Desktop: der Schleier war nach 150 ms weg, die Fläche stand noch voll da und blendete dann 120 ms linear aus. Handy: eine geleerte Fläche fuhr 0,5 s hinunter, so lang wie der Auftritt | Desktop: der Inhalt blendet aus, die geleerte Fläche sinkt beschleunigend weg (`tween.sheetLeave`), der Schleier nimmt den ganzen Weg (`tween.dimLeave`) und endet im selben Bild. Handy: das Blatt fällt mit seinem Inhalt in 0,3 s hinaus (`tween.sheetDrop`), die Seite ist 0,2 s früher bedienbar. „Trade eintragen / bearbeiten“ bleibt exakt wie es war (`exitStyle="classic"`), Morph-Blätter und Wischgesten ebenfalls | `src/motion/Sheet.tsx`, `tokens.ts` | `tests/unit/motion.round16.test.tsx`; im Browser bildweise bei 1440 und 390 px |
+| Runde 17 | Kleine Stücke, die nach einer Handlung im selben Bild dastanden: RSI-Option unter „Chart spiegeln“ (Markt), Lektion der Woche beim Kontowechsel (Coach), Filterzeile mit „Filter zurücksetzen“ (Entscheidungsgrundlagen), Namensfeld von „+ Ansicht speichern“ (Alle Trades), Rückfrage beim Wiederherstellen eines Server-Backups (Konto) | ein Mess-Crawl hat auf allen 19 Seiten bei 1440 und 390 px rund 1 000 Bedienelemente einmal ausgelöst; diese fünf erschienen ohne Bewegung | sie steigen ein: eine native Animation auf dem Stück selbst (Deckkraft und 6 px Anstieg, 0,3 s), kein Wrapper, reduzierte Bewegung = sofort da | `src/motion/Arrive.tsx` und die fünf Stellen | `tests/unit/motion.round17.test.tsx` |
+
+Der Commit von Runde 17 ließ `tsc -b` scheitern (ein Indexzugriff im neuen Test, unter `noUncheckedIndexedAccess` „möglicherweise undefined“); CI und Netlify-Vorschau von PR #11 waren deshalb rot. Runde 18 hat das als Erstes behoben (nur der Test).
+
+## Runde 18 – Funktionsprüfung zuerst; Bewegung nur dort, wo sie zu einem Fund gehört
+
+Stand 2026-11-19. Diese Runde war eine Funktionsprüfung (vier unabhängige Durchgänge im Browser, `docs/audit/STATUS.md`, „Nachtrag Runde 18“). An der Bewegung wurde nichts umgebaut: bildweise Aufnahmen von 26 Interaktionen am Desktop (Seitenwechsel, Trade-Detail, Menü, Assistent, Filter, Auswahllisten, Berichte, Editor, Suche) zeigten Auftritte in Folge und Ausgänge mit Weg, wie in Runde 13 bis 17 beschrieben. Die Aufnahmen liefen, während vier Prüfer dieselben vier Kerne belegten; Dauern daraus sind nicht belastbar (ein Seitenwechsel brauchte dort rund 0,5 s bis zum ersten Bild der neuen Seite), Reihenfolge und Präsenz schon. Keiner der 177 Punkte ändert seinen Status.
+
+| Stelle | Vorher | Jetzt | Datei | Beleg |
+| --- | --- | --- | --- | --- |
+| Markierung im Seitenuntertitel (alle Seiten mit `LeadFill`) | der weiße Balken um das Schlüsselwort ragt mit Absicht 0,1 em in die Leerzeichen daneben; folgte direkt ein Komma oder Punkt („… schwarz auf weiß, zum …“, „… öffnet den Trade.“), lag er über dessen halber Breite | wo ein Zeichen das Wort berührt, bleibt die Polsterung auf dieser Seite echter Vorschub (kein negativer Rand), das Zeichen steht frei. Mit Leerzeichen auf beiden Seiten ändert sich nichts | `src/views/setups/LeadFill.tsx` (`markerEdges`), `src/motion/pulse/TactileHighlight.tsx` | `tests/unit/views.setups.leadFill.test.tsx`; Browser (Berichte, 1440 px): rechte Kante des Balkens 506,8 px, linke Kante des Kommas 506,8 px |
+| Löschen mit der Papierkorb-Pille (Trade, Grundlage, „Alles ersetzen“) | das echte Löschen begann erst mit dem Spinner, nach etwa 1,5 s Wort-Animation; ein Neuladen dazwischen behielt den Eintrag | das Löschen beginnt mit der Bestätigung; die Animation ist dieselbe, der Spinner zeigt weiter genau dieses Versprechen und schließt seinen Ring nie über einem gescheiterten Löschen | `src/motion/BinDelete.tsx` (`useBinDelete.start`) | `tests/unit/motion.binDelete.test.tsx`; Browser: 300 ms nach „Ja, löschen“ steht der Trade nicht mehr im Speicher (13 → 12), nach Neuladen ebenso |
+| Trade-Detail auf dem Handy | „Löschen · Schließen · Bearbeiten“ standen am Ende von rund 1 230 px Inhalt in einem 776 px hohen Blatt | die Zeile bleibt am unteren Rand des Blatts stehen, der Inhalt scrollt darunter durch; am Ende des Inhalts sitzt sie genau dort, wo sie immer saß (kein Sprung). Desktop unverändert | `src/overlays/tradeDetail.css` (Lazy-CSS des Detail-Chunks), `TradeDetail.tsx` | Browser 390 und 360 px: alle drei Knöpfe beim Öffnen im Bild und treffbar; Desktop: `position` nicht `sticky` |
+| Zwei neue Rückfragen an Ort und Stelle: „Gelesen als 30 … 30000 gemeint“ (Einstellungen), „Der Stop liegt über dem Einstieg …“ (Trade-Formular) | neu in dieser Runde | steigen ein wie die Stücke aus Runde 17 (`Arrive`) | `src/views/settings/fields.tsx`, `src/overlays/TradeEditor.tsx` | `tests/unit/views.settings.konten.test.tsx`, `tests/unit/overlays.tradeEditor.test.tsx` |
+
+**Bewusst nicht angefasst:** Toasts liegen auf dem Handy für einige Sekunden über einem offenen Blatt (zum Beispiel „Trade gespeichert“ über dem Feld „Learning“ von „Kurz reflektieren“). Sie verschwinden von selbst; eine andere Position für Toasts bei offenem Blatt wäre ein Eingriff in einen Baustein, den jede Seite benutzt, und gehört an ein echtes Gerät. Der Seitenwechsel selbst (Runde 5 bis 10, `src/app/PageHost.tsx`) ist nicht verändert.
+
+**Nicht gemessen:** Dauern auf ruhiger Maschine, echte Geräte, Canvas-Charts.
+
 ## Die Matrix
 
 Spalten: Nr · Name · Quelle · Status · Stelle im Code · Entscheidung · Begründung.

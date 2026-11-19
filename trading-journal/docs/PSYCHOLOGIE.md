@@ -78,6 +78,8 @@ geprüft und stellen sie nicht als eigene Tatsachen dar.
 
 ## 7. Offen / nicht Teil dieses Pakets
 
+- **Coach-Hinweis nach dem Speichern (Runde 18).** Der Hinweis nach einem Trade („Regelverstoß – kein Stop … Pause“) gilt einer Entscheidung von heute. Ein importierter Eintrag (CSV, Börsen-Abgleich, Screenshot) weckt ihn nur noch, wenn der Trade selbst vom letzten Tag ist (`liveDecision`, `src/views/coach/CoachWatcher.tsx`); ein Import alter Trades ist Geschichte, kein Anlass für eine Pause. Von Hand eingetragene Trades sind unverändert.
+
 - **Erinnerung nur in der App.** Eine Erinnerung per E-Mail oder Web-Push braucht den Server (Cron, Versand) und eine Einwilligung; sie ist nicht gebaut und wird nicht versprochen.
 - **Pause nach Verlusten** ist neu „aus“ (siehe 4): Bestätigung erbeten.
 - **Rechtstexte.** Die Rechtsbezüge in 3 sind Hinweise; die Prüfung steht aus ([RECHT-CHECKLISTE](RECHT-CHECKLISTE.md)).

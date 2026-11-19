@@ -1,5 +1,6 @@
 import { memo, type ReactNode } from "react";
 import { parseNumber, thousandsReading, toInputString } from "@/lib/parse";
+import { Arrive } from "@/motion/Arrive";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import type { DraftTextKey, SettingsDraft } from "./draft";
@@ -28,17 +29,18 @@ export const DraftField = memo(function DraftField({ id, label, help, numeric = 
   const htmlFor = `s-${id}`;
   // „30.000“ is read as 30 (one dot = the decimal point, as everywhere in the journal). Someone who means thirty thousand is ASKED,
   // exactly like in the trade form – a Startkapital of 30 was saved without a word and the overview then read „+2.590 %“
-  // (Funktionsprüfung Runde 18). One tap takes the other reading; nothing is re-read silently.
+  // (Funktionsprüfung Runde 18). One tap takes the other reading; nothing is re-read silently. The question appears in place after an
+  // action, so it rises in (`Arrive`, Runde 17) instead of standing there within one frame.
   const alt = numeric ? thousandsReading(draft[id]) : null;
   const read = alt == null ? null : parseNumber(draft[id]);
   const dotHint =
     alt == null ? null : (
-      <span data-testid={`dot-hint-${id}`} className="text-mute">
+      <Arrive as="span" data-testid={`dot-hint-${id}`} className="inline-block text-mute">
         {read == null ? "So nicht lesbar." : `Gelesen als ${toInputString(read)} – der Punkt gilt als Komma.`}{" "}
         <button type="button" className="touch-hit font-medium text-fg underline underline-offset-2" onClick={() => onChange(id, String(alt))}>
           {alt} gemeint
         </button>
-      </span>
+      </Arrive>
     );
   return (
     <Field

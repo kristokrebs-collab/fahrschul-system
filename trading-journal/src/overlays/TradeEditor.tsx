@@ -34,6 +34,7 @@ import { ShotsField } from "@/journal/screenshots/ShotsField";
 import { clearShotFill, markText, useShotFill, type FillKey, type FillMark } from "@/journal/editor/shotFill";
 import { RatingDots } from "@/journal/ui/RatingDots";
 import { TagInput, tagSuggestions } from "@/journal/ui/TagInput";
+import { Arrive } from "@/motion/Arrive";
 import { BinDelete, useBinDelete, useKept } from "@/motion/BinDelete";
 import { confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
 import { AutoHeight } from "@/views/trades/AutoHeight";
@@ -1156,9 +1157,9 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     const far = t.side === "long" ? stop > entry : stop < entry;
     if (!far) return null;
     return (
-      <span data-testid="stop-side-hint" className="text-warn">
+      <Arrive as="span" data-testid="stop-side-hint" className="inline-block text-warn">
         {t.side === "long" ? "Der Stop liegt über dem Einstieg." : "Der Stop liegt unter dem Einstieg."} Für R zählt der ursprüngliche Stop – ein nachgezogener gehört in die Notiz.
-      </span>
+      </Arrive>
     );
   };
   const priceField = (k: "entry" | "stop" | "target" | "exit", label: string) => {

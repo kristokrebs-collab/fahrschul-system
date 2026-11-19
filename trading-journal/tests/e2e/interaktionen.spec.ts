@@ -277,7 +277,9 @@ test.describe("Radial Share", () => {
     // the pill handed its place to the hub with the ✕ (the trigger keeps its box, hidden meanwhile)
     await expect(trigger.locator("[data-radial-icon]")).toHaveAttribute("data-radial-icon", "close");
     await expect(page.getByTestId("radial-hub")).toBeVisible();
-    // the reference's discs are opaque surfaces (no blur), 48 px
+    // the reference's discs are opaque surfaces (no blur), 48 px – measured once the disc has landed: it scales in from 0.3, and on a
+    // fast machine the first read came in its first frame (14.4 px = 0.3 × 48, every run; also on the state before Runde 18)
+    await expect.poll(() => copy.evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThanOrEqual(44);
     const disc = await copy.evaluate((el) => {
       const face = el.firstElementChild as HTMLElement;
       return { blur: getComputedStyle(face).backdropFilter, bg: getComputedStyle(face).backgroundColor, w: el.getBoundingClientRect().width };
