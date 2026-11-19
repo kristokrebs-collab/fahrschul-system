@@ -4,7 +4,7 @@
  */
 export { CoachView, COACH_LEAD_FILL } from "./CoachView";
 export { TradeCoachPanel } from "./TradeCoachPanel";
-export { CoachWatcher, useCoachWatch, changedIds, fresh, userChanged, BULK_SAVE, FRESH_MS, MACHINE_FIELDS } from "./CoachWatcher";
+export { CoachWatcher, useCoachWatch, changedIds, fresh, liveDecision, userChanged, BULK_SAVE, FRESH_MS, IMPORT_LIVE_MS, MACHINE_FIELDS } from "./CoachWatcher";
 export { useCoachUi, CHAT_MAX, type ChatEntry, type LiveAlert, type AiState } from "./coachStore";
 export { eventsOf, useCoach, useCoachBase } from "./hooks";
 export { useAiAvailable, aiServerEnabled } from "./ask";

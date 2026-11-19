@@ -10,11 +10,14 @@
  * note on the page it landed on.
  */
 import { useEffect, useMemo, useState } from "react";
+import { useMediaQuery } from "@/motion/useMediaQuery";
 import { SearchField, type SearchChip, type SearchOption } from "@/primitives/SearchField";
 
 export const NAV_FINDER_STRINGS = {
   label: "Was willst du tun?",
   placeholder: "Was suchst du? z. B. Einstellungen, Wochenbericht, Daten sichern",
+  /** phones: the long line has ≈ 160 px of room and was cut in the middle of a letter (Funktionsprüfung Runde 18) */
+  placeholderShort: "Was suchst du?",
   all: "Alle Funktionen",
   allHint: "Alle Funktionen ansehen",
   ask: "Assistent fragen",
@@ -57,6 +60,7 @@ export function NavFinder({ onOpen, onAll, onAsk }: NavFinderProps) {
     };
   }, [query]);
 
+  const wide = useMediaQuery("(min-width: 640px)", true);
   const ready = found.done === query;
   const all = useMemo(() => (ready ? found.options : []), [ready, found.options]);
   const visible = useMemo(() => all.filter((x) => filter === "all" || x.kind === filter).slice(0, 6), [all, filter]);
@@ -112,7 +116,7 @@ export function NavFinder({ onOpen, onAll, onAsk }: NavFinderProps) {
         size="lg"
         label={NAV_FINDER_STRINGS.label}
         labelHidden
-        placeholder={NAV_FINDER_STRINGS.placeholder}
+        placeholder={wide ? NAV_FINDER_STRINGS.placeholder : NAV_FINDER_STRINGS.placeholderShort}
         value={q}
         onChange={(v) => {
           setQ(v);

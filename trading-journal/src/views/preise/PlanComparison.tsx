@@ -235,7 +235,8 @@ export function PlanComparison({ className }: { className?: string }) {
                       <span className="sm:hidden">{PREISE.currentShort}</span>
                     </span>
                   )}
-                  <span className={cn("max-w-full truncate text-[10.5px] font-semibold tracking-tight sm:text-[12px] sm:tracking-normal", i === ORIGIN_COL || i === mine ? "text-fg" : "text-mute")}>{PLAN_CATALOG[p].name}</span>
+                  {/* never ellipsed: at 360 px „Premium“ is 1 px wider than its column and read „Premi…“ (Funktionsprüfung Runde 18) */}
+                  <span className={cn("whitespace-nowrap text-[10.5px] font-semibold tracking-tight sm:text-[12px] sm:tracking-normal", i === ORIGIN_COL || i === mine ? "text-fg" : "text-mute")}>{PLAN_CATALOG[p].name}</span>
                 </span>
               ))}
             </div>

@@ -361,6 +361,13 @@ function Panel({ reduced, onFling }: { reduced: boolean; onFling: (info: SwipeDi
       return;
     }
     if (typing) return;
+    // Type-ahead (Funktionsprüfung Runde 18): the menu opens with the focus on its close button – someone who presses Strg+K and starts
+    // typing „Einstell…“ typed into nothing, and Enter or the first space closed the menu. A letter now moves the focus into the search
+    // field, where the same keystroke lands (the digits stay the page shortcuts below).
+    if (e.key.length === 1 && /\p{L}/u.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      ref.current?.querySelector<HTMLInputElement>("input[data-cmd-item]")?.focus();
+      return;
+    }
     const digit = Number(e.key);
     const target = Number.isInteger(digit) && digit >= 1 && digit <= PAGES.length && !e.metaKey && !e.ctrlKey ? PAGES[digit - 1] : undefined;
     if (target) {

@@ -68,7 +68,8 @@ function LinkRow({ row }: { row: Row }) {
       </span>
       <span className="grid min-w-0 flex-1 gap-0.5">
         <span className="text-[13.5px] font-medium text-fg">{row.label}</span>
-        <span className="truncate text-[12px] text-mute">{row.sub}</span>
+        {/* wraps on a phone (Funktionsprüfung Runde 18: „Login, Sync, 2FA, Datenschutz, Börsen-…“ was cut at 390 px) */}
+        <span className="text-[12px] text-mute">{row.sub}</span>
       </span>
       <span aria-hidden="true" className="shrink-0 text-mute transition-transform duration-200 group-hover/row:translate-x-0.5">
         →

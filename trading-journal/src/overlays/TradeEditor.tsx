@@ -131,6 +131,8 @@ export const EDITOR_MESSAGES = {
   date: "Bitte Datum angeben.",
   /** a year nobody traded in ("26" typed as the year reads as the year 26) or far ahead – the field shows 10.11.26 either way */
   dateRange: "Bitte das Datum prüfen: Das Jahr liegt außerhalb des plausiblen Bereichs (vierstellig eingeben, z. B. 2026).",
+  /** a year far ahead: „vierstellig eingeben“ made no sense for 2031 (Funktionsprüfung Runde 18) */
+  dateFuture: "Bitte das Datum prüfen: Das Jahr liegt zu weit in der Zukunft.",
   entry: "Bitte einen Einstiegspreis angeben.",
   // names the third way out (Funktionsprüfung Runde 18): in the short form the status sits in the closed group „Details“, and a new
   // user who wanted to note an OPEN position was told to enter an exit or a P&L – neither exists yet. The group opens with the message.
@@ -505,7 +507,7 @@ export const MAX_FORM_NUMBER = 1e12;
  */
 export function validateRecord(rec: ReturnType<typeof toRecord>, rawChart: string, j?: JournalForm): string | null {
   if (!rec.date) return EDITOR_MESSAGES.date;
-  if (!plausibleTradeDate(rec.date)) return EDITOR_MESSAGES.dateRange;
+  if (!plausibleTradeDate(rec.date)) return Number(/^(\d{4,6})-/.exec(rec.date)?.[1]) > new Date().getFullYear() ? EDITOR_MESSAGES.dateFuture : EDITOR_MESSAGES.dateRange;
   if (!(rec.entry != null && rec.entry > 0)) return EDITOR_MESSAGES.entry;
   if (rec.status !== "open" && rec.pnlManual == null) {
     if (!(rec.exit != null && rec.exit > 0)) {
@@ -546,6 +548,7 @@ export function invalidFieldOf(problem: string): InvalidField | null {
   switch (problem) {
     case EDITOR_MESSAGES.date:
     case EDITOR_MESSAGES.dateRange:
+    case EDITOR_MESSAGES.dateFuture:
       return "date";
     case EDITOR_MESSAGES.entry:
       return "entry";
@@ -1143,11 +1146,26 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
       </span>
     );
   };
+  // A stop on the far side of the entry (above it for a long, below it for a short) was saved without a word and gave a POSITIVE R on a
+  // winner – R is the distance between entry and stop (Funktionsprüfung Runde 18). It is not refused: a stop that was trailed into profit is
+  // a real thing to note. The field says what R needs; nothing is blocked.
+  const stopSideHint = (): ReactNode => {
+    const entry = parseNumber(d.entry);
+    const stop = parseNumber(d.stop);
+    if (entry == null || stop == null || entry <= 0 || stop <= 0 || stop === entry) return null;
+    const far = t.side === "long" ? stop > entry : stop < entry;
+    if (!far) return null;
+    return (
+      <span data-testid="stop-side-hint" className="text-warn">
+        {t.side === "long" ? "Der Stop liegt über dem Einstieg." : "Der Stop liegt unter dem Einstieg."} Für R zählt der ursprüngliche Stop – ein nachgezogener gehört in die Notiz.
+      </span>
+    );
+  };
   const priceField = (k: "entry" | "stop" | "target" | "exit", label: string) => {
     const live = (k === "entry" || k === "exit") && hasLive;
     const fixed = k === "entry" || k === "exit" ? fromFills(k) : null;
     const disabled = (k === "exit" && isOpen) || fixed != null;
-    const hint = disabled ? null : dotHint(k);
+    const hint = disabled ? null : (dotHint(k) ?? (k === "stop" ? stopSideHint() : null));
     return (
       <Field key={k} label={label} htmlFor={"f-" + k} help={hint ?? (k === "entry" || k === "exit" ? shotHelp(k, fixed != null ? "Ø aus den Fills" : undefined) : fixed != null ? "Ø aus den Fills" : undefined)}>
         <div className={cn(live && "grid gap-1.5")}>

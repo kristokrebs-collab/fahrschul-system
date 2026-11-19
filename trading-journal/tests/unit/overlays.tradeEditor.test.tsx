@@ -56,7 +56,7 @@ describe("TradeEditor – pure helpers", () => {
     const range = "Bitte das Datum prüfen: Das Jahr liegt außerhalb des plausiblen Bereichs (vierstellig eingeben, z. B. 2026).";
     expect(validateRecord(toRecord({ ...ok, date: "0026-11-10T09:00" }, base.t), "")).toBe(range);
     expect(validateRecord(toRecord({ ...ok, date: "1900-01-01T09:00" }, base.t), "")).toBe(range);
-    expect(validateRecord(toRecord({ ...ok, date: "2099-01-01T09:00" }, base.t), "")).toBe(range);
+    expect(validateRecord(toRecord({ ...ok, date: "2099-01-01T09:00" }, base.t), "")).toBe(EDITOR_MESSAGES.dateFuture);
     expect(validateRecord(toRecord({ ...ok, date: "2019-03-01T09:00" }, base.t), "")).toBeNull();
     const now = Date.UTC(2026, 10, 11);
     expect(plausibleTradeDate("2026-11-10T09:00", now)).toBe(true);
@@ -65,6 +65,14 @@ describe("TradeEditor – pure helpers", () => {
     expect(plausibleTradeDate("1990-01-01T00:00", now)).toBe(true);
     expect(plausibleTradeDate("1989-12-31T23:59", now)).toBe(false);
     expect(invalidFieldOf(range)).toBe("date");
+  });
+  it("a year far ahead gets its own words – „vierstellig eingeben“ made no sense for 2031 (Runde 18)", () => {
+    const base = defaultForm(settings(), "scalp");
+    const ok = { ...base.d, entry: "80000", pnlManual: "1" };
+    const far = `${new Date().getFullYear() + 5}-05-05T09:00`;
+    expect(validateRecord(toRecord({ ...ok, date: far }, base.t), "")).toBe(EDITOR_MESSAGES.dateFuture);
+    expect(validateRecord(toRecord({ ...ok, date: "0026-11-10T09:00" }, base.t), "")).toBe(EDITOR_MESSAGES.dateRange);
+    expect(invalidFieldOf(EDITOR_MESSAGES.dateFuture)).toBe("date");
   });
   it("a leverage of 0 or below and a blank pair are refused; an empty leverage stays allowed; the pair is stored trimmed", () => {
     const base = defaultForm(settings(), "scalp");
@@ -409,5 +417,23 @@ describe("TradeEditor – edit mode", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(useUi.getState().editor.open).toBe(false);
     expect(saveTrade).not.toHaveBeenCalled();
+  });
+});
+
+describe("TradeEditor – a stop on the far side of the entry (Runde 18)", () => {
+  beforeEach(() => seed({ open: true }));
+
+  it("long with the stop above the entry: the field says what R needs; nothing is blocked; the hint goes when the stop is on its side", () => {
+    mount();
+    type("Einstieg", "80000");
+    type("Stop-Loss", "81000");
+    expect(screen.getByTestId("stop-side-hint")).toHaveTextContent("Der Stop liegt über dem Einstieg. Für R zählt der ursprüngliche Stop");
+    type("Stop-Loss", "79000");
+    expect(screen.queryByTestId("stop-side-hint")).toBeNull();
+    // short: the mirror
+    fireEvent.click(screen.getByRole("radio", { name: /Short/ }));
+    expect(screen.getByTestId("stop-side-hint")).toHaveTextContent("Der Stop liegt unter dem Einstieg.");
+    type("Stop-Loss", "81000");
+    expect(screen.queryByTestId("stop-side-hint")).toBeNull();
   });
 });

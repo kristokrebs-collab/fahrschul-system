@@ -13,7 +13,8 @@ import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
-import { BULK_SAVE, changedIds, CoachView, CoachWatcher, fresh, TradeCoachPanel, useCoachUi, userChanged } from "@/views/coach";
+import { isImported } from "@/exchanges/inbox";
+import { BULK_SAVE, changedIds, CoachView, CoachWatcher, fresh, liveDecision, TradeCoachPanel, useCoachUi, userChanged } from "@/views/coach";
 import { resetAiStatusForTests } from "@/views/coach/ask";
 import { COACH_SETTINGS, coachJournal, ct } from "./coach.fixtures";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
@@ -293,5 +294,17 @@ describe("watcher helpers", () => {
     expect(fresh({ updatedAt: new Date(1_000_000).toISOString() }, 1_000_000 + 4 * MIN)).toBe(true);
     expect(fresh({ updatedAt: new Date(1_000_000).toISOString() }, 1_000_000 + 6 * MIN)).toBe(false);
     expect(BULK_SAVE).toBe(3);
+  });
+  it("liveDecision: an imported record wakes the coach only when the trade itself is of the last day (Runde 18: „Regelverstoß … Pause“ about an imported trade of last month)", () => {
+    const now = new Date(2026, 10, 19, 12).getTime();
+    const old = "2026-10-05T09:30";
+    const today = "2026-11-19T10:15";
+    // typed by hand: always a decision of the trader, whatever its date (unchanged)
+    expect(liveDecision({ date: old }, now)).toBe(true);
+    // imported (CSV / exchange sync): history is history …
+    expect(liveDecision({ date: old, syncSource: "csv:bitunix" }, now)).toBe(false);
+    expect(liveDecision({ date: old, origin: { kind: "exchange" } as never }, now)).toBe(isImported({ origin: { kind: "exchange" } as never }) ? false : true);
+    // … a position the sync brings in right after it closed still counts
+    expect(liveDecision({ date: today, syncSource: "bitunix" }, now)).toBe(true);
   });
 });

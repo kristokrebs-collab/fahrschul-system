@@ -159,6 +159,28 @@ describe("command navigation", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull(), { timeout: 2500 });
   });
 
+  it("type-ahead: a letter typed with the focus outside the search field moves the focus into it; a digit stays the page shortcut (Runde 18)", { timeout: 30_000 }, async () => {
+    renderNav();
+    act(() => openCommandNav());
+    const d = dialog();
+    const field = d.querySelector<HTMLInputElement>("input[data-cmd-item]")!;
+    const close = within(d).getAllByRole("button")[0]!;
+    close.focus();
+    expect(document.activeElement).not.toBe(field);
+    fireEvent.keyDown(close, { key: "e" });
+    expect(document.activeElement).toBe(field);
+    // with a modifier it is a shortcut of something else, not text
+    close.focus();
+    fireEvent.keyDown(close, { key: "e", ctrlKey: true });
+    expect(document.activeElement).toBe(close);
+    // typing inside the field is left alone (no page jump on a digit there)
+    field.focus();
+    const before = useUi.getState().page;
+    fireEvent.keyDown(field, { key: "2" });
+    expect(useUi.getState().page).toBe(before);
+    await closeAndSettle();
+  });
+
   it("the shortcut is ignored while another modal dialog is open", async () => {
     render(
       <MotionRoot>

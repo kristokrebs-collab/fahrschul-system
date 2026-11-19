@@ -63,7 +63,8 @@ export const LegalCard = memo(function LegalCard({ className }: { className?: st
             <li key={p} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-ink-950/40 px-3.5 py-3" data-testid={`settings-legal-${p}`} data-tone={st.tone}>
               <span className="grid min-w-0 flex-1 gap-0.5">
                 <span className="text-[13.5px] font-medium text-fg">{LEGAL_LABEL[p]}</span>
-                <span className="truncate text-[12px] text-mute">{LEGAL_CARD.hint[p]}</span>
+                {/* wraps on a phone (Funktionsprüfung Runde 18: the line ended in „…“ at 390 px – it is the only description of the row) */}
+                <span className="text-[12px] text-mute">{LEGAL_CARD.hint[p]}</span>
                 <span className={st.tone === "warn" ? "text-[11.5px] font-medium text-warn" : "text-[11.5px] text-mute"}>{st.text}</span>
               </span>
               <Button size="sm" onClick={() => openLegal(p)} aria-label={`${LEGAL_LABEL[p]} ${LEGAL_CARD.open}`}>

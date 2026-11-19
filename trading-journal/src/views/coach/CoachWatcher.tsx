@@ -6,7 +6,8 @@
  *
  * Only real saves count: at most `BULK_SAVE` records changed at once (an import, a restore or a sync snapshot is not
  * a save), only records whose `updatedAt` is fresh and only changes the trader made (the MAE / MFE backfill or a
- * drawing on the chart is not a decision – `MACHINE_FIELDS`). Hints (severity 1) are not toasted – they wait in the timeline.
+ * drawing on the chart is not a decision – `MACHINE_FIELDS`), and an imported record only when the trade itself is of the last day
+ * (`liveDecision`). Hints (severity 1) are not toasted – they wait in the timeline.
  * Each event (behaviour + triggering trade) is toasted at most once per session. Never blocks anything.
  *
  * P14: mount `<CoachWatcher />` once in App.tsx as a leaf with `data-layer`, after SetupEditor, before Celebrate.
@@ -14,6 +15,8 @@
 import { useEffect } from "react";
 import { coachAlert } from "@/domain/coach";
 import type { Trade } from "@/domain/types";
+import { isImported } from "@/exchanges/inbox";
+import { tradeTime } from "@/lib/dates";
 import { getEnriched, useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
 import { useCoachUi } from "./coachStore";
@@ -54,6 +57,21 @@ export function changedIds(prev: readonly Trade[], next: readonly Trade[]): stri
     .map((t) => t.id);
 }
 
+/** An imported record older than this is history, not a decision of today (ms). */
+export const IMPORT_LIVE_MS = 24 * 60 * 60_000;
+
+/**
+ * An imported record (CSV, exchange sync, screenshot reader) wakes the coach only when the TRADE itself is recent: a small import of
+ * old trades carries a fresh `updatedAt` and at most `BULK_SAVE` records, so it looked like a save – and the coach said „Regelverstoß –
+ * kein Stop … Pause“ about a trade of last month, over the import dialog (Funktionsprüfung Runde 18). A position the sync brings in
+ * minutes after it closed still counts; a trade typed by hand is unchanged.
+ */
+export function liveDecision(t: Pick<Trade, "origin" | "syncSource" | "date">, now: number): boolean {
+  if (!isImported(t)) return true;
+  const at = +tradeTime(t as Trade);
+  return Number.isFinite(at) && Math.abs(now - at) <= IMPORT_LIVE_MS;
+}
+
 /** Saved just now (not an imported / synced old record). */
 export function fresh(t: Pick<Trade, "updatedAt">, now: number): boolean {
   const u = Date.parse(t.updatedAt);
@@ -74,7 +92,7 @@ export function useCoachWatch(): void {
       const ids = changedIds(before.trades, state.trades);
       if (!ids.length || ids.length > BULK_SAVE) return;
       const byId = new Map(state.trades.map((t) => [t.id, t]));
-      const freshIds = new Set(ids.filter((id) => fresh(byId.get(id)!, now)));
+      const freshIds = new Set(ids.filter((id) => fresh(byId.get(id)!, now) && liveDecision(byId.get(id)!, now)));
       if (!freshIds.size) return;
       // off the save's own task: the detectors read the whole journal twice, the save and its commit must not wait
       timers.add(
