@@ -6,6 +6,7 @@
  */
 import type { ReactNode } from "react";
 import { FeatureLinks } from "@/app/FeatureLinks";
+import { useEntitlement } from "@/billing/entitlements";
 import { useBillingMode } from "@/billing/store";
 import { BillingCard, PlanCard, ReferralCard } from "@/billing/ui";
 import { cloudEnabled } from "@/cloud/env";
@@ -39,6 +40,10 @@ function KontoExtras() {
   const mode = useBillingMode();
   const savedViews = useViews((s) => s.views.length);
   const dashboards = useCockpit((s) => s.boards.length);
+  // The dashboards counter belongs to the Cockpit, which opens from Premium („Eigene Dashboards“). A plan without that page gets no
+  // counter for it: a Free account read „Dashboards 2 / 1 · Limit erreicht · Dieses Limit gehört zu Pro“ – about a page it cannot open,
+  // and Pro cannot open it either (Funktionsprüfung Runde 18).
+  const cockpit = useEntitlement("customDashboards");
   let index = baseCells(signedIn);
   const billing = mode !== "off";
   const account = mode === "open" && signedIn;
@@ -46,7 +51,7 @@ function KontoExtras() {
   if (billing) {
     cells.push(
       <Cell key="plan" index={index++} span={account ? "lg:col-span-7" : "lg:col-span-12"} section="konto-tarif" size={account ? { base: 354, lg: 316 } : undefined}>
-        <PlanCard onNavigate={(p) => navigate(p)} usage={{ savedViews, dashboards }} />
+        <PlanCard onNavigate={(p) => navigate(p)} usage={cockpit ? { savedViews, dashboards } : { savedViews }} />
       </Cell>,
     );
   }

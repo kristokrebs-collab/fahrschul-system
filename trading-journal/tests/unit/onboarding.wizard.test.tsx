@@ -55,6 +55,21 @@ describe("decision (pure)", () => {
     expect(ws.wizardDecision({ ...quiet, busy: true })).toBe("wait");
   });
 
+  it("armed by a registration it waits for THAT account: another account in the same browser is not told its account was just created", () => {
+    ws.armWizard("Neu@Example.com ");
+    const stored = ws.readWizard();
+    // a fingerprint, never the address
+    expect(stored?.who).toBe(ws.whoOf("neu@example.com"));
+    expect(localStorage.getItem(ws.WIZARD_KEY)).not.toMatch(/example/i);
+    expect(ws.wizardDecision({ ...quiet, stored, email: "alt@example.com" })).toBe("wait");
+    // … also when that other account has trades: the pending wizard is not used up for the one that registered
+    expect(ws.wizardDecision({ ...quiet, stored, email: "alt@example.com", tradeCount: 12 })).toBe("wait");
+    expect(ws.wizardDecision({ ...quiet, stored, email: null })).toBe("wait");
+    expect(ws.wizardDecision({ ...quiet, stored, email: "neu@example.com" })).toBe("open");
+    // a record without an owner (older builds, started by hand) belongs to whoever is signed in
+    expect(ws.wizardDecision({ ...quiet, email: "alt@example.com" })).toBe("open");
+  });
+
   it("an existing trader (a journal with trades) is never asked: they are marked handled", () => {
     expect(ws.wizardDecision({ ...quiet, tradeCount: 3 })).toBe("existing");
     ws.armWizard();

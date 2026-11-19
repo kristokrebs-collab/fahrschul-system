@@ -346,3 +346,27 @@ Die vier Durchgänge haben ihre Zeit überzogen und trotzdem nicht alles geschaf
 ### Geprüft in dieser Runde
 
 Typprüfung und Lint sauber. Unit-Tests: 678 Dateien, 9 800 grün, 1 übersprungen (lokal). Budget: Erstladung JS 664,0 / 800 KiB, CSS 52,5 / 52,5 KiB (53 752 von 53 760 Bytes – die Reserve beträgt 8 Bytes, neue Stile gehören weiter in Lazy-Chunks; das Trade-Detail hat dafür ein eigenes Stylesheet bekommen). Jede Korrektur am neu gebauten Stand im Browser nachgeprüft (1440, 390 und 360 px). E2E: der Lauf auf dem Endstand steht im PR #12. Nicht geprüft: echte Geräte, echte Zahlungen und Registrierungen, Binance, TradingView, Resend/Twilio.
+
+### Zweite Welle: Konto und Werkzeuge (zwei weitere Durchgänge)
+
+Zwei weitere Prüfer haben nachgeholt, was die ersten vier nicht erreicht hatten: Registrierung mit ihren Fehlerpfaden, Passwort-Reset, 2FA, Konto-Karten, Tarif-Sperren für Free (Cloud-Build gegen die Mocks) sowie Handelsplan, Labor, Backup und Wiederherstellen (Build ohne Cloud). Kein Fund lässt die App abstürzen oder verliert Trades.
+
+| Fund | Schwere | Jetzt | Beleg |
+| --- | --- | --- | --- |
+| Server-Fehler (HTTP 5xx) beim Anmelden oder Registrieren hieß „Keine Verbindung zum Server. Prüfe dein Internet.“ | P2 | „Der Server antwortet gerade nicht richtig. Bitte versuch es in einem Moment erneut.“ | `src/cloud/authErrors.ts`; `tests/unit/cloud.helpers.test.ts` |
+| Konto › Tarif (Free): „Dashboards 2 / 1 … gehört zu Pro“, obwohl das eigene Cockpit zu Premium gehört | P2 | die Zeile erscheint nur mit dem Recht auf das Cockpit; der genannte Tarif ist der kleinste, der Funktion UND Menge erlaubt | `src/billing/plans.ts` (`upgradePlanForLimit`), `KontoPage.tsx`; `tests/unit/cloud.takeoverStrings.test.ts` |
+| Ein Tarifwechsel in einem anderen Tab oder auf dem Handy kam erst nach dem Neuladen an | P2 | ein Tab, der wieder nach vorn kommt, fragt den Server (höchstens einmal je Minute, still: eine verpasste Antwort ändert nichts) | `src/billing/ui/BillingHost.tsx`, `store.ts` (`quiet`); `tests/unit/billing.store.test.tsx` |
+| Reset-Link: Escape schloss den Schritt „Neues Passwort“ wortlos, die Person blieb mit dem alten Passwort angemeldet | P2 | das Fenster schließt weiter, eine Zeile sagt den Stand („Passwort unverändert … unter Konto → Login“) | `src/cloud/ui/AuthSheet.tsx` (`closeWindow`); `tests/unit/cloud.authWindow.test.tsx` |
+| „Konto erstellen“ ↔ „Anmelden“: Name und Zustimmung waren nach dem Blick zurück leer (die Adresse blieb) | P2 | beide bleiben, solange die Seite offen ist; das Passwort nie | `AuthSheet.tsx` (`signupDraft`); derselbe Test |
+| 2FA einrichten: nach einem falschen Code fiel der Fokus auf die Seite | P2 | zurück ins leere Code-Feld, wie beim Anmelden | `src/cloud/ui/SecurityCard.tsx` |
+| Die Einrichtung („Dein Konto ist angelegt“) öffnete sich für ein altes Konto, wenn im selben Browser zuvor eine ANDERE Adresse registriert worden war | P2 | die Registrierung merkt sich einen Fingerabdruck der Adresse (nie die Adresse selbst); die Einrichtung wartet auf genau dieses Konto | `src/onboarding/wizard/wizardStore.ts` (`whoOf`); `tests/unit/onboarding.wizard.test.tsx` |
+| Registrierung: der Hinweis zur Passwortstärke brach um und stieß an die Balken | P2 | Abstand, rechtsbündig | `src/cloud/ui/authWindow.css` |
+| Ein Journal mit genau einem Trade: „1 Trades“, „1 Handelstage“, „Die letzten 1 Einträge“, „1 Grundregeln“, „+1 Trades außerhalb des Zeitraums“, „bei den 1 gepaarten Trades“ an über einem Dutzend Stellen | P2 | die Zahl bekommt ihr Wort in der richtigen Form (`countText`) | `src/lib/format.ts` und die genannten Karten; Tests je Stelle |
+| Backup → Leeren → Wiederherstellen: gespeicherte Ansichten und die Versionen des Labors waren weg, die Karte hatte nie gesagt, dass sie nicht zum Backup gehören | P2 | Einstellungen › Daten sagt, was im Backup liegt und was je Gerät bleibt; am Umfang des Backups ist nichts geändert | `src/views/settings/DataCard.tsx`; `tests/unit/views.settings.backupScope.test.ts` |
+| Handelsplan: „Gespeichert am 18.11.2026 22:54 Uhr“ stand in der Zeitzone der Sitzung, ohne es zu sagen | P2 | Speicher- und Abrufzeit tragen ihr „(UTC−5)“ wie die Kerzen | `src/views/plan/TicketStep.tsx`, `SavedPlans.tsx` |
+| Labor: nach einer geänderten Regel blieb das alte Ergebnis stehen, nur das Wort des Knopfs wechselte | P2 | „Einstellungen geändert – das Ergebnis unten gehört noch zum vorigen Lauf“ | `src/views/labor/ConfigCard.tsx`; `tests/unit/views.labor*.test.tsx` |
+| Grundlagen-Editor: nach „+ Punkt hinzufügen“ fügte jedes Leerzeichen einen weiteren leeren Punkt an | P2 | der Fokus steht im neuen Punkt | `src/overlays/SetupEditor.tsx` |
+
+Weiter offen aus dieser Welle, je einmal gesehen: im Labor die Anordnung der Entwürfe bei sehr vielen Versionen und die klebende Karte „Annahmen“, die bei 1024 px über die nächste reicht. Nicht geprüft bleiben Gutscheine, Kündigung und Widerruf gegen das echte Stripe sowie echte Geräte (wie in Abschnitt 8).
+
+Stand nach der zweiten Welle: Typprüfung und Lint sauber, Unit-Tests 679 Dateien grün, Budget Erstladung JS 664,2 / 800 KiB, CSS 52,5 / 52,5 KiB.

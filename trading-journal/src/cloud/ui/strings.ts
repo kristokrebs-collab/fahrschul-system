@@ -79,6 +79,9 @@ export const AUTH = {
   recoveryDoneDetail: "Richte den Zwei-Faktor-Schutz unter Konto → Sicherheit neu ein.",
   recoveryNoCodes: "Keine Codes mehr? Dann kann nur der Betreiber nach einer Identitätsprüfung helfen – schreib über die Kontaktadresse im Impressum.",
   passwordSaved: "Passwort gespeichert",
+  // the reset link's "Neues Passwort" step was closed (Escape, the close button) without a new password
+  passwordKept: "Passwort unverändert",
+  passwordKeptDetail: "Du bist über den Link angemeldet. Ein neues Passwort setzt du jederzeit unter Konto → Login.",
   passwordOthersOut: "Alle anderen Geräte wurden abgemeldet.",
   passwordOthersKept: "Andere Geräte konnten nicht abgemeldet werden. Melde sie unter Konto → Sicherheit ab.",
   signedOut: "Abgemeldet",

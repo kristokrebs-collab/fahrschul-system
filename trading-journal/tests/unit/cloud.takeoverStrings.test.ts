@@ -36,3 +36,15 @@ describe("takeover dialog: the done line and the option lines", () => {
     expect(TAKEOVER.options.local.text).toMatch(/kommt auf dieses Gerät dazu/);
   });
 });
+
+describe("plan limits: a limit of a paid page is never offered below the plan that opens the page (Runde 18)", () => {
+  it("dashboards → Premium (the Cockpit opens from Premium), also for a Free account at „2 / 1“; other limits keep their next plan", async () => {
+    const { upgradePlanForLimit, planIncludes, LIMIT_NEEDS_FEATURE } = await import("@/billing/plans");
+    expect(LIMIT_NEEDS_FEATURE.dashboards).toBe("customDashboards");
+    expect(planIncludes("pro", "customDashboards")).toBe(false);
+    expect(upgradePlanForLimit("dashboards", "free", 2)).toBe("premium");
+    expect(upgradePlanForLimit("dashboards", "pro", 3)).toBe("premium");
+    expect(upgradePlanForLimit("savedViews", "free", 99)).not.toBe("free");
+    expect(upgradePlanForLimit("savedViews", "free", 1)).toBe("pro");
+  });
+});

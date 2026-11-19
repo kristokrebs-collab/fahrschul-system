@@ -12,6 +12,9 @@ import { UpgradeSheet } from "./UpgradeSheet";
 // the order sheet, the tariff detail, the management sheet and the result page: one lazy chunk, loaded when one is asked for
 const PurchaseHost = lazy(() => import("../purchase/PurchaseHost"));
 
+/** How often a tab that comes back to the front may ask the server for the plan. */
+export const BILLING_REFRESH_MS = 60_000;
+
 export interface BillingHostProps {
   /** Page navigation for "Alle Tarife vergleichen" (`navigate("preise")`). */
   onNavigate?: (page: "preise" | "konto") => void;
@@ -54,6 +57,25 @@ export function BillingHost({ onNavigate }: BillingHostProps) {
     if (!userId) clearAccount();
     void loadBilling();
   }, [active, phase, userId, needsMfa]);
+
+  // The plan can change while this tab sits in the background: bought in another tab or on the phone, a trial that ran out, a
+  // cancellation. The tab used to keep the old plan until a reload (review Runde 18) – coming back to it asks the server again, at
+  // most once a minute, quietly (a missed answer changes nothing).
+  useEffect(() => {
+    if (!active || !userId) return;
+    let last = Date.now();
+    const onBack = () => {
+      if (document.visibilityState !== "visible" || Date.now() - last < BILLING_REFRESH_MS) return;
+      last = Date.now();
+      void loadBilling({ quiet: true });
+    };
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    return () => {
+      document.removeEventListener("visibilitychange", onBack);
+      window.removeEventListener("focus", onBack);
+    };
+  }, [active, userId]);
 
   useEffect(() => {
     if (!active) return;

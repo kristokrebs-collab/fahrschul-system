@@ -336,9 +336,14 @@ export function upgradePlanFor(feature: Feature): PaidPlanId {
 
 /** The cheapest paid plan above `current` whose limit for `key` exceeds `used` (Premium when none does). */
 export function upgradePlanForLimit(key: LimitKey, current: PlanId, used: number): PaidPlanId {
-  for (const p of PAID_PLANS) if (PLAN_RANK[p] > PLAN_RANK[current] && PLAN_LIMITS[p][key] > used) return p;
+  // a limit whose page is itself a paid feature is never offered below the plan that opens the page (dashboards → the Cockpit)
+  const floor = LIMIT_NEEDS_FEATURE[key] ? PLAN_RANK[upgradePlanFor(LIMIT_NEEDS_FEATURE[key]!)] : 0;
+  for (const p of PAID_PLANS) if (PLAN_RANK[p] > PLAN_RANK[current] && PLAN_RANK[p] >= floor && PLAN_LIMITS[p][key] > used) return p;
   return "premium";
 }
+
+/** Limits that count something on a page which is a paid feature of its own. */
+export const LIMIT_NEEDS_FEATURE: Partial<Record<LimitKey, Feature>> = { dashboards: "customDashboards" };
 
 /**
  * Automatic sync in the background (the cron): the plan has the feature `exchangeSync` AND a quota for it. Free syncs its

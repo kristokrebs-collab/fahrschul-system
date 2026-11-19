@@ -32,6 +32,20 @@ export interface StoredWizard {
   /** The decision of step 2 (`null` until made). */
   data: WizardData;
   at: string;
+  /**
+   * Whose registration armed it: a short fingerprint of the address (never the address itself). Absent on records of older builds
+   * and on a wizard started by hand – those belong to whoever is signed in.
+   */
+  who?: string;
+}
+
+/** Fingerprint of an e-mail address (FNV-1a, base 36): enough to tell two accounts in one browser apart, nothing to read back. */
+export function whoOf(email: string | null | undefined): string | null {
+  const e = (email ?? "").trim().toLowerCase();
+  if (!e) return null;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < e.length; i++) h = Math.imul(h ^ e.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(36);
 }
 
 const clampStep = (n: unknown): number => (typeof n === "number" && Number.isFinite(n) ? Math.max(0, Math.min(WIZARD_COUNT - 1, Math.round(n))) : 0);
@@ -40,13 +54,13 @@ export function readWizard(): StoredWizard | null {
   try {
     const raw = JSON.parse(localStorage.getItem(WIZARD_KEY) ?? "null") as Partial<StoredWizard> | null;
     if (!raw || (raw.status !== "pending" && raw.status !== "active" && raw.status !== "done" && raw.status !== "skipped")) return null;
-    return { v: WIZARD_VERSION, status: raw.status, step: clampStep(raw.step), data: raw.data === "demo" || raw.data === "own" ? raw.data : null, at: typeof raw.at === "string" ? raw.at : "" };
+    return { v: WIZARD_VERSION, status: raw.status, step: clampStep(raw.step), data: raw.data === "demo" || raw.data === "own" ? raw.data : null, at: typeof raw.at === "string" ? raw.at : "", ...(typeof raw.who === "string" && raw.who ? { who: raw.who } : null) };
   } catch {
     return null;
   }
 }
 
-function write(patch: Partial<Pick<StoredWizard, "status" | "step" | "data">>): StoredWizard {
+function write(patch: Partial<Pick<StoredWizard, "status" | "step" | "data" | "who">>): StoredWizard {
   const cur = readWizard() ?? { v: WIZARD_VERSION, status: "pending" as WizardStatus, step: 0, data: null as WizardData, at: "" };
   const next: StoredWizard = { ...cur, ...patch, v: WIZARD_VERSION, at: new Date().toISOString() };
   try {
@@ -67,9 +81,14 @@ interface WizardState {
 
 export const useWizard = create<WizardState>(() => ({ open: false, step: 0, data: null, loaded: false }));
 
-/** A fresh registration arms the wizard – only when nothing is stored yet (a person who finished or declined it is not asked again). */
-export function armWizard(): void {
-  if (!readWizard()) write({ status: "pending", step: 0, data: null });
+/**
+ * A fresh registration arms the wizard – only when nothing is stored yet (a person who finished or declined it is not asked again).
+ * `email`: the address that registered; the wizard then waits for THAT account (review Runde 18: someone registered a second address
+ * and signed in with their existing account – "Dein Konto ist angelegt" opened for an account that was years old).
+ */
+export function armWizard(email?: string | null): void {
+  const who = whoOf(email);
+  if (!readWizard()) write({ status: "pending", step: 0, data: null, ...(who ? { who } : null) });
 }
 
 /** Opens the wizard: at the stored step when it was left half-way (`resume`), else at the first. */
@@ -114,6 +133,8 @@ export interface WizardDecisionInput {
   journalLoaded: boolean;
   tradeCount: number;
   introSettled: boolean;
+  /** The signed-in account's address (`null`: unknown) – compared with the registration that armed the wizard. */
+  email?: string | null;
   /** Another dialog or flow owns the screen (login sheet, takeover question, order, editor, share link …) – wait. */
   busy: boolean;
 }
@@ -122,6 +143,8 @@ export interface WizardDecisionInput {
 export function wizardDecision(i: WizardDecisionInput): "open" | "wait" | "never" | "existing" {
   if (!i.stored || i.stored.status !== "pending") return "never";
   if (!i.signedIn || !i.journalLoaded) return "wait";
+  // armed by another address' registration: not this account's wizard – it keeps waiting for the one that registered
+  if (i.stored.who && whoOf(i.email) !== i.stored.who) return "wait";
   if (i.tradeCount > 0) return "existing"; // a journal with trades does not need a first-trade wizard
   if (!i.introSettled || i.busy) return "wait";
   return "open";

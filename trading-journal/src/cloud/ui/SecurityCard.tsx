@@ -69,6 +69,7 @@ function MfaSection() {
   const [accepted, setAccepted] = useState(false);
   const [askOff, setAskOff] = useState(false);
   const badge = useRef<HTMLSpanElement>(null);
+  const slots = useRef<HTMLDivElement>(null);
 
   async function start() {
     setBusy(true);
@@ -91,6 +92,9 @@ function MfaSection() {
     if (!r || !r.ok) {
       setErr({ message: r && !r.ok ? r.message : "Cloud nicht erreichbar.", key: Date.now() });
       setCode("");
+      // the slots were disabled while the code was checked and lost the focus with it (it fell to the page): back into the empty
+      // field, so the next code can be typed at once (the login's code step does the same)
+      requestAnimationFrame(() => slots.current?.querySelector<HTMLInputElement>("input:not([disabled])")?.focus());
       return;
     }
     setAccepted(true);
@@ -146,7 +150,7 @@ function MfaSection() {
                 <CopyButton text={enroll.secret} label={SECURITY.copy} doneLabel={SECURITY.copied} />
               </span>
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-2" ref={slots}>
               <span className="text-center text-[12px] text-faint">{SECURITY.codeLabel}</span>
               <CodeSlots
                 value={code}

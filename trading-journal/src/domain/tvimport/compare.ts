@@ -188,7 +188,7 @@ function reasonsOf(c: Comparison): CompareReason[] {
     r.push({
       id: "costs",
       title: "Kosten",
-      text: `Das Labor zieht bei den ${c.pairs.length} gepaarten Trades ${n0(c.costs.fees)} USDT Gebühren${c.costs.funding ? ` und ${n0(Math.abs(c.costs.funding))} USDT Funding` : ""} ab (Slippage steckt in den Fill-Preisen: ${n0(c.costs.slippage)} USDT). TradingView rechnet nur Kommission und Slippage aus den Strategie-Eigenschaften – ohne Eintrag dort 0. Das kann einen Teil des Unterschieds im Netto erklären.`,
+      text: `Das Labor zieht ${c.pairs.length === 1 ? "bei dem einen gepaarten Trade" : `bei den ${c.pairs.length} gepaarten Trades`} ${n0(c.costs.fees)} USDT Gebühren${c.costs.funding ? ` und ${n0(Math.abs(c.costs.funding))} USDT Funding` : ""} ab (Slippage steckt in den Fill-Preisen: ${n0(c.costs.slippage)} USDT). TradingView rechnet nur Kommission und Slippage aus den Strategie-Eigenschaften – ohne Eintrag dort 0. Das kann einen Teil des Unterschieds im Netto erklären.`,
     });
   }
 

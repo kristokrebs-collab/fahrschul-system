@@ -169,6 +169,22 @@ describe("modes + entitlements", () => {
 });
 
 describe("store flows", () => {
+  it("a quiet look (the tab came back) keeps what is known when the server does not answer; a normal load reports the outage", async () => {
+    signIn();
+    handler = () => ({ body: status({ plan: { plan: "pro", status: "active", trialEnd: null }, subscription: SUB, hasCustomer: true }) });
+    await act(() => loadBilling());
+    expect(useBilling.getState()).toMatchObject({ configState: "ready", account: { plan: { plan: "pro" } } });
+    handler = () => ({ status: 500, body: { error: "kaputt" } });
+    await act(() => loadBilling({ quiet: true }));
+    expect(useBilling.getState()).toMatchObject({ configState: "ready", account: { plan: { plan: "pro" } } });
+    await act(() => loadBilling());
+    expect(useBilling.getState().configState).toBe("error");
+    // … and the quiet look picks a changed plan up
+    handler = () => ({ body: status({ plan: { plan: "premium", status: "active", trialEnd: null }, subscription: SUB, hasCustomer: true }) });
+    await act(() => loadBilling({ quiet: true }));
+    expect(useBilling.getState()).toMatchObject({ configState: "ready", account: { plan: { plan: "premium" } } });
+  });
+
   it("functions missing (SPA page instead of JSON) → closed, honestly", async () => {
     handler = () => ({ body: null, html: true });
     await act(() => loadBilling());

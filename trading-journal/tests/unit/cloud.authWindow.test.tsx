@@ -270,6 +270,40 @@ describe("the forms (kept behaviour)", () => {
     await waitFor(() => expect(signUp).toHaveBeenCalledWith("ada@example.com", "Ein-langes-Passwort-42", null, "Ada Beispiel"));
   });
 
+  it("a look at „Anmelden“ and back keeps the name and the consent of the registration (review Runde 18), never the password", async () => {
+    openAuthSheet("signup", "card");
+    mount();
+    await screen.findByRole("dialog", { name: "Konto erstellen" });
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ada Beispiel" } });
+    const box = screen.queryByRole("checkbox");
+    if (box) fireEvent.click(box);
+    fireEvent.click(screen.getByTestId("auth-to-signin"));
+    await finishAll();
+    await screen.findByRole("dialog", { name: "Anmelden" });
+    fireEvent.click(screen.getByTestId("auth-to-signup"));
+    await finishAll();
+    await screen.findByRole("dialog", { name: "Konto erstellen" });
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Ada Beispiel");
+    if (box) expect(screen.getByRole("checkbox")).toBeChecked();
+    // the password is never carried
+    expect((screen.getByLabelText("Passwort") as HTMLInputElement).value).toBe("");
+  });
+
+  it("closing the reset link's „Neues Passwort“ step says where things stand (it closed silently, review Runde 18); other steps close without a word", async () => {
+    const { useUi } = await import("@/store/uiStore");
+    const titles = () => useUi.getState().toasts.map((t) => t.title);
+    openAuthSheet("signin", "card");
+    mount();
+    await screen.findByRole("dialog", { name: "Anmelden" });
+    fireEvent.click(screen.getByRole("button", { name: "Schließen" }));
+    expect(titles()).not.toContain("Passwort unverändert");
+    act(() => openAuthSheet("newPassword", "callback"));
+    await screen.findByRole("dialog", { name: "Neues Passwort" });
+    fireEvent.click(screen.getByRole("button", { name: "Schließen" }));
+    expect(useCloudSession.getState().sheet.open).toBe(false);
+    expect(titles()).toContain("Passwort unverändert");
+  });
+
   it("„Angemeldet bleiben“ is the idle sign-out: unticked, a successful login sets 30 minutes; left as it was, nothing changes", async () => {
     signInPassword.mockResolvedValue({ ok: true, value: { mfa: false } });
     openAuthSheet("signin", "card");

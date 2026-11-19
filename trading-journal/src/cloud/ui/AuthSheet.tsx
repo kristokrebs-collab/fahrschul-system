@@ -45,6 +45,23 @@ export interface AuthSheetProps {
 const noop = (): void => undefined;
 
 /**
+ * Escape, the close button, a click beside the card. Closing the "Neues Passwort" step of a reset link left the person signed in with
+ * the old (forgotten) password and said nothing (review Runde 18) – the window still closes, a line says where things stand.
+ */
+function closeWindow(): void {
+  const skipped = useCloudSession.getState().sheet.view === "newPassword";
+  closeAuthSheet();
+  if (skipped) pushToast({ kind: "info", title: AUTH.passwordKept, detail: AUTH.passwordKeptDetail, duration: 9000 });
+}
+
+/**
+ * What the registration form holds besides the address while the window is open: a look at "Anmelden" and back used to empty the
+ * name and untick the consent (the address was kept) – review Runde 18. Memory only (gone with a reload), never the password; emptied
+ * when the registration went through.
+ */
+let signupDraft: { name: string; consent: boolean } = { name: "", consent: false };
+
+/**
  * Login window (P09, Paket V – all German): password, magic link, registration (strength hint, e-mail confirmation), reset, new
  * password after the reset link, the 2FA step-up after a password login, the signed-in account panel and the welcome with the first
  * sync. ONE landscape card (`AuthWindow`): Anmelden on the left with the dark band on the right, Registrieren mirrored; the switch
@@ -74,7 +91,7 @@ export function AuthSheet({ onOpenAccount, gate }: AuthSheetProps) {
         renderView={(view, titleId) => <ViewBody view={view} titleId={titleId} onOpenAccount={onOpenAccount} />}
       />
     );
-  return <AuthWindow open={sheet.open} view={sheet.view} onClose={closeAuthSheet} renderView={(view, titleId) => <ViewBody view={view} titleId={titleId} onOpenAccount={onOpenAccount} />} />;
+  return <AuthWindow open={sheet.open} view={sheet.view} onClose={closeWindow} renderView={(view, titleId) => <ViewBody view={view} titleId={titleId} onOpenAccount={onOpenAccount} />} />;
 }
 
 function ViewBody({ view, titleId, onOpenAccount }: { view: AuthView; titleId: string; onOpenAccount?: () => void }) {
@@ -361,10 +378,18 @@ function SignInForm({ mode, titleId }: { mode: "signin" | "magic"; titleId: stri
 function SignUpForm({ titleId }: { titleId: string }) {
   const consentNeeded = legalShown();
   const stored = useCloudSession((s) => s.sheet.email);
-  const [name, setName] = useState("");
+  const [name, setNameState] = useState(signupDraft.name);
   const [email, setEmail] = useState(stored);
   const [password, setPassword] = useState("");
-  const [consent, setConsent] = useState(false);
+  const [consent, setConsentState] = useState(signupDraft.consent);
+  const setName = (v: string) => {
+    signupDraft = { ...signupDraft, name: v };
+    setNameState(v);
+  };
+  const setConsent = (v: boolean) => {
+    signupDraft = { ...signupDraft, consent: v };
+    setConsentState(v);
+  };
   const [consentMissing, setConsentMissing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<FieldError | null>(null);
@@ -409,7 +434,8 @@ function SignUpForm({ titleId }: { titleId: string }) {
     setBusy(false);
     if (!r.ok) return fail(errorOf(r.field, r.message));
     // a registration arms the setup wizard (once; it opens after the sign-in, when nothing else owns the screen)
-    armWizard();
+    armWizard(email);
+    signupDraft = { name: "", consent: false };
     setAuthView(r.value.confirm ? "sent" : "welcome", { sent: "confirm" });
   }
 

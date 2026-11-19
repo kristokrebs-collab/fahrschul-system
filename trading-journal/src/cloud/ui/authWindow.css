@@ -466,12 +466,15 @@ button.aw-ficon:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 2cqw;
+  text-align: right;
   height: 3cqh;
   font-size: max(11px, 1.95cqh);
   color: var(--color-mute);
 }
 .aw-seg {
   display: flex;
+  flex: none;
   gap: 1cqw;
 }
 .aw-seg span {

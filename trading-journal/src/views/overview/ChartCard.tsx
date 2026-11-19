@@ -56,7 +56,7 @@ export const CHART_ONLY_7D = "Im 1m-Intervall nur 7 Tage";
 export const CHART_ONLY_30D = "Im 30m-Intervall nur 1 Monat";
 /** Toast after a range pill beyond the interval's history switched the interval. */
 export const CHART_SWITCHED = "Auf 1h gewechselt";
-export const outsideNote = (n: number): string => `+${n} Trades außerhalb des Zeitraums`;
+export const outsideNote = (n: number): string => `+${n} ${n === 1 ? "Trade" : "Trades"} außerhalb des Zeitraums`;
 /** `tj2-ui.flags` key that hides the second pane (`–`). */
 export const PANE_OFF_FLAG = "chartPaneOff";
 /**

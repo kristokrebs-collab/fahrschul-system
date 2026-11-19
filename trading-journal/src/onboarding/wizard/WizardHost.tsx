@@ -26,6 +26,7 @@ export const WIZARD_SETTLE_MS = 450;
 export function WizardHost() {
   const loaded = useWizard((s) => s.loaded);
   const signedIn = useCloudSession((s) => s.phase === "signedIn" && !s.needsMfa);
+  const email = useCloudSession((s) => s.user?.email ?? null);
   const authOpen = useCloudSession((s) => s.sheet.open);
   const takeoverOpen = useTakeover((s) => s.phase !== "idle" && s.phase !== "undone");
   const journalLoaded = useJournal((s) => s.loaded);
@@ -40,14 +41,14 @@ export function WizardHost() {
   const busy = authOpen || takeoverOpen || navOpen || sharing || orderBusy || returning || uiBusy;
 
   useEffect(() => {
-    const d = wizardDecision({ stored: readWizard(), signedIn, journalLoaded, tradeCount, introSettled, busy });
+    const d = wizardDecision({ stored: readWizard(), signedIn, journalLoaded, tradeCount, introSettled, busy, email });
     if (d === "existing") markWizardExisting();
     if (d !== "open") return;
     // a beat after the screen went quiet: the login sheet that just closed finishes its exit first (two dialogs never overlap);
     // anything that takes the screen in the meantime cancels the opening (the effect re-runs with `busy`)
     const t = setTimeout(() => openWizard(false), WIZARD_SETTLE_MS);
     return () => clearTimeout(t);
-  }, [signedIn, journalLoaded, tradeCount, introSettled, busy]);
+  }, [signedIn, journalLoaded, tradeCount, introSettled, busy, email]);
 
   if (!loaded) return null;
   return (

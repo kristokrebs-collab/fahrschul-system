@@ -231,8 +231,11 @@ export function functionsMissing(e: unknown): boolean {
 
 let loadSeq = 0;
 
-/** Loads config + (signed in) the account from the server. `invoices` also fetches the newest invoices. */
-export async function loadBilling(opts: { invoices?: boolean } = {}): Promise<BillingStatus | null> {
+/**
+ * Loads config + (signed in) the account from the server. `invoices` also fetches the newest invoices; `quiet` keeps the known state
+ * when the request fails (a background look, see `BillingHost`).
+ */
+export async function loadBilling(opts: { invoices?: boolean; quiet?: boolean } = {}): Promise<BillingStatus | null> {
   if (!billingActive()) return null;
   const userId = sessionUserId();
   const seq = ++loadSeq;
@@ -265,7 +268,8 @@ export async function loadBilling(opts: { invoices?: boolean } = {}): Promise<Bi
       const config = CLOSED_CONFIG("functions_missing");
       useBilling.setState({ config, configState: "ready", account: null });
       persist(config, null, userId);
-    } else useBilling.setState({ configState: "error" });
+    } else if (!opts.quiet || !useBilling.getState().config) useBilling.setState({ configState: "error" });
+    // `quiet` (the look when the tab comes back): what is known stays – one missed answer is no outage
     return null;
   }
 }

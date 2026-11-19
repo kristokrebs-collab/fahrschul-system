@@ -65,6 +65,13 @@ const BY_MESSAGE: ReadonlyArray<readonly [RegExp, string]> = [
 ];
 
 export const NETWORK_ERROR: AuthErrorText = { message: "Keine Verbindung zum Server. Prüfe dein Internet.", field: null };
+/**
+ * The server ANSWERED, with a 5xx (Funktionsprüfung Runde 18): supabase-js throws its `AuthRetryableFetchError` for 502 / 503 / 504 as
+ * well as for a request that never left, and the window said „Keine Verbindung zum Server. Prüfe dein Internet.“ to someone whose
+ * internet was fine. A status tells the two apart.
+ */
+export const SERVER_ERROR: AuthErrorText = { message: "Der Server antwortet gerade nicht richtig. Bitte versuch es in einem Moment erneut.", field: null };
+const isServerFault = (status: unknown): boolean => typeof status === "number" && status >= 500 && status <= 599;
 export const GENERIC_ERROR: AuthErrorText = { message: "Das hat nicht geklappt. Bitte versuch es erneut.", field: null };
 
 /** Maps any thrown / returned auth error to German text. */
@@ -73,6 +80,7 @@ export function authErrorText(e: unknown): AuthErrorText {
   const code = typeof err.code === "string" ? err.code : "";
   if (code && BY_CODE[code]) return BY_CODE[code];
   const message = typeof err.message === "string" ? err.message : typeof e === "string" ? e : "";
+  if (isServerFault(err.status)) return SERVER_ERROR;
   if (err.name === "AuthRetryableFetchError" || /failed to fetch|networkerror|load failed|network request failed/i.test(message)) return NETWORK_ERROR;
   for (const [re, c] of BY_MESSAGE) if (re.test(message)) return BY_CODE[c]!;
   if (err.status === 429) return BY_CODE.over_request_rate_limit!;
@@ -85,6 +93,7 @@ export function authErrorCodeOf(e: unknown): string {
   const code = typeof err.code === "string" ? err.code : "";
   if (code && BY_CODE[code]) return code;
   const message = typeof err.message === "string" ? err.message : typeof e === "string" ? e : "";
+  if (isServerFault(err.status)) return "";
   if (err.name === "AuthRetryableFetchError" || /failed to fetch|networkerror|load failed|network request failed/i.test(message)) return "network";
   for (const [re, c] of BY_MESSAGE) if (re.test(message)) return c;
   return err.status === 429 ? "over_request_rate_limit" : "";

@@ -213,3 +213,19 @@ describe("outbox + base", () => {
     expect(localBaseStore.read()).toBeNull();
   });
 });
+
+describe("authErrorText: a server fault is not „no internet“ (Runde 18)", () => {
+  it("5xx answers – also as supabase-js's AuthRetryableFetchError – name the server; a request that never left names the connection", async () => {
+    const { authErrorText, authErrorCodeOf, NETWORK_ERROR, SERVER_ERROR } = await import("@/cloud/authErrors");
+    expect(authErrorText({ name: "AuthRetryableFetchError", status: 503, message: "Service Unavailable" })).toBe(SERVER_ERROR);
+    expect(authErrorText({ name: "AuthApiError", status: 500, message: "Internal Server Error" })).toBe(SERVER_ERROR);
+    expect(SERVER_ERROR.message).not.toMatch(/Internet|Verbindung/);
+    expect(authErrorText({ name: "AuthRetryableFetchError", status: 0, message: "Failed to fetch" })).toBe(NETWORK_ERROR);
+    expect(authErrorText(new TypeError("Failed to fetch"))).toBe(NETWORK_ERROR);
+    // the sheet's „network“ branch (offline hint) is for a missing connection only
+    expect(authErrorCodeOf({ name: "AuthRetryableFetchError", status: 502 })).toBe("");
+    expect(authErrorCodeOf({ name: "AuthRetryableFetchError", status: 0 })).toBe("network");
+    // a known code still wins over the status
+    expect(authErrorText({ code: "over_request_rate_limit", status: 500 }).message).toMatch(/viele|Versuch/i);
+  });
+});
