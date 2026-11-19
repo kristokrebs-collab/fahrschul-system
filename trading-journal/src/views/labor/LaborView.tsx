@@ -112,13 +112,18 @@ export function LaborView({ className }: { className?: string }) {
             <IdeaCard />
           </Cell>
         )}
-        <Cell index={0} span={custom ? "lg:col-span-8" : "lg:col-span-7"}>
-          <ConfigCard signal={signal} />
-        </Cell>
-        {/* the assumptions stay in view beside the long set-up form (sticky under the page strip) instead of leaving an empty card floor */}
-        <Cell index={1} span={custom ? "lg:col-span-4" : "lg:col-span-5"} className="lg:sticky lg:top-[136px] lg:self-start">
-          <AssumptionsCard />
-        </Cell>
+        {/* A row of its own (same columns and gap as the page grid): the sticky card needs a box that ends with the set-up. As a direct
+            cell of the page grid (a section is `display: contents`) it kept its place under the strip for the whole page and showed
+            through every gap between the cards that follow – beside „Lauf“, „Forward-Test“ … (Funktionsprüfung Runde 18). */}
+        <div className="grid grid-cols-1 gap-5 lg:col-span-12 lg:grid-cols-12" data-testid="labor-setup-row">
+          <Cell index={0} span={custom ? "lg:col-span-8" : "lg:col-span-7"}>
+            <ConfigCard signal={signal} />
+          </Cell>
+          {/* the assumptions stay in view beside the long set-up form (sticky under the page strip) instead of leaving an empty card floor */}
+          <Cell index={1} span={custom ? "lg:col-span-4" : "lg:col-span-5"} className="lg:sticky lg:top-[136px] lg:self-start">
+            <AssumptionsCard />
+          </Cell>
+        </div>
       </Section>
       <Section id={ids.run} section="run" title={T.run.title} sub={T.run.sub}>
         <Cell index={0} span={hasResult && !busy ? "lg:col-span-7" : "lg:col-span-12"}>

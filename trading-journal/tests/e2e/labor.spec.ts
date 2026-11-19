@@ -140,6 +140,33 @@ test.describe("Labor", () => {
     expect(errors.filter((e) => !/Failed to fetch|net::ERR_FAILED|fapi\.binance\.com/.test(e))).toEqual([]);
   });
 
+  test("Die klebende Karte „Annahmen“ endet mit dem Versuchsaufbau: weiter unten liegt sie über keiner Karte mehr", async ({ page }, info) => {
+    test.skip(info.project.name !== "desktop", "sticky from 1024 px");
+    await open(page, info);
+    const card = page.getByTestId("labor-assumptions");
+    const row = page.getByTestId("labor-setup-row");
+    await expect(card).toBeVisible();
+    // beside the long form it stays in view …
+    const rowBox = (await row.boundingBox())!;
+    const cardBox = (await card.boundingBox())!;
+    if (rowBox.height > cardBox.height + 200) {
+      await page.evaluate((y) => window.scrollTo(0, y), Math.round(rowBox.y + 200));
+      await expect.poll(async () => (await card.boundingBox())!.y).toBeGreaterThan(0);
+    }
+    // … and leaves with its row: it used to keep its place under the strip for the whole page (Runde 18) and showed beside „Lauf“
+    await page.evaluate(() => {
+      const r = document.querySelector('[data-testid="labor-setup-row"]')!.getBoundingClientRect();
+      window.scrollTo(0, window.scrollY + r.bottom + 40);
+    });
+    await expect
+      .poll(async () => {
+        const [c, r] = await Promise.all([card.boundingBox(), row.boundingBox()]);
+        return c && r ? Math.round(c.y + c.height - (r.y + r.height)) : 999;
+      })
+      .toBeLessThanOrEqual(1);
+    expect((await card.boundingBox())!.y + (await card.boundingBox())!.height).toBeLessThanOrEqual(0);
+  });
+
   test("Abbrechen während des Laufs", async ({ page }, info) => {
     const { errors } = await open(page, info, { extra: { "tj2-labor": { strategy: "box", symbol: "BTCUSDT", period: "3y", boxTf: "1d" } } });
     await page.getByTestId("labor-start").click();
