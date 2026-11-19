@@ -29,6 +29,13 @@ function recordAnimations(): Run[] {
   return runs;
 }
 
+/** The n-th recorded run (the index access alone is `Run | undefined` under noUncheckedIndexedAccess). */
+function run(runs: Run[], i: number): Run {
+  const r = runs[i];
+  if (!r) throw new Error(`no animation run #${i} (recorded: ${runs.length})`);
+  return r;
+}
+
 afterEach(() => {
   delete (Element.prototype as unknown as { animate?: unknown }).animate;
   useMotionPref.getState().setMode("system");
@@ -46,13 +53,13 @@ describe("Arrive: a piece that appears in place rises in once", () => {
     expect(piece.tagName).toBe("P");
     expect(piece.className).toBe("x");
     expect(runs).toHaveLength(1);
-    expect(runs[0].el).toBe(piece);
-    expect(runs[0].frames).toEqual([
+    expect(run(runs, 0).el).toBe(piece);
+    expect(run(runs, 0).frames).toEqual([
       { opacity: 0, transform: `translateY(${ARRIVE_RISE}px)` },
       { opacity: 1, transform: "none" },
     ]);
     // `backwards`: hidden only until its first frame – afterwards the piece shows its own style, nothing can stay invisible
-    expect(runs[0].opts).toMatchObject({ duration: ARRIVE_S * 1000, delay: 0, fill: "backwards" });
+    expect(run(runs, 0).opts).toMatchObject({ duration: ARRIVE_S * 1000, delay: 0, fill: "backwards" });
     expect(ARRIVE_S).toBeLessThan(0.42);
   });
 
@@ -68,9 +75,9 @@ describe("Arrive: a piece that appears in place rises in once", () => {
     const { rerender, unmount } = render(<Arrive key="a">a</Arrive>);
     rerender(<Arrive key="b">b</Arrive>);
     expect(runs).toHaveLength(2);
-    expect(runs[0].cancel).toHaveBeenCalledTimes(1);
+    expect(run(runs, 0).cancel).toHaveBeenCalledTimes(1);
     unmount();
-    expect(runs[1].cancel).toHaveBeenCalledTimes(1);
+    expect(run(runs, 1).cancel).toHaveBeenCalledTimes(1);
   });
 
   it("reduced motion: the piece is simply there", () => {
