@@ -96,7 +96,9 @@ describe("PageHost", () => {
     expect(parked).toHaveAttribute("inert");
     expect(screen.queryByRole("button", { name: /Übersicht/ })).toBeNull();
     expect(screen.getByText("Übersicht 1", { selector: "button" })).toBeInTheDocument();
-    expect(effects.cleaned).toBe(1);
+    // the cleanup is a passive effect of the commit that parked the page: the attribute can be seen a moment before React has
+    // flushed it (CI, 2026-11-19: 0 instead of 1 in one of two runs of the same commit) – exactly one cleanup, once it ran
+    await waitFor(() => expect(effects.cleaned).toBe(1), { timeout: 1500 });
 
     await switchTo(() => rerender(host("overview", onT)));
     expect(screen.getByRole("button", { name: "Übersicht 1" })).toBeInTheDocument();
