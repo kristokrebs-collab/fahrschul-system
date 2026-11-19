@@ -73,7 +73,7 @@ describe("Ticket zum Kopieren", () => {
       "Flat by: 15:55 Uhr (UTC−4)",
       "Risiko-Check: Grün",
       "Sitzung: Mo 19.10. · New York 9:30 (UTC−4), 5 Minuten-Kerzen",
-      "Quelle: Binance USDⓈ-M · Kerzen bis 19.10.2026 10:00 Uhr (UTC−4), abgerufen 25.10.2026 06:00 Uhr",
+      "Quelle: Binance USDⓈ-M · Kerzen bis 19.10.2026 10:00 Uhr (UTC−4), abgerufen 25.10.2026 06:00 Uhr (UTC−4)",
       TICKET_NOTE,
     ]);
     expect(TICKET_NOTE).toContain("die App sendet nichts an eine Börse und platziert keine Order");

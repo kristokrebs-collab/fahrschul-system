@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useMemo, useState } from "react";
 import type { StoreMode } from "@/domain/types";
-import { dateTime, date as fmtDate } from "@/lib/format";
+import { dateTime, date as fmtDate, countText } from "@/lib/format";
 import { processDone } from "@/motion/processFeedback";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -44,9 +44,11 @@ export const DATA_STRINGS = {
   no: "Nein",
   quarantine: "Quarantäne ansehen",
   quarantineHide: "Quarantäne ausblenden",
-  quarantineNote: (n: number) => `${n} Einträge konnten nicht gelesen werden und liegen unverändert in ${KEYS.quarantine}.`,
-  footer: (trades: number, setups: number, rules: number) => `${trades} Trades gespeichert · ${setups} Grundlagen · ${rules} Grundregeln`,
-  trades: (n: number) => `${n} Trades`,
+  quarantineNote: (n: number) =>
+    n === 1 ? `1 Eintrag konnte nicht gelesen werden und liegt unverändert in ${KEYS.quarantine}.` : `${n} Einträge konnten nicht gelesen werden und liegen unverändert in ${KEYS.quarantine}.`,
+  footer: (trades: number, setups: number, rules: number) =>
+    `${countText(trades, "Trade", "Trades")} gespeichert · ${countText(setups, "Grundlage", "Grundlagen")} · ${countText(rules, "Grundregel", "Grundregeln")}`,
+  trades: (n: number) => countText(n, "Trade", "Trades"),
   showAll: "Alle anzeigen",
   /** Review F08 / A2: the plain JSON backup carries only references to the pictures; the ZIP carries the original files. */
   jsonShots: "Backup mit Bildern (ZIP)",

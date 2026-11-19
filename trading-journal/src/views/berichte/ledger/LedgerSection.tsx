@@ -112,7 +112,7 @@ function YearBlock({ y, cur }: { y: YearSummary; cur: string }) {
         <p className="text-[11.5px] leading-snug text-mute" data-testid="ledger-year-flags">
           {y.flagged > 0 && (
             <>
-              {y.flagged} {L.flagged}.{" "}
+              {y.flagged} {y.flagged === 1 ? L.flaggedOne : L.flagged}.{" "}
             </>
           )}
           {y.duplicateGross !== 0 && <>{L.duplicateIn(`${n2(y.duplicateGross)} ${cur}`)}. </>}

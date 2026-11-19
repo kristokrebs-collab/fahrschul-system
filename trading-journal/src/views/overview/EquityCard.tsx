@@ -4,6 +4,7 @@ import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
 import { useAccountView, useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
+import { countText } from "@/lib/format";
 
 export const EQUITY_TITLE = "Kontostand";
 export const EQUITY_EMPTY_TITLE = "Noch keine Kurve";
@@ -26,7 +27,7 @@ export function EquityCard() {
       note={
         n ? (
           <>
-            {n} Trades · jetzt <MotionNumber value={view.balance} decimals={0} suffix={` ${cur}`} tone="none" flash />
+            {countText(n, "Trade", "Trades")} · jetzt <MotionNumber value={view.balance} decimals={0} suffix={` ${cur}`} tone="none" flash />
           </>
         ) : undefined
       }

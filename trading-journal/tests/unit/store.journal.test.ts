@@ -29,7 +29,7 @@ describe("bootJournal", () => {
     expect(s.mode).toBe("connecting");
     expect(s.loaded).toBe(false);
     expect(s.quarantined).toBe(1);
-    expect(useUi.getState().toasts[0]?.title).toBe("1 Einträge konnten nicht gelesen werden");
+    expect(useUi.getState().toasts[0]?.title).toBe("1 Eintrag konnte nicht gelesen werden");
     await p;
     expect(useJournal.getState().mode).toBe("local");
     expect(useJournal.getState().loaded).toBe(true);

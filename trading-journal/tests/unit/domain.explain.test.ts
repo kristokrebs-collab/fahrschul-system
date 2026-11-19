@@ -222,7 +222,7 @@ describe("checklist evaluation (bundle khe)", () => {
     expect(ex.rows[2]).toEqual(["Mit Lücken", `3 · 33 % Win-Rate`]);
     expect(ex.rows[3]).toEqual(["Differenz", "+67 Prozentpunkte"]);
     expect(ex.verdict.text).toBe("Mit voller Checkliste gewinnst du öfter. Die Regeln wirken.");
-    expect(checklistTileCaption(ev.full)).toBe("1 Trades · +396");
+    expect(checklistTileCaption(ev.full)).toBe("1 Trade · +396");
     const onlyGaps = explainChecklist(evaluateChecklist(view.closed));
     expect(onlyGaps.rows[3]).toEqual(["Differenz", "–"]);
     expect(onlyGaps.verdict.text).toBe("Für einen Vergleich brauchst du Trades mit und ohne vollständige Checkliste.");

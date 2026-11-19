@@ -12,6 +12,7 @@ import { condText, FEE_PRESETS, RULE_DEFAULTS, RULE_LABEL, sanitizeCond, strateg
 import { boxesCfgOf, normalizeWatchSymbol } from "@/domain/boxes";
 import type { SignalCfg } from "@/domain/signals";
 import { cn } from "@/lib/cn";
+import { Arrive } from "@/motion/Arrive";
 import { Autocomplete } from "@/motion/pulse/Autocomplete";
 import { MorphSelect } from "@/motion/pulse/MorphSelect";
 import { radius, spring, tween } from "@/motion/tokens";
@@ -23,6 +24,7 @@ import { Icon } from "@/primitives/icons";
 import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import { useJournal } from "@/store/journalStore";
+import { jsonEqual } from "@/store/merge3";
 import { cancelLab, pagesEstimate, planOf, startLab, useLabor, type LabConfig } from "./laborStore";
 import { RuleBuilder } from "./RuleBuilder";
 import { LABOR, type LaborPeriod } from "./strings";
@@ -42,6 +44,9 @@ const RULE_KINDS = Object.keys(RULE_LABEL) as RuleKind[];
 export function ConfigCard({ signal, className }: { signal: SignalCfg; className?: string }) {
   const cfg = useLabor((s) => s.cfg);
   const status = useLabor((s) => s.status);
+  // the set-up was changed since the run whose result is shown below (Funktionsprüfung Runde 18: only the button's word changed –
+  // equity, Kennzahlen and trade list of the OLD rules stood there as if they belonged to the new ones)
+  const stale = useLabor((s) => s.status === "done" && s.runCfg != null && !jsonEqual(s.runCfg, s.cfg));
   const setCfg = useLabor((s) => s.setCfg);
   const setParam = useLabor((s) => s.setParam);
   const boxesRaw = useJournal((s) => (s.settings as unknown as { boxes?: unknown }).boxes);
@@ -188,6 +193,11 @@ export function ConfigCard({ signal, className }: { signal: SignalCfg; className
           </Collapse>
         </div>
 
+        {stale && (
+          <Arrive as="p" role="status" className="text-[12.5px] text-warn" data-testid="labor-stale">
+            {LABOR.stale}
+          </Arrive>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-[12px] text-faint" data-testid="labor-estimate">
             {cfg.symbol} · {LABOR.estimate(pages, false)}

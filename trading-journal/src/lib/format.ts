@@ -27,6 +27,12 @@ export const isFin = (e: unknown): e is number => e != null && typeof e === "num
 export type SignedDigits = 0 | 1 | 2;
 
 /** Integer, e.g. 85900 → "85.900". */
+/**
+ * „1 Trade“ / „5 Trades“: a count with its noun in the right number. A journal with exactly one trade is what every new user has –
+ * „1 Trades“ stood in a dozen places of it (Funktionsprüfung Runde 18).
+ */
+export const countText = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+
 export const n0 = (e: number | null | undefined): string => (isFin(e) ? minus(f0.format(e)) : DASH);
 /** One decimal, e.g. 1.25 → "1,3". */
 export const n1 = (e: number | null | undefined): string => (isFin(e) ? minus(f1.format(e)) : DASH);

@@ -158,6 +158,6 @@ describe("SettingsView · Konten", () => {
     expect(line.closest('[role="status"]')).not.toBeNull();
     expect(onTest).toHaveBeenCalledWith({ endpoints: ["topTraderAccountsLongShort", "whaleRetailDelta"], params: { coin: "BTC", exchange: "binance_perp_stable", timeframe: "1h", limit: 3 } });
     expect(screen.getByText("Nur dieser Browser")).toBeInTheDocument();
-    expect(screen.getByText("2 Trades gespeichert · 2 Grundlagen · 1 Grundregeln")).toBeInTheDocument();
+    expect(screen.getByText("2 Trades gespeichert · 2 Grundlagen · 1 Grundregel")).toBeInTheDocument();
   });
 });

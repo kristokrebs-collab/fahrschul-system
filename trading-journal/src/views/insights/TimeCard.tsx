@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { useMemo, useRef, useState, type PointerEvent } from "react";
 import { bucketSummary, byHour, bySession, byWeekday, EMPTY, explainTime, TITLES, type TimeBucket } from "@/domain/insights";
 import { cn } from "@/lib/cn";
-import { pct0, signed } from "@/lib/format";
+import { pct0, signed, countText } from "@/lib/format";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { EMPTY_LINE_CLOSED, EmptyState } from "@/primitives/EmptyState";
@@ -134,7 +134,7 @@ export function TimeCard() {
                   {tab === "hour" ? sel.sub : sel.label}
                   {tab === "session" && sel.sub ? <span className="font-normal text-faint"> · {sel.sub}</span> : null}
                 </span>
-                <span className="num font-mono text-mute">{sel.g.n} Trades</span>
+                <span className="num font-mono text-mute">{countText(sel.g.n, "Trade", "Trades")}</span>
                 {sel.g.n > 0 && (
                   <>
                     <span className="num font-mono text-mute">{pct0(sel.g.winRate)} Win-Rate</span>
@@ -151,7 +151,7 @@ export function TimeCard() {
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="Beste" value={name(sum.best)} sub={sum.best ? `${signed(sum.best.g.net, 0)} ${cur}` : "ab 3 Trades"} tone={sum.best ? "text-win" : "text-faint"} />
             <Stat label="Schlechteste" value={name(sum.worst)} sub={sum.worst ? `${signed(sum.worst.g.net, 0)} ${cur}` : "–"} tone={sum.worst ? "text-loss" : "text-faint"} />
-            <Stat label="Aktivste" value={name(sum.busiest)} sub={sum.busiest ? `${sum.busiest.g.n} Trades` : "–"} />
+            <Stat label="Aktivste" value={name(sum.busiest)} sub={sum.busiest ? countText(sum.busiest.g.n, "Trade", "Trades") : "–"} />
             <Stat label="Beste Win-Rate" value={name(sum.bestWin)} sub={sum.bestWin ? pct0(sum.bestWin.g.winRate) : "ab 3 Trades"} />
           </div>
         </div>

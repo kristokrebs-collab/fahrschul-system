@@ -143,7 +143,7 @@ describe("import dialog reads a ZIP", () => {
     fireEvent.change(input, { target: { files: [new File([built.blob], "backup.zip", { type: "application/zip" })] } });
     await waitFor(() => expect(screen.getByTestId("import-shots")).toHaveTextContent("inkl. 1 Screenshot als Original"));
     expect(screen.getByTestId("import-shots-missing")).toHaveTextContent("1 Screenshot war beim Export nicht erreichbar");
-    expect(screen.getByTestId("import-preview-text")).toHaveTextContent("1 Trades");
+    expect(screen.getByTestId("import-preview-text")).toHaveTextContent("1 Trade,");
   });
 
   it("a broken ZIP shows the reason instead of a preview", async () => {

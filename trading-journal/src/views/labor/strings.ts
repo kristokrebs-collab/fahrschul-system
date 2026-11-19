@@ -42,6 +42,7 @@ export const LABOR = {
   noConds: "Ohne Bedingung gibt es kein Signal. Füge mindestens eine hinzu.",
   start: "Backtest starten",
   again: "Neu rechnen",
+  stale: "Einstellungen geändert – das Ergebnis unten gehört noch zum vorigen Lauf. „Neu rechnen“ bringt es auf den Stand.",
   cancel: "Abbrechen",
   retry: "Erneut versuchen",
   estimate: (pages: number, cached: boolean) => (pages === 0 ? "Alle Kerzen liegen im Cache." : `${pages} Abruf${pages === 1 ? "" : "e"} bei Binance${cached ? " (Rest aus dem Cache)" : ""}.`),
@@ -140,7 +141,9 @@ export const LABOR = {
       sub: "Derselbe Lauf mit einer Sache weniger.",
       variant: "Variante",
       none: "Für diese Strategie gibt es nur den Vergleich ohne Kosten, und der lief nicht (zu wenig Daten).",
-      note: "Jede Zeile ist ein eigener Lauf über denselben Zeitraum. Ein Unterschied bei wenigen Trades kann Zufall sein.",
+      // Funktionsprüfung Runde 18: the diagnosis said „ohne Kosten … −1.139 USDT“ (the gross of the main run), this table „Ohne Kosten …
+      // −1.225 USDT“ (a run of its own) – two answers to what reads as one question. The note says why they may differ.
+      note: "Jede Zeile ist ein eigener Lauf über denselben Zeitraum, auch „Ohne Kosten“: ohne Slippage sind die Füllkurse andere, und die Positionsgröße folgt dem anderen Kontostand. Die Summe muss deshalb nicht dem Brutto des Hauptlaufs unter „Brutto und Netto“ entsprechen. Ein Unterschied bei wenigen Trades kann Zufall sein.",
     },
     costs: { title: "Brutto und Netto", sub: "Was Gebühren, Slippage und Funding kosten." },
     exits: { title: "Ausstiege und Gewinn/Verlust", sub: "Wie die Trades enden und wie groß Gewinner und Verlierer sind." },

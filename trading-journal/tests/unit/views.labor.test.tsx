@@ -101,6 +101,13 @@ describe("LaborView", () => {
       fireEvent.click(screen.getByTestId("labor-start"));
     });
     await waitFor(() => expect(screen.getByTestId("labor-run")).toHaveAttribute("data-status", "done"), { timeout: 30_000 });
+    // Runde 18: right after a run nothing is stale; a changed set-up says that the result below belongs to the run before, and going
+    // back to the run's set-up takes the note away again
+    expect(screen.queryByTestId("labor-stale")).toBeNull();
+    act(() => useLabor.getState().setCfg({ period: "1y" }));
+    expect(screen.getByTestId("labor-stale")).toHaveTextContent("Einstellungen geändert – das Ergebnis unten gehört noch zum vorigen Lauf.");
+    act(() => useLabor.getState().setCfg({ period: "6m" }));
+    expect(screen.queryByTestId("labor-stale")).toBeNull();
     // paging: only 4h, forward, increasing startTime, Binance's page size
     expect(calls.length).toBeGreaterThan(0);
     expect(calls.every((c) => c.interval === "4h" && c.limit === 1500)).toBe(true);

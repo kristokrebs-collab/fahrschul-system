@@ -130,7 +130,7 @@ export function DiaryCard({ days, className }: { days: readonly DiaryDay[]; clas
   const shown = days.slice(-DIARY_ROWS);
   const total = shown.length;
   return (
-    <Card title={WACHSTUM.psyche.diary} note={total ? `Die letzten ${total} Einträge · ziehen oder abspielen` : undefined} className={className} data-testid="growth-diary" data-n={total}>
+    <Card title={WACHSTUM.psyche.diary} note={total ? `${total === 1 ? "Der letzte Eintrag" : `Die letzten ${total} Einträge`} · ziehen oder abspielen` : undefined} className={className} data-testid="growth-diary" data-n={total}>
       {total === 0 ? (
         <EmptyState title={WACHSTUM.psyche.diaryEmptyTitle} text={WACHSTUM.psyche.diaryEmpty} line={false} className="flex-1" />
       ) : (

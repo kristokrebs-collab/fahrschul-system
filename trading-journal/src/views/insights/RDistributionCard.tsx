@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { useMemo, useRef, useState } from "react";
 import { EMPTY, explainR, rDistribution, TITLES } from "@/domain/insights";
 import { cn } from "@/lib/cn";
-import { pct0, r as fmtR } from "@/lib/format";
+import { pct0, r as fmtR, countText } from "@/lib/format";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { EmptyState } from "@/primitives/EmptyState";
@@ -28,7 +28,7 @@ export function RDistributionCard() {
   const scale = Math.max(0.5, Math.abs(d.planned ?? 0), Math.abs(d.avgR ?? 0));
 
   return (
-    <InsightCard title={TITLES.r} explain={() => explainR(d)} note={d.rN ? `${d.rN} Trades mit Stop` : undefined} data-testid="insights-r">
+    <InsightCard title={TITLES.r} explain={() => explainR(d)} note={d.rN ? `${countText(d.rN, "Trade", "Trades")} mit Stop` : undefined} data-testid="insights-r">
       {!d.rN ? (
         <EmptyState title={EMPTY.r.title} text={EMPTY.r.text} line={false} />
       ) : (
@@ -36,7 +36,7 @@ export function RDistributionCard() {
           <div className="grid gap-1.5">
             <div className="grid items-end gap-1" style={{ height: HIST_H, gridTemplateColumns: `repeat(${d.bins.length}, minmax(0, 1fr))` }}>
               {d.bins.map((b, i) => (
-                <div key={b.key} className="relative flex h-full flex-col justify-end" role="img" aria-label={`${b.label} R: ${b.n} Trades`}>
+                <div key={b.key} className="relative flex h-full flex-col justify-end" role="img" aria-label={`${b.label} R: ${countText(b.n, "Trade", "Trades")}`}>
                   <span className={cn("num mb-1 text-center font-mono text-[10px]", b.n ? "text-mute" : "text-faint/60")}>{b.n}</span>
                   <motion.span
                     aria-hidden="true"
@@ -60,7 +60,7 @@ export function RDistributionCard() {
           <div className="grid gap-2">
             {[
               { label: "Geplant", v: d.planned, sub: d.plannedN ? `${d.plannedN} Trades mit Ziel` : "kein Ziel eingetragen" },
-              { label: "Realisiert", v: d.avgR, sub: `${d.rN} Trades` },
+              { label: "Realisiert", v: d.avgR, sub: countText(d.rN, "Trade", "Trades") },
             ].map((row, i) => (
               <div key={row.label} className="grid grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-3 text-[12.5px]">
                 <span className="text-mute">{row.label}</span>

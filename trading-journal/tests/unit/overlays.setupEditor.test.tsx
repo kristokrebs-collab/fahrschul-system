@@ -65,6 +65,16 @@ describe("SetupEditor", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("„+ Punkt hinzufügen“: the new point's field takes the focus, so the next keys are its text and not more empty points (Runde 18)", () => {
+    render(<SetupEditor open onClose={() => {}} />);
+    const add = screen.getByRole("button", { name: "+ Punkt hinzufügen" });
+    fireEvent.click(add);
+    expect(document.activeElement).toBe(screen.getByLabelText("Punkt 1"));
+    fireEvent.click(add);
+    expect(document.activeElement).toBe(screen.getByLabelText("Punkt 2"));
+    expect(screen.queryByLabelText("Punkt 3")).toBeNull();
+  });
+
   it("a name another Grundlage already carries is refused (spaces and case do not make a new name); the own name stays savable", async () => {
     const saveSpy = vi.fn(useJournal.getState().saveSettings);
     useJournal.setState({ saveSettings: saveSpy });
@@ -98,13 +108,13 @@ describe("SetupEditor", () => {
     const onClose = vi.fn();
     render(<SetupEditor open setupId="s_bo" fromTrade onClose={onClose} />);
     expect(screen.getByRole("dialog", { name: "Grundlage bearbeiten" })).toBeInTheDocument();
-    expect(screen.getByText("In 1 Trades verwendet")).toBeInTheDocument();
+    expect(screen.getByText("In 1 Trade verwendet")).toBeInTheDocument();
     expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("4H-Breakout über 85.900");
 
     fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
-    expect(screen.getByText("1 Trades verlieren die Zuordnung.")).toBeInTheDocument();
+    expect(screen.getByText("1 Trade verliert die Zuordnung.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Nein" }));
-    expect(screen.queryByText("1 Trades verlieren die Zuordnung.")).toBeNull();
+    expect(screen.queryByText("1 Trade verliert die Zuordnung.")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
     fireEvent.click(screen.getByRole("button", { name: "Ja" }));
     await waitFor(() => expect(useJournal.getState().settings.setups.map((x) => x.id)).toEqual(["s_mtf"]));
@@ -116,7 +126,7 @@ describe("SetupEditor", () => {
   it("a completed hold on a setup in use opens the usage warning instead of deleting", async () => {
     render(<SetupEditor open setupId="s_bo" fromTrade onClose={vi.fn()} />);
     fireEvent.pointerDown(screen.getByRole("button", { name: "Löschen" }), { button: 0 });
-    await screen.findByText("1 Trades verlieren die Zuordnung.", undefined, { timeout: 4000 });
+    await screen.findByText("1 Trade verliert die Zuordnung.", undefined, { timeout: 4000 });
     expect(useJournal.getState().settings.setups.map((x) => x.id)).toEqual(["s_bo", "s_mtf"]);
     fireEvent.click(screen.getByRole("button", { name: "Ja" }));
     await waitFor(() => expect(useJournal.getState().settings.setups.map((x) => x.id)).toEqual(["s_mtf"]));

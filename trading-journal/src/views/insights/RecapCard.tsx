@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { disciplineDays, EMPTY, explainRecap, RECAP_MIN_TRADES, recap, TITLES, type RecapKind } from "@/domain/insights";
 import { cn } from "@/lib/cn";
 import { tradeTime } from "@/lib/dates";
-import { date as fmtDate, pct0, signed } from "@/lib/format";
+import { date as fmtDate, pct0, signed, countText } from "@/lib/format";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { Badge } from "@/primitives/Badge";
 import { EmptyState } from "@/primitives/EmptyState";
@@ -54,9 +54,9 @@ export function RecapCard() {
             <p className="text-[15px] leading-snug text-fg">{r.sentence}</p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="Netto" value={<MotionNumber value={g.net} signed suffix={` ${cur}`} tone="auto" countOnReveal />} sub={`${g.n} Trades`} />
+            <Stat label="Netto" value={<MotionNumber value={g.net} signed suffix={` ${cur}`} tone="auto" countOnReveal />} sub={countText(g.n, "Trade", "Trades")} />
             <Stat label="Win-Rate" value={pct0(g.winRate)} sub={`${g.wins} G · ${g.losses} V`} />
-            <Stat label="Tage im Plus" value={pct0(r.dayWinRate)} sub={`${r.tradingDays} Handelstage`} />
+            <Stat label="Tage im Plus" value={pct0(r.dayWinRate)} sub={countText(r.tradingDays, "Handelstag", "Handelstage")} />
             <Stat
               label="Edge-Score"
               value={r.edge == null ? "–" : String(r.edge)}

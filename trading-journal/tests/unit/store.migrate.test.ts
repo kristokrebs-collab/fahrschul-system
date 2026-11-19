@@ -20,7 +20,7 @@ describe("migrate v0 → v1", () => {
     const r = migrate(now);
     expect(r.quarantined).toBe(1);
     expect(r.snapshotTag).toBe("v0-2026-09-30T10:00:00.000Z");
-    expect(quarantineToastTitle(r.quarantined)).toBe("1 Einträge konnten nicht gelesen werden");
+    expect(quarantineToastTitle(r.quarantined)).toBe("1 Eintrag konnte nicht gelesen werden");
 
     const snap = JSON.parse(localStorage.getItem("tj2-backup-v0-2026-09-30T10:00:00.000Z")!);
     expect(snap.trades).toHaveLength(3); // raw, including the broken one

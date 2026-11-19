@@ -45,7 +45,7 @@ describe("parseBackup", () => {
     expect(p.ok).toBe(true);
     if (p.ok) {
       expect(p.preview).toMatchObject({ trades: 2, setups: 1, readings: 2, schemaVersion: null });
-      expect(previewText(p.preview)).toBe("2 Trades, 1 Grundlagen, 2 Ablesungen · exportiert am 29.09.26");
+      expect(previewText(p.preview)).toBe("2 Trades, 1 Grundlage, 2 Ablesungen · exportiert am 29.09.26");
     }
   });
 });

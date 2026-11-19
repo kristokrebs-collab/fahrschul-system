@@ -21,6 +21,7 @@ import { riskSpread } from "../risk/perStrategy";
 import { hasCheckin } from "../psych/checkin";
 import type { Prepared } from "./context";
 import { addDays } from "./habits";
+import { countText } from "@/lib/format";
 
 export type SkillKey = "discipline" | "risk" | "journal" | "patience" | "emotions" | "planning";
 export type SkillLevel = 0 | 1 | 2 | 3 | 4 | 5;
@@ -83,12 +84,12 @@ export function skillProfile(p: Prepared): SkillProfile {
   };
 
   const scored = p.discDays.filter((d) => d.key >= fromKey && d.key <= p.todayKey && d.score != null).length;
-  add("discipline", scored >= 3 ? disciplineAvg(p.discDays, fromKey, p.todayKey) : null, `${scored} Handelstage`);
+  add("discipline", scored >= 3 ? disciplineAvg(p.discDays, fromKey, p.todayKey) : null, countText(scored, "Handelstag", "Handelstage"));
 
   const spread = riskSpread(recentClosed, p.settings, "setup", p.limits.maxLossTradePct).overall;
-  add("risk", spread && spread.n >= 5 ? 100 * spread.consistency * (1 - spread.over / spread.n) : null, `${spread?.n ?? 0} Trades mit Stop`);
+  add("risk", spread && spread.n >= 5 ? 100 * spread.consistency * (1 - spread.over / spread.n) : null, `${countText(spread?.n ?? 0, "Trade", "Trades")} mit Stop`);
 
-  add("journal", recentClosed.length >= 3 ? journalRate(recentClosed) * 100 : null, `${recentClosed.length} Trades`);
+  add("journal", recentClosed.length >= 3 ? journalRate(recentClosed) * 100 : null, countText(recentClosed.length, "Trade", "Trades"));
 
   const calm = days.filter((k) => {
     if ((p.eventsByDay.get(k) ?? []).some((e) => RESTLESS.has(e.key))) return false;
@@ -96,16 +97,16 @@ export function skillProfile(p: Prepared): SkillProfile {
     for (const t of p.byDay.get(k) ?? []) count[accountOf(t)] = (count[accountOf(t)] ?? 0) + 1;
     return Object.entries(count).every(([a, n]) => n <= p.limits.maxTrades[a as "makro" | "scalp"]);
   }).length;
-  add("patience", days.length >= 3 ? (calm / days.length) * 100 : null, `${days.length} Handelstage`);
+  add("patience", days.length >= 3 ? (calm / days.length) * 100 : null, countText(days.length, "Handelstag", "Handelstage"));
 
   const hot = new Set(p.events.filter((e) => HOT.has(e.key)).map(triggerOf));
-  add("emotions", recentClosed.length >= 5 ? (recentClosed.filter((t) => !hot.has(t.id)).length / recentClosed.length) * 100 : null, `${recentClosed.length} Trades`);
+  add("emotions", recentClosed.length >= 5 ? (recentClosed.filter((t) => !hot.has(t.id)).length / recentClosed.length) * 100 : null, countText(recentClosed.length, "Trade", "Trades"));
 
   const planned = recentAll.filter((t) => t.followedPlan != null);
   const lists = recentAll.filter((t) => t.complete != null);
   const prepared = days.filter((k) => hasCheckin(p.days[k]) || (p.days[k]?.plan ?? "").trim() !== "").length;
   const parts = [planned.length >= 3 ? planned.filter((t) => t.followedPlan).length / planned.length : null, lists.length >= 3 ? lists.filter((t) => t.complete).length / lists.length : null, days.length >= 3 ? prepared / days.length : null].filter((x): x is number => x != null);
-  add("planning", recentAll.length >= 5 && parts.length ? (mean(parts) ?? 0) * 100 : null, `${recentAll.length} Trades`);
+  add("planning", recentAll.length >= 5 && parts.length ? (mean(parts) ?? 0) * 100 : null, countText(recentAll.length, "Trade", "Trades"));
 
   const avail = axes.filter((a) => a.value != null);
   const value = avail.length >= 3 ? Math.round(mean(avail.map((a) => a.value!))!) : null;

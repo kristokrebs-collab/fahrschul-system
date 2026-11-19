@@ -94,7 +94,7 @@ export function buildTicket(p: TicketPlan): Ticket {
   const entryHow = p.entrySource === "signal" ? `Schlusskurs der Signal-Kerze${p.signalAt != null ? ` (${clockIn(p.signalAt, p.tz)} Uhr)` : ""}` : p.entrySource === "level" ? "geplant am Ausbruchsniveau, noch kein Signal" : "von dir eingegeben";
   const stand =
     p.candlesUntil != null || p.fetchedAt != null
-      ? `${p.candlesUntil != null ? `Kerzen bis ${dateTimeIn(p.candlesUntil, p.tz)} Uhr (${zoneLabel(p.candlesUntil, p.tz)})` : "Kerzen: keine Daten"}${p.fetchedAt != null ? `, abgerufen ${dateTimeIn(p.fetchedAt, p.tz)} Uhr` : ""}`
+      ? `${p.candlesUntil != null ? `Kerzen bis ${dateTimeIn(p.candlesUntil, p.tz)} Uhr (${zoneLabel(p.candlesUntil, p.tz)})` : "Kerzen: keine Daten"}${p.fetchedAt != null ? `, abgerufen ${dateTimeIn(p.fetchedAt, p.tz)} Uhr (${zoneLabel(p.fetchedAt, p.tz)})` : ""}`
       : "keine Daten";
   const rows: [string, string][] = [
     ["Symbol", p.symbol],

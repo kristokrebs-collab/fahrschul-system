@@ -334,7 +334,7 @@ test.describe("Screenshot-Originale", () => {
       await p2.getByRole("button", { name: "Backup importieren" }).click();
       const dialog = p2.getByRole("dialog", { name: "Backup importieren" });
       await dialog.getByLabel("Backup-Datei").setInputFiles(zipFile);
-      await expect(dialog.getByTestId("import-preview-text")).toContainText("1 Trades");
+      await expect(dialog.getByTestId("import-preview-text")).toContainText("1 Trade,");
       await expect(dialog.getByTestId("import-shots")).toContainText("inkl. 2 Screenshots als Original");
       await dialog.getByRole("button", { name: "Importieren", exact: true }).click();
       await expect(toast(p2).filter({ hasText: "Bilder wiederhergestellt" })).toBeVisible({ timeout: 30_000 });

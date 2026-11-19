@@ -25,6 +25,7 @@ export const LEDGER = {
   net: "Nach Gebühren und Funding",
   closes: "Schließungen",
   flagged: "Zeilen mit Hinweis",
+  flaggedOne: "Zeile mit Hinweis",
   duplicateIn: (v: string) => `davon in möglichen Dubletten: ${v}`,
   unmatched: (q: string) => `${q} Einheiten ohne Einstieg im Buch`,
   empty: "Im Journal liegt noch kein Trade, aus dem sich Buchungszeilen bilden ließen.",

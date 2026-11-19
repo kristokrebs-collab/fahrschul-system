@@ -51,7 +51,7 @@ export interface ValidationResult<T> {
 
 /** German toast text for `n` quarantined records (Plan 8.3). */
 export function quarantineToastTitle(n: number): string {
-  return `${n} Einträge konnten nicht gelesen werden`;
+  return n === 1 ? "1 Eintrag konnte nicht gelesen werden" : `${n} Einträge konnten nicht gelesen werden`;
 }
 
 export function readMeta(): Meta {

@@ -6,7 +6,7 @@
  * saves it there).
  */
 import { useMemo, useState } from "react";
-import { dateTimeIn, planOfSettings, priceText, clockIn, type SavedPlan } from "@/domain/plan";
+import { dateTimeIn, planOfSettings, priceText, clockIn, zoneLabel, type SavedPlan } from "@/domain/plan";
 import { newId } from "@/lib/ids";
 import { tvSymbolToBinance } from "@/market/symbol";
 import { Button } from "@/primitives/Button";
@@ -165,7 +165,7 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
             )}
             {saved && (
               <p className="num text-[12px] leading-snug text-mute" data-testid="hplan-saved-state">
-                Gespeichert am {dateTimeIn(saved.savedAt, t.tz)} Uhr{dirty ? " – der Plan oben weicht davon ab; „Plan aktualisieren“ übernimmt ihn" : ""}.{saved.journalAt ? " Ein Journal-Entwurf wurde geöffnet." : ""}
+                Gespeichert am {dateTimeIn(saved.savedAt, t.tz)} Uhr ({zoneLabel(saved.savedAt, t.tz)}){dirty ? " – der Plan oben weicht davon ab; „Plan aktualisieren“ übernimmt ihn" : ""}.{saved.journalAt ? " Ein Journal-Entwurf wurde geöffnet." : ""}
               </p>
             )}
             {alarms && (

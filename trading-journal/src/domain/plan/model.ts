@@ -345,7 +345,7 @@ export function buildPlanModel(i: ModelInput): PlanModel {
       stocks ? "Aktien ohne Hebel: es gibt keine Liquidation, die vor dem Stop liegen könnte." : "Liquidation ist eine Näherung (Wartungsmargen-Stufen der Risiko-Einstellungen)",
     ],
     ticket: [
-      `Quelle ${i.sourceLabel}${candlesUntil != null ? ` · Kerzen bis ${dateTimeIn(candlesUntil, session.tz)} Uhr` : " · keine Kerzendaten"}${i.fetchedAt != null ? ` · abgerufen ${dateTimeIn(i.fetchedAt, session.tz)} Uhr` : ""}`,
+      `Quelle ${i.sourceLabel}${candlesUntil != null ? ` · Kerzen bis ${dateTimeIn(candlesUntil, session.tz)} Uhr` : " · keine Kerzendaten"}${i.fetchedAt != null ? ` · abgerufen ${dateTimeIn(i.fetchedAt, session.tz)} Uhr (${zoneLabel(i.fetchedAt, session.tz)})` : ""}`,
       "Das Ticket wird nicht gesendet und nicht gespeichert, bis du es selbst kopierst oder den Plan speicherst.",
     ],
   };

@@ -55,10 +55,10 @@ export const SETUP_EDITOR_STRINGS = {
   addItem: "+ Punkt hinzufügen",
   removeItem: "Punkt entfernen",
   color: "Farbe",
-  usedBy: (n: number) => `In ${n} Trades verwendet`,
+  usedBy: (n: number) => (n === 1 ? "In 1 Trade verwendet" : `In ${n} Trades verwendet`),
   del: "Löschen",
   delConfirm: "Löschen?",
-  delUsed: (n: number) => `${n} Trades verlieren die Zuordnung.`,
+  delUsed: (n: number) => (n === 1 ? "1 Trade verliert die Zuordnung." : `${n} Trades verlieren die Zuordnung.`),
   yes: "Ja",
   no: "Nein",
   cancel: "Abbrechen",
@@ -173,6 +173,14 @@ export function SetupEditor(props: SetupEditorProps) {
 
   const patch = (p: Partial<Form>) => setForm((f) => ({ ...f, ...p }));
   const setItems = (checklist: ChecklistItem[]) => patch({ checklist });
+  // The point that „+ Punkt hinzufügen“ just added takes the focus: the next keys are its text. Before, the focus stayed on the button
+  // and typing the text added a further empty point with every space (Funktionsprüfung Runde 18).
+  const [addedId, setAddedId] = useState<string | null>(null);
+  const addItem = () => {
+    const id = newChecklistItemId();
+    setAddedId(id);
+    setItems([...form.checklist, { id, text: "" }]);
+  };
 
   async function save() {
     if (!form.name.trim()) {
@@ -342,6 +350,7 @@ export function SetupEditor(props: SetupEditorProps) {
                       index={i}
                       count={form.checklist.length}
                       ids={checklistIds}
+                      focusOnMount={item.id === addedId}
                       onChange={(text) => setItems(form.checklist.map((c) => (c.id === item.id ? { ...c, text } : c)))}
                       onRemove={() => setItems(form.checklist.filter((c) => c.id !== item.id))}
                       onMove={(dir) => setItems(moveItem(form.checklist, i, dir))}
@@ -349,7 +358,7 @@ export function SetupEditor(props: SetupEditorProps) {
                   ))}
                 </AnimatePresence>
               </Reorder.Group>
-              <Button size="sm" className="justify-self-start" onClick={() => setItems([...form.checklist, { id: newChecklistItemId(), text: "" }])}>
+              <Button size="sm" className="justify-self-start" onClick={addItem}>
                 {SETUP_EDITOR_STRINGS.addItem}
               </Button>
             </div>
@@ -448,6 +457,8 @@ function ColorRadios({ value, onChange }: { value: string; onChange: (hex: strin
 const LIFT_SCALE = 1.02;
 
 interface ChecklistRowProps {
+  /** The row was just added by „+ Punkt hinzufügen“: its field takes the focus when it mounts. */
+  focusOnMount?: boolean;
   item: ChecklistItem;
   index: number;
   count: number;
@@ -459,7 +470,7 @@ interface ChecklistRowProps {
 }
 
 /** One checklist line: drag handle (pointer) / arrow keys (keyboard), input `Punkt {n}`, remove `Punkt entfernen`. */
-function ChecklistRow({ item, index, count, ids, onChange, onRemove, onMove }: ChecklistRowProps) {
+function ChecklistRow({ item, index, count, ids, focusOnMount, onChange, onRemove, onMove }: ChecklistRowProps) {
   const controls = useDragControls();
   const lift = useLift({ scale: LIFT_SCALE });
   const onHandleKey = (e: KeyboardEvent<HTMLButtonElement>) => {
@@ -510,7 +521,7 @@ function ChecklistRow({ item, index, count, ids, onChange, onRemove, onMove }: C
           <circle cx="8" cy="9.5" r="1" />
         </svg>
       </button>
-      <Input value={item.text} aria-label={`Punkt ${index + 1}`} onChange={(e) => onChange(e.target.value)} autoComplete="off" />
+      <Input value={item.text} aria-label={`Punkt ${index + 1}`} onChange={(e) => onChange(e.target.value)} autoComplete="off" autoFocus={focusOnMount} />
       <button
         type="button"
         aria-label={SETUP_EDITOR_STRINGS.removeItem}

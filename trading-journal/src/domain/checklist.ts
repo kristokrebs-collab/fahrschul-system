@@ -89,7 +89,7 @@ export function missedLabel(m: MissedItem): string {
 
 /** Tile caption: "{n} Trades · {signed(net,0)}". */
 export function checklistTileCaption(g: Agg): string {
-  return `${g.n} Trades · ${signed(g.net, 0)}`;
+  return `${g.n} ${g.n === 1 ? "Trade" : "Trades"} · ${signed(g.net, 0)}`;
 }
 
 /** Explainer of the card ("Details"). */

@@ -192,7 +192,8 @@ export function skippedText(n: number): string {
 /** `{n} Trades, {m} Grundlagen, {k} Ablesungen · exportiert am {date}` */
 export function previewText(p: ImportPreview): string {
   const date = p.exportedAt ? fmt.date(new Date(p.exportedAt)) : "–";
-  return `${p.trades} Trades, ${p.setups} Grundlagen, ${p.readings} Ablesungen · exportiert am ${date}`;
+  const c = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+  return `${c(p.trades, "Trade", "Trades")}, ${c(p.setups, "Grundlage", "Grundlagen")}, ${c(p.readings, "Ablesung", "Ablesungen")} · exportiert am ${date}`;
 }
 
 /**

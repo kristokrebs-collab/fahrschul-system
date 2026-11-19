@@ -16,7 +16,7 @@ export const DISC = {
   failed: "Die Suche ist fehlgeschlagen. Die Daten wurden nicht verändert – bitte noch einmal versuchen.",
   outdated: "Die Daten haben sich seit der letzten Suche geändert. Bitte noch einmal rechnen.",
   noInput: "Noch nichts zu prüfen. Starte einen Backtest oder wähle Journal-Trades, dann steht hier die Zahl der Trades.",
-  trades: (usable: number, all: number): string => (usable === all ? `${usable} Trades mit bekanntem R` : `${usable} von ${all} Trades haben ein bekanntes R – die übrigen werden nicht verwendet`),
+  trades: (usable: number, all: number): string => (usable === all ? `${usable} ${usable === 1 ? "Trade" : "Trades"} mit bekanntem R` : `${usable} von ${all} Trades haben ein bekanntes R – die übrigen werden nicht verwendet`),
   tooFew: (have: number): string => `Zu wenige Trades: Für eine saubere Prüfung braucht es mindestens ${LIMITS.minTrades} Trades mit bekanntem R – hier sind es ${have}. Mit weniger fände die Suche vor allem Zufall.`,
   stand: (at: string, from: string | null, to: string | null, source: "backtest" | "journal"): string => `Stand: gerechnet am ${at}${from && to ? ` · Trades von ${from} bis ${to}` : ""} · Quelle: ${source === "journal" ? "dein Journal" : "der gezeigte Backtest"}. Zahlen aus einer deterministischen Rechnung, kein Sprachmodell.`,
   seed: (s: number): string => `Startwert der Zufallszahlen (Seed): ${s}. Gleiche Daten und gleicher Startwert geben immer dasselbe Ergebnis.`,

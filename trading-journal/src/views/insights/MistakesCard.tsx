@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { EMPTY, explainMistakes, mistakeReport, TITLES } from "@/domain/insights";
 import { cn } from "@/lib/cn";
-import { pct0, r as fmtR, signed } from "@/lib/format";
+import { pct0, r as fmtR, signed, countText } from "@/lib/format";
 import { EMPTY_LINE_CLOSED, EmptyState } from "@/primitives/EmptyState";
 import { Collapse } from "@/primitives/Expander";
 import { Segmented } from "@/primitives/Segmented";
@@ -34,7 +34,7 @@ export function MistakesCard() {
     <InsightCard
       title={TITLES.mistakes}
       explain={() => explainMistakes(rep, cur, scope === "all")}
-      note={rep.total ? `${rep.tagged} von ${rep.total} Trades mit Fehler · ${rep.clean.n} sauber` : undefined}
+      note={rep.total ? `${rep.tagged} von ${countText(rep.total, "Trade", "Trades")} mit Fehler · ${rep.clean.n} sauber` : undefined}
       action={<Segmented<Scope> size="sm" aria-label="Welche Fehler" options={SCOPES} value={scope} onChange={setScope} className={SEG_TOUCH} />}
       data-testid="insights-mistakes"
     >
