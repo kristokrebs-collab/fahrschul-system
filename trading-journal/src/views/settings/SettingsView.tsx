@@ -128,7 +128,8 @@ const SIZE = {
   mistakes: { base: 528, sm: 512, lg: 654 },
   rules: { base: 384, sm: 368, lg: 368 },
   limits: { base: 314, sm: 250, lg: 266 },
-  data: { base: 949, sm: 665, lg: 647 },
+  // + the line that says what the backup holds (Runde 18): measured +99 / +62 / +43 px at 390 / 700 / 1024–1440
+  data: { base: 1048, sm: 727, lg: 690 },
   storage: { base: 499, sm: 369, lg: 336 },
   // + „Bewegung“ (Runde 11): measured 661 / 598 / 574–595 px at 390 / 700 / 1024–1440; + „Rückmeldung bei geschafften Schritten“ (Paket P,
   // two switches): measured 836 / 766 / 752–759 px

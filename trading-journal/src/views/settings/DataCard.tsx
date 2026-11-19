@@ -28,6 +28,13 @@ export const DATA_STRINGS = {
   import: "Backup importieren",
   /** NEW (merge): the import takes the other version's files as well (`parseBackup`: ours, `{exportedAt, settings, trades}`, `{trades}`, a bare list). */
   importHint: "Nimmt auch Backups der Datei-Version an: JSON mit Trades und Einstellungen oder nur eine Trade-Liste. „Zusammenführen“ behält alles, was schon da ist, und übernimmt Fehler-Tags und Check-Einstellungen.",
+  /**
+   * What the backup holds and what stays behind (Funktionsprüfung Runde 18: after backup → wipe → restore, saved views and the Labor's
+   * versions were gone – the card had never said they are not part of it). The backup is the JOURNAL (the same four parts the cloud
+   * syncs); what a page keeps for itself on this device is named here, so nobody finds out on a new device.
+   */
+  scope:
+    "Im Backup: Trades, Tagesnotizen und Einstellungen samt Grundlagen, Regeln, Zielen, Schlüsselmarken und Strategien. Nur in diesem Browser bleiben gespeicherte Ansichten, Labor-Entwürfe, -Versionen und -Läufe, Simulationen, das Cockpit-Layout und das Datenarchiv.",
   lastBackup: (d: string) => `Letztes Backup ${d}`,
   noBackup: "Noch kein Backup",
   restoreTitle: "Wiederherstellen",
@@ -153,6 +160,9 @@ export function DataCard({ onImport, className }: DataCardProps) {
         <Button onClick={onImport}>{DATA_STRINGS.import}</Button>
       </div>
       <p className="mt-2.5 text-[11.5px] leading-relaxed text-faint">{DATA_STRINGS.importHint}</p>
+      <p className="mt-1.5 text-[11.5px] leading-relaxed text-faint" data-testid="data-backup-scope">
+        {DATA_STRINGS.scope}
+      </p>
       {localShots > 0 && (
         <p className="mt-1.5 text-[11.5px] leading-relaxed text-warn" data-testid="data-shots-local">
           {DATA_STRINGS.shotsLocal(localShots)}
