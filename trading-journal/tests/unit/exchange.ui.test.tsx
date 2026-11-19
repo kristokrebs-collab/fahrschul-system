@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setCloudEnabledForTests } from "@/cloud/env";
 import { resetCloudSession, useCloudSession } from "@/cloud/session";
 import type { Trade } from "@/domain/types";
-import { CSV_MAX_BYTES, CsvImportSheet } from "@/exchanges/csv/CsvImportSheet";
+import { CSV_MAX_BYTES, CSV_STRINGS, CsvImportSheet, looksBinary } from "@/exchanges/csv/CsvImportSheet";
 import { readDismissed } from "@/exchanges/inbox";
 import { refreshPositions, useExchangePositions, useHasExchangeConnection, usePositionsStore, type ExchangePosition } from "@/exchanges/positions";
 import { openConnect, openCsvImport, resetExchangeStore, useExchange } from "@/exchanges/store";
@@ -316,6 +316,36 @@ describe("CsvImportSheet", () => {
     expect(screen.getByTestId("csv-run")).toBeDisabled();
     expect(screen.getByTestId("csv-known")).toHaveTextContent("schon importiert");
     expect(screen.getByTestId("csv-known")).toHaveAttribute("data-writes", "0");
+  });
+
+  it("the same row twice in one file: the preview counts the trade once, like the import, and says so (Runde 18: „3 Trades“ over „Importieren (1)“)", async () => {
+    const row = BITUNIX_CSV.split("\n")[1]!;
+    const twice = [BITUNIX_CSV, row, row].join("\n");
+    wrap(<CsvImportSheet readFile={async () => twice} />);
+    act(() => openCsvImport());
+    fireEvent.change(await screen.findByTestId("csv-file"), { target: { files: [new File([twice], "doppelt.csv", { type: "text/csv" })] } });
+    await screen.findByTestId("csv-row");
+    expect(screen.getAllByTestId("csv-row")).toHaveLength(1);
+    expect(screen.getByTestId("csv-run")).toHaveTextContent("Importieren (1)");
+    expect(screen.getByTestId("csv-dupes")).toHaveTextContent("2 Zeilen stehen doppelt in der Datei");
+  });
+
+  it("a picture renamed to .csv is named as such – no column mapper over binary noise", async () => {
+    const png = "\u0089PNG\r\n\u001a\n\u0000\u0000\u0000\rIHDR\u0000\u0000";
+    wrap(<CsvImportSheet readFile={async () => png} />);
+    act(() => openCsvImport());
+    fireEvent.change(await screen.findByTestId("csv-file"), { target: { files: [new File([png], "bild.csv", { type: "text/csv" })] } });
+    expect(await screen.findByText(CSV_STRINGS.notCsv)).toBeTruthy();
+    expect(screen.queryByText(CSV_STRINGS.unknown)).toBeNull();
+    // a real export with one unreadable character stays a CSV
+    expect(looksBinary(BITUNIX_CSV + "\uFFFD")).toBe(false);
+    expect(looksBinary("\uFFFD".repeat(40) + "abc")).toBe(true);
+  });
+
+  it("one skipped row is „1 Zeile“, not „1 Zeilen“", () => {
+    expect(CSV_STRINGS.skipped(1)).toBe("1 Zeile übersprungen (ohne Richtung, Preis oder Zeit).");
+    expect(CSV_STRINGS.skipped(2)).toBe("2 Zeilen übersprungen (ohne Richtung, Preis oder Zeit).");
+    expect(CSV_STRINGS.dupes(1)).toMatch(/^1 Zeile steht doppelt/);
   });
 });
 

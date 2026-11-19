@@ -293,3 +293,47 @@ describe("the journal's own CSV export, read back (Funktionsprüfung Runde 14)",
   });
 });
 
+
+/**
+ * Funktionsprüfung Runde 18: the exchange formats trusted the delimiter alone and read a lone dot as decimal – a German-format
+ * Bitunix export was imported with an entry of 80 instead of 80 000, without any hint (the preview shows no entry price). Every
+ * format now reads its numbers in the convention the table's own cells prove (`numberEvidence`).
+ */
+describe("exchange formats read numbers in the file's own convention", () => {
+  const BITUNIX_DE = `Futures;Side;Leverage;Margin mode;Avg. entry price;Avg. close price;Closed amount;Realized PnL;Fee;Funding fee;Open time;Close time
+BTCUSDT;Long;10;Isolated;80.000;81.500,50;0,05;75,03;2,5048;-0,3123;2026-10-05 07:30:12;2026-10-05 11:02:45
+DOGEUSDT;Long;5;Cross;0,25;0,35;1.000;100.250;3,13;0;2026-10-06 13:15:00;2026-10-06 16:40:31
+`;
+
+  it("German Bitunix export: „80.000“ is eighty thousand, „1.000“ a thousand, „100.250“ a hundred thousand", () => {
+    const { l, parsed } = run(BITUNIX_DE);
+    expect(l.format!.id).toBe("bitunix");
+    expect(parsed.trades).toHaveLength(2);
+    const [btc, doge] = parsed.trades;
+    expect(btc).toMatchObject({ entry: 80000, exit: 81500.5, qty: 0.05 });
+    expect(doge).toMatchObject({ entry: 0.25, exit: 0.35, qty: 1000 });
+    // net = realized − fee (+ funding): the thousands dot of the P&L is read as such
+    expect(doge!.pnl).toBeCloseTo(100250 - 3.13, 2);
+  });
+
+  it("the English export is read as before, also with a thousands comma and a date written with dots in another column", () => {
+    const en = `Futures,Side,Leverage,Margin mode,Avg. entry price,Avg. close price,Closed amount,Realized PnL,Fee,Funding fee,Open time,Close time
+BTCUSDT,Long,10,Isolated,"62,000.50",63240,0.05,62,2.5048,-0.3123,2026-10-05 07:30:12,2026-10-05 11:02:45
+`;
+    expect(run(en).parsed.trades[0]).toMatchObject({ entry: 62000.5, exit: 63240, qty: 0.05 });
+    // no evidence at all (integers and the ambiguous "1.500" only): the old reading – a dot is decimal
+    const plain = `Futures,Side,Leverage,Margin mode,Avg. entry price,Avg. close price,Closed amount,Realized PnL,Fee,Funding fee,Open time,Close time
+BTCUSDT,Long,10,Isolated,62000,63240,1.500,62,2,0,2026-10-05 07:30:12,2026-10-05 11:02:45
+`;
+    expect(run(plain).parsed.trades[0]).toMatchObject({ entry: 62000, qty: 1.5 });
+  });
+
+  it("German OKX position history (semicolon): thousands dots in entry and close", () => {
+    const okx = `Instrument;Margin mode;Leverage;Direction;Opened;Closed;Avg. entry price;Avg. close price;Closed amount;PnL;PnL%;Realized PnL;Fee;Funding fee
+BTC-USDT-SWAP;Cross;10;Long;2026-10-05 07:30:12;2026-10-05 11:02:45;62.000;63.240,5;0,05;62,02;10%;59,18;-2,50;-0,31
+`;
+    const { l, parsed } = run(okx);
+    expect(l.format!.id).toBe("okx");
+    expect(parsed.trades[0]).toMatchObject({ entry: 62000, exit: 63240.5, qty: 0.05 });
+  });
+});

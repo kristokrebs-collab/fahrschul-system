@@ -60,7 +60,9 @@ export const CSV_STRINGS = {
   trades: "Trades",
   wins: "Gewinner",
   net: "Netto",
-  skipped: (n: number) => `${n} Zeilen übersprungen (ohne Richtung, Preis oder Zeit).`,
+  skipped: (n: number) => `${n === 1 ? "1 Zeile" : `${n} Zeilen`} übersprungen (ohne Richtung, Preis oder Zeit).`,
+  /** rows that are the same trade twice in one file: the preview counts them once, as the import does (Funktionsprüfung Runde 18) */
+  dupes: (n: number) => (n === 1 ? "1 Zeile steht doppelt in der Datei – sie zählt als ein Trade." : `${n} Zeilen stehen doppelt in der Datei – jeder Trade zählt einmal.`),
   top: "Die größten Trades",
   missing: (f: string) => `Bitte „${f}“ zuordnen.`,
   run: "Importieren",
@@ -76,9 +78,29 @@ export const CSV_STRINGS = {
     [u ? `${u} aktualisiert` : "", s ? `${s} unverändert` : ""].filter(Boolean).join(" · ") || "Notizen und Setups bleiben unberührt.",
   failed: "Import fehlgeschlagen",
   readError: "Datei konnte nicht gelesen werden.",
+  /** a picture, a spreadsheet or a PDF with the ending .csv: say so instead of opening the column mapper over binary noise */
+  notCsv: "Das ist keine CSV-Datei, sondern ein Bild oder ein anderes Dateiformat. Exportiere die Trade-Historie als CSV (Text mit Spalten) und wähle diese Datei.",
   tooBig: "Die Datei ist größer als 20 MB – exportiere einen kürzeren Zeitraum.",
   empty: "Keine Trades in der Datei gefunden.",
 } as const;
+
+/**
+ * A file that is not text: NUL bytes, or more than a handful of characters the decoder could not read (U+FFFD) – a PNG, an .xlsx, a
+ * PDF renamed to .csv. Only the head is looked at; a real export with one odd character stays a CSV.
+ */
+export function looksBinary(text: string): boolean {
+  const head = text.slice(0, 4096);
+  if (head.includes("\u0000")) return true;
+  let bad = 0;
+  for (const ch of head) if (ch === "\uFFFD") bad++;
+  return bad > 8 && bad / head.length > 0.02;
+}
+
+/** First occurrence of every id, in file order. */
+export function uniqueById<T extends { id: string }>(list: readonly T[]): T[] {
+  const seen = new Set<string>();
+  return list.filter((t) => (seen.has(t.id) ? false : (seen.add(t.id), true)));
+}
 
 /** A CSV is parsed in the main thread – larger exports are refused instead of freezing the tab. */
 export const CSV_MAX_BYTES = 20 * 1024 * 1024;
@@ -147,6 +169,11 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
     }
     try {
       const text = await (readFile ? readFile(file) : file.text());
+      if (looksBinary(text)) {
+        setLoaded(null);
+        setReadError(CSV_STRINGS.notCsv);
+        return;
+      }
       const l = loadCsv(text);
       setLoaded(l);
       setMapping(l.format ? null : guessMapping(l.table.header));
@@ -164,10 +191,12 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
   }, [loaded, mapping, zone, pair]);
 
   const formatId = loaded?.format?.id ?? "generic";
-  const trades = useMemo(
-    () => (parsed ? buildTrades(parsed, { formatId, venue: loaded?.format?.venue, account, fallbackPair: (pair || "BTC/USDT").toUpperCase() }) : []),
-    [parsed, formatId, loaded, account, pair],
-  );
+  // the same trade twice in one file (same id) is one trade for the import (`planCsvMerge`) – the preview counts like the import
+  const { trades, dupes } = useMemo(() => {
+    const all = parsed ? buildTrades(parsed, { formatId, venue: loaded?.format?.venue, account, fallbackPair: (pair || "BTC/USDT").toUpperCase() }) : [];
+    const unique = uniqueById(all);
+    return { trades: unique, dupes: all.length - unique.length };
+  }, [parsed, formatId, loaded, account, pair]);
   const stats = useMemo(() => {
     const pnls = trades.map(pnlOf).filter((v): v is number => v !== null);
     return { n: trades.length, wins: pnls.filter((v) => v > 0).length, net: Math.round(pnls.reduce((a, b) => a + b, 0) * 100) / 100 };
@@ -416,6 +445,11 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
                         ))}
                       </ul>
                     </>
+                  )}
+                  {dupes > 0 && (
+                    <p className="text-[11.5px] text-faint" data-testid="csv-dupes">
+                      {CSV_STRINGS.dupes(dupes)}
+                    </p>
                   )}
                   {parsed.skipped > 0 && <p className="text-[11.5px] text-faint">{CSV_STRINGS.skipped(parsed.skipped)}</p>}
                   {parsed.warnings.map((w) => (

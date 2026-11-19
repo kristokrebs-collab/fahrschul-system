@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { Trade } from "@/domain/types";
 import { CSV_HEADER } from "@/domain/csv";
 import { aggregateFills, guessMapping, normalizePair, parseCsv, parseNum, parseTime, parseWithMapping, planCsvMerge, sameTrade, toJournalTrade, type CsvFill } from "@/exchanges/csv";
-import { detectDelimiter, fnv1a, numberStyle, parseSide, tokenize, uniqueHeader } from "@/exchanges/csv/parse";
+import { detectDelimiter, fnv1a, numberEvidence, numberStyle, parseSide, tokenize, uniqueHeader } from "@/exchanges/csv/parse";
 
 describe("tokenizer", () => {
   it("detects the delimiter from the header line", () => {
@@ -215,5 +215,20 @@ describe("merge into the journal", () => {
 
   it("fnv1a is stable", () => {
     expect(fnv1a("abc")).toBe("1a47e90b");
+  });
+});
+
+describe("numberEvidence: what the cells of a whole table prove (Runde 18)", () => {
+  it("only plain numbers are evidence – dates with dots, times, pairs and ids say nothing", () => {
+    expect(numberEvidence(["05.11.2026", "09:30", "BTCUSDT", "123456789", "1.500", "Long"])).toBeNull();
+    expect(numberEvidence(["05.11.2026", "81.500,50"])).toBe("german");
+    expect(numberEvidence(["05.11.2026", "0,05"])).toBe("german");
+    expect(numberEvidence(["1.234.567"])).toBe("german");
+    expect(numberEvidence(["2026.11.05", "62,000.50"])).toBe("english");
+    expect(numberEvidence(["0.05", "1,234,567"])).toBe("english");
+  });
+
+  it("both conventions in one table: no verdict (the caller keeps its fallback)", () => {
+    expect(numberEvidence(["0,05", "0.25"])).toBeNull();
   });
 });

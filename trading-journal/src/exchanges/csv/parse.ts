@@ -148,6 +148,24 @@ const cleanNum = (raw: string): string =>
  * decimal dot. Both or neither (integers, or only the ambiguous "1.500") → the fallback for the comma, dots stay decimal (as before).
  */
 export function numberStyle(cells: Iterable<string>, fallbackDecimalComma = false): NumberStyle {
+  const evidence = numberEvidence(cells);
+  if (evidence === "german") return { decimalComma: true, dotThousands: true };
+  if (evidence === "english") return { decimalComma: false, dotThousands: false };
+  return { decimalComma: fallbackDecimalComma, dotThousands: false };
+}
+
+/** "1.234.567" / "1,234,567": separators in strict groups of three – the only multi-separator spelling that is a number. */
+const GROUPS_OF_THREE = (sep: string) => new RegExp(`^\\d{1,3}(\\${sep}\\d{3})+$`);
+const DOT_GROUPED = GROUPS_OF_THREE(".");
+const COMMA_GROUPED = GROUPS_OF_THREE(",");
+
+/**
+ * Which convention the cells PROVE: `"german"`, `"english"`, or `null` when they show both or neither (integers, only the ambiguous
+ * "1.500"). Cells that are not plain numbers are no evidence – so the cells of a whole table may be passed (Funktionsprüfung Runde 18:
+ * the exchange formats read "80.000" of a German Bitunix export as 80; they now ask the table, `formats.ts`): a time ("09:30"), a
+ * pair, an id, and a date with dots ("05.11.2026" – several dots, but not in groups of three) say nothing.
+ */
+export function numberEvidence(cells: Iterable<string>): "german" | "english" | null {
   let german = false;
   let english = false;
   for (const raw of cells) {
@@ -158,21 +176,23 @@ export function numberStyle(cells: Iterable<string>, fallbackDecimalComma = fals
     const dots = s.split(".").length - 1;
     const commas = s.split(",").length - 1;
     if (comma >= 0 && dot >= 0) {
-      if (comma > dot) german = true;
-      else english = true;
+      // one decimal separator after grouped thousands: "80.000,5" / "1,234.56" (anything else – "1.2,3.4" – is not a number)
+      if (comma > dot && commas === 1 && DOT_GROUPED.test(s.slice(0, comma))) german = true;
+      else if (dot > comma && dots === 1 && COMMA_GROUPED.test(s.slice(0, dot))) english = true;
     } else if (comma >= 0) {
       const decimals = s.length - comma - 1;
       if (commas === 1 && (decimals !== 3 || /^0+$/.test(s.slice(0, comma)))) german = true;
-      else if (commas > 1) english = true; // "1,234,567"
+      else if (commas > 1 && COMMA_GROUPED.test(s)) english = true; // "1,234,567"
     } else if (dot >= 0) {
       const decimals = s.length - dot - 1;
-      if (dots > 1) german = true; // "1.234.567"
-      else if (decimals !== 3 || /^0+$/.test(s.slice(0, dot))) english = true;
+      if (dots > 1) {
+        if (DOT_GROUPED.test(s)) german = true; // "1.234.567" – a date "05.11.2026" is no evidence
+      } else if (decimals !== 3 || /^0+$/.test(s.slice(0, dot))) english = true;
     }
   }
-  if (german && !english) return { decimalComma: true, dotThousands: true };
-  if (english && !german) return { decimalComma: false, dotThousands: false };
-  return { decimalComma: fallbackDecimalComma, dotThousands: false };
+  if (german && !english) return "german";
+  if (english && !german) return "english";
+  return null;
 }
 
 /** "1.000", "79.500", "1.234.567": dots in strict groups of three after a leading group that is not zero. */

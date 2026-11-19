@@ -23,6 +23,8 @@ import { MorphSelect, type MorphSelectOption } from "@/motion/pulse/MorphSelect"
 import { Button, CheckboxRow, ConvictionRadio, Field, Input, Segmented, Textarea, revealInvalid, shakeField } from "@/primitives";
 import { saveTradeNow, useJournal } from "@/store/journalStore";
 import { jsonEqual } from "@/store/merge3";
+import { StorageWriteError } from "@/store/storage";
+import { foreignEdits } from "./editMerge";
 import { pushToast, useUi, type AccFilter, type TradeDraft } from "@/store/uiStore";
 import { ExecutionSection } from "@/journal/editor/ExecutionSection";
 import { PsychSection } from "@/journal/editor/PsychSection";
@@ -137,7 +139,12 @@ export const EDITOR_MESSAGES = {
   leverage: "Der Hebel muss größer als 0 sein (oder leer bleiben).",
   pair: "Bitte ein Paar angeben (z. B. BTC/USDT).",
   saveFailed: "Speichern fehlgeschlagen. Prüfe die Verbindung und versuch es erneut.",
+  // the browser's storage is full (Funktionsprüfung Runde 18: the editor blamed „die Verbindung“ – in local mode there is none)
+  saveFailedFull: "Speichern fehlgeschlagen: Der Speicher dieses Browsers ist voll. Lade ein Backup herunter (Einstellungen → Daten) und entferne alte Screenshots oder Sicherungen – deine Eingabe bleibt hier stehen.",
+  // any other failed write of the browser's own storage (blocked, private window): still nothing to do with a connection
+  saveFailedLocal: "Speichern fehlgeschlagen: Dieser Browser hat den Eintrag nicht gespeichert. Deine Eingabe bleibt hier stehen – versuch es erneut.",
   deleteFailed: "Löschen fehlgeschlagen.",
+  foreignKept: "Änderungen aus einem anderen Fenster sind erhalten geblieben.",
 } as const;
 
 /**
@@ -599,6 +606,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const draft = !editor.tradeId ? editor.draft : undefined;
   const session = editor.open ? `${editor.tradeId ?? ""}|${draft ? (editor.draftSeq ?? 0) : ""}` : null;
   const initialised = useRef<string | null>(null);
+  /** The stored trade as it was when the form was filled from it – what a save compares the store against (`foreignEdits`). */
+  const openedRef = useRef<Trade | null>(null);
 
   const [d, setD] = useState<TradeFormStrings>(() => defaultForm(settings, defaultAccount(acc)).d);
   const [t, setT] = useState<TradeFormTyped>(() => defaultForm(settings, defaultAccount(acc)).t);
@@ -651,6 +660,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     }
     if (initialised.current === session) return;
     initialised.current = session;
+    openedRef.current = trade ?? null;
     setErr("");
     setInvalid(null);
     setSaving(false);
@@ -910,15 +920,23 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         }
         const boxSnap = boxes ? await boxes : undefined;
         const now = new Date().toISOString();
+        // Two windows, one trade: what another tab (or another device through the sync) saved on this trade since the form was filled
+        // stays, for every field this form did not touch (`foreignEdits`) – the result is derived again from the fields as saved.
+        const opened = trade && openedRef.current?.id === trade.id ? openedRef.current : null;
+        const atOpen = opened && baseline ? toRecord(baseline.d, baseline.t) : null;
+        const foreign = trade && opened && atOpen ? foreignEdits(opened as unknown as Record<string, unknown>, trade as unknown as Record<string, unknown>, atOpen, cur.rec) : null;
+        const recNow = foreign ? ({ ...cur.rec, ...foreign } as typeof cur.rec) : cur.rec;
+        const xNow = foreign ? deriveTrade(recNow) : cur.x;
+        const foreignChecks = !!trade && !!opened && !!baseline && jsonEqual(baseline.t.checks, cur.t.checks) && !jsonEqual(opened.checks, trade.checks);
         // Spread the stored trade first so passthrough/unknown fields (legacy extras, `signal`, `mistakes`) survive an edit.
         const record: TradeRecord = {
           ...(trade ?? draftExtras(draft)),
-          ...cur.rec,
-          checks: pruneChecks(cur.checks, cur.items),
+          ...recNow,
+          checks: foreignChecks ? trade.checks : pruneChecks(cur.checks, cur.items),
           ...(signal ? { signal } : null),
           ...(boxSnap ? { boxSnap } : null),
-          pnl: cur.x.pnl,
-          r: cur.x.r,
+          pnl: xNow.pnl,
+          r: xNow.r,
           updatedAt: now,
           createdAt: trade?.createdAt || now,
         };
@@ -941,8 +959,10 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         pushToast({
           kind: "success",
           title: trade ? "Trade aktualisiert" : "Trade gespeichert",
-          value: cur.x.pnl == null ? "offen" : signed(cur.x.pnl),
-          valueTone: cur.x.pnl == null ? undefined : cur.x.pnl < 0 ? "loss" : "win",
+          value: xNow.pnl == null ? "offen" : signed(xNow.pnl),
+          valueTone: xNow.pnl == null ? undefined : xNow.pnl < 0 ? "loss" : "win",
+          // said once, plainly: nothing was overwritten
+          detail: foreign || foreignChecks ? EDITOR_MESSAGES.foreignKept : undefined,
         });
         // No burst of dots for a realised win (decision of the operator, 2026-11-10: „kein Konfetti“): the journal rewards process,
         // never the outcome of a trade (docs/PSYCHOLOGIE.md). The toast above states the result – in its sign and colour, nothing more.
@@ -958,10 +978,11 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           if (scroller && typeof scroller.scrollTo === "function") scroller.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
           entryRef.current?.focus({ preventScroll: true });
         }
-      } catch {
-        setErr(EDITOR_MESSAGES.saveFailed);
+      } catch (e) {
+        const full = e instanceof StorageWriteError && e.quota;
+        setErr(full ? EDITOR_MESSAGES.saveFailedFull : e instanceof StorageWriteError ? EDITOR_MESSAGES.saveFailedLocal : EDITOR_MESSAGES.saveFailed);
         shakeField(alertRef.current, { reduced, self: true });
-        pushToast({ kind: "error", title: "Speichern fehlgeschlagen" });
+        pushToast({ kind: "error", title: "Speichern fehlgeschlagen", detail: full ? "Der Speicher dieses Browsers ist voll." : undefined });
       } finally {
         clearTimeout(busy);
         savingRef.current = false;

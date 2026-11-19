@@ -17,7 +17,7 @@
  * | journal | the journal's OWN export (Einstellungen › Daten › CSV exportieren) | one trade per row, local time, own account + text |
  */
 import { aggregateFills, type CsvFill, type CsvFormat, type CsvTrade, type ParseResult } from "./model";
-import { cell, findCol, normalizePair, parseBuySell, parseNum, parseSide, parseTime, type CsvTable } from "./parse";
+import { cell, findCol, normalizePair, numberEvidence, parseBuySell, parseNum, parseSide, parseTime, type CsvTable } from "./parse";
 import { isHedgeLeg, isInverseContract, noRejections, reject, rejectionWarnings } from "./scope";
 
 /** Share of `patterns` (each one header alternative) found in the header. */
@@ -30,6 +30,31 @@ function score(header: readonly string[], required: RegExp[][], bonus: RegExp[][
 
 const col = (t: CsvTable, ...p: RegExp[]) => findCol(t.header, ...p);
 const dec = (t: CsvTable) => t.delimiter === ";";
+
+/** What a table's own cells prove about its number convention (`numberEvidence`), read once per table. */
+const evidenceOf = new WeakMap<CsvTable, "german" | "english" | null>();
+function evidence(t: CsvTable): "german" | "english" | null {
+  let e = evidenceOf.get(t);
+  if (e === undefined) {
+    e = numberEvidence(t.rows.flat());
+    evidenceOf.set(t, e);
+  }
+  return e;
+}
+
+/**
+ * A number cell of an exchange export, read in the FILE's convention (Funktionsprüfung Runde 18). The formats used to trust the
+ * delimiter alone (`;` = decimal comma) and read a lone dot as decimal: a German-format Bitunix export („80.000“, „81.500,50“) was
+ * imported with an entry of 80 instead of 80 000 – silently, the preview shows no entry price. Now the table's cells decide, as in
+ * the generic mapper: German evidence ("81.500,50", "0,05") → decimal comma and dots in groups of three are thousands; English
+ * evidence ("62,000.50", "0.05") → decimal dot; neither or both → the format's old reading (`semicolon`: a `;` file has a decimal comma).
+ */
+function num(t: CsvTable, raw: string, semicolon = false): number | null {
+  const e = evidence(t);
+  if (e === "german") return parseNum(raw, true, true);
+  if (e === "english") return parseNum(raw, false, false);
+  return parseNum(raw, semicolon && dec(t), false);
+}
 
 /* ------------------------------------------------------------------ Bitunix */
 
@@ -65,20 +90,20 @@ export const bitunixFormat: CsvFormat = {
     let skipped = 0;
     for (const r of t.rows) {
       const side = parseSide(cell(r, c.side));
-      const entry = parseNum(cell(r, c.entry), dec(t));
-      const exit = parseNum(cell(r, c.exit), dec(t));
+      const entry = num(t, cell(r, c.entry), true);
+      const exit = num(t, cell(r, c.exit), true);
       const closedAt = parseTime(cell(r, c.closed));
       const symbol = cell(r, c.symbol);
       if (!side || !entry || !symbol || closedAt === null) {
         skipped++;
         continue;
       }
-      const realized = parseNum(cell(r, c.pnl), dec(t));
-      const net = parseNum(cell(r, c.net), dec(t));
-      const fee = Math.abs(parseNum(cell(r, c.fee), dec(t)) ?? 0);
-      const funding = parseNum(cell(r, c.funding), dec(t));
+      const realized = num(t, cell(r, c.pnl), true);
+      const net = num(t, cell(r, c.net), true);
+      const fee = Math.abs(num(t, cell(r, c.fee), true) ?? 0);
+      const funding = num(t, cell(r, c.funding), true);
       const openedAt = parseTime(cell(r, c.opened)) ?? closedAt;
-      const qty = Math.abs(parseNum(cell(r, c.qty), dec(t)) ?? 0) || null;
+      const qty = Math.abs(num(t, cell(r, c.qty), true) ?? 0) || null;
       // Bitunix: realized P&L excludes fee and funding (API docs); funding < 0 = paid
       const pnl = net ?? (realized !== null ? realized - fee + (funding ?? 0) : null);
       const id = cell(r, c.id);
@@ -96,7 +121,7 @@ export const bitunixFormat: CsvFormat = {
         fees: fee || null,
         funding: funding !== null ? -funding : null,
         pnl,
-        leverage: parseNum(cell(r, c.lev)) ?? null,
+        leverage: num(t, cell(r, c.lev)) ?? null,
         marginMode: /cross/i.test(cell(r, c.margin)) ? "cross" : /isol/i.test(cell(r, c.margin)) ? "isolated" : undefined,
         market: "perp",
       });
@@ -135,8 +160,8 @@ export const binanceFormat: CsvFormat = {
       if (isInverseContract("binance", symbol)) return reject(rej, "inverse", symbol);
       if (isHedgeLeg(cell(r, ci.posSide))) return reject(rej, "hedge", symbol);
       const side = parseBuySell(cell(r, ci.side));
-      const price = parseNum(cell(r, ci.price));
-      const qty = parseNum(cell(r, ci.qty));
+      const price = num(t, cell(r, ci.price));
+      const qty = num(t, cell(r, ci.qty));
       const at = parseTime(cell(r, ci.at), { assume: "utc" });
       if (!side || !price || !qty || at === null) {
         skipped++;
@@ -148,7 +173,7 @@ export const binanceFormat: CsvFormat = {
         side,
         qty: Math.abs(qty),
         price,
-        fee: Math.abs(parseNum(cell(r, ci.fee)) ?? 0),
+        fee: Math.abs(num(t, cell(r, ci.fee)) ?? 0),
         at,
       });
     });
@@ -207,7 +232,7 @@ export const bybitFormat: CsvFormat = {
             : /buy/i.test(dir)
               ? "short"
               : null;
-      const entry = parseNum(cell(r, ci.entry));
+      const entry = num(t, cell(r, ci.entry));
       const closedAt = parseTime(cell(r, ci.closed), { assume: "utc" });
       if (!side || !entry || closedAt === null) {
         skipped++;
@@ -224,10 +249,10 @@ export const bybitFormat: CsvFormat = {
         openedAt: parseTime(cell(r, ci.opened), { assume: "utc" }) ?? closedAt,
         closedAt,
         entry,
-        exit: parseNum(cell(r, ci.exit)),
-        qty: Math.abs(parseNum(cell(r, ci.qty)) ?? 0) || null,
+        exit: num(t, cell(r, ci.exit)),
+        qty: Math.abs(num(t, cell(r, ci.qty)) ?? 0) || null,
         // Bybit's Closed P&L is net of trading and funding fees
-        pnl: parseNum(cell(r, ci.pnl)),
+        pnl: num(t, cell(r, ci.pnl)),
         market: "perp",
       });
     }
@@ -280,17 +305,17 @@ export const okxFormat: CsvFormat = {
         continue;
       }
       const side = parseSide(cell(r, ci.side));
-      const entry = parseNum(cell(r, ci.entry), dec(t));
+      const entry = num(t, cell(r, ci.entry), true);
       const closedAt = parseTime(cell(r, ci.closed), { assume: "utc" });
       const inst = cell(r, ci.inst);
       if (!side || !entry || !inst || closedAt === null) {
         skipped++;
         continue;
       }
-      const fee = parseNum(cell(r, ci.fee), dec(t));
-      const funding = parseNum(cell(r, ci.funding), dec(t));
-      const realized = parseNum(cell(r, ci.realized), dec(t));
-      const gross = parseNum(cell(r, ci.pnl), dec(t));
+      const fee = num(t, cell(r, ci.fee), true);
+      const funding = num(t, cell(r, ci.funding), true);
+      const realized = num(t, cell(r, ci.realized), true);
+      const gross = num(t, cell(r, ci.pnl), true);
       const id = cell(r, ci.id);
       // OKX: "Realized PnL" = P&L + fee + funding (fees negative); without it: gross − |fee| + funding
       const pnl = realized ?? (gross !== null ? gross - Math.abs(fee ?? 0) + (funding ?? 0) : null);
@@ -303,12 +328,12 @@ export const okxFormat: CsvFormat = {
         openedAt: parseTime(cell(r, ci.opened), { assume: "utc" }) ?? closedAt,
         closedAt,
         entry,
-        exit: parseNum(cell(r, ci.exit), dec(t)),
-        qty: Math.abs(parseNum(cell(r, ci.qty), dec(t)) ?? 0) || null,
+        exit: num(t, cell(r, ci.exit), true),
+        qty: Math.abs(num(t, cell(r, ci.qty), true) ?? 0) || null,
         fees: fee !== null ? Math.abs(fee) : null,
         funding: funding !== null ? -funding : null,
         pnl,
-        leverage: parseNum(cell(r, ci.lev)) ?? null,
+        leverage: num(t, cell(r, ci.lev)) ?? null,
         marginMode: /cross/i.test(cell(r, ci.margin)) ? "cross" : /isol/i.test(cell(r, ci.margin)) ? "isolated" : undefined,
         market: /swap|perp|futures/i.test(inst) || !/-.*-/.test(inst) ? "perp" : "spot",
       });
@@ -341,21 +366,21 @@ export const krakenFormat: CsvFormat = {
     let margin = false;
     t.rows.forEach((r, i) => {
       const side = parseBuySell(cell(r, ci.type));
-      const price = parseNum(cell(r, ci.price));
-      const qty = parseNum(cell(r, ci.vol));
+      const price = num(t, cell(r, ci.price));
+      const qty = num(t, cell(r, ci.vol));
       const at = parseTime(cell(r, ci.time), { assume: "utc" });
       if (!side || !price || !qty || at === null) {
         skipped++;
         return;
       }
-      if ((parseNum(cell(r, ci.margin)) ?? 0) > 0) margin = true;
+      if ((num(t, cell(r, ci.margin)) ?? 0) > 0) margin = true;
       fills.push({
         id: cell(r, ci.id) || `r${i}`,
         symbol: cell(r, ci.pair),
         side,
         qty: Math.abs(qty),
         price,
-        fee: Math.abs(parseNum(cell(r, ci.fee)) ?? 0),
+        fee: Math.abs(num(t, cell(r, ci.fee)) ?? 0),
         at,
       });
     });
@@ -404,15 +429,15 @@ export const coinbaseFormat: CsvFormat = {
     t.rows.forEach((r, i) => {
       const kind = cell(r, ci.side);
       const side = /convert|send|receive|reward|deposit|withdraw/i.test(kind) ? null : parseBuySell(kind.replace(/advanced trade /i, ""));
-      const price = parseNum(cell(r, ci.price));
-      const qty = parseNum(cell(r, ci.qty));
+      const price = num(t, cell(r, ci.price));
+      const qty = num(t, cell(r, ci.qty));
       const at = parseTime(cell(r, ci.at), { assume: "utc" });
       if (!side || !price || !qty || at === null) {
         skipped++;
         return;
       }
       const sym = tx ? `${cell(r, ci.sym)}-${cell(r, ci.quote) || "USD"}` : cell(r, ci.sym);
-      fills.push({ id: cell(r, ci.id) || `r${i}`, symbol: sym, side, qty: Math.abs(qty), price, fee: Math.abs(parseNum(cell(r, ci.fee)) ?? 0), at });
+      fills.push({ id: cell(r, ci.id) || `r${i}`, symbol: sym, side, qty: Math.abs(qty), price, fee: Math.abs(num(t, cell(r, ci.fee)) ?? 0), at });
     });
     const agg = aggregateFills(fills, { allowShort: false, market: "spot", pairOf: normalizePair });
     return { trades: agg.trades, skipped: skipped + agg.skipped, warnings: [] };
@@ -488,13 +513,13 @@ export const mtFormat: CsvFormat = {
     let skipped = 0;
     for (const r of t.rows) {
       const side = parseSide(cell(r, ci.type));
-      const entry = parseNum(cell(r, ci.entry), dec(t));
+      const entry = num(t, cell(r, ci.entry), true);
       const closedAt = parseTime(cell(r, ci.closed), { assume: "local" });
       if (!side || !entry || closedAt === null) {
         skipped++;
         continue;
       }
-      const n = (i: number) => parseNum(cell(r, i), dec(t)) ?? 0;
+      const n = (i: number) => num(t, cell(r, i), true) ?? 0;
       const fees = Math.abs(n(ci.comm)) + Math.abs(n(ci.taxes));
       const swap = n(ci.swap);
       const id = cell(r, ci.id);
@@ -507,18 +532,18 @@ export const mtFormat: CsvFormat = {
         openedAt: parseTime(cell(r, ci.opened), { assume: "local" }) ?? closedAt,
         closedAt,
         entry,
-        exit: parseNum(cell(r, ci.exit), dec(t)),
+        exit: num(t, cell(r, ci.exit), true),
         // lots × contract size (FX / metals); unknown symbols get no quantity – no fake notional, no fake R
         ...((): Pick<CsvTrade, "qty" | "size"> => {
-          const lots = parseNum(cell(r, ci.vol), dec(t));
+          const lots = num(t, cell(r, ci.vol), true);
           const cs = contractSize(cell(r, ci.sym));
           return lots !== null && cs !== null ? { qty: lots * cs } : { qty: null, size: null };
         })(),
         fees: fees || null,
         funding: swap ? -swap : null,
         pnl: n(ci.profit) + n(ci.comm) + n(ci.taxes) + swap,
-        stop: parseNum(cell(r, ci.sl), dec(t)) || null,
-        target: parseNum(cell(r, ci.tp), dec(t)) || null,
+        stop: num(t, cell(r, ci.sl), true) || null,
+        target: num(t, cell(r, ci.tp), true) || null,
       });
     }
     return {
@@ -560,8 +585,8 @@ export const ibkrFormat: CsvFormat = {
     const mult = new Map<string, number>();
     t.rows.forEach((r, i) => {
       if (/^(header|total|subtotal)/i.test(r[0] ?? "")) return;
-      const q = parseNum(cell(r, ci.qty));
-      const price = parseNum(cell(r, ci.price));
+      const q = num(t, cell(r, ci.qty));
+      const price = num(t, cell(r, ci.price));
       const at = parseTime(ci.at >= 0 ? cell(r, ci.at) : `${cell(r, ci.date)} ${cell(r, ci.time)}`, { assume: "local" });
       const side = parseBuySell(cell(r, ci.bs)) ?? (q !== null ? (q > 0 ? "buy" : "sell") : null);
       if (!q || !price || at === null || !side) {
@@ -569,8 +594,8 @@ export const ibkrFormat: CsvFormat = {
         return;
       }
       const sym = cell(r, ci.sym);
-      mult.set(sym, parseNum(cell(r, ci.mult)) || 1);
-      fills.push({ id: cell(r, ci.id) || `r${i}`, symbol: sym, side, qty: Math.abs(q), price, fee: Math.abs(parseNum(cell(r, ci.comm)) ?? 0), at });
+      mult.set(sym, num(t, cell(r, ci.mult)) || 1);
+      fills.push({ id: cell(r, ci.id) || `r${i}`, symbol: sym, side, qty: Math.abs(q), price, fee: Math.abs(num(t, cell(r, ci.comm)) ?? 0), at });
     });
     const agg = aggregateFills(fills, { allowShort: true, market: "spot", pairOf: (s) => s });
     for (const tr of agg.trades) {
@@ -621,7 +646,7 @@ export const tradingViewFormat: CsvFormat = {
       const entryRow = rows.find((r) => /entry/i.test(cell(r, ci.type)));
       const exitRow = rows.find((r) => /exit/i.test(cell(r, ci.type)));
       const side = parseSide(cell(entryRow ?? exitRow ?? [], ci.type));
-      const entry = entryRow ? parseNum(cell(entryRow, ci.price)) : null;
+      const entry = entryRow ? num(t, cell(entryRow, ci.price)) : null;
       const openedAt = entryRow ? parseTime(cell(entryRow, ci.at), { assume: "local" }) : null;
       if (!side || !entry || openedAt === null) {
         skipped += rows.length;
@@ -636,9 +661,9 @@ export const tradingViewFormat: CsvFormat = {
         openedAt,
         closedAt: exitRow && !open ? parseTime(cell(exitRow, ci.at), { assume: "local" }) : null,
         entry,
-        exit: exitRow && !open ? parseNum(cell(exitRow, ci.price)) : null,
-        qty: parseNum(cell(entryRow ?? exitRow!, ci.qty)),
-        pnl: exitRow && !open ? parseNum(cell(exitRow, ci.pnl)) : null,
+        exit: exitRow && !open ? num(t, cell(exitRow, ci.price)) : null,
+        qty: num(t, cell(entryRow ?? exitRow!, ci.qty)),
+        pnl: exitRow && !open ? num(t, cell(exitRow, ci.pnl)) : null,
         tags: ["Backtest"],
         notes: "Aus dem TradingView-Strategietester.",
       });

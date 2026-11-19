@@ -28,14 +28,15 @@ export const TAKEOVER = {
   apply: { merge: "Zusammenführen", local: "Übernehmen", cloud: "Konto übernehmen", keep: "Lokal behalten" } as Record<TakeoverChoice, string>,
   options: {
     merge: { title: "Zusammenführen", text: "Alles aus beiden Teilen. Wo ein Eintrag verschieden ist, gewinnt die neuere Version. Es geht nichts verloren." },
-    local: { title: "Lokale Daten übernehmen", text: "Dieses Gerät gewinnt, wo ein Eintrag verschieden ist. Was nur im Konto liegt, bleibt dort." },
+    // „bleibt dort“ read as „kommt nicht hierher“ – but after the takeover both sides are the same journal (Funktionsprüfung Runde 18)
+    local: { title: "Lokale Daten übernehmen", text: "Dieses Gerät gewinnt, wo ein Eintrag verschieden ist. Was nur im Konto liegt, bleibt erhalten und kommt auf dieses Gerät dazu." },
     cloud: { title: "Nur Cloud", text: `Dieses Gerät übernimmt das Konto. Dein lokales Journal bleibt in der Sicherung und ${minutes} Minuten per „Rückgängig“ zurückholbar.` },
     keep: { title: "Lokal behalten", text: "Nichts wird übertragen oder geladen. Der Sync ist auf diesem Gerät aus – du kannst ihn jederzeit unter Konto → Datenschutz einschalten." },
   } as Record<TakeoverChoice, { title: string; text: string }>,
   working: { title: "Daten werden übernommen …", lead: "Das Fenster bleibt offen, bis alles übertragen ist." },
   steps: { snapshot: "Sicherung anlegen", merge: "Zusammenführen", upload: "Übertragen" } as Record<Exclude<TakeoverStep, "finish">, string>,
   progress: (done: number, total: number) => `${done.toLocaleString("de-DE")} von ${total.toLocaleString("de-DE")}`,
-  done: { title: "Fertig", undo: "Rückgängig", undoHint: (left: string) => `Noch ${left} zum Rückgängigmachen.`, undoNote: "Rückgängig stellt dieses Gerät und das Konto wieder her. Einträge, die seitdem geändert wurden, landen in einer neuen Sicherung.", close: "Schließen", expired: "Das Rückgängig-Fenster ist abgelaufen. Die Sicherung findest du unter Einstellungen → Daten → Wiederherstellen." },
+  done: { title: "Fertig", cloudOnly: "Dieses Gerät zeigt jetzt dein Konto. Das Journal von vorher liegt in der Sicherung.", undo: "Rückgängig", undoHint: (left: string) => `Noch ${left} zum Rückgängigmachen.`, undoNote: "Rückgängig stellt dieses Gerät und das Konto wieder her. Einträge, die seitdem geändert wurden, landen in einer neuen Sicherung.", close: "Schließen", expired: "Das Rückgängig-Fenster ist abgelaufen. Die Sicherung findest du unter Einstellungen → Daten → Wiederherstellen." },
   error: { title: "Das hat nicht geklappt", text: "Dein Journal in diesem Browser ist unverändert. Der Sync versucht es später erneut und fragt dann noch einmal.", close: "Schließen" },
   undone: "Rückgängig gemacht. Wähle noch einmal.",
   undoDone: { title: "Übernahme rückgängig gemacht", detail: "Dein Journal ist wie vorher. Du kannst neu wählen." },
@@ -52,7 +53,11 @@ export function effectLine(choice: TakeoverChoice, p: TakeoverPreview): string {
     case "merge":
       return [toCloud ? `${n(toCloud, "Eintrag", "Einträge")} ins Konto` : "", fromCloud ? `${n(fromCloud, "Eintrag", "Einträge")} hierher` : "", differ ? `${n(differ, "Unterschied", "Unterschiede")}: die neuere Version gewinnt` : ""].filter(Boolean).join(" · ") || "Nichts zu übertragen";
     case "local":
-      return [toCloud ? `${n(toCloud, "Eintrag", "Einträge")} ins Konto` : "", differ ? `${n(differ, "Eintrag", "Einträge")} im Konto überschrieben` : ""].filter(Boolean).join(" · ") || "Nichts zu übertragen";
+      return (
+        [toCloud ? `${n(toCloud, "Eintrag", "Einträge")} ins Konto` : "", differ ? `${n(differ, "Eintrag", "Einträge")} im Konto überschrieben` : "", fromCloud ? `${n(fromCloud, "Eintrag", "Einträge")} hierher` : ""]
+          .filter(Boolean)
+          .join(" · ") || "Nichts zu übertragen"
+      );
     case "cloud":
       return `${n(totalOf(p.local), "lokaler Eintrag", "lokale Einträge")} werden hier ersetzt, ${n(totalOf(p.cloud), "Eintrag", "Einträge")} aus dem Konto kommen hierher`;
     case "keep":
@@ -63,7 +68,10 @@ export function effectLine(choice: TakeoverChoice, p: TakeoverPreview): string {
 /** The done screen's summary. */
 export function summaryLine(r: TakeoverResult): string {
   const parts = [r.pushed ? `${n(r.pushed, "Eintrag", "Einträge")} ins Konto` : "", r.pulled ? `${n(r.pulled, "Eintrag", "Einträge")} hierher` : "", r.conflicts ? `${n(r.conflicts, "Unterschied", "Unterschiede")} aufgelöst` : "", r.duplicates ? `${n(r.duplicates, "Doppelter", "Doppelte")} übersprungen` : ""].filter(Boolean);
-  return parts.length ? parts.join(" · ") : "Beide Seiten waren schon gleich.";
+  if (parts.length) return parts.join(" · ");
+  // „Nur Cloud“ over an EMPTY account moves nothing in either direction – but this device's journal was just replaced, so „Beide
+  // Seiten waren schon gleich.“ was wrong there (Funktionsprüfung Runde 18)
+  return r.choice === "cloud" ? TAKEOVER.done.cloudOnly : "Beide Seiten waren schon gleich.";
 }
 
 /** `m:ss` of the time left in the undo window. */
