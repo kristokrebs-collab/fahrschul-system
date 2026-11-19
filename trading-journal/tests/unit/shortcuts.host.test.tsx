@@ -22,6 +22,11 @@ describe("ShortcutHost", () => {
   beforeAll(async () => {
     installDomPolyfills();
     await import("@/app/ShortcutSheet");
+    // „/“ opens the search: its host fetches the search chunk (the search sources pull half the domain in). Loaded here, the lazy
+    // import resolves from the module cache – otherwise it could still be loading when the last test ended and the environment was
+    // torn down (CI, 2026-11-19: all tests green, the run red with an EnvironmentTeardownError from this file).
+    await import("@/search/GlobalSearch");
+    await import("@/search/actions");
   });
   beforeEach(async () => {
     await bootFixtureJournal();
