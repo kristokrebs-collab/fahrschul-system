@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel Text Fill</title>
+<style>
+/* ==========================================================================
+   CONFIG (CSS) - alle Look-Werte zum "Hochdrehen". Referenz-Viewport 1234x673.
+   Timing (Start/Dauer je Zeile, Easing) steht im CONFIG (JS) weiter unten.
+   ========================================================================== */
+:root {
+  --ptf-stage:   #020205;   /* Buehnenhintergrund (gemessen, fast schwarz mit Blauhauch) */
+  --ptf-dim:     #252527;   /* Ruhefarbe des Textes vor dem Fill (~15 % Weiss) */
+  --ptf-orange:  #ff5200;   /* "Glut"-Front: pixeliger Orangeton */
+  --ptf-white:   #f4f0ec;   /* Endfarbe (leicht warmes Weiss) */
+  --ptf-size:    clamp(18px, 3.24vw, 44px); /* 40px bei 1234px Breite */
+  --ptf-weight:  500;       /* medium */
+  --ptf-line:    1.2;       /* Zeilenhoehe 48px bei 40px */
+  --ptf-tracking: -0.01em;
+  --ptf-font:    Inter, Geist, Roboto, "Helvetica Neue", Arial, "Liberation Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --ptf-feather-o: 2.2em;   /* weicher Rand der orangen Front (px-Breite des Verlaufs) */
+  --ptf-feather-w: 4.4em;   /* weicher Rand der weissen Front (Weiss -> Orange Verlauf, ~170px) */
+  --ptf-dot:      4px;      /* Raster der Pixel-/Halftone-Punkte in der orangen Zone */
+  --ptf-hole:     1.2px;    /* Radius der Loecher (Ruhetext scheint durch); 0 = voll orange */
+}
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--ptf-stage);
+  display: grid; place-items: center;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== COMPONENT CSS ===== */
+.ptf {
+  margin: 0; padding: 0 16px;
+  font: var(--ptf-weight) var(--ptf-size)/var(--ptf-line) var(--ptf-font);
+  letter-spacing: var(--ptf-tracking);
+  text-align: center;
+  color: var(--ptf-dim);
+  cursor: pointer;
+  user-select: none; -webkit-user-select: none;
+  touch-action: manipulation;
+  contain: layout style;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+.ptf:focus-visible { outline: 2px solid rgba(255,255,255,.4); outline-offset: .3em; border-radius: .2em; }
+.ptf__line { position: relative; display: block; width: fit-content; margin: 0 auto; white-space: nowrap; contain: layout paint; }
+.ptf__base { display: block; color: var(--ptf-dim); }
+/* Reveal-Fenster: wird per transform verschoben, der Inhalt gegenlaeufig => nur Compositor-Arbeit */
+.ptf__rev {
+  position: absolute; left: 0; top: 0; height: 100%;
+  overflow: hidden; pointer-events: none;
+  transform: translate3d(-100000px,0,0);       /* JS setzt Breite + Position */
+}
+.ptf__rev--o {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - var(--ptf-feather-o)), transparent 100%);
+          mask-image: linear-gradient(90deg, #000 calc(100% - var(--ptf-feather-o)), transparent 100%);
+}
+.ptf__rev--w {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - var(--ptf-feather-w)), transparent 100%);
+          mask-image: linear-gradient(90deg, #000 calc(100% - var(--ptf-feather-w)), transparent 100%);
+}
+.ptf__in { position: absolute; left: 0; top: 0; display: block; white-space: nowrap; }
+.ptf__in--o {
+  color: var(--ptf-orange);
+  /* Pixel-Dither: Punktraster (versetzt) schneidet Loecher in die orange Schicht */
+  -webkit-mask-image:
+    radial-gradient(circle at 25% 25%, transparent 0 var(--ptf-hole), #000 calc(var(--ptf-hole) + .45px)),
+    radial-gradient(circle at 75% 75%, transparent 0 var(--ptf-hole), #000 calc(var(--ptf-hole) + .45px));
+  -webkit-mask-size: var(--ptf-dot) var(--ptf-dot);
+  -webkit-mask-composite: source-in;
+          mask-image:
+    radial-gradient(circle at 25% 25%, transparent 0 var(--ptf-hole), #000 calc(var(--ptf-hole) + .45px)),
+    radial-gradient(circle at 75% 75%, transparent 0 var(--ptf-hole), #000 calc(var(--ptf-hole) + .45px));
+          mask-size: var(--ptf-dot) var(--ptf-dot);
+          mask-composite: intersect;
+}
+.ptf__in--w { color: var(--ptf-white); }
+.ptf.is-running .ptf__rev, .ptf.is-running .ptf__in { will-change: transform; }
+.ptf.is-reduced .ptf__rev { display: none; }
+.ptf.is-reduced .ptf__base { color: var(--ptf-white); }
+@media (prefers-reduced-motion: reduce) {
+  .ptf .ptf__rev { display: none; }
+  .ptf .ptf__base { color: var(--ptf-white); }
+}
+/* ===== /COMPONENT CSS ===== */
+</style>
+</head>
+<body>
+
+<!-- COMPONENT:START -->
+<p class="ptf" id="demo" tabindex="0" title="Klicken zum Wiederholen">
+  <span>Build with calm motion.</span>
+  <span>Keep the rhythm crisp and clear.</span>
+  <span>Make each screen feel alive.</span>
+  <span>Let every detail guide focus.</span>
+</p>
+<!-- COMPONENT:END -->
+
+<script>
+/* ==========================================================================
+   CONFIG (JS) - Timing in ms ab Start. Je Zeile ein Eintrag (4 Zeilen).
+   Gemessen am Video: Orange-Front laeuft ~0.8-1.0 s links->rechts, die weisse Front
+   startet, wenn die orange Front die Zeile verlassen hat, und folgt in ~0.55-0.7 s.
+   ========================================================================== */
+const PTF_CONFIG = {
+  oStart: [1000, 2100, 3300, 4000],   /* Start der orangen Front je Zeile */
+  oDur:   [1000,  950,  800,  800],   /* Dauer der orangen Front */
+  wStart: [2100, 3300, 4000, 4800],   /* Start der weissen Fuellung (= Start der naechsten Orange-Zeile) */
+  wDur:   [ 700,  600,  700,  550],   /* Dauer der weissen Fuellung */
+  oPow:   1.7,    /* Orange-Front beschleunigt (Ease-In, p^oPow); 1 = linear. Gemessen: Zeile 1 ~ p^2 */
+  wPow:   1.0,    /* Weiss laeuft linear */
+  autoplay: true,
+  loop: false,    /* true = nach loopDelay von vorn */
+  loopDelay: 2500,
+};
+
+/* ===== COMPONENT JS ===== */
+function initPixelTextFill(root, opts) {
+  const cfg = Object.assign({}, PTF_CONFIG, opts || {});
+  const lines = (cfg.lines || Array.from(root.children).map(el => el.textContent.trim())).filter(Boolean);
+  root.textContent = '';
+  const items = lines.map(txt => {
+    const line = document.createElement('span'); line.className = 'ptf__line';
+    const base = document.createElement('span'); base.className = 'ptf__base'; base.textContent = txt;
+    const mk = (cls) => {
+      const rev = document.createElement('span'); rev.className = 'ptf__rev ' + cls.rev; rev.setAttribute('aria-hidden', 'true');
+      const inn = document.createElement('span'); inn.className = 'ptf__in ' + cls.in; inn.textContent = txt;
+      rev.appendChild(inn); line.appendChild(rev); return { rev, inn };
+    };
+    line.appendChild(base);
+    const o = mk({ rev: 'ptf__rev--o', in: 'ptf__in--o' });
+    const w = mk({ rev: 'ptf__rev--w', in: 'ptf__in--w' });
+    root.appendChild(line);
+    return { txt, o, w, W: 0, Fo: 0, Fw: 0, Bo: 0, Bw: 0, eo: -1, ew: -1 };
+  });
+  const reduce = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* einmal messen + cachen (kein Layout-Lesen pro Frame) */
+  function measure() {
+    const em = parseFloat(getComputedStyle(root).fontSize) || 16;
+    const csr = getComputedStyle(root);
+    const fo = parseFloat(csr.getPropertyValue('--ptf-feather-o')) * (/em/.test(csr.getPropertyValue('--ptf-feather-o')) ? em : 1) || 2.2 * em;
+    const fw = parseFloat(csr.getPropertyValue('--ptf-feather-w')) * (/em/.test(csr.getPropertyValue('--ptf-feather-w')) ? em : 1) || 4.4 * em;
+    items.forEach(it => {
+      it.W = it.o.rev.parentNode.firstChild.getBoundingClientRect().width;
+      it.Fo = fo; it.Fw = fw;
+      it.Bo = 2 * it.W + fo;  it.Bw = 2 * it.W + fw;      /* Fensterbreite */
+      it.o.rev.style.width = it.Bo + 'px'; it.w.rev.style.width = it.Bw + 'px';
+      it.o.rev.style.setProperty('--ptf-feather-o', fo + 'px'); it.w.rev.style.setProperty('--ptf-feather-w', fw + 'px');
+      it.eo = it.ew = NaN;
+    });
+    apply(lastT);
+  }
+  const ease = (p, k) => Math.pow(p, k);
+  const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+  /* Kante e (px) von 0 .. W+F ; Fenster translate = e - B ; Inhalt gegenlaeufig */
+  function setEdge(it, layer, B, e, key) {
+    if (it[key] === e) return; it[key] = e;
+    layer.rev.style.transform = 'translate3d(' + (e - B).toFixed(2) + 'px,0,0)';
+    layer.inn.style.transform = 'translate3d(' + (B - e).toFixed(2) + 'px,0,0)';
+  }
+  let lastT = 0;
+  function apply(t) {                        /* t = ms seit Start */
+    if (reduce()) return;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const po = ease(clamp01((t - cfg.oStart[i]) / cfg.oDur[i]), cfg.oPow);
+      const pw = ease(clamp01((t - cfg.wStart[i]) / cfg.wDur[i]), cfg.wPow);
+      setEdge(it, it.o, it.Bo, Math.round(po * (it.W + it.Fo) * 4) / 4, 'eo');
+      setEdge(it, it.w, it.Bw, Math.round(pw * (it.W + it.Fw) * 4) / 4, 'ew');
+    }
+  }
+  const total = Math.max.apply(null, cfg.wStart.map((s, i) => s + cfg.wDur[i]));
+  let raf = 0, t0 = 0, timer = 0;
+  function frame(now) {
+    const t = now - t0; lastT = t;
+    apply(t);
+    if (t < total) raf = requestAnimationFrame(frame);
+    else { root.classList.remove('is-running'); raf = 0; if (cfg.loop) timer = setTimeout(replay, cfg.loopDelay); }
+  }
+  function replay() {
+    cancelAnimationFrame(raf); clearTimeout(timer);
+    if (reduce()) { root.classList.add('is-reduced'); return; }
+    root.classList.remove('is-reduced');
+    items.forEach(it => { it.eo = it.ew = NaN; });
+    apply(-1e6); lastT = 0;
+    root.classList.add('is-running');
+    t0 = performance.now();
+    raf = requestAnimationFrame(frame);
+  }
+  const onKey = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); replay(); } };
+  root.addEventListener('click', replay);
+  root.addEventListener('keydown', onKey);
+  root.setAttribute('role', 'button');
+  root.setAttribute('aria-label', lines.join(' ') + ' (Enter: Animation wiederholen)');
+  const ro = ('ResizeObserver' in window) ? new ResizeObserver(() => { if (!raf) measure(); }) : null;
+  if (ro) ro.observe(root);
+  window.addEventListener('resize', measure);
+  measure();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+  if (reduce()) root.classList.add('is-reduced'); else if (cfg.autoplay) replay();
+  return {
+    replay,
+    destroy() { cancelAnimationFrame(raf); clearTimeout(timer); root.removeEventListener('click', replay); root.removeEventListener('keydown', onKey); window.removeEventListener('resize', measure); if (ro) ro.disconnect(); },
+  };
+}
+/* ===== /COMPONENT JS ===== */
+
+/* ===== DEMO ===== */
+window.ptfDemo = initPixelTextFill(document.getElementById('demo'));
+</script>
+</body>
+</html>

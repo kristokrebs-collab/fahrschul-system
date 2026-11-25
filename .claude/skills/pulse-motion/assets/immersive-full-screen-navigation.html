@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Immersive Full Screen Navigation</title>
+<style>
+/* ==========================================================================
+   CONFIG (CSS) - alle Look-Werte zum "Hochdrehen". Referenz-Viewport 1234x673.
+   Motion-Werte (Dauern, Staffelung, Easing) stehen im CONFIG (JS) weiter unten.
+   ========================================================================== */
+:root {
+  --ifn-page:      #1f1f1f;   /* Buehne / Seitenhintergrund (gemessen) */
+  --ifn-panel:     #020106;   /* Vollbild-Panel (fast schwarz, leicht bläulich) */
+  --ifn-ink:       #ffffff;   /* Schrift im Panel + Brand */
+  --ifn-muted:     #8e8e8e;   /* graue Texte der Demo */
+  --ifn-burger:    #5c5c5c;   /* Hamburger-Linien (zu) */
+  --ifn-close:     #8c8c8c;   /* X-Linien (offen) */
+  --ifn-font:      Inter, Geist, Roboto, "Helvetica Neue", Arial, "Liberation Sans", ui-sans-serif, system-ui, sans-serif;
+  --ifn-radius:    14px;      /* Buehnen-Ecken */
+  --ifn-img-radius: 14px;     /* Bild-Kacheln */
+  --ifn-link-size: min(6.15cqw, 11.3cqh);   /* Linkgroesse (76px bei 1234x673) */
+  --ifn-link-gap:  min(8.9cqw, 16.3cqh);    /* Zeilenabstand (110px) */
+  --ifn-pad-x:     2.9cqw;    /* Kopfzeile links/rechts (36px) */
+  --ifn-col-x:     9.55cqw;   /* linke Inhaltsspalte (118px) */
+  --ifn-lift:      24px;      /* Einstiegs-Versatz der Elemente (translateY) */
+}
+html, body { margin: 0; height: 100%; }
+body { background: var(--ifn-page); font-family: var(--ifn-font); color: var(--ifn-ink);
+  display: grid; place-items: center; -webkit-font-smoothing: antialiased; }
+
+/* COMPONENT CSS */
+.ifn { position: relative; container-type: size; contain: layout paint; width: min(100vw, 1234px); height: min(100vh, 673px);
+  background: var(--ifn-page); border-radius: var(--ifn-radius); overflow: hidden; font-family: var(--ifn-font); }
+.ifn *, .ifn *::before, .ifn *::after { box-sizing: border-box; }
+.ifn__page { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 16px; }
+.ifn__eyebrow { font-size: 12px; letter-spacing: .3em; text-transform: uppercase; color: var(--ifn-muted); margin: 0 0 min(5.6cqh, 38px); }
+.ifn__title { margin: 0; font-weight: 400; font-size: min(7.1cqw, 12.5cqh); line-height: 1.28; letter-spacing: -.01em; color: #fff; }
+.ifn__desc { margin: min(6cqh, 40px) 0 0; max-width: 460px; font-size: 14.5px; line-height: 1.6; color: var(--ifn-muted); }
+
+.ifn__header { position: absolute; z-index: 5; top: 0; left: 0; right: 0; height: 82px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ifn-pad-x); pointer-events: none; }
+.ifn__brand { font-weight: 600; font-size: 16px; letter-spacing: .24em; color: #fff; text-decoration: none; pointer-events: auto; }
+.ifn__toggle { pointer-events: auto; position: relative; width: 56px; height: 44px; margin-right: -6px; border: 0; background: none; cursor: pointer; padding: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.ifn__toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 6px; }
+.ifn__bar { position: absolute; left: 7px; top: 21px; width: 41px; height: 2px; background: var(--ifn-burger); transform-origin: 50% 50%; transition: transform var(--ifn-icon-dur, .45s) cubic-bezier(.76,0,.24,1), opacity .25s linear, background-color .3s linear; }
+.ifn__bar:nth-child(1) { transform: translate3d(0,-8px,0); }
+.ifn__bar:nth-child(3) { transform: translate3d(0,8px,0); }
+.ifn.is-open .ifn__bar { background: var(--ifn-close); height: 1.5px; }
+.ifn.is-open .ifn__bar:nth-child(1) { transform: translate3d(0,0,0) rotate(45deg) scaleX(.9); }
+.ifn.is-open .ifn__bar:nth-child(2) { opacity: 0; }
+.ifn.is-open .ifn__bar:nth-child(3) { transform: translate3d(0,0,0) rotate(-45deg) scaleX(.9); }
+
+/* Wipe: Huelle (clip) + Inhalt gegenlaeufig -> nur transform, kein clip-path */
+.ifn__wipe { position: absolute; inset: 0; z-index: 3; overflow: hidden; background: var(--ifn-panel); transform: translate3d(-100%,0,0); visibility: hidden; }
+.ifn__inner { position: absolute; inset: 0; transform: translate3d(100%,0,0); }
+.ifn.is-open .ifn__wipe, .ifn.is-anim .ifn__wipe { visibility: visible; }
+
+.ifn__intro { position: absolute; left: var(--ifn-col-x); top: 12cqh; }
+.ifn__intro b { display: block; font-size: 13px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; margin-bottom: 11px; }
+.ifn__intro span { font-size: 14px; color: #fff; }
+.ifn__links { position: absolute; left: var(--ifn-col-x); top: 25.6cqh; margin: 0; padding: 0; list-style: none; }
+.ifn__links li { height: var(--ifn-link-gap); display: flex; align-items: center; }
+.ifn__links a { color: #fff; text-decoration: none; font-size: var(--ifn-link-size); line-height: 1; letter-spacing: -.005em; display: inline-block; transition: opacity .25s linear; }
+.ifn__links:hover a:not(:hover), .ifn__links:focus-within a:not(:focus-visible) { opacity: .45; }
+.ifn__links a:focus-visible { outline: 2px solid #fff; outline-offset: 6px; border-radius: 4px; }
+.ifn__imgs { position: absolute; left: 38.1cqw; top: 41cqh; display: flex; gap: 2.65cqw; }
+.ifn__img { width: 24.8cqw; height: 32.7cqh; border-radius: var(--ifn-img-radius); overflow: hidden; background: #000; }
+.ifn__img svg { display: block; width: 100%; height: 100%; }
+.ifn__social { position: absolute; left: var(--ifn-col-x); bottom: -.2cqh; display: flex; gap: 24px; }
+.ifn__social a { color: #a0a0a0; display: block; width: 24px; height: 24px; transition: color .25s linear; }
+.ifn__social a:hover, .ifn__social a:focus-visible { color: #fff; }
+.ifn__social svg { width: 100%; height: 100%; display: block; }
+.ifn__loc { position: absolute; right: 9.6cqw; bottom: .6cqh; font-size: 14px; color: #fff; }
+.ifn__item { opacity: 0; transform: translate3d(0, var(--ifn-lift), 0); }
+@media (max-width: 720px) {
+  .ifn__imgs { left: var(--ifn-col-x); top: auto; bottom: 14cqh; }
+  .ifn__img { width: 36cqw; height: 22cqh; }
+  .ifn__loc { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ifn__bar { transition: none; }
+  .ifn__links a, .ifn__social a { transition: none; }
+}
+/* /COMPONENT CSS */
+</style>
+</head>
+<body>
+
+<!-- COMPONENT:START -->
+<div class="ifn" id="ifn-demo">
+  <div class="ifn__page">
+    <p class="ifn__eyebrow">Navigation</p>
+    <h1 class="ifn__title">Immersive Full<br>Screen Nav</h1>
+    <p class="ifn__desc">Click the menu button &mdash; the panel wipes open via clip-path, then the brand block, links, images, and socials reveal in sequence.</p>
+  </div>
+
+  <div class="ifn__wipe" id="ifn-panel" role="dialog" aria-label="Navigation" aria-hidden="true" inert>
+    <div class="ifn__inner">
+      <div class="ifn__intro ifn__item"><b>Northline Studio</b><span>Brand and product design for early-stage teams.</span></div>
+      <ul class="ifn__links">
+        <li><a class="ifn__item" href="#work">Work</a></li>
+        <li><a class="ifn__item" href="#studio">Studio</a></li>
+        <li><a class="ifn__item" href="#journal">Journal</a></li>
+        <li><a class="ifn__item" href="#contact">Contact</a></li>
+      </ul>
+      <div class="ifn__imgs">
+        <div class="ifn__img ifn__item" aria-hidden="true">
+          <svg viewBox="0 0 306 220" preserveAspectRatio="xMidYMid slice"><defs>
+            <filter id="ifn-b1" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="5"/></filter>
+            <linearGradient id="ifn-g1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9622b"/><stop offset=".3" stop-color="#e8e3dc"/><stop offset=".6" stop-color="#3b82d6"/><stop offset="1" stop-color="#8fc3f0"/></linearGradient>
+            <linearGradient id="ifn-g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f1ea"/><stop offset=".5" stop-color="#9a8f86"/><stop offset="1" stop-color="#2a3b5c"/></linearGradient></defs>
+            <rect width="306" height="220" fill="#030305"/>
+            <g filter="url(#ifn-b1)"><path d="M0 120 L40 100 L50 220 L0 220Z" fill="#c8561f"/><path d="M40 110 L170 140 L120 220 L50 220Z" fill="url(#ifn-g2)"/><path d="M110 150 L306 95 L306 220 L150 220Z" fill="url(#ifn-g1)"/><path d="M70 200 L260 120 L300 150 L120 220Z" fill="#e9eef5" opacity=".85"/></g>
+            <g fill="none" stroke="#0a0a10" stroke-width="1.3"><path d="M110 4 C170 20 250 40 306 78"/><path d="M80 14 C150 40 230 70 290 112"/><path d="M50 48 C110 74 190 104 255 150"/><path d="M0 90 C60 110 120 140 150 200"/></g>
+            <path d="M110 0 C190 20 270 40 306 70 L306 0Z" fill="#030305"/></svg>
+        </div>
+        <div class="ifn__img ifn__item" aria-hidden="true">
+          <svg viewBox="0 0 308 220" preserveAspectRatio="xMidYMid slice"><defs>
+            <linearGradient id="ifn-g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e8e8e8"/><stop offset="1" stop-color="#7a7a7a"/></linearGradient>
+            <linearGradient id="ifn-g4" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9c9c9c"/><stop offset="1" stop-color="#c47a5a"/></linearGradient></defs>
+            <rect width="308" height="220" fill="#000"/>
+            <g stroke="#6b6b6b" stroke-width=".8" fill="none"><path d="M154 0 V220"/><path d="M0 164 L308 30"/><path d="M0 40 L308 168"/><path d="M0 110 L308 120"/></g>
+            <g transform="translate(154 112)"><rect x="-10" y="-52" width="20" height="104" fill="url(#ifn-g3)"/><rect x="-52" y="-10" width="104" height="20" fill="url(#ifn-g3)"/><rect x="28" y="-10" width="26" height="20" fill="url(#ifn-g4)"/><rect x="-54" y="-10" width="26" height="20" fill="url(#ifn-g4)" opacity=".8"/><rect x="-9" y="-54" width="18" height="20" fill="#dcdcdc"/></g></svg>
+        </div>
+      </div>
+      <div class="ifn__social ifn__item">
+        <a href="#instagram" aria-label="Instagram"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm5 5.5A4.5 4.5 0 1 0 12 16.5 4.5 4.5 0 0 0 12 7.5zm0 2A2.5 2.5 0 1 1 12 14.5 2.5 2.5 0 0 1 12 9.5zM17.3 5.6a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2z" fill-rule="evenodd"/></svg></a>
+        <a href="#x" aria-label="X"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 3.5l16 17M20 3.5L4 20.5"/></svg></a>
+        <a href="#linkedin" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9h4v12H3zM5 3a2.3 2.3 0 1 1 0 4.6A2.3 2.3 0 0 1 5 3zM10 9h3.8v1.7c.6-1.1 2-2 3.9-2 3.600 0 4.300 2.400 4.300 5.400V21h-4v-6c0-1.500 0-3.200-2-3.200s-2.300 1.500-2.300 3.100V21h-3.700z"/></svg></a>
+      </div>
+      <div class="ifn__loc ifn__item">Lisbon, Portugal</div>
+    </div>
+  </div>
+
+  <header class="ifn__header">
+    <a class="ifn__brand" href="#">NORTHLINE</a>
+    <button class="ifn__toggle" type="button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="ifn-panel"><i class="ifn__bar"></i><i class="ifn__bar"></i><i class="ifn__bar"></i></button>
+  </header>
+</div>
+<!-- COMPONENT:END -->
+
+<script>
+/* ==========================================================================
+   CONFIG (JS) - Motion-Werte (ms). Alle Zeiten relativ zum Klick.
+   ========================================================================== */
+const IFN_CONFIG = {
+  wipeOpenMs:  800,                       // Panel faehrt von links auf (Video ~0.8 s)
+  wipeCloseMs: 800,                       // Panel faehrt nach rechts weg (gleiche Kurve)
+  wipeEase:    'cubic-bezier(.76,0,.24,1)', // langsamer Start, schnelle Mitte, lange Auslauf-Kurve
+  itemMs:      650,                       // Dauer je Element (Fade + Anhub)
+  itemEase:    'cubic-bezier(.22,1,.36,1)', // ease-out
+  // Verzoegerung je Element ab Klick (ms): Intro, 4 Links, 2 Bilder, Socials, Ort
+  delays: { intro: 620, links: [620, 720, 820, 900], imgs: [720, 800], social: 2250, loc: 2300 }
+};
+
+/* COMPONENT JS - initImmersiveFullScreenNav(root, opts)
+   opts: { config?: Partial<IFN_CONFIG>, onToggle?: (open:boolean)=>void }
+   Gibt { open, close, toggle, isOpen } zurueck. Reine WAAPI (transform/opacity) -> compositor, 120 Hz. */
+function initImmersiveFullScreenNav(root, opts) {
+  opts = opts || {};
+  const C = Object.assign({}, IFN_CONFIG, opts.config || {});
+  const D = Object.assign({}, IFN_CONFIG.delays, (opts.config && opts.config.delays) || {});
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  const wipe = root.querySelector('.ifn__wipe');
+  const inner = root.querySelector('.ifn__inner');
+  const btn = root.querySelector('.ifn__toggle');
+  const items = {
+    intro: root.querySelector('.ifn__intro'),
+    links: [...root.querySelectorAll('.ifn__links a')],
+    imgs:  [...root.querySelectorAll('.ifn__img')],
+    social: root.querySelector('.ifn__social'),
+    loc: root.querySelector('.ifn__loc')
+  };
+  const seq = [[items.intro, D.intro]]
+    .concat(items.links.map((el, i) => [el, D.links[i] ?? D.links[D.links.length - 1]]))
+    .concat(items.imgs.map((el, i) => [el, D.imgs[i] ?? D.imgs[D.imgs.length - 1]]))
+    .concat([[items.social, D.social], [items.loc, D.loc]]).filter(p => p[0]);
+  const all = seq.map(p => p[0]);
+  let open = false, anims = [], itemAnims = [];
+  const lift = () => getComputedStyle(root).getPropertyValue('--ifn-lift').trim() || '24px';
+
+  function cancel(withItems) { anims.forEach(a => a.cancel()); anims = []; if (withItems) { itemAnims.forEach(a => a.cancel()); itemAnims = []; } }
+  function setItems(visible) { all.forEach(el => { el.style.opacity = visible ? '1' : '0'; el.style.transform = visible ? 'none' : ''; }); }
+
+  function run(opening) {
+    cancel(opening);   // beim Schliessen bleiben die Elemente sichtbar, bis der Wipe durch ist
+    open = opening;
+    root.classList.toggle('is-open', open);
+    btn.setAttribute('aria-expanded', String(open));
+    btn.setAttribute('aria-label', open ? 'Menü schließen' : 'Menü öffnen');
+    wipe.setAttribute('aria-hidden', String(!open));
+    wipe.inert = !open;
+    root.classList.add('is-anim');
+    const dur = reduce.matches ? 1 : (opening ? C.wipeOpenMs : C.wipeCloseMs);
+    const ease = C.wipeEase;
+    const o = { duration: dur, easing: ease, fill: 'forwards' };
+    // Oeffnen: Huelle -100% -> 0 (rechte Kante wandert), Inhalt gegenlaeufig. Schliessen: linke Kante wandert nach rechts.
+    const wFrames = opening ? [{ transform: 'translate3d(-100%,0,0)' }, { transform: 'translate3d(0,0,0)' }]
+                            : [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(100%,0,0)' }];
+    const iFrames = opening ? [{ transform: 'translate3d(100%,0,0)' }, { transform: 'translate3d(0,0,0)' }]
+                            : [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-100%,0,0)' }];
+    wipe.style.willChange = inner.style.willChange = 'transform';
+    const aw = wipe.animate(wFrames, o), ai = inner.animate(iFrames, o);
+    anims.push(aw, ai);
+    if (opening) {
+      setItems(false);
+      const L = lift();
+      seq.forEach(([el, d]) => {
+        el.style.willChange = 'transform, opacity';
+        const a = el.animate([{ opacity: 0, transform: 'translate3d(0,' + L + ',0)' }, { opacity: 1, transform: 'translate3d(0,0,0)' }],
+          { duration: reduce.matches ? 1 : C.itemMs, delay: reduce.matches ? 0 : d, easing: C.itemEase, fill: 'both' });
+        itemAnims.push(a);
+        a.finished.then(() => { el.style.willChange = ''; }, () => {});
+      });
+    }
+    aw.finished.then(() => {
+      wipe.style.willChange = inner.style.willChange = '';
+      root.classList.remove('is-anim');
+      // Endzustand als Inline-Style festschreiben, Animationen freigeben
+      if (open) { wipe.style.transform = 'translate3d(0,0,0)'; inner.style.transform = 'translate3d(0,0,0)'; }
+      else { wipe.style.transform = ''; inner.style.transform = ''; cancel(true); setItems(false); }
+    }, () => {});
+    if (opts.onToggle) opts.onToggle(open);
+  }
+  const api = { open: () => !open && run(true), close: () => open && run(false), toggle: () => run(!open), isOpen: () => open };
+  btn.addEventListener('click', api.toggle);
+  root.addEventListener('keydown', e => { if (e.key === 'Escape' && open) { api.close(); btn.focus(); } });
+  wipe.addEventListener('click', e => { if (e.target.closest('a')) { e.preventDefault(); api.close(); } });
+  setItems(false);
+  return api;
+}
+/* /COMPONENT JS */
+
+/* Demo (exakt der Video-Inhalt) */
+initImmersiveFullScreenNav(document.getElementById('ifn-demo'));
+</script>
+</body>
+</html>

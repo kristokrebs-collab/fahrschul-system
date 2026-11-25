@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Text Animate</title>
+<style>
+/* ===== CONFIG (hier hochdrehen) ===== */
+:root{
+  --stage-bg:#131313;          /* Buehnenfarbe (gemessen 131313) */
+  --text-color:#fafafa;        /* Textfarbe */
+  --font:Inter,Geist,Roboto,ui-sans-serif,system-ui,"Helvetica Neue",Arial,sans-serif;
+  --font-size:clamp(22px,2.6vw,32px); /* Referenz: ~31px @ 1234x673 */
+  --font-weight:500;           /* medium (Roboto-/Inter-artig, wirkt im Video "semi") */
+  --letter-spacing:-0.01em;
+  --ms-per-char:65;            /* ms pro Zeichen (Tippgeschwindigkeit; kleiner = schneller) */
+  --start-delay:0;             /* ms Pause zwischen Replay-Klick und erstem Zeichen (erstes Zeichen kommt sofort) */
+  --caret-w:2px;               /* Cursor-Breite */
+  --caret-color:#fafafa;       /* Cursor-Farbe */
+  --caret-blink:1000;          /* ms pro Blinkzyklus (50 % an / 50 % aus), nach dem Tippen */
+  --btn-bg:#494949;            /* Replay-Button (gemessen 494949) */
+  --btn-bg-hover:#555;
+  --btn-color:#f2f2f2;
+  --btn-radius:8px;
+  --btn-w:64px; --btn-h:32px;  /* Referenz 64x32 */
+  --btn-font-size:12px;
+  --gap:24px;                  /* Luecke Text -> Button (Mitte-zu-Mitte ~59px) */
+  --press-scale:.95;           /* Button gedrueckt */
+}
+</style>
+<style>
+/* COMPONENT CSS */
+html,body{margin:0;height:100%}
+body{background:var(--stage-bg);display:grid;place-items:center;overflow:hidden;font-family:var(--font)}
+.ta{display:flex;flex-direction:column;align-items:center;gap:var(--gap);contain:layout paint;
+  font-family:var(--font);color:var(--text-color);padding:40px 60px}
+.ta__line{position:relative;display:block;min-height:1.25em;line-height:1.25;white-space:pre;text-align:center;
+  font-size:var(--font-size);font-weight:var(--font-weight);letter-spacing:var(--letter-spacing);
+  -webkit-user-select:none;user-select:none}
+.ta__caret{display:inline-block;width:var(--caret-w);height:1.05em;vertical-align:text-bottom;
+  background:var(--caret-color);margin-left:1px;opacity:1;
+  animation:ta-blink calc(var(--caret-blink)*1ms) steps(1,end) infinite}
+.ta.is-typing .ta__caret{animation:none;opacity:1}
+@keyframes ta-blink{0%{opacity:1}50%{opacity:0}100%{opacity:0}}
+.ta__btn{appearance:none;border:0;margin:0;cursor:pointer;width:var(--btn-w);height:var(--btn-h);
+  border-radius:var(--btn-radius);background:var(--btn-bg);color:var(--btn-color);
+  font:500 var(--btn-font-size)/1 var(--font);touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  transition:transform 120ms cubic-bezier(.2,.8,.2,1),background-color 150ms ease-out}
+.ta__btn:hover{background:var(--btn-bg-hover)}
+.ta__btn:active{transform:scale(var(--press-scale))}
+.ta__btn:focus-visible{outline:2px solid #7aa2ff;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.ta__caret{animation:none}.ta__btn{transition:none}}
+</style>
+</head>
+<body>
+<!-- COMPONENT:START -->
+<div class="ta" id="ta">
+  <div class="ta__line" data-text="Ship beautiful interfaces, fast."></div>
+  <button class="ta__btn" type="button">Replay</button>
+</div>
+<!-- COMPONENT:END -->
+<script>
+/* Init: initTextAnimate(rootEl, {text, msPerChar, startDelay, autoplay, onDone})
+   Liest Text aus .ta__line[data-text]; Button .ta__btn startet neu. Gibt {replay, finish, destroy} zurueck.
+   Zeitbasiert: Zeichenanzahl = floor(elapsed / msPerChar) + 1, DOM nur bei Aenderung. */
+function initTextAnimate(root, opts){
+  opts = opts || {};
+  var cs = getComputedStyle(root);
+  var num = function(n, d){ var v = parseFloat(cs.getPropertyValue(n)); return isNaN(v) ? d : v; };
+  var line = root.querySelector('.ta__line'), btn = root.querySelector('.ta__btn');
+  var text = opts.text || line.getAttribute('data-text') || line.textContent;
+  var msPer = opts.msPerChar != null ? opts.msPerChar : num('--ms-per-char', 65);
+  var delay = opts.startDelay != null ? opts.startDelay : num('--start-delay', 0);
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var raf = 0, t0 = null, shown = -1;
+
+  root.setAttribute('role', 'group');
+  line.setAttribute('role', 'text'); line.setAttribute('aria-label', text);
+  var tn = document.createTextNode(''), caret = document.createElement('span');
+  caret.className = 'ta__caret'; caret.setAttribute('aria-hidden', 'true');
+  line.textContent = ''; line.appendChild(tn); line.appendChild(caret);
+
+  function set(n){ if (n === shown) return; shown = n; tn.nodeValue = text.slice(0, n); }
+  function frame(t){
+    if (t0 == null) t0 = t;
+    var el = t - t0 - delay;
+    var n = el < 0 ? 0 : Math.min(text.length, Math.floor(el / msPer) + 1);
+    set(n);
+    if (n >= text.length){ finish(); if (opts.onDone) opts.onDone(); return; }
+    raf = requestAnimationFrame(frame);
+  }
+  function finish(){ cancelAnimationFrame(raf); raf = 0; set(text.length); root.classList.remove('is-typing'); }
+  function replay(){
+    cancelAnimationFrame(raf); t0 = null; shown = -1;
+    if (reduce){ finish(); return; }
+    root.classList.add('is-typing'); set(0);
+    raf = requestAnimationFrame(frame);
+  }
+  var onClick = function(){ replay(); };
+  btn.addEventListener('click', onClick);
+  set(text.length);                        // Startzustand: Text komplett (wie im Video)
+  if (opts.autoplay) replay();
+  return { replay: replay, finish: finish, destroy: function(){ cancelAnimationFrame(raf); btn.removeEventListener('click', onClick); } };
+}
+</script>
+<script>
+/* Demo: exakt der Video-Inhalt */
+window.textAnimate = initTextAnimate(document.getElementById('ta'), {});
+</script>
+</body>
+</html>

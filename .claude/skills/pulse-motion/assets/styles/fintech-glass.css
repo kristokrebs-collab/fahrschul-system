@@ -1,0 +1,25 @@
+/* Fintech Glass — „Vertrauen aus Licht“ (dark). Einsatz: <section data-style="fintech-glass"> (+ _base.css). Eigener Look nach Beobachtung dunkler Fintech-Fallstudien, kein Markenmaterial. */
+[data-style="fintech-glass"] {
+  /* Marke */
+  --fg-night: #050608; --fg-ink: #0b0d11; --fg-glass: rgba(255,255,255,.07); --fg-glass-2: rgba(255,255,255,.02); --fg-edge: rgba(255,255,255,.16);
+  --fg-text: #f4f6fb; --fg-dim: rgba(244,246,251,.46); --fg-mint: #3be0a8; --fg-amber: #ff9a62; --fg-violet: #7a6cff;
+  /* Semantik-Schicht */
+  --s-bg: var(--fg-night); --s-surface: var(--fg-glass); --s-fg: var(--fg-text); --s-fg-muted: var(--fg-dim);
+  --s-border: var(--fg-edge); --s-border-strong: rgba(255,255,255,.34); --s-accent: var(--fg-mint); --s-link: var(--fg-text);
+  --s-action-bg: var(--fg-text); --s-action-fg: var(--fg-night);
+  --s-radius-card: 22px; --s-radius-btn: 999px; --s-card-pad: 20px; --s-card-border: 1px solid var(--fg-edge);
+  --s-btn-pad: 11px 20px; --s-btn-weight: 500;
+  --s-font-ui: 'Inter', 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-display: var(--s-font-ui); --s-font-mono: 'JetBrains Mono', 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s-display-weight: 300; --s-display-leading: 1.04; --s-display-tracking: -0.035em; --s-body-weight: 400;
+  --s-ease: cubic-bezier(.16,1,.3,1); --s-dur: .26s;
+  --s-card-fg: var(--fg-text); --s-card-muted: var(--fg-dim);
+}
+[data-style="fintech-glass"] .s-card { background: linear-gradient(145deg, var(--fg-glass), var(--fg-glass-2) 55%, var(--fg-glass)); -webkit-backdrop-filter: blur(22px) saturate(1.5); backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow: inset 0 1px 0 var(--fg-edge), 0 16px 44px rgba(0,0,0,.45); }
+/* Display: erste Wörter gedimmt, Schlusswort hell (wie „Where Credit Meets / Confidence“) */
+[data-style="fintech-glass"] .fg-dim { color: var(--fg-dim); }
+[data-style="fintech-glass"] .fg-num { font-family: var(--s-font-mono); font-variant-numeric: tabular-nums; letter-spacing: -.03em; font-size: 44px; font-weight: 300; }
+[data-style="fintech-glass"] .fg-index { font: 11px var(--s-font-mono); color: var(--fg-dim); letter-spacing: .08em; } /* „01 / 04“ */
+[data-style="fintech-glass"] .fg-rule { height: 1px; background: linear-gradient(90deg, transparent, var(--fg-edge), transparent); border: 0; }
+[data-style="fintech-glass"] .fg-pill { display: inline-block; border: 1px solid var(--fg-edge); border-radius: 999px; padding: 5px 12px; font: 12px var(--s-font-ui); background: var(--fg-glass-2); }

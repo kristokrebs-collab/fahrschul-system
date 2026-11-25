@@ -1,0 +1,20 @@
+/* Dala — „Konstellation auf schwarzem Samt“ (dark). Einsatz: <section data-style="dala"> … </section> (+ _base.css) */
+[data-style="dala"] {
+  /* Marke */
+  --dala-void: #000000; --dala-bone: #ffffff; --dala-ash: #9a9a9a; --dala-mist: #bdbdbd;
+  --dala-iris: #8052ff; --dala-saffron: #ffb829; --dala-verdant: #15846e;
+  /* Semantik-Schicht */
+  --s-bg: var(--dala-void); --s-surface: var(--dala-void); --s-fg: var(--dala-bone); --s-fg-muted: var(--dala-ash);
+  --s-border: transparent; --s-border-strong: rgba(255,255,255,.35); --s-accent: var(--dala-iris); --s-link: var(--dala-saffron);
+  --s-action-bg: var(--dala-iris); --s-action-fg: #ffffff;
+  --s-radius-card: 24px; --s-radius-btn: 22.5px; --s-card-pad: 24px; --s-card-border: 0;
+  --s-btn-pad: 14.4px 16px; --s-btn-weight: 600; --s-btn-case: uppercase; --s-btn-tracking: .025em;
+  --s-font-ui: 'PPNeueMontreal', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-display: var(--s-font-ui); --s-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s-display-weight: 400; --s-display-leading: 1.1; --s-display-tracking: -0.04em; --s-body-weight: 200;
+  --s-ease: ease; --s-dur: .2s;
+  /* Extras */
+  --dala-label: var(--dala-saffron);           /* kleines UPPERCASE-Label über Fließtext */
+  --dala-type-display: 113px; --dala-type-lg: 78px;   /* Hierarchie nur über Größe, nie über Gewicht */
+  font-feature-settings: "ss01" on;
+}

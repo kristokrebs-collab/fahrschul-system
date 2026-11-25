@@ -1,0 +1,20 @@
+/* Superhuman — „Goldene-Stunde-Editorial“ (light, Pergament). Einsatz: <section data-style="superhuman"> (+ _base.css) */
+[data-style="superhuman"] {
+  /* Marke */
+  --sh-wine: #421d24; --sh-violet: #714cb6; --sh-lilac: #d4c7ff; --sh-lagoon: #0c4243; --sh-parchment: #f2f0eb;
+  --sh-mist: #e3e3e2; --sh-charcoal: #292827; --sh-stone: #666666; --sh-paper: #ffffff;
+  /* Semantik-Schicht */
+  --s-bg: var(--sh-parchment); --s-surface: var(--sh-paper); --s-fg: var(--sh-charcoal); --s-fg-muted: var(--sh-stone);
+  --s-border: var(--sh-mist); --s-border-strong: var(--sh-charcoal); --s-accent: var(--sh-violet); --s-link: var(--sh-violet);
+  --s-action-bg: var(--sh-wine); --s-action-fg: #ffffff;
+  --s-radius-card: 16px; --s-radius-btn: 16px; --s-card-pad: 16px; --s-card-border: 1px solid var(--sh-mist);
+  --s-btn-pad: 12px 12px; --s-btn-weight: 460;
+  --s-font-ui: 'Super Sans VF', 'Inter', 'Söhne', 'General Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-display: var(--s-font-ui); --s-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s-display-weight: 460; --s-display-leading: 0.96; --s-display-tracking: -0.028em; --s-body-weight: 460;
+  --s-ease: ease; --s-dur: .2s;
+  /* Extras: Violett NUR für Links; Wein NUR für den einen Primär-Button; Lilac = Sekundär-Fläche */
+  --sh-secondary-bg: var(--sh-lilac); --sh-glass: rgba(255,255,255,.85); --sh-header-blur: blur(12px);
+  --sh-band-dark: var(--sh-lagoon); --sh-footer: var(--sh-wine);
+}
+[data-style="superhuman"] .s-btn--secondary { background: var(--sh-secondary-bg); color: var(--sh-charcoal); border: 1px solid var(--sh-charcoal); border-radius: 8px; padding: 6px 16px; }
