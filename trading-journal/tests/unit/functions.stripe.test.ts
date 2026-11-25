@@ -351,6 +351,12 @@ function fakeStripe(): FakeStripe {
         f.updates.push({ id, params });
         const s = f.subs.get(id)!;
         const next = { ...s } as Stripe.Subscription & Record<string, unknown>;
+        // real Stripe: "Received both cancel_at_period_end and cancel_at parameters. Please pass in only one."
+        if (params.cancel_at_period_end !== undefined && params.cancel_at !== undefined) throw Object.assign(new Error("both cancel params"), { type: "StripeInvalidRequestError" });
+        if (params.cancel_at === "") {
+          next.cancel_at_period_end = false;
+          next.cancel_at = null;
+        }
         if (params.cancel_at_period_end !== undefined) {
           next.cancel_at_period_end = params.cancel_at_period_end;
           next.cancel_at = params.cancel_at_period_end ? NOW + 30 * 86400 : null;
@@ -1012,6 +1018,8 @@ describe("POST /api/v1/billing/portal", () => {
     // still entitled until the period ends
     expect(res.body.plan).toMatchObject({ plan: "pro", status: "active" });
     const undo = await portal({ action: "resume" });
+    // `cancel_at: ""` alone clears a cancellation of either kind (Stripe refuses both parameters in one request)
+    expect(stripe.updates[1]).toEqual({ id: "sub_1", params: { cancel_at: "" } });
     expect(undo.body.subscription).toMatchObject({ cancelAtPeriodEnd: false });
     const pause = await portal({ action: "pause", months: 2 });
     expect(stripe.updates[2]!.params.pause_collection).toMatchObject({ behavior: "void" });
@@ -1444,5 +1452,17 @@ describe("fail closed in production, cost features and dunning (Linse 1 #10, #3 
     await expect(requireFeature(U1, "shotExtract")).rejects.toMatchObject({ status: 402, code: "payment_past_due" });
     Object.assign(profile(db, U1), { plan_status: "active" });
     await expect(requireFeature(U1, "coachAi")).resolves.toMatchObject({ plan: "premium" });
+  });
+});
+
+describe("a cancellation made in the Customer Portal (cancel_at, not cancel_at_period_end) – found on the real sandbox, Runde 13", () => {
+  it("counts as ending at the end of the term: the app shows 'Gekündigt' and the date", () => {
+    const sub = { ...stripeSub("sub_p", { user: U1, status: "trialing" }), cancel_at_period_end: false, cancel_at: NOW + 14 * 86400 } as Stripe.Subscription;
+    const row = rowFromSubscription(sub, U1);
+    expect(row.cancel_at_period_end).toBe(true);
+    expect(row.cancel_at).toEqual(new Date((NOW + 14 * 86400) * 1000).toISOString());
+    // a subscription that is already over is not "ending", and one without any cancellation is not either
+    expect(rowFromSubscription({ ...sub, status: "canceled" } as Stripe.Subscription, U1).cancel_at_period_end).toBe(false);
+    expect(rowFromSubscription({ ...sub, cancel_at: null } as Stripe.Subscription, U1).cancel_at_period_end).toBe(false);
   });
 });

@@ -46,6 +46,8 @@ export const AUTH = {
     // registered address never gets – the neutral sentence stays, the same words for an address with and without an account
     confirm: (email: string) => `Wenn die Adresse frei ist, schicken wir dir eine Bestätigung an ${email} – darin bestätigst du dein Konto, danach bist du angemeldet. Hast du schon ein Konto, melde dich an oder setze dein Passwort zurück.`,
     sameBrowser: "Öffne den Link am besten in diesem Browser.",
+    /** Shown under the neutral "check your mail" step for EVERY address (never only when something went wrong – that would say something about the address). */
+    noMail: "Nichts angekommen? Schau im Spam-Ordner nach und tippe nach einer Minute auf „Erneut senden“. Kommt auch dann nichts an, ist der Mail-Versand dieser Seite gerade begrenzt oder noch nicht eingerichtet – schreib dem Betreiber über die Kontaktadresse im Impressum.",
     resend: "Erneut senden",
     resendIn: (s: number) => `Erneut senden in ${s} s`,
     resent: "Neue E-Mail ist unterwegs.",

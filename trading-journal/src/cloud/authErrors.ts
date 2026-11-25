@@ -29,6 +29,10 @@ const BY_CODE: Record<string, AuthErrorText> = {
   email_provider_disabled: { message: "Anmelden per E-Mail ist hier abgeschaltet.", field: null },
   over_email_send_rate_limit: { message: "Zu viele E-Mails in kurzer Zeit. Warte bitte eine Minute.", field: "email" },
   over_request_rate_limit: { message: "Zu viele Versuche. Warte bitte einen Moment.", field: null },
+  // Mail delivery (SETUP.md §2.2 / BETRIEB.md „Mail“): Supabase's built-in mail server sends only to a few pre-authorised addresses and only a handful per hour; a
+  // broken custom SMTP answers „Error sending … email“. The texts name the cause (operator side), never an account fact – the same words for every address.
+  email_address_not_authorized: { message: "An diese Adresse kann der Mail-Versand dieser Seite gerade nichts zustellen: Der Betreiber hat seinen Mail-Server noch nicht eingerichtet. Schreib ihm über die Kontaktadresse im Impressum.", field: null },
+  mail_failed: { message: "Die E-Mail konnte gerade nicht verschickt werden. Versuch es in ein paar Minuten noch einmal. Klappt es weiter nicht, schreib dem Betreiber über die Kontaktadresse im Impressum.", field: null },
   otp_expired: { message: "Der Link ist abgelaufen. Fordere einfach einen neuen an.", field: null },
   flow_state_expired: { message: "Der Link ist abgelaufen. Fordere einfach einen neuen an.", field: null },
   flow_state_not_found: { message: "Öffne den Link bitte im selben Browser, in dem du ihn angefordert hast.", field: null },
@@ -52,6 +56,8 @@ const BY_MESSAGE: ReadonlyArray<readonly [RegExp, string]> = [
   [/email not confirmed/i, "email_not_confirmed"],
   [/already registered|already exists/i, "user_already_exists"],
   [/password should be|weak password/i, "weak_password"],
+  [/error sending .*email|sending (confirmation|recovery|magic link|email)|smtp/i, "mail_failed"],
+  [/email.*not authorized|not authorized.*email|cannot be used as it is not authorized/i, "email_address_not_authorized"],
   [/rate limit/i, "over_request_rate_limit"],
   [/expired/i, "otp_expired"],
   [/invalid totp|invalid code/i, "mfa_verification_failed"],
@@ -85,6 +91,9 @@ export function authErrorCodeOf(e: unknown): string {
 
 /** Codes that mean "too many mails / attempts right now": the resend button then waits longer and says why (never retried in a loop). */
 export const isSendLimit = (code: string | undefined): boolean => code === "over_email_send_rate_limit" || code === "over_request_rate_limit";
+
+/** Codes that mean "the mail could not be delivered at all" (operator side): the resend button waits longer and says why, like the limit. */
+export const isMailFailure = (code: string | undefined): boolean => code === "mail_failed" || code === "email_address_not_authorized";
 
 /** Simple client-side checks before a request (the server decides in the end). */
 export function emailProblem(email: string): string | null {

@@ -8,7 +8,7 @@ import { RollingDigits } from "@/motion/RollingDigits";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { BILLING } from "../strings";
-import type { BillingMode } from "../store";
+import { purchaseOpenOf, type BillingMode } from "../store";
 import type { BillingConfig } from "../contract";
 
 /** `12 €` as rolling Doto digits (value mode: only changed columns roll – the Monat/Jahr switch). */
@@ -70,11 +70,17 @@ export function Mark({ on, delay = 0, className }: { on: boolean; delay?: number
   );
 }
 
-/** Honest note while nothing can be bought (no cloud / no Stripe / no functions). */
-export function ClosedNotice({ mode, config, className, action }: { mode: BillingMode; config: BillingConfig | null; className?: string; action?: ReactNode }) {
+/**
+ * Honest note while nothing can be bought: no cloud / no Stripe / no functions (`mode` off / closed: everything is unlocked), or Stripe
+ * is set up but the operator's legal texts are missing (`mode` open, `purchaseOpen` false: the plan gates apply, only the purchase is shut).
+ * `legalNote={false}`: the caller names the legal reason itself (the order window).
+ */
+export function ClosedNotice({ mode, config, className, action, legalNote = true }: { mode: BillingMode; config: BillingConfig | null; className?: string; action?: ReactNode; legalNote?: boolean }) {
   const reduced = useReducedFx();
-  if (mode === "open") return null;
-  const text = mode === "off" ? BILLING.offNoCloud : config?.reason === "functions_missing" ? BILLING.functionsMissing : BILLING.closedText;
+  const legal = mode === "open" && !purchaseOpenOf(config, mode).open;
+  if (mode === "open" && (!legal || !legalNote)) return null;
+  const title = legal ? BILLING.legalClosedTitle : mode === "off" ? "Keine Abos in dieser Version" : BILLING.closedTitle;
+  const text = legal ? BILLING.legalClosedText : mode === "off" ? BILLING.offNoCloud : config?.reason === "functions_missing" ? BILLING.functionsMissing : BILLING.closedText;
   return (
     <motion.div
       role="note"
@@ -88,7 +94,7 @@ export function ClosedNotice({ mode, config, className, action }: { mode: Billin
         <span className="fx-ping bg-warn" />
       </span>
       <span className="min-w-0 flex-1 text-[13px] leading-snug">
-        <strong className="font-semibold text-fg">{mode === "off" ? "Keine Abos in dieser Version" : BILLING.closedTitle}</strong>
+        <strong className="font-semibold text-fg">{title}</strong>
         <span className="text-mute"> – {text}</span>
       </span>
       {action}

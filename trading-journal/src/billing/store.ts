@@ -353,7 +353,8 @@ export function requestOrder(intent: CheckoutIntent): void {
   const s = useBilling.getState();
   const gate = purchaseOpenOf(s.config, currentMode());
   if (!gate.open) {
-    pushToast({ kind: "info", title: BILLING.closedTitle, detail: gate.blockedBy.includes("legal") && !gate.blockedBy.includes("stripe") ? BILLING.legalClosedText : BILLING.closedText });
+    const legalOnly = gate.blockedBy.includes("legal") && !gate.blockedBy.includes("stripe");
+    pushToast({ kind: "info", title: legalOnly ? BILLING.legalClosedTitle : BILLING.closedTitle, detail: legalOnly ? BILLING.legalClosedText : BILLING.closedText });
     return;
   }
   if (!sessionUserId()) {

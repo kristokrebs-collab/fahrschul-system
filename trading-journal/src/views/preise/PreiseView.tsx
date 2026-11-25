@@ -132,7 +132,7 @@ export function PreiseView({ className }: PreiseViewProps) {
           ) : undefined
         }
       />
-      {mode !== "open" && <ClosedNotice mode={mode} config={config} />}
+      <ClosedNotice mode={mode} config={config} />
       <RefBanner />
       <Cell index={0}>
         <PricingHero />

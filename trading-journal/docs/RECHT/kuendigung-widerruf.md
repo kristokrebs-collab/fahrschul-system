@@ -40,4 +40,4 @@ Zwei getrennte, nicht vorangekreuzte Kästchen in der Bestellübersicht (AGB / W
 
 ## Button-Beschriftung bei Stripe
 
-Der Button der Bestellübersicht heißt genau „Zahlungspflichtig bestellen“. Stripes eigener Button lässt sich in Checkout nicht auf diesen Wortlaut setzen (`submit_type: "pay"`, bei Testphase „Testversion starten“). Die App setzt deshalb `custom_text.submit` neben den Button („Mit dem Klick auf den Button gibst du eine zahlungspflichtige Bestellung ab …“). Ob das genügt, ist Anwaltsfrage 7.
+Der Button der Bestellübersicht heißt genau „Zahlungspflichtig bestellen“. Stripes eigener Button lässt sich in Checkout nicht auf diesen Wortlaut setzen (im Abo-Modus heißt er „Abonnieren“, bei Testphase „Testversion starten“; `submit_type` ist dort von Stripe nicht erlaubt). Die App setzt deshalb `custom_text.submit` neben den Button („Mit dem Klick auf den Button gibst du eine zahlungspflichtige Bestellung ab …“). Ob das genügt, ist Anwaltsfrage 7.

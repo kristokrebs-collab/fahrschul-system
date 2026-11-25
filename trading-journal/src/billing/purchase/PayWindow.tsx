@@ -503,7 +503,7 @@ export function PayWindow() {
               </p>
               {!gate.open ? (
                 <div className="pw-abs" style={at(ROWS.holderLabel)}>
-                  <ClosedNotice mode={mode} config={config} />
+                  <ClosedNotice mode={mode} config={config} legalNote={false} />
                   <p className="pw-sub mt-2" data-testid="order-closed">
                     {gate.blockedBy.includes("legal") ? ORDER.closedLegal : ORDER.closedStripe}
                   </p>

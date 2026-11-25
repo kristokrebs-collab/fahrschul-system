@@ -55,10 +55,11 @@ export function PlanCard({ className, onNavigate, usage }: PlanCardProps) {
       <Card title={PLAN_CARD.title} className={cn("h-full", className)} action={signedIn && mode === "open" ? <StatusBadge sub={sub} plan={plan} /> : null}>
         {mode === "closed" ? (
           <ClosedNotice mode={mode} config={config} />
-        ) : !signedIn ? (
-          <SignedOut onNavigate={onNavigate} />
         ) : (
-          <Current plan={plan} sub={sub} onNavigate={onNavigate} usage={usage} />
+          <div className="grid gap-3">
+            {!sub && <ClosedNotice mode={mode} config={config} />}
+            {!signedIn ? <SignedOut onNavigate={onNavigate} /> : <Current plan={plan} sub={sub} onNavigate={onNavigate} usage={usage} />}
+          </div>
         )}
       </Card>
     </div>

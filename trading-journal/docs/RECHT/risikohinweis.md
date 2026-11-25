@@ -4,7 +4,7 @@
 
 **Keine professionelle Finanzberatung.** Dieses Trading-Journal ist ein Werkzeug zur Selbstkontrolle und Auswertung eigener Trades. Es ist keine Anlageberatung, keine Anlageempfehlung, keine Aufforderung zum Kauf oder Verkauf und kein Angebot. Es führt keine Order aus.
 
-Kurzfassung (Konstante `RISK_SHORT`):
+Kurzfassung:
 
 > Handel mit Hebelprodukten kann zum Totalverlust führen. Simulationen sind keine Prognose. Keine professionelle Finanzberatung.
 

@@ -381,6 +381,22 @@ describe("management (Konto → Abo verwalten)", () => {
     expect(within(sheet).getByTestId("manage-switch")).toHaveTextContent("Auf jährlich wechseln");
   });
 
+  it("in the trial the sheet warns that a plan change ends the trial and bills at once (seen in the real Stripe portal); not otherwise", async () => {
+    useBilling.setState({ config: CONFIG, account: account({ ...SUB, status: "trialing" }) });
+    wrap();
+    act(() => openManage());
+    const sheet = await screen.findByTestId("manage-sheet");
+    expect(within(sheet).getByTestId("manage-trial-switch-note")).toHaveTextContent("beendet die Testphase");
+  });
+
+  it("outside the trial there is no such warning", async () => {
+    useBilling.setState({ config: CONFIG, account: account(SUB) });
+    wrap();
+    act(() => openManage());
+    const sheet = await screen.findByTestId("manage-sheet");
+    expect(within(sheet).queryByTestId("manage-trial-switch-note")).toBeNull();
+  });
+
   it("after the 14 days the withdraw button is gone (the public page still answers 'late')", async () => {
     useBilling.setState({ config: CONFIG, account: account({ ...SUB, startedAt: new Date(Date.now() - 20 * 86_400_000).toISOString() }) });
     wrap();

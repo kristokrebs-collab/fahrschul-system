@@ -244,6 +244,12 @@ function fakeStripe(): FakeStripe {
         f.updates.push({ id, params });
         const s = f.subs.get(id)!;
         const next = { ...s } as Stripe.Subscription & Record<string, unknown>;
+        // real Stripe: "Received both cancel_at_period_end and cancel_at parameters. Please pass in only one."
+        if (params.cancel_at_period_end !== undefined && params.cancel_at !== undefined) throw Object.assign(new Error("both cancel params"), { type: "StripeInvalidRequestError" });
+        if (params.cancel_at === "") {
+          next.cancel_at_period_end = false;
+          next.cancel_at = null;
+        }
         if (params.cancel_at_period_end !== undefined) {
           next.cancel_at_period_end = params.cancel_at_period_end;
           next.cancel_at = params.cancel_at_period_end ? NOW_S + 30 * 86400 : null;
@@ -516,10 +522,14 @@ describe("success / cancel URLs: this site's origin only", () => {
 });
 
 describe("the button text beside Stripe's (§ 312j Abs. 3 BGB)", () => {
-  it("submit_type pay + a custom text that says the order creates a payment obligation, the renewal and the cancellation", async () => {
+  it("a custom text that says the order creates a payment obligation, the renewal and the cancellation – and NO submit_type (Stripe refuses it in subscription mode)", async () => {
     await checkout(order());
     const p = stripe.sessions[0]!.params;
-    expect(p.submit_type).toBe("pay");
+    // real Stripe answers 400 "You can not pass `submit_type: 'pay'` in `subscription` mode" (found by the real sandbox order, Runde 13): never send it
+    expect(p.mode).toBe("subscription");
+    expect(p).not.toHaveProperty("submit_type");
+    // the amount on Stripe's page is the EUR amount of the order sheet, not a converted one (Adaptive Pricing off)
+    expect(p.adaptive_pricing).toEqual({ enabled: false });
     const submit = p.custom_text?.submit;
     const text = submit && typeof submit === "object" ? submit.message : "";
     expect(text).toMatch(/zahlungspflichtige Bestellung/);
