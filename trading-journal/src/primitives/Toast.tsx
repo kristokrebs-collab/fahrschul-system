@@ -313,7 +313,7 @@ function IslandCard({ note, queued, reduced, onMilestone, onDismiss }: IslandCar
         onClick={() => onDismiss(null)}
         whileTap={reduced ? undefined : { scale: pressScale.label, transition: spring.press }}
         layoutRoot
-        className="relative flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-800 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/calc(0.35*var(--shade,1)))]"
+        className="gl-float relative flex items-center gap-3 overflow-hidden pl-2 pr-4 text-left shadow-[var(--gl-in),0_18px_40px_rgb(0_0_0/calc(0.35*var(--shade,1)))]"
         style={{ maxWidth: "calc(100vw - 32px)" }}
         // motion-exception: toast-island — width/height/borderRadius animate as in the bundle (44×44 → auto×50), Plan 3.2 rule 1.
         initial={{ width: 44, height: 44, borderRadius: radius.toastStart, opacity: 0, y: initialLane === "top" ? -24 : 24, scale: 0.6 }}
@@ -374,7 +374,7 @@ function IslandCard({ note, queued, reduced, onMilestone, onDismiss }: IslandCar
             note.action!.onClick();
             onDismiss(null);
           }}
-          className="h-[50px] shrink-0 rounded-full border border-line-2 bg-ink-800 px-4 text-[13px] font-medium text-fg shadow-[0_18px_40px_rgb(0_0_0/calc(0.35*var(--shade,1)))] transition-colors hover:bg-ink-750 pointer-coarse:min-h-11"
+          className="gl-float h-[50px] shrink-0 rounded-full px-4 text-[13px] font-medium text-fg shadow-[var(--gl-in),0_18px_40px_rgb(0_0_0/calc(0.35*var(--shade,1)))] transition-shadow duration-150 active:shadow-(--gl-dn) pointer-coarse:min-h-11"
           initial={reduced ? false : { opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={reduced ? instant : { ...spring.pop, delay: tween.toastText.delay }}

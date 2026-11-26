@@ -32,6 +32,29 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Liquid Glass (Runde 13): the lenses of `.lg` / `--gl-blur` (src/styles/shell-motion.css), used as `backdrop-filter: url(#…)` where the
+         browser can (Chromium, `html[data-lg]`). One displacement map (red = x, green = y, neutral in the middle, bending towards the centre at
+         the rim), stretched to the element: `lg` rest, `lg2` pressed (stronger), `lgd` with a red fringe at the rim (dispersion). -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="lg" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+          <feImage x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="m" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='x'%3E%3Cstop stop-color='%23f00'/%3E%3Cstop offset='.09' stop-color='%23800000'/%3E%3Cstop offset='.91' stop-color='%23800000'/%3E%3Cstop offset='1' stop-color='%23000'/%3E%3C/linearGradient%3E%3ClinearGradient id='y' x2='0' y2='1'%3E%3Cstop stop-color='%230f0'/%3E%3Cstop offset='.32' stop-color='%23008000'/%3E%3Cstop offset='.68' stop-color='%23008000'/%3E%3Cstop offset='1' stop-color='%23000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23x)'/%3E%3Crect width='100' height='100' fill='url(%23y)' style='mix-blend-mode:screen'/%3E%3C/svg%3E" />
+          <feDisplacementMap in="SourceGraphic" in2="m" scale="14" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <filter id="lg2" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+          <feImage x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="m" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='x'%3E%3Cstop stop-color='%23f00'/%3E%3Cstop offset='.09' stop-color='%23800000'/%3E%3Cstop offset='.91' stop-color='%23800000'/%3E%3Cstop offset='1' stop-color='%23000'/%3E%3C/linearGradient%3E%3ClinearGradient id='y' x2='0' y2='1'%3E%3Cstop stop-color='%230f0'/%3E%3Cstop offset='.32' stop-color='%23008000'/%3E%3Cstop offset='.68' stop-color='%23008000'/%3E%3Cstop offset='1' stop-color='%23000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23x)'/%3E%3Crect width='100' height='100' fill='url(%23y)' style='mix-blend-mode:screen'/%3E%3C/svg%3E" />
+          <feDisplacementMap in="SourceGraphic" in2="m" scale="24" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <filter id="lgd" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+          <feImage x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="m" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='x'%3E%3Cstop stop-color='%23f00'/%3E%3Cstop offset='.09' stop-color='%23800000'/%3E%3Cstop offset='.91' stop-color='%23800000'/%3E%3Cstop offset='1' stop-color='%23000'/%3E%3C/linearGradient%3E%3ClinearGradient id='y' x2='0' y2='1'%3E%3Cstop stop-color='%230f0'/%3E%3Cstop offset='.32' stop-color='%23008000'/%3E%3Cstop offset='.68' stop-color='%23008000'/%3E%3Cstop offset='1' stop-color='%23000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23x)'/%3E%3Crect width='100' height='100' fill='url(%23y)' style='mix-blend-mode:screen'/%3E%3C/svg%3E" />
+          <feDisplacementMap in="SourceGraphic" in2="m" scale="22" xChannelSelector="R" yChannelSelector="G" result="r" />
+          <feDisplacementMap in="SourceGraphic" in2="m" scale="14" xChannelSelector="R" yChannelSelector="G" result="g" />
+          <feColorMatrix in="r" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="r1" />
+          <feColorMatrix in="g" values="0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" result="g1" />
+          <feBlend in="r1" in2="g1" mode="screen" />
+        </filter>
+      </defs>
+    </svg>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

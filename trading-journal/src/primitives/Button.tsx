@@ -14,16 +14,18 @@ export type ButtonSize = "sm" | "md";
 
 // Focus: the global outline is swapped for a pre-rendered ring (`--ring-glow-btn`, tokens.css / themes.css), no transition.
 export const buttonBase =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border font-semibold transition-colors duration-200 focus-visible:outline-none! focus-visible:shadow-(--ring-glow-btn) disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border font-semibold transition-[color,background-color,border-color,box-shadow] duration-200 focus-visible:outline-none! focus-visible:shadow-(--ring-glow-btn) disabled:cursor-not-allowed disabled:opacity-50";
 export const buttonVariant: Record<ButtonVariant, string> = {
-  // glass (Runde 13, `.glass` in shell-motion.css): a face lit from the top, a 1 px rim light above → dark below, a thin inner edge; hover brightens the fill
+  // liquid glass (Runde 13, `.glass` in shell-motion.css): lit from the top left – a specular rim (cool above, a warm counter-light below right), an inner
+  // light edge and a shade that give it thickness; pressed, the light moves to the lower edge. No lens by default: a page holds dozens of these on flat
+  // cards (nothing to bend, but a backdrop layer each – measured slower under load); a button that floats over imagery adds `lg` itself
   secondary: "glass bg-white/[0.02] text-fg hover:bg-white/[0.07]",
-  // no rim, no fill until hover – then the glass's inner edge
-  ghost: "border-transparent text-mute hover:bg-white/[0.06] hover:text-fg hover:shadow-(--gl-in)",
+  // no rim, no fill until hover – then the glass's inner edge; pressed like the glass
+  ghost: "border-transparent text-mute hover:bg-white/[0.06] hover:text-fg hover:shadow-(--gl-in) active:shadow-(--gl-dn)",
   // the one main action of a card: its sheen and a soft glow under it in the veil ink (white on ink, ink on paper)
   primary:
-    "border-transparent bg-gradient-to-b from-white to-(--color-primary-btn-to) text-ink-950 shadow-[var(--shadow-btn-sheen),0_6px_22px_-10px_rgb(var(--veil-rgb,255_255_255)/0.45)] hover:to-white focus-visible:shadow-[var(--shadow-btn-sheen),var(--ring-glow-btn)]",
-  danger: "border-(--color-danger)/40 bg-(--color-danger)/10 text-(--color-danger-text) hover:bg-(--color-danger)/20 focus-visible:shadow-(--ring-glow-btn-danger)",
+    "border-transparent bg-gradient-to-b from-white to-(--color-primary-btn-to) text-ink-950 shadow-[var(--shadow-btn-sheen),0_6px_22px_-10px_rgb(var(--veil-rgb,255_255_255)/0.45)] hover:to-white active:shadow-[inset_0_3px_8px_-2px_rgb(0_0_0/0.45),inset_0_-1px_0_rgb(255_255_255/0.6)] focus-visible:shadow-[var(--shadow-btn-sheen),var(--ring-glow-btn)]",
+  danger: "border-(--color-danger)/40 bg-(--color-danger)/10 text-(--color-danger-text) hover:bg-(--color-danger)/20 active:shadow-(--gl-dn) focus-visible:shadow-(--ring-glow-btn-danger)",
 };
 export const buttonSize: Record<ButtonSize, string> = { md: "px-4 py-2 text-[13px]", sm: "px-3 py-1.5 text-xs" };
 

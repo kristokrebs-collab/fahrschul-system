@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -17,7 +20,7 @@ import {
   type ViewportInfo,
 } from "@/app/layerDiag";
 import LayerDiagnostics, { DIAG_TITLE, placeLabels, PROBE_H } from "@/app/LayerDiagnostics";
-import { isSafeFx, setSafeFx, wantsSafeFx } from "@/app/pwa";
+import { isSafeFx, LENS_ATTR, setSafeFx, wantsLens, wantsSafeFx } from "@/app/pwa";
 
 const SAMSUNG = "Mozilla/5.0 (Linux; Android 14; SM-X916B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Safari/537.36";
 const CHROME = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
@@ -218,5 +221,32 @@ describe("Samsung-Internet-safe effects", () => {
     expect(document.documentElement.hasAttribute("data-safe-fx")).toBe(true);
     setSafeFx(false);
     expect(document.documentElement.hasAttribute("data-safe-fx")).toBe(false);
+  });
+
+  it("the glass lenses (Runde 13): Chromium only, never with the safe effects; ?lg=1 / ?lg=0 force them", () => {
+    const SAFARI = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
+    const FIREFOX = "Mozilla/5.0 (X11; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0";
+    const IOS_CHROME = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0.6367.88 Mobile/15E148 Safari/604.1";
+    expect(wantsLens(CHROME, "")).toBe(true);
+    expect(wantsLens(SAFARI, "")).toBe(false);
+    expect(wantsLens(FIREFOX, "")).toBe(false);
+    expect(wantsLens(IOS_CHROME, "")).toBe(false);
+    // Samsung Internet is Chromium, but runs the safe effects: no backdrop filter at all
+    expect(wantsLens(SAMSUNG, "")).toBe(false);
+    expect(wantsLens(CHROME, "?safefx=1")).toBe(false);
+    expect(wantsLens(CHROME, "?lg=0")).toBe(false);
+    expect(wantsLens(SAFARI, "?lg=1")).toBe(true);
+    // switching the safe effects on takes the lenses away
+    document.documentElement.setAttribute(LENS_ATTR, "");
+    setSafeFx(true);
+    expect(document.documentElement.hasAttribute(LENS_ATTR)).toBe(false);
+    setSafeFx(false);
+  });
+
+  it("index.html carries the three lenses once, built on one displacement map", () => {
+    const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../index.html"), "utf8");
+    for (const id of ["lg", "lg2", "lgd"]) expect(html.match(new RegExp(`<filter id="${id}"`, "g")) ?? []).toHaveLength(1);
+    expect(html.match(/<feDisplacementMap /g) ?? []).toHaveLength(4);
+    expect(new Set(html.match(/<feImage [^>]*href="data:image\/svg\+xml,[^"]+"/g) ?? []).size).toBe(1);
   });
 });
