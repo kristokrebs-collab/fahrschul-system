@@ -367,6 +367,91 @@ test.describe("Kaufstrecke", () => {
     expect(bill.checkouts).toHaveLength(1);
   });
 
+  test("Bezahlfenster Glas / Flach (Runde 14): „Flach“ und ohne Attribut wie bisher; „Glas“: Unschärfe nur am Fensterkörper im Querformat, Abdunklung deckend, „Heute fällig“ im Bild, nichts abgeschnitten; data-safe-fx deckend", async ({ page }, info) => {
+    const { errors } = await setup(page);
+    await openRoute(page, PREISE, "Preise", { timeout: 30_000 });
+    await signInHeader(page);
+    // Team, 3 seats: the longest summary (plan, seats, trial, cancellation, tax)
+    const team = page.getByTestId("plan-team");
+    await team.scrollIntoViewIfNeeded();
+    await team.getByRole("button", { name: "Einen Sitz mehr" }).click();
+    await page.getByTestId("cta-team").click();
+    const sheet = page.getByTestId("order-sheet");
+    await expect(sheet).toBeVisible({ timeout: 20_000 });
+    const phone = info.project.name === "mobile";
+    const read = () =>
+      page.evaluate(() => {
+        const blur = (sel: string) => {
+          const el = document.querySelector(sel);
+          if (!el) return "missing";
+          const cs = getComputedStyle(el);
+          return cs.backdropFilter || (cs as unknown as { webkitBackdropFilter?: string }).webkitBackdropFilter || "none";
+        };
+        const rect = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
+        const sum = rect(".pw-summary");
+        const total = rect('[data-testid="order-today"]');
+        const flow = document.querySelector(".pw-flow")!;
+        const win = rect(".pw-win");
+        const pane = rect(".pw-right");
+        const details = rect('[data-testid="order-details"]');
+        return {
+          win: blur(".pw-win"),
+          inner: [".pw-dim", ".pw-head", ".pw-right", ".pw-summary", ".pc-face", ".pw-form"].map(blur),
+          close: blur(".pw-close"),
+          winAlpha: getComputedStyle(document.querySelector(".pw-win")!).getPropertyValue("--gw-thin").trim(),
+          totalInSummary: total.top >= sum.top - 1 && total.bottom <= sum.bottom + 1,
+          totalInWindow: total.bottom <= win.bottom + 1 && total.top >= win.top,
+          flowFits: flow.scrollHeight <= flow.clientHeight + 1,
+          paneInside: pane.width === 0 || (pane.right <= win.right && pane.bottom <= win.bottom && pane.left >= win.left),
+          detailsInPane: pane.width === 0 || details.bottom <= pane.bottom,
+          paneRadius: getComputedStyle(document.querySelector(".pw-right")!).borderTopLeftRadius,
+          totalPosition: getComputedStyle(document.querySelector(".pw-total")!).position,
+        };
+      });
+    // flat (no attribute, and "off"): the window of before – no filter anywhere, the measured rows, the square right column
+    for (const v of [null, "off"]) {
+      await page.evaluate((x) => (x ? document.documentElement.setAttribute("data-glass", x) : document.documentElement.removeAttribute("data-glass")), v);
+      const flat = await read();
+      expect([flat.win, flat.close, ...flat.inner], `flat (${v})`).toEqual(["none", "none", "none", "none", "none", "none", "none", "none"]);
+      expect(flat.winAlpha, `flat (${v})`).toBe("");
+      expect(flat.paneRadius, `flat (${v})`).toBe("0px");
+      expect(flat.totalPosition, `flat (${v})`).toBe("static");
+    }
+    // Runde 14: the glass look is a setting (`html[data-glass]`, set by the app; here from outside) – this test is about „Glas“
+    await page.evaluate(() => document.documentElement.setAttribute("data-glass", "on"));
+    const glass = await read();
+    expect(glass.totalPosition).toBe(phone ? "static" : "sticky");
+    expect(glass.inner, "no blur on the dim, the header, the panes or the card").toEqual(["none", "none", "none", "none", "none", "none"]);
+    if (phone) {
+      // the phone window is the whole screen: nothing behind it, so no filter and a solid ground
+      expect(glass.win).toBe("none");
+      expect(glass.winAlpha).toBe("0%");
+    } else {
+      expect(glass.win).toContain("blur(26px)");
+      expect(glass.close).not.toBe("none");
+      expect(glass.flowFits, "the footer of the form column needs no scrolling").toBe(true);
+      expect(glass.totalInSummary, "„Heute fällig“ sticks to the foot of the summary").toBe(true);
+      expect(glass.paneInside).toBe(true);
+      expect(glass.detailsInPane).toBe(true);
+    }
+    if (!phone) expect(glass.totalInWindow).toBe(true);
+    await expect(page.getByTestId("order-today")).toHaveText(/€/);
+    // the statutory button and both boxes are what they were
+    await expect(sheet.getByRole("button", { name: "Zahlungspflichtig bestellen", exact: true })).toBeVisible();
+    await expect(sheet.getByRole("checkbox")).toHaveCount(2);
+    for (const box of await sheet.getByRole("checkbox").all()) await expect(box).not.toBeChecked();
+    await expectNoHorizontalScroll(page);
+    // text on the glass keeps its contrast (axe, dark and light)
+    await axe(page, '[data-testid="order-sheet"]', "Bezahlfenster (Glas, dunkel)");
+    await page.evaluate(() => (document.documentElement.dataset.theme = "light"));
+    await axe(page, '[data-testid="order-sheet"]', "Bezahlfenster (Glas, hell)");
+    await page.evaluate(() => document.documentElement.setAttribute("data-safe-fx", ""));
+    const safe = await read();
+    expect(safe.win).toBe("none");
+    expect(safe.winAlpha).toBe("0%");
+    expect(errors).toEqual([]);
+  });
+
   for (const theme of ["dark", "light"] as const) {
     test(`Barrierefreiheit (axe, ${theme}): Tarifkarten, Tarif im Detail, Bestellübersicht, Kündigungsseite`, async ({ page }) => {
       await setup(page);

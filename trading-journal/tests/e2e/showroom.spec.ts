@@ -246,11 +246,13 @@ test.describe("Showroom", () => {
     expect(appOnly(errors), errors.join("\n")).toEqual([]);
   });
 
-  test("Bezahlen (Paket V): Premium jährlich → Bezahlfenster mit Demo-Feldern → Karte füllt sich, wendet bei der Prüfziffer → fliegt in die Mitte → „Testphase läuft“ erst nach dem Server → Tarif aktiv", async ({ page }) => {
+  test("Bezahlen (Paket V): Premium jährlich → Bezahlfenster mit Demo-Feldern → Karte füllt sich, wendet bei der Prüfziffer → fliegt in die Mitte → „Testphase läuft“ erst nach dem Server → Tarif aktiv", async ({ page }, info) => {
     const errors = collectErrors(page);
     const foreign = foreignRequests(page);
     await open(page);
     await waitSignedIn(page);
+    // Runde 14: the glass look is a setting (`html[data-glass]`, set by the app; here from outside) – the flow below runs in „Glas“
+    await page.evaluate(() => document.documentElement.setAttribute("data-glass", "on"));
     await jump(page, "order");
     const win = page.getByTestId("order-sheet");
     await expect(win).toBeVisible({ timeout: 40_000 });
@@ -275,6 +277,16 @@ test.describe("Showroom", () => {
     await page.getByTestId("pay-holder").focus();
     await expect(flipper).toHaveAttribute("data-flipped", "0");
     await expectNoHorizontalScroll(page);
+    // Runde 14 (Glas): with all four fields the footer of the form needs no scrolling on the desktop window, „Heute fällig“ stays in the summary
+    if (info.project.name === "desktop") {
+      const fit = await page.evaluate(() => {
+        const flow = document.querySelector(".pw-flow")!;
+        const sum = document.querySelector(".pw-summary")!.getBoundingClientRect();
+        const total = document.querySelector('[data-testid="order-today"]')!.getBoundingClientRect();
+        return { flow: flow.scrollHeight <= flow.clientHeight + 1, total: total.top >= sum.top && total.bottom <= sum.bottom + 1 };
+      });
+      expect(fit).toEqual({ flow: true, total: true });
+    }
     for (const box of await win.getByRole("checkbox").all()) await box.check();
     await page.getByTestId("order-pay").click();
     // the card lifts (the Animations API sees the 300 ms flight on the measured curve), the status shows in place
@@ -282,6 +294,17 @@ test.describe("Showroom", () => {
     expect(lift.length).toBe(1);
     await expect(win).toHaveAttribute("data-pay-phase", "confirmed", { timeout: 30_000 });
     await expect(page.getByTestId("pay-status-title")).toHaveText(/Testphase läuft|Bezahlt/);
+    // the quiet success slip (Runde 14): the status stands UNDER the lifted card (on a tall phone the tick used to lie on it), all of it on screen
+    await page.waitForTimeout(700);
+    const stage = await page.evaluate(() => {
+      const card = document.querySelector('[data-testid="pay-card"] .pc-front')!.getBoundingClientRect();
+      const title = document.querySelector('[data-testid="pay-status-title"]')!.getBoundingClientRect();
+      const tick = document.querySelector(".pw-ok")!.getBoundingClientRect();
+      const done = document.querySelector('[data-testid="pay-done"]')!.getBoundingClientRect();
+      const slip = getComputedStyle(document.querySelector('[data-testid="pay-status"]')!, "::before");
+      return { tickUnderCard: tick.top >= card.bottom - 1, titleUnderCard: title.top >= card.bottom, doneOnScreen: done.bottom <= window.innerHeight && done.top >= 0, slip: slip.content !== "none" && slip.borderTopStyle === "solid" };
+    });
+    expect(stage).toEqual({ tickUnderCard: true, titleUnderCard: true, doneOnScreen: true, slip: true });
     await page.getByTestId("pay-done").click();
     await expect(win).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => localStorage.getItem("tj2-billing") ?? "")).toContain('"plan":"premium"');
@@ -308,6 +331,11 @@ test.describe("Showroom", () => {
     await expect(win).toHaveAttribute("data-pay-phase", "failed", { timeout: 20_000 });
     await expect(page.getByTestId("pay-number-error")).toContainText("abgelehnt");
     await expect(page.getByTestId("pay-status-title")).not.toHaveText(/Bezahlt|Testphase läuft/);
+    // no success slip in the failed state (it belongs to the server-confirmed state alone) – in „Glas“ as in „Flach“ (this test runs flat)
+    expect(await page.getByTestId("pay-status").evaluate((el) => getComputedStyle(el, "::before").content)).toBe("none");
+    await page.evaluate(() => document.documentElement.setAttribute("data-glass", "on"));
+    expect(await page.getByTestId("pay-status").evaluate((el) => getComputedStyle(el, "::before").content)).toBe("none");
+    await page.evaluate(() => document.documentElement.removeAttribute("data-glass"));
     // the card is back at its place (the form usable again)
     await expect(page.getByTestId("pay-holder")).toBeEditable({ timeout: 5_000 });
     // another card that passes the check but whose payment fails afterwards: nothing is shown as paid
