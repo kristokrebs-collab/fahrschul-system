@@ -472,6 +472,23 @@ Die Frost-Kristallisation des Prototyps (`prototypes/trading-journal-frost`, nur
 
 Belege, dass nichts erfunden ist: `tests/unit/views.labor.search.test.tsx` (die Szene hält dieselben Arrays wie das Ergebnis, die Blitze sind die Wechsel des laufenden Bestwerts, die gezeichneten Punkte liegen auf den Werten der Kurven). Die Wiedergabe zeigt eine fertig gerechnete Suche; sie ist eine Darstellung, kein Live-Rechnen.
 
+## Runde 13 – Paket H: Scanner „Wer bricht aus?“ und die „Rechnung“ des Rechners (Zusatz, keiner der 177 Punkte)
+
+Vorlage war der Prototyp `prototypes/scanner-risiko` (Konzept). Gebaut ist er mit den Tokens und Bausteinen der App; die Zeilen oben bleiben unverändert.
+Bewusst NICHT übernommen: die 4,4 Sekunden lange Radar-Wiedergabe des Prototyps, die fertige Ergebnisse nacheinander „aufdeckt“ (eine vorgetäuschte
+Rechenzeit), die Haptik (`navigator.vibrate`) und Mint als zweiter Akzent (erfüllt = Datenfarbe Grün, der eine rote Punkt bleibt Signalrot).
+
+| Bewegung | Wo | Zustand |
+|---|---|---|
+| Zwölf Plätze bauen sich nacheinander auf (45 ms je Karte, ease-out, 14 px von unten); die Karte füllt sich, wenn IHRE Kerzen da sind (kein Abspielen) | `src/views/markt/breakout/breakout.css` (`bo-in`, `bo-fade`), `BreakoutSection.tsx` | neu eingebaut, nur CSS (opacity / transform), feste Kartenhöhe 232 px |
+| Kürzel entschlüsselt sich einmal (`TextScramble`), die drei Gründe springen einzeln an (45 ms, Feder mit leichtem Überschwinger), der rote Punkt setzt sich auf den Schluss der Ausbruchskerze | `BreakoutSection.tsx`, `MiniCandles.tsx`, `breakout.css` (`bo-pop`) | neu eingebaut, vorhandener Baustein `src/motion/TextScramble.tsx` |
+| Radar dreht nur, solange wirklich geladen wird; Zähler „Geprüft 7/12“ und „A+ / A“ laufen auf den echten Stand | `RadarSweep` (erklärte Ausnahme `radar-sweep`), `MotionNumber` | vorhandene Bausteine, kein Loop im Ruhezustand |
+| Nach dem Lauf sortieren sich die Karten per Feder nach Note (`layout="position"`, `spring.layout`); was keinen Ausbruch hat, tritt zurück, die Karte mit den meisten Gründen bekommt Rand und Marke | `BreakoutSection.tsx`, `breakout.css` (`[data-done]`, `[data-best]`) | neu eingebaut, nur transform / opacity; keine Belohnung, kein Konfetti |
+| Rechnung: Posten bauen sich nacheinander auf (45 ms), die Größe läuft mit `MotionNumber` auf den neuen Wert, Preisleiter und Hebel-Balken federn per transform | `src/views/risiko/CalcBill.tsx`, `bill.css` (`bl-in`) | neu eingebaut; feste Mindesthöhe (1096 px bei 390 px Breite, 722 px ab 640 px), der Platzhalter in `CalculatorCard.tsx` reserviert dieselbe |
+| Reduzierte Bewegung (`prefers-reduced-motion` und die Einstellung „Reduziert“): Endzustand sofort, kein Sortierflug, kein Radar | `base.css` (Dauer 0), `useReducedFx` (`layout={false}`) | geprüft in `tests/e2e/breakout.spec.ts` („reduzierte Bewegung“) |
+
+Layout: der Block hat in jedem Zustand dieselbe Höhe (`src/views/markt/breakout/reserve.ts`); `tests/e2e/layout-shift.spec.ts` misst den Lauf (Verschiebungen im Block ≤ 0,02, Höhe und alle zwölf Plätze unverändert) und das Nachladen der Rechnung.
+
 ## Was nicht belegt werden konnte
 
 - **Die Originale der Quelle R** (46 Punkte, mit Port oder ohne): Die Dateien der Sammlung `pulse-motion` und der Kataloge (Uiverse, Magic UI, Hyper-Stack) liegen nicht im Bestand. Ein „vorhanden“ in R-Zeilen belegt nur, dass die App einen Port hat, nicht dass er der Vorlage gleicht.

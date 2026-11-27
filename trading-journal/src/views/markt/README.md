@@ -214,3 +214,14 @@ Tests: `tests/unit/views.markt.flipExplainer.test.tsx`, `tests/e2e/flip-explaine
 ## Etappe 1c (kürzere Seite)
 - Sechs Karten stehen eingeklappt in einer Zeile (`Fold`, „Mehr anzeigen“): Squeeze, Preis- & RSI-Struktur, Ähnliche Situationen, Alarme & Zustellprotokoll, Ereignisphasen (in `TermineSection`), Box-Einstellungen. Die `data-testid` der Karten bleiben im DOM; der Funktionsfinder öffnet die Karte beim Ansprung. Höhe bei 390 px: 21 273 → 11 200 px.
 
+## Ausbruch-Scanner „Wer bricht aus?“ (Runde 13, Paket H)
+
+Eigener Abschnitt „Ausbruch-Scanner“ (`data-section="breakout"`, vor „Beobachten“), Frost-Block als eigener Lazy-Chunk samt Stylesheet (`breakout/BreakoutSection.tsx`, `breakout/breakout.css`; die Erstladungs-CSS wuchs nicht). Platz bis dahin: `breakout/reserve.ts` (`PendingBlock`).
+
+- **Regel** (`src/domain/breakout/detect.ts`, rein): Spanne der ersten 30 Minuten einer Sitzung (New York 9:30 / London 8:00 Ortszeit) aus 5-Minuten-Kerzen; Ausbruch = erster Schluss einer geschlossenen Kerze außerhalb (derselbe `entryTimer` wie im Handelsplan), gesucht 240 Minuten; Volumen-Faktor gegen den Schnitt der 20 Kerzen davor (ab 1,5× bestätigt, ab 2× stark); Trend am EMA 50; Abstand zur Marke in % und ATR 14. Note A+ / A / B / C = Zahl der erfüllten Gründe, keine Gewinnaussage. Alle Schwellen stehen in `BREAKOUT_RULES` und unter „So wird erkannt“ auf der Seite.
+- **Daten** (`src/market/breakout/candles.ts`): zwölf feste USDT-Märkte, je eine Seite (499 Kerzen), Binance → EU-Proxy → Bybit; eigenes Budget (60 Gewicht je Minute). Quelle und Stand unter den Karten (`SourceStand`); fällt alles aus, steht der Grund da – nie Ersatzkerzen. Der erste Lauf startet erst, wenn der Block auf dem Bildschirm steht.
+- **Lauf** (`breakout/scanStore.ts`): drei Abrufe gleichzeitig; jede Karte füllt sich mit ihrer echten Antwort, der Zähler ist der echte Stand. Sitzungswechsel rechnet auf frischen Kerzen (60 s) neu, ohne Abruf.
+- **Keine Dark Patterns:** kein Orderknopf, kein „jetzt“, keine Belohnung; erfüllt kein Markt alle Gründe, sagt die Seite das. „In den Rechner übernehmen“ (`breakout/toCalculator.ts`) belegt im Rechner der Risiko-Seite nur Paar, Richtung, Einstieg (letzter Schluss) und Stop (andere Seite der Spanne, sonst 1,5 ATR) vor.
+- **Bewegung:** siehe `docs/ANIMATIONEN-MATRIX.md` (Runde 13 – Paket H). Feste Höhen überall.
+
+Tests: `tests/unit/breakout.detect.test.ts`, `tests/unit/breakout.source.test.ts`, `tests/unit/views.breakout.test.tsx`, `tests/e2e/breakout.spec.ts`, `tests/e2e/layout-shift.spec.ts`. Geprüft gegen Festkerzen (`tests/e2e/mocks/breakout.ts`, als Test-Daten beschriftet) und Attrappen, nicht gegen die echte Börse.

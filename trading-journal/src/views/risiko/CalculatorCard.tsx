@@ -12,7 +12,7 @@ import { chipClass } from "@/primitives/chip";
 import { SeeAlso } from "@/app/FeatureLinks";
 import { AnimatePresence, motion } from "motion/react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { boxTargetsFor, liquidationPrice, positionSize, rrCalc, rTargets, stopCandidates, symbolOf, type RiskLimits, type SizingResult } from "@/domain/risk";
+import { boxTargetsFor, liquidationPrice, positionSize, riskFraction, rrCalc, rTargets, stopCandidates, symbolOf, type RiskLimits, type RiskMode, type SizingError, type SizingResult } from "@/domain/risk";
 import { LAGE_STRUCTURE } from "@/domain/lage/compute";
 import { marketStructure } from "@/domain/signals/structure";
 import type { AccountId, Side } from "@/domain/types";
@@ -29,6 +29,7 @@ import { Button } from "@/primitives/Button";
 import { useShake } from "@/primitives/fieldFx";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
+import { RESERVE_CLASS, reserveStyle } from "@/primitives/Reserve";
 import { Segmented } from "@/primitives/Segmented";
 import { useUi } from "@/store/uiStore";
 import type { RiskBase } from "./hooks";
@@ -38,6 +39,8 @@ import { RISIKO } from "./strings";
 import { Metric, RiskCard, SEG_TOUCH, money, pct, priceText, qtyText } from "./ui";
 
 const S = RISIKO.calc;
+/** The "Rechnung" under the result (price ladder, cost share, minimum distance, step hint) – its own chunk with its stylesheet */
+const CalcBill = lazy(() => import("./CalcBill"));
 /** F65: the management plan (break-even, partial target, trailing) under the result – its own chunk, loaded when the card shows a result */
 const CalcManage = lazy(() => import("./CalcManage"));
 const ACC_OPTS = [
@@ -50,6 +53,14 @@ const SIDE_OPTS = [
 ];
 const SIDE_TONES = { long: "bg-win/15 border-win/30", short: "bg-loss/15 border-loss/30" };
 const RISK_CHIPS = [0.5, 1, 2];
+const MODE_OPTS: { v: RiskMode; label: string }[] = [
+  { v: "pct", label: "%" },
+  { v: "amount", label: "Betrag" },
+];
+/** the place of the "Rechnung" until its chunk is there: the block's own minimum height (`bill.css`) */
+const BILL_RESERVE = { base: 1096, sm: 722 };
+/** which field an input error belongs to */
+const ERROR_FIELD: Record<SizingError, "capital" | "risk" | "entry" | "stop"> = { capital: "capital", risk: "risk", entry: "entry", stop: "stop", side: "stop" };
 
 /** The value after it stopped changing for `tween.debounce` (typing does not cascade per key). */
 function useSettled<T>(value: T): T {
@@ -78,7 +89,8 @@ export interface CalcModel {
 export function calcModel(calc: CalcInputs, d: { account: AccountId; capital: number; riskPct: number; pair: string }, limits: RiskLimits): CalcModel {
   const account = calc.account ?? d.account;
   const capital = calc.capital.trim() ? parseInput(calc.capital) : d.capital;
-  const riskPct = (calc.riskPct.trim() ? parseInput(calc.riskPct) : d.riskPct * 100) / 100;
+  // risk as a share of the capital: typed in percent (empty = the trader's own rule) or as an amount (empty = nothing yet)
+  const riskPct = calc.riskMode === "amount" ? riskFraction("amount", parseInput(calc.riskAmount), capital) : calc.riskPct.trim() ? riskFraction("pct", parseInput(calc.riskPct), capital) : d.riskPct;
   const entry = parseInput(calc.entry);
   const stop = parseInput(calc.stop);
   const target = parseInput(calc.target);
@@ -169,7 +181,20 @@ export function CalculatorCard({ base }: { base: RiskBase }) {
     const p = priceMv.get();
     if (p > 0) set({ entry: toInput(p), pair: m.pair }, true);
   };
-  const error = !s.ok && (calc.entry.trim() || calc.stop.trim()) ? S.errors[s.error] : null;
+  // an error is said at its own field, as soon as that field (or entry and stop) holds something
+  const typed = { capital: calc.capital, risk: calc.riskMode === "amount" ? calc.riskAmount : calc.riskPct, entry: calc.entry, stop: calc.stop };
+  const errField = !s.ok ? ERROR_FIELD[s.error] : null;
+  const errShown = errField != null && !!(typed[errField].trim() || calc.entry.trim() || calc.stop.trim());
+  const errText = !s.ok && errShown ? (s.error === "risk" && calc.riskMode === "amount" ? S.errors.riskAmount : S.errors[s.error]) : null;
+  const errAt = (f: "capital" | "risk" | "entry" | "stop"): string | undefined => (errShown && errField === f && errText ? errText : undefined);
+  const amountMode = calc.riskMode === "amount";
+  const setMode = (riskMode: RiskMode) => {
+    if (riskMode === calc.riskMode) return;
+    // the same risk in the other unit, so the switch never changes the result
+    if (riskMode === "amount") set({ riskMode, riskAmount: s.ok ? toInput(s.riskAmount, 2) : calc.riskAmount });
+    else set({ riskMode, riskPct: s.ok ? toInput(m.riskPct * 100, 2) : calc.riskPct });
+  };
+  const targetWrong = s.ok && Number.isFinite(m.target) && m.target > 0 && !rr;
 
   const adopt = () => {
     if (!s.ok) return;
@@ -194,6 +219,7 @@ export function CalculatorCard({ base }: { base: RiskBase }) {
     });
   };
 
+  const prefillNote = useRiskUi((x) => x.prefillNote);
   const fieldIds = { pair: "rk-pair", capital: "rk-capital", risk: "rk-risk", entry: "rk-entry", stop: "rk-stop", target: "rk-target", lev: "rk-lev" };
   return (
     <RiskCard
@@ -219,33 +245,51 @@ export function CalculatorCard({ base }: { base: RiskBase }) {
           )}
         </div>
         {isLive && <LivePriceStand className="!text-[11.5px]" />}
+        {prefillNote && (
+          <p className="rounded-xl border border-line bg-white/[0.03] px-3 py-2 text-[12px] leading-relaxed text-mute" data-testid="risk-prefill-note">
+            {prefillNote}
+          </p>
+        )}
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Field label={S.pair} htmlFor={fieldIds.pair}>
             <Input id={fieldIds.pair} value={calc.pair} placeholder={m.pair} onChange={(e) => set({ pair: e.target.value })} autoComplete="off" spellCheck={false} />
           </Field>
-          <Field label={S.capital} htmlFor={fieldIds.capital} suffix={cur}>
-            <Input id={fieldIds.capital} numeric value={calc.capital} placeholder={toInput(base.settings.capital[m.account] ?? 0, 0)} onChange={(e) => set({ capital: e.target.value })} />
+          <Field label={S.capital} htmlFor={fieldIds.capital} suffix={cur} error={errAt("capital")}>
+            <Input id={fieldIds.capital} numeric value={calc.capital} invalid={!!errAt("capital")} placeholder={toInput(base.settings.capital[m.account] ?? 0, 0)} onChange={(e) => set({ capital: e.target.value })} aria-describedby={errAt("capital") ? `${fieldIds.capital}-error` : undefined} />
           </Field>
-          <Field label={S.risk} htmlFor={fieldIds.risk} suffix="%">
-            <Input id={fieldIds.risk} numeric value={calc.riskPct} placeholder={toInput(limits.riskPerTradePct * 100, 2)} onChange={(e) => set({ riskPct: e.target.value })} />
+          <Field label={amountMode ? S.riskAmountIn : S.risk} htmlFor={fieldIds.risk} suffix={amountMode ? cur : "%"} error={errAt("risk")}>
+            {amountMode ? (
+              <Input id={fieldIds.risk} numeric value={calc.riskAmount} invalid={!!errAt("risk")} placeholder={toInput(m.capital > 0 ? m.capital * limits.riskPerTradePct : 0, 2)} onChange={(e) => set({ riskAmount: e.target.value })} aria-describedby={errAt("risk") ? `${fieldIds.risk}-error` : undefined} />
+            ) : (
+              <Input id={fieldIds.risk} numeric value={calc.riskPct} invalid={!!errAt("risk")} placeholder={toInput(limits.riskPerTradePct * 100, 2)} onChange={(e) => set({ riskPct: e.target.value })} aria-describedby={errAt("risk") ? `${fieldIds.risk}-error` : undefined} />
+            )}
           </Field>
           <Field label={S.leverage} htmlFor={fieldIds.lev} suffix="×">
             <Input id={fieldIds.lev} numeric value={calc.leverage} placeholder="auto" onChange={(e) => set({ leverage: e.target.value })} />
           </Field>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5" aria-label="Risiko schnell wählen">
-          {RISK_CHIPS.map((r) => (
-            <Chip key={r} active={near(m.riskPct * 100, r)} onClick={() => set({ riskPct: toInput(r, 2) }, true)} testId={`risk-chip-${r}`}>
-              {String(r).replace(".", ",")} %
-            </Chip>
-          ))}
+        <div className="flex min-h-[44px] flex-wrap items-center gap-1.5">
+          <Segmented<RiskMode> aria-label={S.riskMode} options={MODE_OPTS} value={calc.riskMode} onChange={setMode} size="sm" className={SEG_TOUCH} />
+          {amountMode ? (
+            <span className="text-[11.5px] text-mute" data-testid="risk-amount-pct">
+              {s.ok ? S.amountIs(pct(m.riskPct, 2)) : S.amountHint}
+            </span>
+          ) : (
+            <span className="contents" role="group" aria-label="Risiko schnell wählen">
+              {RISK_CHIPS.map((r) => (
+                <Chip key={r} active={near(m.riskPct * 100, r)} onClick={() => set({ riskPct: toInput(r, 2) }, true)} testId={`risk-chip-${r}`}>
+                  {String(r).replace(".", ",")} %
+                </Chip>
+              ))}
+            </span>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Field label={S.entry} htmlFor={fieldIds.entry}>
+          <Field label={S.entry} htmlFor={fieldIds.entry} error={errAt("entry")}>
             <div className="flex gap-1.5">
-              <Input id={fieldIds.entry} numeric value={calc.entry} onChange={(e) => set({ entry: e.target.value })} wrapperClassName="min-w-0 flex-1" />
+              <Input id={fieldIds.entry} numeric value={calc.entry} invalid={!!errAt("entry")} onChange={(e) => set({ entry: e.target.value })} wrapperClassName="min-w-0 flex-1" aria-describedby={errAt("entry") ? `${fieldIds.entry}-error` : undefined} />
               {isLive && (
                 <Button size="sm" variant="secondary" onClick={takeLive} title={S.liveTitle} aria-label={S.liveTitle} className="shrink-0 !px-2.5">
                   {S.live}
@@ -253,11 +297,11 @@ export function CalculatorCard({ base }: { base: RiskBase }) {
               )}
             </div>
           </Field>
-          <Field label={S.stop} htmlFor={fieldIds.stop} error={error ?? undefined}>
-            <Input id={fieldIds.stop} numeric value={calc.stop} invalid={!!error} onChange={(e) => set({ stop: e.target.value })} aria-describedby={error ? `${fieldIds.stop}-error` : undefined} />
+          <Field label={S.stop} htmlFor={fieldIds.stop} error={errAt("stop")}>
+            <Input id={fieldIds.stop} numeric value={calc.stop} invalid={!!errAt("stop")} onChange={(e) => set({ stop: e.target.value })} aria-describedby={errAt("stop") ? `${fieldIds.stop}-error` : undefined} />
           </Field>
-          <Field label={S.target} htmlFor={fieldIds.target} className="col-span-2 sm:col-span-1">
-            <Input id={fieldIds.target} numeric value={calc.target} onChange={(e) => set({ target: e.target.value })} />
+          <Field label={S.target} htmlFor={fieldIds.target} className="col-span-2 sm:col-span-1" error={targetWrong ? S.errors.target : undefined}>
+            <Input id={fieldIds.target} numeric value={calc.target} invalid={targetWrong} onChange={(e) => set({ target: e.target.value })} aria-describedby={targetWrong ? `${fieldIds.target}-error` : undefined} />
           </Field>
         </div>
 
@@ -344,6 +388,11 @@ export function CalculatorCard({ base }: { base: RiskBase }) {
             </motion.p>
           )}
         </div>
+        {s.ok && (
+          <Suspense fallback={<div className={RESERVE_CLASS} style={reserveStyle(BILL_RESERVE)} aria-busy="true" />}>
+            <CalcBill m={m} sizing={s} limits={limits} cur={cur} atr={atrV} />
+          </Suspense>
+        )}
         {s.ok && (
           <Suspense fallback={null}>
             <CalcManage m={m} limits={limits} cur={cur} atr={atrV} />

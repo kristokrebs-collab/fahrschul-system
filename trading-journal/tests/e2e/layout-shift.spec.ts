@@ -5,9 +5,14 @@
  *  - the page does not grow after its first picture: the document height a moment after the heading and a few seconds later
  *    differ by less than 60 px (a skeleton of the finished size instead of a card that arrives bigger).
  * No clock jumps, no waiting for a time of day; the numbers are read at the end, not mid-animation.
+ *
+ * Runde 13 (Paket H): two blocks that fill AFTER the page stands – the breakout scanner of the Markt page (twelve cards that load, then
+ * sort themselves) and the "Rechnung" under the calculator (a lazy chunk) – measured the same way while they do it.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { pinClock, seed } from "./helpers";
+import { BREAKOUT_NOW } from "./mocks/breakout";
+import { mockBreakout } from "./mocks/breakoutRoutes";
 
 // trades / setups / settings joined with the Budget-Schnitt (Runde 11): they are lazy chunks now, a direct landing must not jump either
 const PAGES = ["markt", "analyse", "risiko", "coach", "labor", "studio", "plan", "aktien", "trades", "setups", "settings"] as const;
@@ -140,3 +145,95 @@ for (const c of BERICHTE) {
     expect(cls, `berichte (${c.name}): Layout-Verschiebung ${cls.toFixed(4)}`).toBeLessThanOrEqual(MAX_CLS);
   });
 }
+
+test("markt · Ausbruch-Scanner: der Lauf (laden, füllen, sortieren) verschiebt nichts – Plätze, Blockhöhe und Verschiebungen im Block", async ({ page }, info) => {
+  test.skip(![...PROJECTS, "tablet"].includes(info.project.name), "mobile + desktop + Galaxy-Tab");
+  test.setTimeout(90_000);
+  const clock = await pinClock(page, BREAKOUT_NOW);
+  await seed(page, { clock: clock.now });
+  await mockBreakout(page, () => "binance", clock.now);
+  // the candles are held back until the picture "before" is taken: twelve empty places, on screen
+  let release = (): void => {};
+  const gate = new Promise<void>((r) => (release = r));
+  await page.route("https://fapi.binance.com/fapi/v1/klines?*", async (route) => {
+    const u = new URL(route.request().url());
+    if (u.searchParams.get("interval") === "5m" && !u.searchParams.has("startTime")) await gate;
+    await route.fallback();
+  });
+  await page.goto("/#markt");
+  const block = page.getByTestId("breakout-section");
+  await expect(block).toBeAttached({ timeout: 30_000 });
+  await expect(page.locator("[data-page-skeleton]")).toHaveCount(0, { timeout: 30_000 });
+  /** where every part of the block stands, relative to the block (the page above it is long and still settles – that is not this block) */
+  const picture = () =>
+    block.evaluate((el) => {
+      const o = el.getBoundingClientRect();
+      const box = (n: Element) => {
+        const r = n.getBoundingClientRect();
+        return [Math.round(r.left - o.left), Math.round(r.top - o.top), Math.round(r.width), Math.round(r.height)];
+      };
+      return { height: Math.round(o.height), cells: Array.from(el.querySelectorAll(".bo-cell")).map(box), parts: Array.from(el.children).map(box) };
+    });
+  // bring the block on screen by script (no input event: every shift after it counts)
+  await block.evaluate((el) => el.scrollIntoView({ block: "start" }));
+  await expect(block).toHaveAttribute("data-phase", "scanning", { timeout: 15_000 });
+  await page.waitForTimeout(1200); // the twelve places have come in (45 ms apart)
+  const before = await picture();
+  expect(before.cells).toHaveLength(12);
+  // from here on: sum the shifts INSIDE the block, then let the candles arrive
+  await block.evaluate((el) => {
+    const w = window as unknown as { __cls: number };
+    w.__cls = 0;
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries() as unknown as { value: number; hadRecentInput: boolean; sources: { node: Node | null }[] }[]) {
+        // only what moved inside the block while the block itself stood still (the block as a source = the page above it moved it)
+        const inside = e.sources.length > 0 && e.sources.every((s) => s.node && s.node !== el && el.contains(s.node));
+        if (!e.hadRecentInput && inside) w.__cls += e.value;
+      }
+    }).observe({ type: "layout-shift" });
+  });
+  release();
+  await expect(block).toHaveAttribute("data-phase", "done", { timeout: 30_000 });
+  await expect(page.locator("[data-testid=breakout-card][data-best]")).toHaveCount(1);
+  await page.waitForTimeout(2500); // the sort spring and the reveals are over
+  const after = await picture();
+  const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
+  expect(after.height, "Höhe des Blocks").toBe(before.height);
+  // the twelve places and every part of the block stand exactly where they stood before a single candle arrived
+  expect(after.cells).toEqual(before.cells);
+  expect(after.parts).toEqual(before.parts);
+  expect(cls, `Layout-Verschiebung im Block ${cls.toFixed(4)}`).toBeLessThanOrEqual(MAX_CLS);
+});
+
+test("risiko · Rechnung: sie kommt nach (Lazy-Chunk) und verschiebt dabei nichts", async ({ page }, info) => {
+  test.skip(![...PROJECTS, "tablet"].includes(info.project.name), "mobile + desktop + Galaxy-Tab");
+  test.setTimeout(90_000);
+  await seed(page);
+  // the chunk of the "Rechnung" arrives late: the reserved place has to hold until then
+  await page.route(/\/assets\/CalcBill-[^/]+\.js$/, async (route) => {
+    await new Promise((r) => setTimeout(r, 1200));
+    await route.fallback();
+  });
+  await page.goto("/#risiko");
+  const calc = page.getByTestId("risk-calc");
+  await expect(calc).toBeAttached({ timeout: 30_000 });
+  await calc.scrollIntoViewIfNeeded();
+  await calc.getByRole("textbox", { name: "Einstieg", exact: true }).fill("100");
+  await calc.getByRole("textbox", { name: "Stop", exact: true }).fill("95");
+  // from here on no input: the shifts of the late chunk count in full (the 500 ms grace of the typing is over before it arrives)
+  await page.waitForTimeout(700);
+  await page.evaluate(() => {
+    const w = window as unknown as { __cls: number };
+    w.__cls = 0;
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries() as unknown as { value: number; hadRecentInput: boolean }[]) if (!e.hadRecentInput) w.__cls += e.value;
+    }).observe({ type: "layout-shift" });
+  });
+  const before = await page.evaluate(() => document.documentElement.scrollHeight);
+  await expect(calc.getByTestId("risk-bill")).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(1500);
+  const after = await page.evaluate(() => document.documentElement.scrollHeight);
+  const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
+  expect(Math.abs(after - before), `die Seite änderte ihre Höhe von ${before} auf ${after} px`).toBeLessThan(MAX_GROWTH);
+  expect(cls, `Layout-Verschiebung ${cls.toFixed(4)}`).toBeLessThanOrEqual(MAX_CLS);
+});

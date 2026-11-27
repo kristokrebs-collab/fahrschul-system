@@ -87,3 +87,12 @@ Unter dem Ergebnis des Rechners (`risk-calc`) steht, sobald es ein gültiges Erg
 `LivePriceStand.tsx` under the calculator's live price: „Quelle: … · letzter Kurs hh:mm“ from the newer of the `aggTrade` / `ticker24h` feeds (the two that drive `priceMv`), rounded down to the minute so the line renders once a minute; no price → „keine Daten“.
 `LiquidationCard` ends with `liq-source`: how many legs are journal trades / venue positions (`liqBasis` in `model.ts`), with the time of the last venue request (`usePositionsStore.at`), and per price whether the venue or
 the trade gave it or the tier table calculated it. Tests: `views.risiko.source.test.tsx`, `views.risiko.test.tsx`.
+
+## Rechner: Risiko als Betrag, Feldfehler und die „Rechnung“ (Runde 13, Paket H)
+
+- **Risiko in Prozent oder als Betrag** (`riskStore.CalcInputs.riskMode` / `riskAmount`, `riskFraction` in `@/domain/risk`): der Wechsel übernimmt denselben Wert in der anderen Einheit.
+- **Fehleingaben** stehen am eigenen Feld (`RISIKO.calc.errors`): Kapital, Risiko, Einstieg, Stop (0, negativ, gleich dem Einstieg, falsche Seite), Ziel auf der falschen Seite. Ohne gültige Eingaben gibt es keine Größe.
+- **Rechnung** (`CalcBill.tsx` + `bill.css`, eigener Lazy-Chunk; rein gerechnet in `src/domain/risk/bill.ts`): Positionsgröße, Positionswert, nötiger Hebel gegen die eigene Regel, Abstand zum Stop (% und ATR), Verlust am Stop, davon Gebühren + Slippage, Mindestabstand (Kosten ≤ 25 % des Risikos), Betrag am Ziel nach Gebühren, Preisleiter, Hinweise. Die Annahmen (Gebühr, Slippage aus den Risiko-Einstellungen) stehen sichtbar da; die Rundung auf einen Mengenschritt ist nur ein Hinweis mit Beispiel-Schritt. Eine Rechnung, keine Empfehlung – kein Knopf darin.
+- **Vorbelegung aus dem Ausbruch-Scanner** (`riskStore.prefillNote`): ein Satz nennt die Herkunft, bis der Trader Einstieg, Stop, Richtung oder Paar selbst setzt.
+
+Tests: `tests/unit/risk.bill.test.ts`, `tests/unit/views.risiko.bill.test.tsx`, `tests/e2e/breakout.spec.ts`, `tests/e2e/layout-shift.spec.ts`.
