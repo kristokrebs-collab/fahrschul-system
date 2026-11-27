@@ -5,6 +5,7 @@
  */
 export * from "./config";
 export * from "./sizing";
+export * from "./bill";
 export * from "./liquidation";
 export * from "./limits";
 export * from "./exposure";

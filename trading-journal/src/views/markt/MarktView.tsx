@@ -24,7 +24,7 @@ import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { AnalysisNote } from "@/ui/AnalysisNote";
-import { PendingCard } from "@/ui/PendingCard";
+import { PendingBlock, PendingCard } from "@/ui/PendingCard";
 import { SectionTitle } from "@/views/analyse/ui";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { useMirrorState } from "@/views/biasTest";
@@ -34,6 +34,7 @@ import { BestSetupsCard } from "./BestSetupsCard";
 import { BoxChartCard } from "./BoxChartCard";
 import { BoxSettingsCard } from "./BoxSettingsCard";
 import { BoxStateCard } from "./BoxStateCard";
+import { BREAKOUT_HEAD, BREAKOUT_RESERVE } from "./breakout/reserve";
 import { RsiLinesCard } from "./RsiLinesCard";
 import { ScannerCard } from "./ScannerCard";
 import { MarktStand } from "./MarktStand";
@@ -53,6 +54,10 @@ const TraderNetCard = lazy(() => import("./TraderNetCard"));
 // F07: „Squeeze-Beobachtung“ (reads the data archive) – own chunk, loaded with the page
 const SqueezeCard = lazy(() => import("./SqueezeCard"));
 
+// „Wer bricht aus?“ (Ausbruch-Scanner über zwölf Märkte, Frost-Block mit eigenem Stylesheet) – own chunk, loaded with the page;
+// its candles are only fetched once the block is on screen
+const BreakoutSection = lazy(() => import("./breakout/BreakoutSection"));
+
 // F43: „Heute wichtig“ (Morgenbriefing), „Termine“ (Kalender) and „Ereignisphasen“ – own chunk, loaded with the page
 const TermineSection = lazy(() => import("@/views/termine/TermineSection"));
 
@@ -65,6 +70,7 @@ const NAV: readonly SectionNavItem[] = [
   { id: "context", label: "Einordnung" },
   { id: "levels", label: "Marken & Alarme" },
   { id: "calendar", label: "Termine" },
+  { id: "breakout", label: "Ausbruch" },
   { id: "watch", label: "Beobachten" },
 ];
 
@@ -177,7 +183,7 @@ export function MarktView({ className }: { className?: string }) {
   // a running bias test (F62) shows only the chart: the setups, box status and alerts would tell the direction
   const test = useMirrorState("markt");
   const focus = test.frozen;
-  const ids = { now: useId(), context: useId(), levels: useId(), calendar: useId(), watch: useId() };
+  const ids = { now: useId(), context: useId(), levels: useId(), calendar: useId(), breakout: useId(), watch: useId() };
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="markt-view" data-state={view.state}>
       <PageHeader className="lg:col-span-12" title={MARKT.title} lead={MARKT.lead} leadFill={MARKT_LEAD_FILL} action={<HeaderStatus view={view} maskName={focus && test.blind.hideName} />} />
@@ -261,6 +267,15 @@ export function MarktView({ className }: { className?: string }) {
             <div className="min-w-0 lg:col-span-12">
               <Suspense fallback={<PendingCard title="Termine" testId="termine-loading" height={{ base: 5760, lg: 2590 }} />}>
                 <TermineSection />
+              </Suspense>
+            </div>
+          </section>
+          <section aria-labelledby={ids.breakout} className="contents">
+            <SectionTitle id={ids.breakout} section="breakout" title={BREAKOUT_HEAD.section} sub={BREAKOUT_HEAD.sub} className="lg:col-span-12" />
+            {/* no `Cell` (Reveal): the block is taller than a screen on a phone, and it reveals its twelve places itself (45 ms apart) */}
+            <div className="min-w-0 lg:col-span-12">
+              <Suspense fallback={<PendingBlock height={BREAKOUT_RESERVE} />}>
+                <BreakoutSection />
               </Suspense>
             </div>
           </section>

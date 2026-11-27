@@ -3,6 +3,7 @@
  * parses them) and the risk-spread grouping. The liquidation card reads the calculator's planned position from here.
  */
 import { create } from "zustand";
+import type { RiskMode } from "@/domain/risk/bill";
 import type { AccountId, Side } from "@/domain/types";
 
 export interface CalcInputs {
@@ -11,19 +12,27 @@ export interface CalcInputs {
   pair: string;
   capital: string;
   riskPct: string;
+  /** how the risk is given: a share of the capital (`riskPct`) or an amount in the account currency (`riskAmount`) */
+  riskMode: RiskMode;
+  riskAmount: string;
   entry: string;
   stop: string;
   target: string;
   leverage: string;
 }
 
-export const EMPTY_CALC: CalcInputs = { account: null, side: "long", pair: "", capital: "", riskPct: "", entry: "", stop: "", target: "", leverage: "" };
+export const EMPTY_CALC: CalcInputs = { account: null, side: "long", pair: "", capital: "", riskPct: "", riskMode: "pct", riskAmount: "", entry: "", stop: "", target: "", leverage: "" };
+
+const NOTE_KEYS: readonly (keyof CalcInputs)[] = ["entry", "stop", "side", "pair"];
 
 interface RiskUi {
   calc: CalcInputs;
   /** bumped by every programmatic fill (chip, live price) – the result cascades again */
   fillSeq: number;
   spreadBy: "setup" | "asset";
+  /** where a prefill came from, in one sentence (e.g. the breakout scanner) – shown until the trader changes entry, stop, side or pair himself */
+  prefillNote: string | null;
+  setPrefillNote(note: string | null): void;
   setCalc(patch: Partial<CalcInputs>, programmatic?: boolean): void;
   resetCalc(): void;
   setSpreadBy(by: "setup" | "asset"): void;
@@ -33,8 +42,16 @@ export const useRiskUi = create<RiskUi>()((set) => ({
   calc: EMPTY_CALC,
   fillSeq: 0,
   spreadBy: "setup",
-  setCalc: (patch, programmatic = false) => set((s) => ({ calc: { ...s.calc, ...patch }, fillSeq: programmatic ? s.fillSeq + 1 : s.fillSeq })),
-  resetCalc: () => set((s) => ({ calc: EMPTY_CALC, fillSeq: s.fillSeq + 1 })),
+  prefillNote: null,
+  setPrefillNote: (prefillNote) => set({ prefillNote }),
+  setCalc: (patch, programmatic = false) =>
+    set((s) => ({
+      calc: { ...s.calc, ...patch },
+      fillSeq: programmatic ? s.fillSeq + 1 : s.fillSeq,
+      // a programmatic fill from somewhere else replaces the note; typing entry / stop / side / pair makes the values the trader's own
+      prefillNote: programmatic ? null : NOTE_KEYS.some((k) => k in patch) ? null : s.prefillNote,
+    })),
+  resetCalc: () => set((s) => ({ calc: EMPTY_CALC, fillSeq: s.fillSeq + 1, prefillNote: null })),
   setSpreadBy: (spreadBy) => set({ spreadBy }),
 }));
 

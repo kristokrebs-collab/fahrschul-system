@@ -1,0 +1,535 @@
+/* Scanner „Wer bricht aus?“ – der Frost-Block der Markt-Seite (Titel, Sitzung, zwei Zähler, zwölf Karten mit echten Mini-Kerzen, die
+   Zahlen der gewählten Karte). Liegt im Lazy-Chunk des Scanners – kein Eintrag in der Erstladungs-CSS. Farben nur aus den Tokens
+   (Schleier = `--veil-rgb`: im Hellen wird er zu Tinte); Signalrot bleibt der eine Punkt (Fragezeichen, Ausbruchsmarke), Grün und Rot
+   sind Datenfarben (Kerzen, 24-h-Änderung, erfüllte Gründe). Aufbau nacheinander (45 ms je Karte und je Grund), Eintritt ease-out, Feder
+   mit leichtem Überschwinger, nichts linear; `base.css` setzt unter „Bewegung reduzieren“ jede Dauer auf 0 – der Endzustand steht sofort.
+   Jede Fläche hat ihre feste Höhe: zwölf Plätze stehen von Anfang an, nichts springt, wenn Kerzen ankommen. */
+
+.bo-frost {
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  display: grid;
+  gap: 16px;
+  padding: 22px 22px 18px;
+  border-radius: 28px;
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.14);
+  background-color: var(--color-ink-850);
+  background-image:
+    radial-gradient(46% 62% at 4% 0%, color-mix(in srgb, var(--color-win) 8%, transparent), transparent 70%),
+    radial-gradient(40% 50% at 100% 12%, rgb(var(--veil-rgb, 255 255 255) / 0.05), transparent 70%),
+    linear-gradient(150deg, rgb(var(--veil-rgb, 255 255 255) / 0.06), rgb(var(--veil-rgb, 255 255 255) / 0.02) 60%, rgb(var(--veil-rgb, 255 255 255) / 0.05));
+  box-shadow:
+    inset 0 1px 0 rgb(var(--veil-rgb, 255 255 255) / 0.16),
+    0 24px 60px -30px rgb(0 0 0 / calc(0.7 * var(--shade, 1)));
+  overflow: clip;
+}
+
+.bo-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 16px 20px;
+}
+.bo-title {
+  margin: 0;
+  font-size: clamp(40px, 9cqw, 92px);
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 0.9;
+  color: var(--color-fg);
+}
+.bo-title span {
+  color: var(--color-signal);
+}
+.bo-lead {
+  margin: 12px 0 0;
+  min-height: 2.8em;
+  max-width: 62ch;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--color-mute);
+}
+.bo-ctl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.bo-label {
+  font: 500 10.5px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-mute);
+}
+.bo-side {
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+}
+.bo-radar {
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 132px;
+}
+/* the scope fills its box (the component's own size is the phone's 64 px) */
+.bo-radar > span {
+  width: 100% !important;
+  height: 100% !important;
+}
+.bo-stats {
+  display: flex;
+  gap: 10px;
+}
+.bo-stat {
+  min-width: 104px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.16);
+  background: rgb(var(--veil-rgb, 255 255 255) / 0.04);
+}
+.bo-stat > span {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-mute);
+}
+.bo-stat b {
+  display: block;
+  margin-top: 4px;
+  font: 600 20px/1.2 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg);
+}
+
+/* eine Zeile für das, was der Lauf sagt (leer, läuft, nichts gefunden, Fehler) – ihr Platz steht immer */
+.bo-msg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 44px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-mute);
+}
+.bo-msg[data-tone="error"] {
+  color: var(--color-fg);
+}
+
+.bo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bo-cell {
+  min-width: 0;
+}
+.bo-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 52px auto auto;
+  align-content: start;
+  gap: 8px;
+  width: 100%;
+  height: 232px;
+  padding: 14px 14px 12px;
+  border-radius: 20px;
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.12);
+  background-color: color-mix(in srgb, var(--color-ink-900) 70%, transparent);
+  background-image: linear-gradient(150deg, rgb(var(--veil-rgb, 255 255 255) / 0.07), rgb(var(--veil-rgb, 255 255 255) / 0.015) 58%, rgb(var(--veil-rgb, 255 255 255) / 0.05));
+  box-shadow: inset 0 1px 0 rgb(var(--veil-rgb, 255 255 255) / 0.1);
+  text-align: left;
+  color: var(--color-fg);
+  cursor: pointer;
+  animation: bo-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i, 0) * 45ms) backwards;
+  transition:
+    border-color 0.25s ease-out,
+    opacity 0.35s ease-out,
+    box-shadow 0.35s ease-out;
+}
+@keyframes bo-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+}
+.bo-card:disabled {
+  cursor: default;
+}
+.bo-card:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-glow-btn, 0 0 0 2px var(--color-fg));
+}
+@media (hover: hover) {
+  .bo-card:not(:disabled):hover {
+    border-color: rgb(var(--veil-rgb, 255 255 255) / 0.3);
+  }
+}
+.bo-card[aria-pressed="true"] {
+  border-color: rgb(var(--veil-rgb, 255 255 255) / 0.5);
+}
+/* fertig: was keinen Ausbruch hat, tritt zurück – die Karte mit den meisten Gründen hebt sich ab */
+.bo-grid[data-done] .bo-card:not([data-status="breakout"]) {
+  opacity: 0.62;
+}
+.bo-card[data-best] {
+  border-color: color-mix(in srgb, var(--color-win) 60%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--veil-rgb, 255 255 255) / 0.14),
+    0 0 0 1px color-mix(in srgb, var(--color-win) 30%, transparent),
+    0 18px 40px -22px color-mix(in srgb, var(--color-win) 55%, transparent);
+}
+.bo-best {
+  position: absolute;
+  top: -9px;
+  left: 14px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--color-win);
+  font: 700 9.5px/1.2 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-950);
+  animation: bo-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+.bo-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.bo-tick {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.bo-name {
+  font: 700 22px/1 var(--font-sans);
+  letter-spacing: -0.03em;
+}
+.bo-tick small {
+  overflow: hidden;
+  font: 500 10px/1.2 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-mute);
+}
+/* die Note als Umriss-Ziffer; erfüllt (A+ / A) wird sie gefüllt */
+.bo-grade {
+  flex: none;
+  min-width: 1.2em;
+  font: 300 38px/0.85 var(--font-sans);
+  letter-spacing: -0.04em;
+  text-align: right;
+  color: transparent;
+  -webkit-text-stroke: 1.2px rgb(var(--fg-rgb, 242 242 242) / 0.55);
+}
+.bo-grade[data-top] {
+  color: var(--color-win);
+  -webkit-text-stroke: 0;
+  font-weight: 500;
+}
+.bo-px {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.bo-px b {
+  font: 500 15px/1.2 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.bo-px em {
+  font: 500 11.5px/1.2 var(--font-mono);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-mute);
+}
+.bo-px em[data-tone="win"] {
+  color: var(--color-win);
+}
+.bo-px em[data-tone="loss"] {
+  color: var(--color-loss);
+}
+
+.bo-chart {
+  position: relative;
+  display: block;
+  height: 52px;
+  min-width: 0;
+}
+.bo-chart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.bo-chart .rg {
+  fill: rgb(var(--veil-rgb, 255 255 255) / 0.07);
+}
+.bo-chart .ed {
+  stroke: rgb(var(--veil-rgb, 255 255 255) / 0.34);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  vector-effect: non-scaling-stroke;
+}
+.bo-chart .up {
+  fill: var(--color-win);
+  stroke: var(--color-win);
+}
+.bo-chart .dn {
+  fill: var(--color-loss);
+  stroke: var(--color-loss);
+}
+.bo-chart path {
+  fill: none;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.85;
+}
+.bo-chart rect.up,
+.bo-chart rect.dn {
+  stroke: none;
+  opacity: 0.85;
+}
+/* der eine rote Punkt: der Schluss der Ausbruchskerze */
+.bo-mark {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: var(--color-signal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-signal) 24%, transparent);
+  animation: bo-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.25s backwards;
+}
+.bo-fill {
+  animation: bo-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+@keyframes bo-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.bo-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 5px;
+  min-width: 0;
+  min-height: 22px;
+}
+.bo-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.16);
+  font: 500 10.5px/1.3 var(--font-sans);
+  white-space: nowrap;
+  color: var(--color-mute);
+  animation: bo-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) calc(120ms + var(--k, 0) * 45ms) backwards;
+}
+.bo-chip[data-s="y"] {
+  border-color: color-mix(in srgb, var(--color-win) 55%, transparent);
+  background: color-mix(in srgb, var(--color-win) 12%, transparent);
+  color: var(--color-fg);
+}
+.bo-chip[data-s="n"] {
+  text-decoration: line-through;
+  text-decoration-color: rgb(var(--veil-rgb, 255 255 255) / 0.4);
+}
+.bo-chip[data-s="u"] {
+  border-style: dashed;
+}
+@keyframes bo-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+.bo-st {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--color-mute);
+}
+.bo-st b {
+  font-weight: 500;
+  color: var(--color-fg);
+}
+.bo-skel {
+  display: block;
+  height: 100%;
+  border-radius: 10px;
+  background: rgb(var(--veil-rgb, 255 255 255) / 0.045);
+}
+
+/* ------------------------------------------------------------------ die gewählte Karte in Zahlen */
+
+.bo-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 16px 24px;
+  align-content: start;
+  min-height: 268px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.1);
+  background: color-mix(in srgb, var(--color-ink-950) 46%, transparent);
+}
+.bo-detail h4 {
+  margin: 0;
+  font: 600 20px/1.15 var(--font-sans);
+  letter-spacing: -0.02em;
+  color: var(--color-fg);
+}
+.bo-detail h4 small {
+  display: block;
+  margin-top: 4px;
+  font: 400 12.5px/1.35 var(--font-sans);
+  letter-spacing: 0;
+  color: var(--color-mute);
+}
+.bo-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin: 14px 0 0;
+}
+.bo-facts div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.bo-facts dt {
+  font: 500 10px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-mute);
+}
+.bo-facts dd {
+  margin: 0;
+  font: 500 13px/1.3 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg);
+  overflow-wrap: anywhere;
+}
+.bo-why {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--color-mute);
+}
+.bo-why li {
+  padding-left: 12px;
+  border-left: 1px solid rgb(var(--veil-rgb, 255 255 255) / 0.16);
+  animation: bo-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--k, 0) * 45ms) backwards;
+}
+.bo-act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--color-mute);
+}
+.bo-act p {
+  flex: 1 1 220px;
+  margin: 0;
+}
+
+.bo-rules summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 12.5px;
+  color: var(--color-mute);
+  text-decoration: underline;
+  text-decoration-color: var(--color-line-2);
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.bo-rules summary:focus-visible {
+  outline: none;
+  border-radius: 8px;
+  box-shadow: var(--ring-glow-btn, 0 0 0 2px var(--color-fg));
+}
+.bo-rules ol {
+  display: grid;
+  gap: 6px;
+  max-width: 86ch;
+  margin: 4px 0 8px;
+  padding-left: 1.4em;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-mute);
+}
+
+@container (max-width: 1020px) {
+  .bo-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container (max-width: 760px) {
+  .bo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .bo-detail {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 520px;
+  }
+  .bo-radar {
+    width: 96px;
+    height: 96px;
+  }
+}
+@container (max-width: 520px) {
+  .bo-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bo-side {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    justify-items: start;
+  }
+  .bo-radar {
+    width: 64px;
+    height: 64px;
+    order: 2;
+  }
+  .bo-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bo-detail {
+    min-height: 640px;
+  }
+}
+@media (max-width: 640px) {
+  .bo-frost {
+    padding: 18px 14px 14px;
+    border-radius: 22px;
+  }
+}
