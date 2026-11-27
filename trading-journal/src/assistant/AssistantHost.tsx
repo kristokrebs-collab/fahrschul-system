@@ -324,7 +324,7 @@ function AssistantBody() {
         </div>
       </StaggerItem>
 
-      <StaggerItem className="sticky bottom-0 z-10 -mx-1 grid gap-2 border-t border-line bg-ink-850 px-1 pb-1 pt-3">
+      <StaggerItem className="glass-bar sticky bottom-0 z-10 -mx-1 grid gap-2 border-t border-line bg-ink-850 px-1 pb-1 pt-3">
         <form onSubmit={onSubmit} className="flex min-w-0 gap-2" role="search" aria-label="Frage an den Assistenten">
           <label htmlFor="assistant-input" className="sr-only">
             Deine Frage

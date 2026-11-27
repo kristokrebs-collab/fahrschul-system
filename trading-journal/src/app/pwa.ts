@@ -10,6 +10,7 @@
  */
 import { useSyncExternalStore } from "react";
 import { SAFE_FX_ATTR } from "@/motion/safeFx";
+import { applyGlass, bootGlass, isGlass, onGlassChange } from "@/motion/glass";
 
 type Listener = () => void;
 
@@ -124,6 +125,8 @@ export function setSafeFx(on: boolean): void {
   document.documentElement.toggleAttribute(SAFE_FX_ATTR, on);
   // the lenses are backdrop filters: never together with the safe effects
   if (on) document.documentElement.removeAttribute(LENS_ATTR);
+  // glass is never shown with the safe effects; switched back, the reader's choice applies again
+  applyGlass(undefined, false);
 }
 
 /**
@@ -297,7 +300,11 @@ export const DISPLAY_STRINGS = {
 if (hasWindow) {
   // before React's first paint (this module is imported by the shell): the fallbacks never flash in
   if (wantsSafeFx(navigator.userAgent, location.search)) setSafeFx(true);
-  document.documentElement.toggleAttribute(LENS_ATTR, wantsLens(navigator.userAgent, location.search));
+  // the glass switch (`@/motion/glass`): `data-glass` before the first paint; the lenses only with glass
+  const syncLens = () => document.documentElement.toggleAttribute(LENS_ATTR, isGlass() && wantsLens(navigator.userAgent, location.search));
+  bootGlass();
+  syncLens();
+  onGlassChange(syncLens);
   window.addEventListener("beforeinstallprompt", (e) => {
     // keep the browser's mini-infobar from covering the dock; the app offers "App installieren" itself
     e.preventDefault();

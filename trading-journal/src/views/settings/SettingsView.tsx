@@ -127,7 +127,8 @@ const SIZE = {
   storage: { base: 499, sm: 369, lg: 336 },
   // + „Bewegung“ (Runde 11): measured 661 / 598 / 574–595 px at 390 / 700 / 1024–1440; + „Rückmeldung bei geschafften Schritten“ (Paket P,
   // two switches): measured 836 / 766 / 752–759 px
-  theme: { base: 836, sm: 766, lg: 755 },
+  // + „Glas-Look“ (Runde 14, Segmented + Hinweis): + 169 / 133 / 151 px
+  theme: { base: 1005, sm: 899, lg: 906 },
   // the card grew with the setup-wizard row (Paket B): measured 659 / 506 px at 390 / 820
   tour: { base: 659, sm: 506, lg: 436 },
   more: { base: 361, sm: 266, lg: 266 },

@@ -237,14 +237,14 @@ function TradeDetailDialog({ candles, onEdit, className }: TradeDetailProps) {
               transition={{ ...spring.detail, layout: spring.detail }}
               onAnimationComplete={() => markSettled(trade.id)}
               onLayoutAnimationComplete={() => markSettled(trade.id)}
-              className="pointer-events-auto relative max-h-[92vh] w-full overflow-y-auto overscroll-contain rounded-[28px] border border-line-2 bg-gradient-to-b from-ink-750 to-ink-850 outline-none"
+              className="pointer-events-auto relative max-h-[92vh] w-full overflow-y-auto overscroll-contain glass-panel [--gp-drop:0_0_#0000] rounded-[28px] border border-line-2 bg-gradient-to-b from-ink-750 to-ink-850 outline-none"
             >
               {/* swipe handle on touch screens: stays at the top while the panel scrolls (opaque, so text never shows under it) */}
               <div
                 ref={touchGuard}
                 data-detail-grabber=""
                 aria-hidden="true"
-                className="sticky top-0 z-10 hidden h-5 rounded-t-[28px] bg-ink-750 pointer-coarse:block"
+                className="glass-bar sticky top-0 z-10 hidden h-5 rounded-t-[28px] bg-ink-750 pointer-coarse:block"
                 {...swipe.handle}
               >
                 <span className="pointer-events-none absolute left-1/2 top-2 h-[5px] w-9 -translate-x-1/2 rounded-full bg-white/15" />

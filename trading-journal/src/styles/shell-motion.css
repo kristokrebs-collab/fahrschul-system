@@ -109,6 +109,123 @@ html[data-safe-fx] {
     background-color: var(--color-ink-900);
   }
 }
+/* ---- Runde 14 – der Glas-Schalter (`html[data-glass]`, motion/glass.ts; vor dem ersten Bild gesetzt) -----------------------------------
+   „on“: EIN Baustein für alles, was aufklappt (Menü, Assistent, Blatt, Dialog, Suche, Auswahlliste, Popover). `.glass-panel` = Milchglas:
+   starke Unschärfe + Sättigung (`--gp-blur`), Tönung (`--gp-tint`, so dicht, dass graue Schrift 4,5 : 1 hält), Licht von oben links, dünner
+   Lichtrand (`--gl-rim`), innere Dicke (`--gp-edge`), Schlagschatten (`--gp-drop`; 0, wo er auf einem Geschwister liegt). `data-gp="sm"`
+   (Listen, Popover): in Chromium bricht die Linse `#lgd`; `data-gp="full"` (Menü, bildschirmfüllend, ohne Abdunklung dahinter): dichter.
+   Die Regeln stehen OHNE Ebene, damit sie die flachen Klassen der Fenster überstimmen – die bleiben unverändert im Markup, und „off“
+   (auch von selbst: Samsung Internet, weniger Transparenz, mehr Kontrast, erzwungene Farben) ist genau das bisherige flache Aussehen.
+   „off“ nimmt außerdem das Glas aus Runde 13 zurück: Rand, Fläche und Lichtkante wie davor, keine Linse, keine Perle, deckende Meldung. */
+html[data-glass="on"],
+html[data-glass="on"][data-theme="light"] [data-layer="Navigation (Vollbild)"] {
+  --gl-ink: 255 255 255;
+  --gp-glow: 10%;
+  --gp-blur: blur(22px) saturate(1.6);
+  --gp-drop: 0 30px 80px rgb(0 0 0 / calc(0.55 * var(--shade, 1)));
+  --gp-tint: rgb(19 20 24 / 0.8);
+  --gp-edge: inset 0 1px 0 rgb(255 255 255 / 0.13), inset 0 -20px 28px -24px rgb(0 0 0 / 0.55);
+  --gp-tile: rgb(255 255 255 / 0.055);
+}
+html[data-glass="on"][data-theme="light"] {
+  --gl-ink: 15 23 42;
+  --gp-glow: 6%;
+  --gp-tint: rgb(253 253 252 / 0.9);
+  --gp-edge: inset 0 1px 0 #fff, inset 0 -18px 26px -22px rgb(15 23 42 / 0.14);
+  --gp-tile: rgb(255 255 255 / 0.62);
+}
+html[data-glass="on"][data-lg] [data-gp="sm"] {
+  --gp-blur: url(#lgd) blur(12px) saturate(1.7);
+}
+html[data-glass="on"] [data-gp="full"][data-layer] {
+  /* bildschirmfüllend: keine Unschärfe (eine vollflächige Unschärfe kostete beim Einwischen jedes Bild, gemessen Ø 95 statt 27 ms) – fast deckend */
+  --gp-tint: rgb(13 14 17 / 0.97);
+  --gp-blur: none;
+}
+html[data-glass="on"] .glass-panel {
+  border: 1px solid transparent;
+  /* unter dem Glas liegt ein weiches Farblicht aus dem Akzent (dunkel 10 %, hell 6 %): ohne es zeigt dunkles Glas auf dunklem Grund keine Tiefe.
+     Beim Öffnen wandert es einmal ein Stück (900 ms, sanft); ohne Bewegung steht es (base.css). */
+  background:
+    radial-gradient(60% 46% at 16% 6%, color-mix(in srgb, var(--color-signal) var(--gp-glow, 10%), transparent), transparent 72%) 0 0 / 150% 150% no-repeat padding-box,
+    linear-gradient(165deg, rgb(var(--gl-hi) / 0.045), transparent 38%) padding-box,
+    linear-gradient(var(--gp-tint), var(--gp-tint)) padding-box,
+    var(--gl-rim) border-box;
+  animation: gp-light 900ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  box-shadow: var(--gp-edge), var(--gp-drop);
+  -webkit-backdrop-filter: var(--gp-blur);
+  backdrop-filter: var(--gp-blur);
+}
+@keyframes gp-light {
+  from {
+    background-position: 100% 60%, 0 0, 0 0, 0 0;
+  }
+}
+/* ein Kopf / Fuß, der im Fenster stehen bleibt: dasselbe Glas über dem, was darunter durchrollt (kein deckender Balken) */
+html[data-glass="on"] .glass-bar {
+  background: color-mix(in srgb, var(--gp-tint) 40%, transparent);
+  -webkit-backdrop-filter: var(--gp-blur);
+  backdrop-filter: var(--gp-blur);
+}
+/* Glas-Pille / Glas-Kachel (Tags, Vorschläge, Menü-Einträge) */
+html[data-glass="on"] .glass-chip {
+  border-color: rgb(var(--gl-ink) / 0.15);
+  background: var(--gp-tile);
+  box-shadow: inset 0 1px 0 rgb(var(--gl-hi) / 0.1);
+}
+html[data-glass="on"] .glass-chip:is(:hover, :focus-visible) {
+  border-color: rgb(var(--gl-ink) / 0.45);
+}
+/* kleine graue Schrift auf Glas: eine Stufe kräftiger */
+html[data-glass="on"] .glass-panel .text-faint {
+  color: var(--color-mute);
+}
+/* die verblasste Großziffer oben rechts in einem Fenster (nur wo sie etwas sagt: der Schritt eines Assistenten) */
+.gp-mark {
+  display: none;
+}
+html[data-glass="on"] .gp-mark {
+  display: block;
+  position: absolute;
+  z-index: -1;
+  top: 70px;
+  right: 22px;
+  font-size: 64px;
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgb(var(--gl-ink) / 0.24);
+  pointer-events: none;
+}
+html[data-glass="off"] {
+  --gl-rim: linear-gradient(rgb(255 255 255 / 0.2), rgb(255 255 255 / 0.03));
+  --gl-face: linear-gradient(rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.015));
+  --gl-on: linear-gradient(rgb(255 255 255 / 0.17), rgb(255 255 255 / 0.05));
+  --gl-in: inset 0 1px 0 rgb(255 255 255 / 0.1);
+  --gl-dn: var(--gl-in);
+}
+html[data-glass="off"][data-theme="light"] {
+  --gl-rim: linear-gradient(rgb(15 23 42 / 0.08), rgb(15 23 42 / 0.22));
+  --gl-face: linear-gradient(#fff, rgb(255 255 255 / 0.5));
+  --gl-on: linear-gradient(rgb(15 23 42 / 0.1), rgb(15 23 42 / 0.04));
+  --gl-in: inset 0 1px 0 #fff;
+  --gl-dn: var(--gl-in);
+}
+html[data-glass="off"] .gl-float {
+  --gl-in: 0 0 #0000;
+  --gl-dn: 0 0 #0000;
+  border-color: var(--color-line-2);
+  background: var(--color-ink-800);
+}
+html[data-glass="off"] .gl-bead {
+  background-image: none;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 1px 3px rgb(0 0 0 / calc(0.35 * var(--shade, 1)));
+}
+html[data-glass="off"] :is(.lg, .gl-float) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
 html[data-motion-tier="pro"] {
   --mt-d: 1;
 }

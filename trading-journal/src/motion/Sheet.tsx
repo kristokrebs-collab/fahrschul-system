@@ -23,6 +23,11 @@ export interface SheetProps {
   size?: "md" | "lg";
   /** Shared-layout source id (`new-trade-{fabCycle}`, `setup-card-{id}`); without it the sheet slides in. */
   layoutId?: string;
+  /**
+   * A large faded figure in the pane's top right corner, under the body (`.gp-mark`, decorative): only where it says
+   * something (the step „02“ of a wizard) – never as mere ornament.
+   */
+  mark?: string;
   /** Extra header content (right of the title, left of the close button). */
   headerExtra?: ReactNode;
   footer?: ReactNode;
@@ -66,6 +71,8 @@ interface Flung extends SwipeDismissInfo {
 const BODY_REVEAL_MS = bodyRevealDelay(spring.sheet) * 1000;
 
 const SHADOW = "shadow-[0_30px_80px_rgb(0_0_0/calc(0.6*var(--shade,1)))]";
+/** The shared glass pane (`.glass-panel`, shell-motion.css) casts its own shadow; a morphing pane leaves it to the unscaled sibling. */
+const NO_DROP = "[--gp-drop:0_0_#0000]";
 const WIDTH: Record<NonNullable<SheetProps["size"]>, string> = { md: "sm:max-w-[540px]", lg: "sm:max-w-[860px]" };
 
 /** Morph body: fades up from ≈ 65 % of the morph (no extra delay) and cascades its `StaggerItem`s. */
@@ -127,7 +134,7 @@ const CONTENT_VARIANTS: Variants = { gone: (f: Flung | null | undefined) => (f ?
  * lifted – with the focus return – after the exit. `layoutRoot` sits on the fixed overlay, never on the morphing
  * panel (Motion forces a layoutRoot node's own layout animation to `type: false`, which killed the morph).
  */
-export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra, footer, children, className, onOpened, handoff, dismissGuard, onDismissAttempt }: SheetProps) {
+export function Sheet({ open, onClose, title, size = "md", layoutId, mark, headerExtra, footer, children, className, onOpened, handoff, dismissGuard, onDismissAttempt }: SheetProps) {
   const desktop = useIsDesktop();
   const reduced = useReducedFx();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -303,9 +310,9 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
                   layoutId={layoutId}
                   style={{ borderRadius: radius.sheet }}
                   className={cn(
-                    "relative flex min-h-0 w-full flex-col overflow-hidden rounded-t-3xl border border-line-2 bg-ink-850 outline-none sm:rounded-3xl",
+                    "glass-panel relative flex min-h-0 w-full flex-col overflow-hidden rounded-t-3xl border border-line-2 bg-ink-850 outline-none sm:rounded-3xl",
                     // a sliding panel only moves by transform, so its own shadow is never repainted mid-flight
-                    !morph && SHADOW,
+                    morph ? NO_DROP : SHADOW,
                     WIDTH[size],
                     className,
                   )}
@@ -343,7 +350,7 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
                         type="button"
                         onClick={() => requestClose("close")}
                         aria-label="Schließen"
-                        className="grid size-9 place-items-center rounded-xl border border-line-2 text-mute transition-colors hover:text-fg pointer-coarse:size-11 [&>svg]:size-4"
+                        className="glass-chip grid size-9 place-items-center rounded-xl border border-line-2 text-mute transition-colors hover:text-fg pointer-coarse:size-11 [&>svg]:size-4"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                           <path d="M6 6l12 12M18 6 6 18" />
@@ -351,6 +358,12 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
                       </button>
                     </div>
                   </motion.div>
+                  {/* the faded figure lies in the glass, under the body (z −1 inside the pane's own stacking context) */}
+                  {mark && (
+                    <span aria-hidden="true" data-testid="sheet-mark" className="gp-mark">
+                      {mark}
+                    </span>
+                  )}
                   <SheetBody morph={morph} ready={bodyReady}>
                     {children}
                   </SheetBody>

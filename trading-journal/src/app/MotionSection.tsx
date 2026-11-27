@@ -4,13 +4,16 @@
  * the other with the chosen profile (reduced: all at once) – the same wave the sidebar plays on the first load.
  */
 import { useEffect, useRef, useState } from "react";
+import { chooseGlass } from "@/app/glassSync";
 import { replayLogo } from "@/app/logoSeq";
+import { GLASS_PREFS, GLASS_STRINGS, glassOfSettings, useGlass, type GlassPref } from "@/motion/glass";
 import { MOTION_MODES, MOTION_STRINGS, useMotionPref, type MotionMode } from "@/motion/profile";
 import { FEEDBACK_STRINGS, useFeedbackPref } from "@/motion/processFeedback";
 import { Switch } from "@/motion/Switch";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
+import { useJournal } from "@/store/journalStore";
 
 /** Marks in the preview strip. */
 const DOTS = 5;
@@ -64,7 +67,28 @@ export function MotionSection() {
           {MOTION_STRINGS.logo}
         </Button>
       </div>
+      <GlassRows />
       <FeedbackRows />
+    </div>
+  );
+}
+
+/**
+ * „Glas-Look“ (Runde 14): Glas or Flach for every window, the menu and the controls (`@/motion/glass`, `html[data-glass]`). The pick
+ * shows at once and is saved with the settings (sync, backup). Where the browser or a system setting rules glass out, that is said.
+ */
+function GlassRows() {
+  const pref = useJournal((s) => glassOfSettings(s.settings));
+  const shown = useGlass();
+  return (
+    <div className="grid gap-2.5 border-t border-line pt-4" data-testid="glass-section">
+      <span id="glass-label" className="label">
+        {GLASS_STRINGS.title}
+      </span>
+      <Segmented<GlassPref> aria-label={GLASS_STRINGS.group} size="sm" value={pref} onChange={(v) => void chooseGlass(v)} options={GLASS_PREFS.map((v) => ({ v, label: GLASS_STRINGS.modes[v] }))} />
+      <p className="text-[12px] text-mute" data-testid="glass-hint">
+        {GLASS_STRINGS.hint} {pref === "on" && !shown ? GLASS_STRINGS.blocked : GLASS_STRINGS.auto}
+      </p>
     </div>
   );
 }
