@@ -499,7 +499,7 @@ _Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 7 Funktionen
 
 ### Konto, Einstellungen & Hilfe
 
-_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 28 Funktionen
+_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 29 Funktionen
 
 **Verbindungen**
 
@@ -540,6 +540,7 @@ _Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 28 Funktionen
 |---|---|---|---|
 | Hell, Dunkel und Akzentfarbe wählen | Darstellung: Hell, Dunkel, Akzent | Einstellungen › Darstellung | fertig |
 | Die Bewegung der Oberfläche einstellen | Bewegung: reduzieren oder volles Profil | Einstellungen › Darstellung | fertig |
+| Zwischen Glas und flachem Aussehen wählen | Glas-Look: Glas oder Flach | Einstellungen › Darstellung | fertig |
 | Dein eigenes Dashboard zusammenstellen | Eigenes Dashboard (Cockpit) | Cockpit | fertig |
 | Eine Seite finden, ohne zu suchen | Seitenleiste und Menü | Übersicht – Handy: „Mehr“ unten → Menü · Tablet und Computer: Seitenleiste links (unten „Anheften“) | fertig |
 | Die App am Handy mit dem Daumen bedienen | Klare mobile Oberfläche | Übersicht – Handy: untere Leiste → Mehr → Menü mit Suchfeld · Hell/Dunkel unter Einstellungen → Darstellung | teilweise |

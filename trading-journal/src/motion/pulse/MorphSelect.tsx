@@ -754,7 +754,8 @@ export function MorphSelect<T extends string = string>({
             data-state={phase}
             inert={phase !== "open" || undefined}
             aria-hidden={phase === "closed" || undefined}
-            className="fixed overflow-hidden border border-line-2 bg-ink-850 text-fg"
+            data-gp="sm"
+            className="glass-panel fixed overflow-hidden border border-line-2 bg-ink-850 text-fg"
             style={{
               left: g.left,
               top: g.top,

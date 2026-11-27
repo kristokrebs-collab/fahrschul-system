@@ -271,11 +271,13 @@ function WipeFrame({ dialogRef, onKeyDown, reduced, onOpened, children }: FrameP
       ref={dialogRef}
       {...dialogProps}
       onKeyDown={onKeyDown}
-      className="fixed inset-0 z-[75] overflow-hidden bg-black outline-none"
+      // Runde 14: the shared glass pane (`html[data-glass="on"]`), full screen – flat it stays the black panel
+      className="glass-panel fixed inset-0 z-[75] overflow-hidden bg-black outline-none [--gp-drop:0_0_#0000]"
       initial={reduced ? false : { transform: SLANT.from.panel }}
       animate={{ transform: SLANT.rest.panel }}
       exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { transform: SLANT.to.panel, transition: WIPE }}
       transition={WIPE}
+      data-gp="full"
       onAnimationComplete={onOpened}
     >
       <motion.div
@@ -320,7 +322,7 @@ function SheetFrame({ dialogRef, onKeyDown, reduced, onOpened, swipe, columnRef,
       </motion.div>
       <motion.div ref={columnRef} className="absolute inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top,0px)+10px)]" style={swipe.style} variants={SHEET_COLUMN} exit="gone">
         <motion.div
-          className="relative size-full overflow-hidden rounded-t-3xl border border-b-0 border-line-2 bg-black"
+          className="glass-panel relative size-full overflow-hidden rounded-t-3xl border border-b-0 border-line-2 bg-black [--gp-drop:0_0_#0000]"
           // Runde 13: the sheet rises on a slant – its top edge tilted (the left corner leads), straight when it lands; the content is counter-skewed
           initial={reduced ? false : { y: "100%", skewY: CONFIG.sheetSlantDeg }}
           animate={{ y: 0, skewY: 0 }}
@@ -503,7 +505,7 @@ function Panel({ reduced, onFling }: { reduced: boolean; onFling: (info: SwipeDi
             type="button"
             onClick={() => closeCommandNav()}
             aria-label={COMMAND_NAV_STRINGS.close}
-            className="tap grid shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg"
+            className="glass-chip tap grid shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg"
           >
             {/* the header's burger, in the same place: it turns into the cross as the menu arrives and back as it leaves */}
             <Burger open={open && cross} />
@@ -561,7 +563,7 @@ function Panel({ reduced, onFling }: { reduced: boolean; onFling: (info: SwipeDi
                               onPointerEnter={() => preloadPage(p)}
                               onFocus={() => preloadPage(p)}
                               onPointerDown={() => preloadPage(p)}
-                              className="cmdnav-link group/link relative flex h-full min-h-14 items-center gap-3 rounded-xl border border-line-2 bg-ink-900 px-3 py-2.5 text-fg outline-none transition-[opacity,border-color] duration-[250ms] hover:border-white/30 focus-visible:border-white/60"
+                              className="cmdnav-link glass-chip group/link relative flex h-full min-h-14 items-center gap-3 rounded-xl border border-line-2 bg-ink-900 px-3 py-2.5 text-fg outline-none transition-[opacity,border-color] duration-[250ms] hover:border-white/30 focus-visible:border-white/60"
                             >
                               <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg border border-line-2 text-mute group-hover/link:text-fg [&>svg]:size-[18px]">
                                 <Icon name={PAGE_ICON[p]} />
@@ -614,7 +616,7 @@ function Panel({ reduced, onFling }: { reduced: boolean; onFling: (info: SwipeDi
                   data-cmd-item=""
                   onClick={(e) => a.run(e)}
                   aria-pressed={a.pressed}
-                  className="group/action flex w-full items-center gap-4 rounded-2xl border border-line-2 bg-ink-900 px-4 py-4 text-left outline-none transition-colors duration-200 hover:border-white/30 focus-visible:border-white/60"
+                  className="glass-chip group/action flex w-full items-center gap-4 rounded-2xl border border-line-2 bg-ink-900 px-4 py-4 text-left outline-none transition-colors duration-200 hover:border-white/30 focus-visible:border-white/60"
                 >
                   <span
                     aria-hidden="true"
@@ -643,7 +645,7 @@ function Panel({ reduced, onFling }: { reduced: boolean; onFling: (info: SwipeDi
                           useViews.getState().applyView(v.id);
                           go("trades");
                         }}
-                        className="max-w-full truncate rounded-full border border-line-2 px-3 py-1.5 text-[12.5px] text-fg outline-none transition-colors duration-200 hover:border-white/30 focus-visible:border-white/60 pointer-coarse:min-h-11"
+                        className="glass-chip max-w-full truncate rounded-full border border-line-2 px-3 py-1.5 text-[12.5px] text-fg outline-none transition-colors duration-200 hover:border-white/30 focus-visible:border-white/60 pointer-coarse:min-h-11"
                       >
                         {v.name}
                       </button>
@@ -667,7 +669,7 @@ function Panel({ reduced, onFling }: { reduced: boolean; onFling: (info: SwipeDi
                           closeCommandNav(true);
                           void import("@/app/featureOpen").then((m) => m.openFeature(c.id));
                         }}
-                        className="max-w-full truncate rounded-full border border-line-2 px-3 py-1.5 text-[12.5px] text-fg outline-none transition-colors duration-200 hover:border-white/30 focus-visible:border-white/60 pointer-coarse:min-h-11"
+                        className="glass-chip max-w-full truncate rounded-full border border-line-2 px-3 py-1.5 text-[12.5px] text-fg outline-none transition-colors duration-200 hover:border-white/30 focus-visible:border-white/60 pointer-coarse:min-h-11"
                       >
                         {c.name}
                       </button>

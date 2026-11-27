@@ -18,6 +18,7 @@ import { PageHost } from "@/app/PageHost";
 import { PageSkeleton } from "@/app/PageSkeleton";
 import { isLazyPage, lazyView, OverviewView, PAGE_FEATURE, preloadPage, SettingsView, SetupsView, TradesView, type LazyPage } from "@/app/pages";
 import { installViewportInset } from "@/app/pwa";
+import { installGlassSync } from "@/app/glassSync";
 import { ScenarioWatcher } from "@/app/ScenarioWatcher";
 import { ShortcutHost } from "@/app/ShortcutHost";
 import { preloadOverlay } from "@/app/overlayLoad";
@@ -296,6 +297,7 @@ function Shell() {
   const bannerOpen = useLocalBannerOpen();
   // grey-bar fix: `--vv-bottom` follows host UI laid over the bottom of the page (visualViewport, event driven)
   useEffect(() => installViewportInset(), []);
+  useEffect(() => installGlassSync(), []);
   return (
     <MorphDialogProvider>
       <ScenarioWatcher />

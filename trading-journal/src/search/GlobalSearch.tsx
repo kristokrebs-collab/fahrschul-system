@@ -11,6 +11,7 @@ import { FULLSCREEN_WIPE_CONFIG } from "@/motion/pulse";
 import { STAGGER_HIDDEN, STAGGER_SHOWN, StaggerItem } from "@/motion/Stagger";
 import { TextScramble } from "@/motion/TextScramble";
 import { stagger, tween } from "@/motion/tokens";
+import { useGlass } from "@/motion/glass";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
 import { useOverlayLane } from "@/primitives/toastStore";
@@ -96,6 +97,7 @@ function useIndex() {
 
 export function GlobalSearch() {
   const reduced = useReducedFx();
+  const glass = useGlass();
   const present = useIsPresent();
   const seed = useSearch((s) => s.seed);
   const [query, setQuery] = useState(seed);
@@ -182,17 +184,29 @@ export function GlobalSearch() {
           exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: tween.exit }}
         >
           {/* signal curtain: leads the ink panel by `curtainLead` (decorative), gone once the panel has landed */}
-          {!reduced && !opened && (
-            <motion.div
-              aria-hidden="true"
-              className="absolute inset-[1px] rounded-[inherit] bg-signal"
-              initial={{ transform: "translateX(-101%)" }}
-              animate={{ transform: "translateX(0%)" }}
-              transition={WIPE}
-            />
-          )}
+          {/* Runde 14, glass on: the pane is translucent (a full red curtain would shine through) – the signal rides as a hairline on its leading edge */}
+          {!reduced &&
+            !opened &&
+            (glass ? (
+              <motion.span
+                aria-hidden="true"
+                data-search-accent=""
+                className="menu-accent pointer-events-none absolute inset-y-0 z-10 w-1.5"
+                initial={{ left: "-1%", opacity: 0 }}
+                animate={{ left: "99%", opacity: [0, 1, 1, 0] }}
+                transition={{ left: { ...WIPE, delay }, opacity: { duration: (CONFIG.wipeMs + 160) / 1000, times: [0, 0.18, 0.7, 1], ease: "linear" } }}
+              />
+            ) : (
+              <motion.div
+                aria-hidden="true"
+                className="absolute inset-[1px] rounded-[inherit] bg-signal"
+                initial={{ transform: "translateX(-101%)" }}
+                animate={{ transform: "translateX(0%)" }}
+                transition={WIPE}
+              />
+            ))}
           <motion.div
-            className="relative border border-line-2 bg-ink-850 [border-radius:inherit]"
+            className="glass-panel relative border border-line-2 bg-ink-850 [border-radius:inherit] [--gp-drop:0_0_#0000]"
             initial={reduced ? { opacity: 0 } : { transform: "translateX(-101%)" }}
             animate={reduced ? { opacity: 1 } : { transform: "translateX(0%)" }}
             transition={reduced ? { duration: 0 } : { ...WIPE, delay }}

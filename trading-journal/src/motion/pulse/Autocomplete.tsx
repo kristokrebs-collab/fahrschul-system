@@ -346,7 +346,8 @@ export function Autocomplete({
             data-placement={geo.up ? "top" : "bottom"}
             data-state={open ? "open" : "closed"}
             onMouseDown={(e) => e.preventDefault()}
-            className={cn("fixed overflow-y-auto overscroll-contain rounded-xl border border-line-2 bg-ink-850 text-fg", !open && "pointer-events-none")}
+            data-gp="sm"
+            className={cn("glass-panel fixed overflow-y-auto overscroll-contain rounded-xl border border-line-2 bg-ink-850 text-fg", !open && "pointer-events-none")}
             style={{
               left: geo.left,
               width: geo.width,

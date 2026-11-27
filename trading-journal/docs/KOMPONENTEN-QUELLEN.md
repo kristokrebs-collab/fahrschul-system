@@ -44,3 +44,21 @@ eine Zeile** (Regel aus `docs/LAUNCH-PLAN.md` §2). Ehrlich: „Idee übernommen
 
 Hinweis zur Herkunft: Für dieses Paket wurde kein 21st.dev-Abruf gemacht (Tageskontingent geschont); es gibt daher keine Fremdlizenz in dieser Tabelle. Sollte ein späterer Schritt
 eine konkrete Komponente übernehmen, kommt hier eine Zeile mit Autor, URL, Lizenz und Anpassung dazu.
+
+## Runde 14 – Glas-Fenster (Paket GF1)
+
+Eine Familie für alles, was aufklappt (`.glass-panel`, `.glass-bar`, `.glass-chip`, `.gp-mark` in `src/styles/shell-motion.css`), und der Schalter „Glas-Look: Glas · Flach“ (`src/motion/glass.ts`, `html[data-glass]`). Angesehen wurden auf 21st.dev (Suche über das MCP-Werkzeug, 2026-11-27) die folgenden Treffer; bei zweien wurde der Quelltext gelesen (Tageskontingent: 2 Abrufe), bei den übrigen nur Vorschau und Beschreibung. **Kein Code übernommen**, alles mit unseren Tokens nachgebaut; keine fremden Marken.
+
+| Treffer (21st.dev) | Link | gelesen | daraus gelernt / als Idee übernommen |
+|---|---|---|---|
+| Glass Card (educalvolpz) | https://21st.dev/@educalvolpz/components/glass-card | Quelltext | Schichtung: Tönung + Unschärfe mit Sättigung ≈ 160 %, innere Lichtkante oben, Schatten unten für Dicke, getrennter Schlagschatten; Linse nur in Chromium, sonst Unschärfe → `--gp-edge`, `--gp-drop`, Linse nur bei `data-gp="sm"` |
+| Command Palette (sarmaasis, Caliper UI) | https://21st.dev/@sarmaasis/components/command-palette | Quelltext | Palette als dichte Fläche mit 24-px-Unschärfe über der abgedunkelten App, dünner Ring statt harter Kante → Suche (`GlobalSearch`) als `.glass-panel` |
+| Dialog (ghaerdi) | https://21st.dev/@ghaerdi/components/dialog | Vorschau | Glas-Dialog: die Abdunklung bleibt Vollton, nur der Körper ist Glas → `Sheet`, `MorphDialog`, `TradeDetail` |
+| Adaptive Sheet (adit-firdaus) | https://21st.dev/@adit-firdaus/components/sheet | Vorschau | Blatt unten am Handy, Dialog am Desktop, Griff oben – bestätigt den Aufbau von `Sheet`; Glas nur auf dem Körper |
+| Drawer (wensity) | https://21st.dev/@wensity/components/drawer | Vorschau | Griff und Ziehen zum Schließen bleiben über dem Glas bedienbar (Kopf als Griff) |
+| Liquid Select (liquefy-ui) | https://21st.dev/@liquefy-ui/components/liquid-select | Vorschau | Auswahlliste als kleines Milchglas-Popover → `MorphSelect`, `Autocomplete`, Suchfeld-Liste mit `data-gp="sm"` |
+| Liquid Glass Hover Card (obaidqatan) | https://21st.dev/@obaidqatan/components/liquid-glass-hover-card | Vorschau | kleines schwebendes Glas mit eigenem, kürzerem Schatten → `--gp-drop` der kleinen Variante |
+| Glassmorphism Navigation (akashsingh890901-crypto) | https://21st.dev/@akashsingh890901-crypto/components/glassmorphism-navigation | Vorschau | Menü-Einträge als hellere Glas-Kacheln auf der Glasfläche → `.glass-chip` im Menü |
+| Animated AI Chat (jatin-yadav05) | https://21st.dev/@jatin-yadav05/components/animated-ai-chat | Vorschau | Assistent: Vorschlags-Pillen mit Glasfüllung, weiches Farblicht hinter der Fläche → `.glass-chip`, Farblicht aus `--color-signal` |
+
+Weitere Quellen: die Bilder 15–21 des Nutzers (Milchglas-Karte mit dünnem hellem Rand, verblasste Großziffer, Glas-Pillen; ruhige, edle Materialität), das Glas-Rezept aus Runde 13 (`--gl-*`, Linsen `#lg` / `#lgd`) und `docs/ANIMATIONEN-MATRIX.md`. Die Videos wurden in diesem Paket nicht erneut Bild für Bild ausgewertet; die Bewegungswerte (Staffel 45 ms, weiches Auslaufen) stammen aus den früheren Auswertungen. Nachweis: `tests/unit/motion.glass.test.ts`, `tests/e2e/glas-fenster.spec.ts`.

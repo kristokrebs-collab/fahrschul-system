@@ -370,7 +370,7 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby={titleId}
-                  className="pointer-events-auto relative max-h-[86vh] w-full overflow-y-auto overscroll-contain border border-line-2 bg-gradient-to-b from-ink-750 to-ink-800 outline-none"
+                  className="glass-panel pointer-events-auto relative max-h-[86vh] w-full overflow-y-auto overscroll-contain [--gp-drop:0_0_#0000] border border-line-2 bg-gradient-to-b from-ink-750 to-ink-800 outline-none"
                   style={{ borderRadius: radius.dialog, opacity: handoff, pointerEvents: hits }}
                   layoutCrossfade={false}
                   transition={{ layout: spring.morph }}
@@ -379,7 +379,7 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
                   <motion.div
                     ref={touchGuard}
                     data-dialog-handle=""
-                    className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-gradient-to-b from-ink-750 via-ink-750/95 to-transparent px-6 pb-3 pt-5 pointer-coarse:cursor-grab pointer-coarse:active:cursor-grabbing"
+                    className="glass-bar sticky top-0 z-10 flex items-center justify-between gap-3 bg-gradient-to-b from-ink-750 via-ink-750/95 to-transparent px-6 pb-3 pt-5 pointer-coarse:cursor-grab pointer-coarse:active:cursor-grabbing"
                     variants={open.pill && !reduced ? HEAD : undefined}
                     initial={STAGGER_HIDDEN}
                     animate={STAGGER_SHOWN}
@@ -394,7 +394,7 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
                       type="button"
                       onClick={dismiss}
                       aria-label="Schließen"
-                      className="touch-hit grid size-8 place-items-center rounded-full border border-line-2 text-mute transition-colors hover:text-fg"
+                      className="glass-chip touch-hit grid size-8 place-items-center rounded-full border border-line-2 text-mute transition-colors hover:text-fg"
                     >
                       {CLOSE_GLYPH}
                     </button>

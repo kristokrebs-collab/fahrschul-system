@@ -114,6 +114,7 @@ export function OnboardingTour() {
       title={TOUR.title}
       size="lg"
       dismissGuard={false}
+      mark={String(step + 1).padStart(2, "0")}
       headerExtra={<DotMatrixText text={`${step + 1}:${STEP_COUNT}`} size={3} gap={1.5} tone="mute" label={`Schritt ${step + 1} von ${STEP_COUNT}`} />}
       footer={
         <div className="flex w-full flex-wrap items-center justify-between gap-2.5">

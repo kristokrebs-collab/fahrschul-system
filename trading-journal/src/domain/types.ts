@@ -389,6 +389,11 @@ export interface Settings {
    * two-tab merge works per entry; entries a newer version wrote survive untouched.
    */
   aiLog?: unknown;
+  /**
+   * Glas-Look (Runde 14): "on" (milk-glass windows, lenses, light edges) or "off" (the flat, opaque look). Absent = "on"; see
+   * `@/motion/glass` (`html[data-glass]`). Travels with sync, backup and import like every setting.
+   */
+  glass?: "on" | "off";
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */
