@@ -1082,3 +1082,465 @@
     transition-duration: 0ms;
   }
 }
+
+/* ================================================================================================================================
+   Runde 14 – GLAS (zuschaltbar): alles ab hier gilt nur unter `html[data-glass="on"]` (Einstellung „Glas“ / „Flach“; ohne das Attribut
+   und mit „off“ bleibt das Fenster oben unverändert). Dieselbe Papier-Insel als MILCHGLAS: das Fenster ist EINE schwebende Glasfläche
+   (`backdrop-filter` nur am Fensterkörper, nur im Querformat, nur solange es offen ist) – links oben dünner („Rauchglas“, dort liegt die
+   Karte), zum Text hin fast deckend (Text ≥ 4,5 : 1 auf jedem Grund); die Formularseite ist eine ruhige Milchglas-Tafel im Glasrahmen;
+   Übersicht und Felder sind Glas derselben Familie (`--gw-rim` = Lichtkante, `--gw-in` = Licht oben + Dicke unten); die Karte hat Glanz,
+   Lichtkante und Dicke. „Bezahlt“ (nur nach dem Server): ein ruhiger Schein in der Erfolgsfarbe, der hinter der Karte hervorkommt.
+   Mit der Glas-Schicht kommen drei Korrekturen: die Zeilen des Formulars stehen enger (`--pw-top-g`), damit der Fuß ohne Rollen passt;
+   „Heute fällig“ klebt am Fuß der Übersicht; auf dem Handy steht der Status UNTER der Karte. Rückfälle (deckend, ohne Filter) stehen
+   zusätzlich hier, auch wenn die App das Attribut dann zentral auf „off“ setzt.
+   ================================================================================================================================ */
+html[data-glass="on"] .pw-win {
+  --gw-thin: 46%;
+  --gw-rim: linear-gradient(150deg, #fff, rgb(255 255 255 / 0.55) 30%, rgb(255 255 255 / 0.18) 62%, rgb(255 240 232 / 0.7));
+  --gw-in: inset 0 1px 0 rgb(255 255 255 / 0.95), inset 1px 0 0 rgb(255 255 255 / 0.6), inset 0 -0.9cqw 1.2cqw -1cqw rgb(15 23 42 / 0.2);
+  --gw-field: inset 0 1px 2px rgb(15 23 42 / 0.09), inset 0 0 0 1px rgb(255 255 255 / 0.5), 0 1px 0 rgb(255 255 255 / 0.9);
+  border-radius: 2.8cqw;
+  border: 1px solid transparent;
+  background: radial-gradient(62% 52% at 22% 27%, color-mix(in srgb, var(--color-ink-850) calc(100% - var(--gw-thin)), transparent), color-mix(in srgb, var(--color-ink-900) 92%, transparent) 74%, color-mix(in srgb, var(--color-ink-950) 96%, transparent)) padding-box, var(--gw-rim) border-box;
+  box-shadow: var(--gw-in), 0 40px 90px rgb(0 0 0 / calc(0.45 * var(--shade, 1))), 0 8px 22px rgb(0 0 0 / calc(0.22 * var(--shade, 1)));
+}
+html[data-glass="on"] .pw-win[data-orient="landscape"] {
+  -webkit-backdrop-filter: blur(26px) saturate(1.6);
+  backdrop-filter: blur(26px) saturate(1.6);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-glass="on"] .pw-win {
+    --gw-thin: 0%;
+  }
+}
+html[data-glass="on"][data-safe-fx] .pw-win,
+html[data-glass="on"] .pw-win[data-orient="portrait"] {
+  --gw-thin: 0%;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+  html[data-glass="on"] .pw-win.pw-win {
+    --gw-thin: 0%;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+html[data-glass="on"] .pw-close {
+  color: var(--color-fg);
+  border: 1px solid transparent;
+  background: linear-gradient(var(--gl-tint), var(--gl-tint)) padding-box, var(--gl-rim) border-box;
+  -webkit-backdrop-filter: var(--gl-blur);
+  backdrop-filter: var(--gl-blur);
+  box-shadow: var(--gl-in), 0 6px 16px rgb(0 0 0 / calc(0.3 * var(--shade, 1)));
+}
+html[data-glass="on"] .pw-close:hover {
+  background: linear-gradient(var(--gl-tint), var(--gl-tint)) padding-box, var(--gl-rim) border-box;
+  box-shadow: var(--gl-in), var(--gl-glow), 0 6px 16px rgb(0 0 0 / calc(0.3 * var(--shade, 1)));
+}
+html[data-glass="on"] .pw-close:focus-visible {
+  outline: 2px solid var(--color-fg);
+}
+html[data-glass="on"] .pw-head {
+  border-bottom: 0;
+  background: linear-gradient(90deg, transparent, var(--color-line-2) 12%, var(--color-line-2) 88%, transparent) bottom / 100% 1px no-repeat, linear-gradient(180deg, color-mix(in srgb, var(--color-ink-850) 96%, transparent), color-mix(in srgb, var(--color-ink-850) 82%, transparent));
+}
+html[data-glass="on"] .pw-steps li + li::before {
+  content: "";
+  width: 1.9cqw;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-win);
+}
+html[data-glass="on"] .pw-dot[data-done] {
+  color: #fff;
+  background: var(--color-win);
+}
+html[data-glass="on"] .pw-dot[data-active] {
+  color: var(--color-ink-850);
+  background: var(--color-fg);
+}
+html[data-glass="on"] .pw-steps li[data-active] {
+  color: var(--color-fg);
+}
+html[data-glass="on"] .pw-steps li[data-active]::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--color-signal);
+}
+html[data-glass="on"] .pw-right {
+  inset: calc(9.4cqh + 0.9cqw) 0.9cqw 0.9cqw 50.6cqw;
+  border-radius: 2cqw;
+  border: 1px solid transparent;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-ink-850) 97%, transparent), color-mix(in srgb, var(--color-ink-800) 95%, transparent)) padding-box, var(--gw-rim) border-box;
+  box-shadow: var(--gw-in), 0 1.4cqw 3cqw -1.8cqw rgb(15 23 42 / 0.3);
+}
+html[data-glass="on"] .pw-left::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(46% 38% at 26% 24%, rgb(255 255 255 / 0.5), transparent 72%), radial-gradient(40% 30% at 54% 47%, color-mix(in srgb, var(--color-signal) 24%, transparent), transparent 72%);
+  pointer-events: none;
+}
+html[data-glass="on"] .pw-plate {
+  border: 1px solid transparent;
+  background: linear-gradient(150deg, rgb(255 255 255 / 0.7), rgb(255 255 255 / 0.4)) padding-box, var(--gw-rim) border-box;
+  box-shadow: var(--gw-in), 0 0 2.6cqw color-mix(in srgb, var(--color-signal) 40%, transparent);
+}
+html[data-glass="on"] .pc-face {
+  color: #ececea;
+  --pc-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 -.08'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.2'/%3E%3C/svg%3E");
+  background: var(--pc-grain) 0 0 / 140px 140px, linear-gradient(112deg, transparent 39%, rgb(255 255 255 / 0.075) 47.5%, rgb(255 255 255 / 0.02) 53%, transparent 60%), radial-gradient(110% 90% at 0% 0%, rgb(255 255 255 / 0.08), transparent 56%), radial-gradient(70% 80% at 106% 112%, color-mix(in srgb, var(--color-signal) 20%, transparent), transparent 72%), linear-gradient(150deg, #2c2c2c 0%, #1b1b1b 46%, var(--color-white) 100%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.17), inset 1px 0 0 rgb(255 255 255 / 0.07), inset 0 -0.7cqw 0.9cqw -0.6cqw rgb(0 0 0 / 0.6), 0 0 0 1px rgb(0 0 0 / 0.45), 0 0.3cqw 0 0 #050505, 0 2.2cqw 3.6cqw -1.3cqw rgb(0 0 0 / 0.42), 0 0.6cqw 1cqw -0.4cqw rgb(0 0 0 / 0.22);
+}
+html[data-glass="on"] .pc-nfc {
+  color: rgb(236 236 234 / 0.42);
+}
+html[data-glass="on"] .pc-chip {
+  filter: brightness(0.62) contrast(1.08);
+}
+html[data-glass="on"] .pc-mark b {
+  text-shadow: 0 -1px 0 rgb(0 0 0 / 0.75), 0 1px 0 rgb(255 255 255 / 0.13);
+}
+html[data-glass="on"] .pc-mark small {
+  color: rgb(236 236 234 / 0.6);
+}
+html[data-glass="on"] .pc-number {
+  text-shadow: 0 -1px 0 rgb(0 0 0 / 0.75), 0 1px 0 rgb(255 255 255 / 0.13);
+}
+html[data-glass="on"] .pc-number span {
+  color: rgb(236 236 234 / 0.3);
+}
+html[data-glass="on"] .pc-number span[data-on] {
+  color: #ececea;
+}
+html[data-glass="on"] .pc-field small {
+  color: rgb(236 236 234 / 0.6);
+}
+html[data-glass="on"] .pc-value {
+  color: rgb(236 236 234 / 0.36);
+  text-shadow: 0 -1px 0 rgb(0 0 0 / 0.75), 0 1px 0 rgb(255 255 255 / 0.13);
+}
+html[data-glass="on"] .pc-value[data-on],
+html[data-glass="on"] .pc-value:has(.pc-fall) {
+  color: #ececea;
+}
+html[data-glass="on"] .pc-ph {
+  color: rgb(236 236 234 / 0.34);
+}
+html[data-glass="on"] .pc-face .pc-brand {
+  color: #ececea;
+  text-shadow: 0 -1px 0 rgb(0 0 0 / 0.75), 0 1px 0 rgb(255 255 255 / 0.13);
+}
+html[data-glass="on"] .pc-stripe {
+  background: var(--pc-grain) 0 0 / 140px 140px, linear-gradient(180deg, #0c0c0c, #050505);
+  box-shadow: inset 0 1px 0 rgb(0 0 0 / 0.8), 0 1px 0 rgb(255 255 255 / 0.07), 0 -0.35cqw 0 color-mix(in srgb, var(--color-signal) 26%, transparent);
+}
+html[data-glass="on"] .pc-hatch {
+  background: repeating-linear-gradient(118deg, #2e2e2e 0 0.35cqw, #383838 0.35cqw 0.7cqw);
+  border: 1px solid rgb(0 0 0 / 0.5);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.5);
+}
+html[data-glass="on"] .pc-cvc {
+  background: linear-gradient(180deg, #dcdcd9, #d2d2cf);
+  border: 1px solid rgb(0 0 0 / 0.5);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.28);
+}
+html[data-glass="on"] .pc-cvc[data-on] {
+  color: #121212;
+}
+html[data-glass="on"] .pc-fine {
+  color: rgb(236 236 234 / 0.6);
+}
+html[data-glass="on"] .pw-sheen > i {
+  width: 34%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.2), transparent);
+}
+html[data-glass="on"] .pw-summary {
+  top: 58.6cqh;
+  max-height: 40.3cqh;
+  padding: 1.3cqh 1.9cqw 0;
+  border-radius: 2.2cqw;
+  border: 1px solid transparent;
+  background: linear-gradient(165deg, color-mix(in srgb, var(--color-ink-850) 96%, transparent), color-mix(in srgb, var(--color-ink-850) 86%, transparent)) padding-box, var(--gw-rim) border-box;
+  box-shadow: var(--gw-in), 0 1.2cqh 3cqh -1.6cqh rgb(15 23 42 / 0.3);
+}
+html[data-glass="on"] .pw-row [data-tone="win"] {
+  color: var(--color-win);
+}
+html[data-glass="on"] .pw-total::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 calc(100% + 1px);
+  height: 1.6cqh;
+  background: linear-gradient(transparent, var(--color-ink-850));
+  pointer-events: none;
+}
+html[data-glass="on"] .pw-total {
+  position: sticky;
+  bottom: 0;
+  margin: 0.6cqh -1.9cqw 0;
+  padding: 0.9cqh 1.9cqw 1.1cqh;
+  background: var(--color-ink-850);
+}
+html[data-glass="on"] .pw-abs {
+  top: calc(var(--pw-top-g, var(--pw-top)) * 1cqh - 9.4cqh);
+}
+html[data-glass="on"] .pw-box {
+  border-radius: 1.4cqw;
+  background: linear-gradient(180deg, var(--color-ink-800), var(--color-ink-850) 60%);
+  box-shadow: var(--gw-field);
+}
+html[data-glass="on"] .pw-box[data-focus] {
+  box-shadow: var(--gw-field), 0 0 0 0.35cqw color-mix(in srgb, var(--color-signal) 18%, transparent);
+}
+html[data-glass="on"] .pw-box[data-invalid] {
+  box-shadow: var(--gw-field), 0 0 0 0.35cqw color-mix(in srgb, var(--color-loss) 13%, transparent);
+}
+html[data-glass="on"] .pw-box input::placeholder {
+  color: var(--color-faint);
+}
+html[data-glass="on"] .pw-mount input::placeholder {
+  color: var(--color-faint);
+}
+html[data-glass="on"] .pw-flow {
+  top: calc(60.1cqh - 9.4cqh);
+  bottom: 1.8cqh;
+  gap: 0.9cqh;
+}
+html[data-glass="on"] .pw-consents {
+  gap: 0.7cqh;
+  padding: 1cqh 1.4cqw;
+  border-radius: 1.4cqw;
+  background: linear-gradient(180deg, var(--color-ink-800), var(--color-ink-850) 60%);
+  box-shadow: var(--gw-field);
+}
+html[data-glass="on"] .pw-check input:checked + .pw-tick {
+  background: var(--color-signal);
+}
+html[data-glass="on"] .pw-check input:focus-visible + .pw-tick {
+  outline: 2px solid var(--color-fg);
+}
+@media (pointer: coarse) {
+  html[data-glass="on"] .pw-consents {
+    gap: 3px;
+    padding-block: 0.6cqh;
+  }
+}
+html[data-glass="on"] .pw-pay {
+  height: 7.6cqh;
+  border-radius: 1.4cqw;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.38), inset 0 -0.5cqw 0.7cqw -0.5cqw rgb(0 0 0 / 0.3), 0 1.6cqh 3.4cqh -1.4cqh color-mix(in srgb, var(--color-signal) 70%, transparent);
+}
+html[data-glass="on"] .pw-pay:focus-visible {
+  outline: 2px solid var(--color-fg);
+}
+html[data-glass="on"] .pw-handover {
+  border-radius: 1.4cqw;
+  background: color-mix(in srgb, var(--color-ink-800) 60%, transparent);
+}
+html[data-glass="on"] .pw-status[data-on] {
+  pointer-events: auto;
+}
+html[data-glass="on"] .pw-status[data-state="confirmed"] {
+  z-index: 2;
+}
+html[data-glass="on"] .pw-status[data-state="confirmed"]::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -7cqh 24cqw -2.6cqh;
+  border-radius: 2.2cqw;
+  border: 1px solid color-mix(in srgb, var(--color-win) 34%, transparent);
+  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--color-win) 42%, transparent) 0 0.6cqw, transparent 0.6cqw 1.2cqw) 0 calc(100% - 2.6cqh - max(40px, 2.2cqh + 1.4cqw) - 0.7cqh) / 100% 1px no-repeat, linear-gradient(180deg, color-mix(in srgb, var(--color-win) 9%, var(--color-ink-850)), var(--color-ink-850) 58%);
+  box-shadow: var(--gw-in), 0 1.6cqh 3.4cqh -1.8cqh color-mix(in srgb, var(--color-win) 55%, transparent);
+  animation: pw-slip 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes pw-slip {
+  from {
+    opacity: 0;
+  }
+}
+html[data-glass="on"] .pw-status[data-state="confirmed"] .pw-status-sub {
+  max-width: 46cqw;
+}
+html[data-glass="on"] .pw-again {
+  background: linear-gradient(180deg, var(--color-ink-850), var(--color-ink-800));
+  box-shadow: var(--gw-field);
+}
+html[data-glass="on"] .pw-again:focus-visible {
+  outline: 2px solid var(--color-fg);
+}
+html[data-glass="on"] .pw-win[data-stage] .pw-form,
+html[data-glass="on"] .pw-win[data-stage] .pw-summary {
+  pointer-events: none;
+}
+html[data-glass="on"] .pw-overlay[data-orient="portrait"] {
+  padding: 0;
+}
+html[data-glass="on"] .pw-frame[data-orient="portrait"] {
+  width: 100vw;
+  height: 100dvh;
+}
+html[data-glass="on"] .pw-frame[data-orient="portrait"] .pw-close {
+  top: 10px;
+  z-index: 6;
+  color: #121212;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] {
+  height: 100%;
+  border-radius: 0;
+  border: 0;
+  background: linear-gradient(180deg, var(--color-ink-950) 0%, var(--color-ink-900) 55%, var(--color-ink-700) 100%);
+  box-shadow: none;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-head {
+  background: linear-gradient(var(--color-line), var(--color-line)) bottom / 100% 1px no-repeat, var(--color-ink-850);
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-head {
+  position: sticky;
+  top: 0;
+  height: 56px;
+  padding: 0 56px 0 16px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-logo {
+  gap: 8px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-logo-mark {
+  width: 28px;
+  height: 28px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-logo-mark span {
+  width: 8px;
+  height: 8px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-dot {
+  width: 18px;
+  height: 18px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-left,
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-right {
+  inset: 0;
+  position: fixed;
+  z-index: -1;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-body {
+  position: relative;
+  gap: 16px;
+  padding: 20px 16px 28px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-cardbox {
+  position: relative;
+  top: auto;
+  width: min(100%, 360px);
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pc-face {
+  border-radius: 14px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] :is(.pw-glow, .pw-glow-ok, .pw-sheen) {
+  border-radius: 14px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pc-chip {
+  width: 40px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pc-nfc {
+  width: 16px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pc-number {
+  gap: 12px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pc-value {
+  max-width: 150px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-summary,
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-form,
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-flow,
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-abs {
+  position: relative;
+  top: auto;
+  bottom: auto;
+  width: auto;
+  max-height: none;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-summary {
+  padding: 12px 14px 0;
+  border-radius: 18px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-total {
+  position: static;
+  margin: 8px -14px 0;
+  padding: 10px 14px 12px;
+  border-radius: 0 0 17px 17px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-form {
+  gap: 12px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-flow {
+  gap: 12px;
+  overflow: visible;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-box {
+  height: 48px;
+  border-radius: 14px;
+  padding: 0 12px 0 40px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-box > svg {
+  width: 16px;
+  height: 16px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-pair {
+  gap: 12px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-consents {
+  padding: 10px 12px;
+  gap: 10px;
+  border-radius: 14px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-check {
+  gap: 10px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-check .pw-tick,
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-check input {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-pay {
+  height: 52px;
+  border-radius: 14px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-status {
+  position: fixed;
+  top: calc(48.8% + min(50vw - 16px, 180px) * 0.681 + 26px);
+  bottom: auto;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-status[data-state="confirmed"]::before {
+  inset: -56px 16px -18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-win) 9%, var(--color-ink-850)), var(--color-ink-850) 58%);
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-status[data-state="confirmed"] .pw-status-sub {
+  max-width: calc(100vw - 72px);
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-spin {
+  width: 30px;
+  height: 30px;
+}
+html[data-glass="on"] .pw-win[data-orient="portrait"] .pw-status-sub {
+  max-width: 86vw;
+}
+@media (forced-colors: active) {
+  html[data-glass="on"] .pw-win,
+  html[data-glass="on"] .pw-right,
+  html[data-glass="on"] .pw-summary,
+  html[data-glass="on"] .pc-face {
+    border: 1px solid CanvasText;
+  }
+}

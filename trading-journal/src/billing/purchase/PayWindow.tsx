@@ -98,7 +98,15 @@ const Icon = {
 
 /** Row positions of the right column (share of the window height, measured § 2.1). */
 const ROWS = { title: 13.3, sub: 18.5, holderLabel: 23.9, holder: 26.9, numberLabel: 39.2, number: 42.4, pairLabel: 54.7, pair: 57.8 } as const;
-const at = (top: number) => ({ "--pw-top": top }) as React.CSSProperties;
+/**
+ * The same rows in the glass look (Runde 14, `html[data-glass="on"]`, payWindow.css reads `--pw-top-g`): they stand closer than in the
+ * recording (a field's box, then 2.4 % for its own message, then the next label). The recording has no consent boxes – with them the
+ * footer (trust line, note, „Tarif im Detail“) did not fit and sat below the fold of the column, most of all on a touch tablet with its
+ * 44-px links. The flat look keeps the measured rows.
+ */
+const ROWS_GLASS: Record<keyof typeof ROWS, number> = { title: 13.0, sub: 18.1, holderLabel: 22.4, holder: 25.4, numberLabel: 35.0, number: 38.0, pairLabel: 47.6, pair: 50.6 };
+const SHIFT = new Map<number, number>((Object.keys(ROWS) as (keyof typeof ROWS)[]).map((k) => [ROWS[k], ROWS_GLASS[k]]));
+const at = (top: number) => ({ "--pw-top": top, "--pw-top-g": SHIFT.get(top) ?? top - (ROWS.pair - ROWS_GLASS.pair) }) as React.CSSProperties;
 
 /** A required box (never pre-ticked): the whole row is its label, the square has a 44-px touch area. */
 function Check({ checked, onChange, invalid, testId, children }: { checked: boolean; onChange: (v: boolean) => void; invalid: boolean; testId: string; children: ReactNode }) {

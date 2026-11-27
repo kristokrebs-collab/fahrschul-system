@@ -204,6 +204,76 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
     await expect(page.getByRole("dialog", { name: "Anmelden" }).getByLabel("E-Mail")).toBeFocused({ timeout: 3_000 });
   });
 
+  test("Glas / Flach (Runde 14): „Flach“ und ohne Attribut wie bisher (kein Rahmen, kein Filter); „Glas“: Milchglas-Rahmen um die Karte, Formularhälfte deckend, Schließen als Glas-Pille; mit data-safe-fx ohne Filter", async ({ page }) => {
+    const { errors } = await setup(page);
+    await openRoute(page, PREISE, "Preise", { timeout: 30_000 });
+    await page.locator('[data-cloud-pill="signin"]').click();
+    const frame = page.locator(".aw-frame");
+    await expect(page.getByTestId("auth-card")).toBeVisible({ timeout: 20_000 });
+    await bandSettled(page);
+    const read = () =>
+      page.evaluate(() => {
+        const f = document.querySelector(".aw-frame")!;
+        const card = document.querySelector(".aw-card")!;
+        const bezel = getComputedStyle(f, "::before");
+        const blur = (el: Element, pseudo?: string) => {
+          const cs = getComputedStyle(el, pseudo);
+          return cs.backdropFilter || (cs as unknown as { webkitBackdropFilter?: string }).webkitBackdropFilter || "none";
+        };
+        const fr = f.getBoundingClientRect();
+        return {
+          bezel: blur(f, "::before"),
+          bezelInset: Number.parseFloat(bezel.top),
+          card: blur(card),
+          band: blur(document.querySelector(".aw-band-inner")!),
+          dim: blur(document.querySelector(".aw-dim")!),
+          cardBg: getComputedStyle(card).backgroundImage,
+          close: blur(document.querySelector(".aw-close")!),
+          closeBg: getComputedStyle(document.querySelector(".aw-close")!).backgroundColor,
+          bezelContent: bezel.content,
+          inView: fr.left + Number.parseFloat(bezel.left) >= 0 && fr.right - Number.parseFloat(bezel.right) <= document.documentElement.clientWidth,
+          box: [fr.left, fr.right, bezel.left, bezel.right, document.documentElement.clientWidth].join(" "),
+        };
+      });
+    // flat (no attribute, and "off"): the window of before – no frame, no filter, the old close button
+    for (const v of [null, "off"]) {
+      await page.evaluate((x) => (x ? document.documentElement.setAttribute("data-glass", x) : document.documentElement.removeAttribute("data-glass")), v);
+      const flat = await read();
+      expect(flat.bezelContent, `flat (${v})`).toBe("none");
+      expect([flat.card, flat.band, flat.dim, flat.close], `flat (${v})`).toEqual(["none", "none", "none", "none"]);
+      expect(flat.closeBg).toBe("rgba(255, 255, 255, 0.12)");
+    }
+    // Runde 14: the glass look is a setting (`html[data-glass]`, set by the app; here from outside) – this test is about „Glas“
+    await page.evaluate(() => document.documentElement.setAttribute("data-glass", "on"));
+    const glass = await read();
+    expect(glass.bezel).toContain("blur(22px)");
+    expect(glass.bezelInset).toBeLessThan(0);
+    expect(glass.card).toBe("none");
+    expect(glass.band).toBe("none");
+    expect(glass.dim).toBe("none");
+    expect(glass.close).not.toBe("none");
+    expect(glass.inView, "the glass frame stays on the screen: " + glass.box).toBe(true);
+    // the form half is paper all through (no alpha in its ground): the floating label in the accent keeps its contrast
+    expect(glass.cardBg).not.toMatch(/rgba\([^)]*,\s*0?\.\d+\)\s*100%/);
+    await expect(frame.locator(".aw-close")).toHaveAccessibleName("Schließen");
+    await expectNoHorizontalScroll(page);
+    // Samsung-Internet-safe effects: the same frame, solid – no filter anywhere in the window
+    await page.evaluate(() => document.documentElement.setAttribute("data-safe-fx", ""));
+    const safe = await read();
+    expect(safe.bezel).toBe("none");
+    expect(safe.card).toBe("none");
+    await page.evaluate(() => document.documentElement.removeAttribute("data-safe-fx"));
+    // the band run is untouched by the material: still one run, the card keeps its size
+    const before = await page.getByTestId("auth-card").boundingBox();
+    await page.getByTestId("auth-to-signup").click();
+    await expect(page.getByRole("dialog", { name: "Konto erstellen" })).toBeVisible({ timeout: 5_000 });
+    await bandSettled(page);
+    const after = await page.getByTestId("auth-card").boundingBox();
+    expect(Math.abs(after!.height - before!.height)).toBeLessThanOrEqual(1);
+    expect(Math.abs(after!.width - before!.width)).toBeLessThanOrEqual(1);
+    expect(errors).toEqual([]);
+  });
+
   test("offline: gesagt, bevor etwas gesendet wird – die Eingabe bleibt", async ({ page, context }) => {
     await setup(page);
     await returningBrowser(page);
