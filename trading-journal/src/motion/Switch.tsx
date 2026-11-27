@@ -80,9 +80,11 @@ export function Switch({ checked, onCheckedChange, size = "md", tone = "fg", dis
           style={{ originX: checked ? 1 : 0 }}
           transition={spring.press}
         >
-          <motion.span className="absolute inset-0 rounded-full shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_1px_3px_rgb(0_0_0/calc(0.35*var(--shade,1)))]" style={reduced ? undefined : { scaleX: stretch }}>
+          <motion.span className="absolute inset-0 rounded-full" style={reduced ? undefined : { scaleX: stretch }}>
             <span className="absolute inset-0 rounded-full bg-mute" />
             <motion.span className={cn("absolute inset-0 rounded-full", THUMB_ON[tone])} initial={false} animate={{ opacity: checked ? 1 : 0 }} transition={fade} />
+            {/* the bead of glass on top (Runde 13): a highlight top left, a shade below – over both inks */}
+            <span className="gl-bead absolute inset-0 rounded-full" />
           </motion.span>
         </motion.span>
       </motion.span>

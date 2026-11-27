@@ -223,6 +223,39 @@ unten dunkel), `--gl-face` / `--gl-on` (Fläche, aktiv), `--gl-in` (dünne Innen
 Belege: Vergleichsbögen Video | Nachbau `vorbild2/vergleich-a.png`, `vorbild2/vergleich-b.png`, Vorher/Nachher `glass/before/*.png`, `glass/after/*.png`
 (1692 × 978 und 390 × 844, dunkel und hell) im Scratchpad der Sitzung.
 
+## Runde 13 – Glass: echtes Liquid Glass und schräges Menü-Öffnen
+
+Stand 2026-11-25. Wunsch des Nutzers: „echtes Liquid Glass“ statt nur Tönung mit Rand, und das Menü soll sich wieder „schräg, mit rotem Akzent“ öffnen.
+
+**Herkunft der Schräge (ehrlich):** In der Git-Historie (alle Zweige, Suche nach `skew`, `polygon(`, `rotate`, Menü/Seitenleiste/Leiste/Blatt) gab es
+nie ein Menü, das sich schräg öffnete. Schräg mit roter Haarlinie war nur die Anmeldung: `AuthBlade` (Paket B, `cb79aabd`, −14°, zurückgenommen in
+`7728e201`) und das Band des Anmeldefensters (`src/cloud/ui/authBand.ts`, 13° quer / 9° hoch, rote Kante in `authWindow.css`). Das Menü ist also ein
+**Nachbau** nach dieser Kante, kein wiederhergestellter Stand.
+
+| Stelle | früher | jetzt | Werte | Reduced Motion |
+|---|---|---|---|---|
+| Menü ab 768 px (`CommandNav.tsx`, `slantWipe`) | gerader Wisch von links, 800 ms | Fläche `translateX · skewX(−13°)`, Inhalt exakt gegenläufig (kein Buchstabe neigt sich), rote Haarlinie auf der Kante | 440 ms, `cubic-bezier(0.22, 1, 0.36, 1)`; Akzent 620 ms (auf bis 18 %, weg bei 100 %); Gruppen 45 ms versetzt, Links darin 12 ms | kein Wisch, kein Akzent |
+| Menü am Handy (Blatt „Mehr“) | steigt gerade | Oberkante 9° schräg (links voraus), wird beim Landen gerade; rote Haarlinie oben | Feder 280/32 wie zuvor | erscheint sofort |
+| Seitenleiste aufklappen (`shell-motion.css`, `sb-slant`) | gerader Beschnitt | schräger Beschnitt (Kopf voraus, 8° – 13° wären breiter als die 192 px Weg), Kantenlinie leuchtet einmal rot | 440 ms, Akzent 620 ms | springt in den Endzustand |
+
+Unverändert: die Einlauffolge der Seitenleiste beim ersten Laden, das Schließen (gerade, 280 ms), die angeheftete Seitenleiste.
+
+**Liquid Glass** (Tokens und Klassen in `src/styles/shell-motion.css`, Linsen einmalig in `index.html`):
+
+| Baustein | Umsetzung |
+|---|---|
+| Brechung | drei SVG-Filter `#lg` (Ruhe, Stärke 14), `#lg2` (gedrückt, 24), `#lgd` (mit rotem Farbsaum am Rand: Rot 22, Grün/Blau 14) aus EINER Verschiebungskarte (`feImage` + `feDisplacementMap`, auf das Element gestreckt), als `backdrop-filter: url(#…)`. Nur Chromium (`html[data-lg]`, `wantsLens` in `src/app/pwa.ts`; `?lg=0/1` erzwingt). |
+| Rückfall | Safari/Firefox: Unschärfe + Tönung (`--gl-blur`, `.lg` 8 px). Samsung Internet (`data-safe-fx`), `prefers-reduced-transparency`, `prefers-contrast: more`, `forced-colors`: kein Filter, deckende Tönung. |
+| Lichtkante | Licht von oben links: `--gl-rim` (kühler Spiegelglanz oben links, warmer Gegenglanz unten rechts = Randdispersion), `--gl-in` (helle Innenkante oben/links). |
+| Dicke | innerer Schatten unten, inneres Licht oben (`--gl-in`). |
+| Druck | `--gl-dn`: das Licht wandert an die Unterkante, 150 ms; die Linse wechselt auf `#lg2`. |
+| Flächen mit Linse | Leiste am Handy (`.dock-glass`), Meldung und Tooltip (`.gl-float`), Suchfeld (`.sf-box`); `.lg` als Zusatzklasse für einzelne Knöpfe über Bildern. |
+| nur Licht/Dicke/Druck (keine Linse) | Sekundär-Knopf (Dutzende je Seite auf glatten Karten: nichts zu brechen, aber je eine Hintergrund-Ebene – unter Last messbar langsamer, deshalb zurückgenommen), Kopf-Kacheln, Segmented-Daumen, Schalter (Daumen als Glasperle `.gl-bead`), Teilen-Scheiben, Griff der Blätter, Ghost/Primär/Danger (gedrückt). |
+| bewusst ohne `backdrop-filter` | vollbreite Streifen und große Flächen: „Inhalt“-Streifen (`.sn-glass`), Kopfzeile, Blätter, das Vollbild-Menü; die Seitenleiste behält ihre Unschärfe nur während des Aufklappens. |
+
+Belege (Scratchpad der Sitzung, `r13/glass/`): `vorher-nachher-*.png` (1692 × 978 und 390 × 844, dunkel und hell), `menue-oeffnen-streifen.png`,
+`messung.tsv` (Bildabstände und Eingabe→Bild beim Öffnen von Blatt, Menü, Seitenleiste, Auswahlliste, Meldung – vorher gegen nachher).
+
 ## Die Matrix
 
 Spalten: Nr · Name · Quelle · Status · Stelle im Code · Entscheidung · Begründung.
@@ -283,7 +316,7 @@ Spalten: Nr · Name · Quelle · Status · Stelle im Code · Entscheidung · Beg
 | 35 | Expanding Glass Capsule | V | neu eingebaut | `src/app/Sidebar.tsx`, `src/app/useSidebarPeek.ts`, `src/styles/shell-motion.css` | bleibt | Sinngemäß: die schmale Leiste öffnet sich bei Absicht über die Seite auf 256 px, ohne die Seite zu verschieben (Glas, solange sie offen über der Seite liegt). Runde 12: die Einblend-Folge beim Öffnen der Website (Zusatzpunkt Z2) läuft jetzt sichtbar und strikt nacheinander. |
 | 36 | Burger Morph | V | neu eingebaut | `src/app/Burger.tsx`, `src/styles/shell-motion.css` | bleibt | Drei Balken werden zum Kreuz, solange das Menü offen ist (reines CSS auf `translate`/`rotate`). |
 | 37 | Staggered Menu Overlay | V | wiederhergestellt/verbessert | `src/app/CommandNav.tsx` (`CONFIG.delays`) | bleibt | Die gestaffelte Einblendung gab es nach der Vorlage; Runde 10 strafft sie, die letzte Zeile startet nach 0,6 s statt 1,8 s. |
-| 38 | Animated Navigation Drawer | V | vorhanden | `src/app/CommandNav.tsx` (Wisch von links ab 768 px, `wipeMs` 800) | bleibt | Das Menü fährt ab 768 px als Fläche von links herein, mit Fokusfalle und Escape. |
+| 38 | Animated Navigation Drawer | V | wiederhergestellt/verbessert | `src/app/CommandNav.tsx` (schräger Wisch von links ab 768 px, `slantWipe`, `wipeMs` 440) | bleibt | Das Menü fährt ab 768 px als Fläche von links herein, mit Fokusfalle und Escape; seit Runde 13 mit schräger Kante (13°) und kurz aufleuchtender roter Haarlinie. |
 | 39 | Mobile Bottom Sheet | V | wiederhergestellt/verbessert | `src/app/CommandNav.tsx` (Blatt am Handy, Ziehen am Kopf schließt), `src/motion/Sheet.tsx` | bleibt | Blätter von unten gab es für Editoren; Runde 10 macht auch „Mehr“ zu einem Blatt mit Ziehen zum Schließen. |
 | 40 | Animated Dock | R | wiederhergestellt/verbessert | `src/app/Dock.tsx` | bleibt | Das Dock mit Lupe gab es; Runde 10 zeichnet das Symbol beim Wechsel neu und lässt die Mitte ab und zu glänzen. |
 | 41 | Immersive Full-Screen Navigation | R | wiederhergestellt/verbessert | `src/app/CommandNav.tsx`, `src/motion/pulse/FullscreenWipe.tsx` | bleibt | Der schwarze Wisch mit gestaffelten Links stammt aus der Vorlage; Runde 10 straffte den Eintritt und gab dem Finder im Menü federnde Treffer mit gleitender Auswahl. |

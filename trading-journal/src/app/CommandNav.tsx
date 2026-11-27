@@ -49,13 +49,23 @@ import { useViews } from "@/store/viewsStore";
 import { create } from "zustand";
 
 export const CONFIG = {
-  /** the wipe from the left (the header's menu button, from 768 px) keeps the pack's measured timing */
-  wipeMs: 800,
-  wipeEase: [0.76, 0, 0.24, 1],
+  /**
+   * Runde 13: the menu opens on a SLANT (the edge of the login band, `motion/vorbild.ts` `skewDeg` 13): from 768 px the panel wipes in from the
+   * left with its leading edge tilted by 13° (the top leads) and straightens as it lands; on a phone the sheet rises with its top edge tilted
+   * (9°, as the band's portrait edge). A hairline in the signal red rides on that edge, lights up once and is gone when the panel rests.
+   * The content inside is counter-skewed, so no letter leans. 440 ms on an expo-out (it used to be the pack's 800 ms in-out wipe).
+   */
+  wipeMs: 440,
+  wipeEase: [0.22, 1, 0.36, 1],
+  slantDeg: 13,
+  sheetSlantDeg: 9,
+  /** how long the red edge shows (ms): up within the first fifth, gone shortly after the panel has landed */
+  accentMs: 620,
   /**
    * Runde 10: the staggered entrance is tightened from "up to 1.8 s until the last link starts" (2.3 s for the live price) to
-   * 0.6 s: the items start while the panel is still arriving (a spring-up sheet on a phone, the wipe on a wide screen), one
-   * 14 ms beat per page, and each one rises 16 px in 0.46 s instead of 24 px in 0.65 s.
+   * 0.6 s: the items start while the panel is still arriving (a spring-up sheet on a phone, the wipe on a wide screen) and each one
+   * rises 16 px in 0.46 s instead of 24 px in 0.65 s. Runde 13: the rows are the four groups – 45 ms from group to group, 12 ms
+   * from link to link inside one.
    */
   itemMs: 460,
   itemEase: [0.22, 1, 0.36, 1],
@@ -67,7 +77,10 @@ export const CONFIG = {
   delays: {
     brand: 140,
     finder: 160,
-    links: Array.from({ length: PAGES.length }, (_, i) => 200 + i * 14),
+    links: NAV_ORDER.map((p) => {
+      const g = NAV_GROUPS.findIndex((x) => (x.pages as readonly Page[]).includes(p));
+      return 150 + Math.max(0, g) * 45 + Math.max(0, NAV_GROUPS[g]?.pages.indexOf(p) ?? 0) * 12;
+    }),
     actions: [180, 210, 240, 270, 300, 330, 360, 390],
     display: 400,
     views: 420,
@@ -234,7 +247,24 @@ interface FrameProps {
 
 const dialogProps = { id: COMMAND_NAV_ID, role: "dialog", "aria-modal": true, "aria-label": COMMAND_NAV_LABEL, tabIndex: -1, "data-layer": "Navigation (Vollbild)" } as const;
 
-/** From 768 px: the black panel wipes in from the left (its content counter-translates, so the wipe is transform-only). */
+/**
+ * The slanted wipe as transforms (pure): the panel is `translateX · skewX`, its content the exact inverse (`skewX⁻¹ · translateX⁻¹`), both
+ * interpolated on the same curve – so the content stands still and upright while the tilted edge passes. `away` is 120 %: the tilt
+ * pushes the top of the edge ahead by half the height × tan(13°), which the extra 20 % keeps off screen at the start.
+ */
+export function slantWipe(deg: number = CONFIG.slantDeg) {
+  const rest = { panel: "translateX(0%) skewX(0deg)", content: "skewX(0deg) translateX(0%)" };
+  return {
+    from: { panel: `translateX(-120%) skewX(${-deg}deg)`, content: `skewX(${deg}deg) translateX(120%)` },
+    rest,
+    to: { panel: `translateX(120%) skewX(${-deg}deg)`, content: `skewX(${deg}deg) translateX(-120%)` },
+  };
+}
+const SLANT = slantWipe();
+/** The red edge: up fast, held while the panel travels, gone once it rests. */
+const ACCENT = { opacity: [0, 1, 1, 0], transition: { duration: CONFIG.accentMs / 1000, times: [0, 0.18, 0.62, 1], ease: "linear" as const } };
+
+/** From 768 px: the black panel wipes in from the left on a slant (its content counter-transforms, so the wipe is transform-only). */
 function WipeFrame({ dialogRef, onKeyDown, reduced, onOpened, children }: FrameProps) {
   return (
     <motion.div
@@ -242,21 +272,23 @@ function WipeFrame({ dialogRef, onKeyDown, reduced, onOpened, children }: FrameP
       {...dialogProps}
       onKeyDown={onKeyDown}
       className="fixed inset-0 z-[75] overflow-hidden bg-black outline-none"
-      initial={reduced ? false : { transform: "translateX(-100%)" }}
-      animate={{ transform: "translateX(0%)" }}
-      exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { transform: "translateX(100%)", transition: WIPE }}
+      initial={reduced ? false : { transform: SLANT.from.panel }}
+      animate={{ transform: SLANT.rest.panel }}
+      exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { transform: SLANT.to.panel, transition: WIPE }}
       transition={WIPE}
       onAnimationComplete={onOpened}
     >
       <motion.div
         className="absolute inset-0 overflow-y-auto overscroll-contain"
-        initial={reduced ? false : { transform: "translateX(100%)" }}
-        animate={{ transform: "translateX(0%)" }}
-        exit={reduced ? undefined : { transform: "translateX(-100%)", transition: WIPE }}
+        initial={reduced ? false : { transform: SLANT.from.content }}
+        animate={{ transform: SLANT.rest.content }}
+        exit={reduced ? undefined : { transform: SLANT.to.content, transition: WIPE }}
         transition={WIPE}
       >
         {children}
       </motion.div>
+      {/* the accent on the leading edge: a hairline in the signal red with a short fall-off into the panel – lights up once, then rests */}
+      {!reduced && <motion.span aria-hidden="true" data-menu-accent="" className="menu-accent pointer-events-none absolute inset-y-0 right-0 w-1.5" initial={{ opacity: 0 }} animate={ACCENT} />}
     </motion.div>
   );
 }
@@ -289,14 +321,18 @@ function SheetFrame({ dialogRef, onKeyDown, reduced, onOpened, swipe, columnRef,
       <motion.div ref={columnRef} className="absolute inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top,0px)+10px)]" style={swipe.style} variants={SHEET_COLUMN} exit="gone">
         <motion.div
           className="relative size-full overflow-hidden rounded-t-3xl border border-b-0 border-line-2 bg-black"
-          initial={reduced ? false : { y: "100%" }}
-          animate={{ y: 0 }}
+          // Runde 13: the sheet rises on a slant – its top edge tilted (the left corner leads), straight when it lands; the content is counter-skewed
+          initial={reduced ? false : { y: "100%", skewY: CONFIG.sheetSlantDeg }}
+          animate={{ y: 0, skewY: 0 }}
           transition={reduced ? { duration: 0 } : CONFIG.sheet}
           variants={reduced ? SHEET_STILL : SHEET_PANEL}
           exit="gone"
           onAnimationComplete={onOpened}
         >
-          <div className="absolute inset-0 overflow-y-auto overscroll-contain">{children}</div>
+          <motion.div className="absolute inset-0 overflow-y-auto overscroll-contain" initial={reduced ? false : { skewY: -CONFIG.sheetSlantDeg }} animate={{ skewY: 0 }} transition={reduced ? { duration: 0 } : CONFIG.sheet}>
+            {children}
+          </motion.div>
+          {!reduced && <motion.span aria-hidden="true" data-menu-accent="" className="menu-accent pointer-events-none absolute inset-x-0 top-0 h-1.5" data-edge="top" initial={{ opacity: 0 }} animate={ACCENT} />}
         </motion.div>
       </motion.div>
     </div>
@@ -458,7 +494,7 @@ function Panel({ reduced, onFling }: { reduced: boolean; onFling: (info: SwipeDi
       <div className={cn("mx-auto flex min-h-full max-w-[1320px] flex-col px-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))] sm:px-6", !sheet && "pt-[env(safe-area-inset-top,0px)]")}>
         {/* on a phone the head is the sheet's handle: a pull on it closes the menu (a grabber shows it) */}
         <div ref={sheet ? touchGuard : undefined} data-sheet-handle={sheet ? "" : undefined} className="relative flex h-16 shrink-0 items-center justify-between gap-4" {...(sheet ? swipe.handle : null)}>
-          {sheet && <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-2 h-[5px] w-9 -translate-x-1/2 rounded-full bg-white/15" />}
+          {sheet && <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-2 h-[5px] w-9 -translate-x-1/2 rounded-full bg-white/20 shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_-1px_1px_rgb(0_0_0/0.4)]" />}
           <Item delay={CONFIG.delays.brand} reduced={reduced} className="min-w-0">
             <p className="truncate font-mono text-[12px] font-semibold uppercase tracking-[0.2em] text-fg">{COMMAND_NAV_STRINGS.brand}</p>
             <p className="truncate text-[13px] text-mute">{COMMAND_NAV_STRINGS.claim}</p>

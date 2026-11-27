@@ -332,7 +332,7 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
                     {...swipe.handle}
                   >
                     {/* grabber: the visible handle of the swipe on touch screens (decorative, the header row is the handle) */}
-                    <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1.5 hidden h-[5px] w-9 -translate-x-1/2 rounded-full bg-white/15 pointer-coarse:block" />
+                    <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1.5 hidden h-[5px] w-9 -translate-x-1/2 rounded-full bg-white/20 shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_-1px_1px_rgb(0_0_0/0.4)] pointer-coarse:block" />
                     <h2 id={titleId} className="text-[17px] font-semibold">
                       {title}
                     </h2>

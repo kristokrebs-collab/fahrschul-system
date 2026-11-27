@@ -122,6 +122,23 @@ export function wantsSafeFx(ua: string, search: string): boolean {
 export function setSafeFx(on: boolean): void {
   if (!hasWindow) return;
   document.documentElement.toggleAttribute(SAFE_FX_ATTR, on);
+  // the lenses are backdrop filters: never together with the safe effects
+  if (on) document.documentElement.removeAttribute(LENS_ATTR);
+}
+
+/**
+ * `data-lg` on `<html>` (Runde 13, Liquid Glass): the small glass surfaces (`.lg`, the floating bar) bend what lies behind them with an
+ * SVG displacement lens as `backdrop-filter: url(#lg)` (index.html, shell-motion.css). Only Chromium renders a reference filter there –
+ * Safari and Firefox would drop the whole declaration or show nothing, so they keep the plain blur; the same holds with the safe effects
+ * (Samsung Internet: no backdrop filter at all). `?lg=1` / `?lg=0` in the URL forces it on / off (comparison, tests).
+ */
+export const LENS_ATTR = "data-lg";
+
+/** Pure: whether the lenses apply – the URL switch wins; else Chromium (not on iOS, where every browser is WebKit) without the safe effects. */
+export function wantsLens(ua: string, search: string): boolean {
+  const m = /[?&]lg=([01])\b/.exec(search);
+  if (m) return m[1] === "1";
+  return /\bChrom(e|ium)\/\d/.test(ua) && !wantsSafeFx(ua, search);
 }
 
 /** iOS / iPadOS Safari: no install prompt API, installation goes through the share sheet. */
@@ -280,6 +297,7 @@ export const DISPLAY_STRINGS = {
 if (hasWindow) {
   // before React's first paint (this module is imported by the shell): the fallbacks never flash in
   if (wantsSafeFx(navigator.userAgent, location.search)) setSafeFx(true);
+  document.documentElement.toggleAttribute(LENS_ATTR, wantsLens(navigator.userAgent, location.search));
   window.addEventListener("beforeinstallprompt", (e) => {
     // keep the browser's mini-infobar from covering the dock; the app offers "App installieren" itself
     e.preventDefault();

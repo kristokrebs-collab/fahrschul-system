@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { closeCommandNav, CommandNav, COMMAND_NAV_STRINGS, CONFIG, isCommandNavShortcut, MENU_BUDGET_MS, openCommandNav, rovingIndex } from "@/app/CommandNav";
+import { closeCommandNav, CommandNav, COMMAND_NAV_STRINGS, CONFIG, isCommandNavShortcut, MENU_BUDGET_MS, openCommandNav, rovingIndex, slantWipe } from "@/app/CommandNav";
 import { MotionRoot } from "@/motion/MotionRoot";
-import { PAGE_HINT } from "@/app/navGroups";
+import { NAV_GROUPS, PAGE_HINT } from "@/app/navGroups";
 import { NAV_ORDER, PAGES, useUi } from "@/store/uiStore";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
@@ -55,18 +55,28 @@ describe("command navigation: pure helpers", () => {
     expect(rovingIndex("ArrowDown", 0, 0)).toBeNull();
   });
 
-  it("keeps the pack's wipe; the staggered entrance is tight (Runde 10: the last item starts within 0.6 s, it used to be 1.8 s / 2.3 s)", () => {
-    // the wipe from the left is the pack's measured timeline and is unchanged
-    expect(CONFIG.wipeMs).toBe(800);
-    expect(CONFIG.wipeEase).toEqual([0.76, 0, 0.24, 1]);
+  it("the wipe opens on a slant (Runde 13: 13°, 440 ms, the content counter-transformed); the staggered entrance is tight (the last item starts within 0.6 s)", () => {
+    // 380–480 ms on an expo-out; the slant is the login band's edge
+    expect(CONFIG.wipeMs).toBeGreaterThanOrEqual(380);
+    expect(CONFIG.wipeMs).toBeLessThanOrEqual(480);
+    expect(CONFIG.wipeEase).toEqual([0.22, 1, 0.36, 1]);
+    expect(CONFIG.slantDeg).toBe(13);
+    // the panel and its content are exact inverses at the start, at rest and at the end: the content never leans or moves
+    const w = slantWipe();
+    expect(w.from).toEqual({ panel: "translateX(-120%) skewX(-13deg)", content: "skewX(13deg) translateX(120%)" });
+    expect(w.rest).toEqual({ panel: "translateX(0%) skewX(0deg)", content: "skewX(0deg) translateX(0%)" });
+    expect(w.to).toEqual({ panel: "translateX(120%) skewX(-13deg)", content: "skewX(13deg) translateX(-120%)" });
+    // the red edge is short: gone shortly after the panel has landed
+    expect(CONFIG.accentMs).toBeGreaterThan(CONFIG.wipeMs);
+    expect(CONFIG.accentMs).toBeLessThanOrEqual(CONFIG.wipeMs + 250);
     expect(CONFIG.itemEase).toEqual([0.22, 1, 0.36, 1]);
     // each item rises 16 px in 0.46 s (was 24 px in 0.65 s)
     expect(CONFIG.itemMs).toBe(460);
     expect(CONFIG.lift).toBe(16);
-    // one 14 ms beat per page, in the order of the groups; nothing starts later than the budget
+    // the rows are the groups: 45 ms from group to group, 12 ms from link to link inside one; nothing starts later than the budget
     const d = CONFIG.delays;
     expect(d.links).toHaveLength(PAGES.length);
-    expect(d.links.every((v, i, a) => i === 0 || v - (a[i - 1] ?? 0) === 14)).toBe(true);
+    NAV_GROUPS.forEach((g, gi) => g.pages.forEach((p, j) => expect(d.links[NAV_ORDER.indexOf(p)], p).toBe(150 + gi * 45 + j * 12)));
     const starts = [d.brand, d.finder, ...d.links, ...d.actions, d.display, d.views, d.hints, d.price];
     expect(Math.max(...starts)).toBeLessThanOrEqual(MENU_BUDGET_MS);
     expect(MENU_BUDGET_MS).toBe(600);
