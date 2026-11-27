@@ -34,6 +34,7 @@ import { gzipSync } from "node:zlib";
  * Runde 12 (Paket C): `initialCss` 52 → 52.5 – measured 51.9 → 52.1 KiB: the glass chips and the caption of the share fan are Tailwind utilities
  * (the sidebar's sequence reuses its keyframes; the voice ring of that package is gone again – Rücknahme R3). Limit for the three packages of
  * the round together: +6 KiB, at most +2 KiB each – this one uses +0.2 and leaves 0.3 of headroom.
+ * Runde 13 (Liquid Glass, Lichtkante/Dicke/Druck für alle Knöpfe und Schalter, Linsen für Dock/Toast/Tooltip/Suchfeld): `initialCss` 52.5 → 54 – gemessen 53.5 KiB.
  * Runde 12 (Paket P, Verhaltenspsychologie): `initialCss` stays 52.5 – measured 52.3 before and after: the new cards (Wochenabschluss, Erinnerung,
  * Rückmeldung, Einrichtung) use only utility classes the app had already (no new keyframes, no new stylesheet); first load JS 656.7 → 656.9.
  * Runde 12 (Paket S, Showroom): budgets unchanged – measured 52.3 CSS / 656.9 JS before and after. The showroom (`VITE_SHOWROOM=1`) is a separate build behind a
@@ -42,7 +43,7 @@ import { gzipSync } from "node:zlib";
  */
 export const BUDGETS = {
   initialJs: 800,
-  initialCss: 52.5,
+  initialCss: 54,
   chunk: 120,
   named: { index: 575, react: 72, motion: 58, recharts: 114, lwc: 62 },
 };
