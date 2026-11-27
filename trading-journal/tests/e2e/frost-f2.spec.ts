@@ -156,6 +156,13 @@ test.describe("Paket F2: Frost – drei Elemente mit echter Funktion", () => {
     await expect(section.getByTestId("journal-net")).toHaveText("−51,00 netto");
     await shot(section, info, "a-journal-karte");
 
+    // built up one after the other (the word letter by letter, 45 ms apart, then the card and its parts) – and finished: every part
+    // stands at full opacity, nothing is left shifted
+    expect(await section.locator('[data-testid="journal-word"] span').evaluateAll((els) => els.map((e) => getComputedStyle(e).transitionDelay))).toEqual(["0s", "0.045s", "0.09s", "0.135s", "0.18s", "0.225s"]);
+    await expect.poll(() => section.locator(".fr-st, .fr-card, [data-testid=journal-word] span").evaluateAll((els) => els.filter((e) => getComputedStyle(e).opacity !== "1" || getComputedStyle(e).transform !== "none").length), { timeout: 6000 }).toBe(0);
+    // the period behind the glass: one bar per closed trade of the week, the entry on screen bright
+    await expect(section.locator('[data-testid="journal-curve"] rect')).toHaveCount(total);
+    await expect(section.locator('[data-testid="journal-curve"] rect[data-on]')).toHaveCount(1);
     // the giant word is behind the card and the card overlaps it; the touch targets are ≥ 44 px
     const word = await box(section.getByTestId("journal-word"));
     const card = await box(section.getByTestId("journal-card"));
@@ -208,6 +215,10 @@ test.describe("Paket F2: Frost – drei Elemente mit echter Funktion", () => {
     }
     await expect(section.getByTestId("journal-entry")).toHaveAttribute("data-id", "f_3");
     await expect(section.getByTestId("journal-review")).toHaveText("Review geschrieben");
+    // process done = a bright chip with a check – never the profit colour
+    await expect(section.getByTestId("journal-review")).toHaveAttribute("data-ok", "");
+    const win = await section.getByTestId("journal-r").evaluate((el) => getComputedStyle(el).color);
+    expect(await section.getByTestId("journal-review").evaluate((el) => getComputedStyle(el).borderTopColor)).not.toBe(win);
     await expect(section.getByTestId("journal-chip").last()).toHaveText("#ausbruch");
     // an entry without a stop has no R – and says so
     await section.getByTestId("journal-card").focus();
@@ -242,6 +253,15 @@ test.describe("Paket F2: Frost – drei Elemente mit echter Funktion", () => {
     expect(text).not.toMatch(/USDT|€|\$|Gewinn|Verlust|Netto|Upgrade|Premium|nur noch|verpass|Serie|in Gefahr/i);
     await expectNoHorizontalScroll(page);
     await shot(card, info, "b-heute-abschliessen-offen");
+    // the pair of the Frost-Vorlage: beside „Frag dein Journal“ on a wide screen (same row, same height – no empty giant card), stacked on the phone
+    const askBox = await box(page.getByTestId("ask-journal"));
+    const dayBox = await box(card);
+    if (info.project.name === "mobile") expect(askBox.y).toBeGreaterThan(dayBox.y + dayBox.height - 2);
+    else {
+      expect(Math.abs(askBox.y - dayBox.y)).toBeLessThan(2);
+      expect(Math.abs(askBox.height - dayBox.height)).toBeLessThan(2);
+      expect(askBox.x).toBeGreaterThan(dayBox.x + dayBox.width);
+    }
     // touch target of the round button ≥ 44 px
     const b = await box(card.getByTestId("day-close-done"));
     expect(Math.min(b.width, b.height)).toBeGreaterThanOrEqual(43.5);
@@ -252,6 +272,7 @@ test.describe("Paket F2: Frost – drei Elemente mit echter Funktion", () => {
     await card.getByTestId("day-close-done").click();
     await expect(card).toHaveAttribute("data-state", "closed");
     await expect(page.getByText("Noch offen: Notiz oder Check-in.").first()).toBeVisible();
+    await expect(card.getByTestId("day-close-hint")).toHaveText("Noch offen: Notiz oder Check-in.");
     await expect(page.getByText("Checkliste und Review für heute sind erledigt.")).toHaveCount(0);
     expect(await vibrations(page)).toEqual([]);
     expect(await audioCount(page)).toBe(0);
@@ -270,6 +291,7 @@ test.describe("Paket F2: Frost – drei Elemente mit echter Funktion", () => {
     await expect(card).toHaveAttribute("data-state", "closed");
     await expect(page.getByText("Checkliste und Review für heute sind erledigt.").first()).toBeVisible();
     await expect(card.getByTestId("day-close-check")).toHaveAttribute("data-ring", "");
+    await expect(card.getByTestId("day-close-hint")).toContainText("das zählt, nicht das Ergebnis");
     await shot(card, info, "b-heute-abschliessen-erledigt");
     expect(await vibrations(page)).toEqual([18]);
     expect(await audioCount(page)).toBe(1); // the tone was tried once (the test's AudioContext throws – no sound is asked of a CI machine)
@@ -312,7 +334,11 @@ test.describe("Paket F2: Frost – drei Elemente mit echter Funktion", () => {
     await expect(ask.getByTestId("ask-bar")).toHaveAttribute("data-open", "");
     await expect(ask.getByTestId("ask-open")).toHaveCount(0);
     await expect(ask.getByTestId("ask-example")).toHaveCount(3);
-    await expect(ask.getByTestId("ask-seek")).toBeHidden();
+    await expect(ask.getByTestId("ask-seek")).toHaveCount(0);
+    await expect(ask.locator("[data-thinking-orb]")).toHaveCount(0);
+    await expect(ask.getByTestId("ask-limits")).toContainText("kein Rat und keine Prognose");
+    // the panel has built up (head, bar, examples one after the other): everything stands at full opacity, nothing is left transformed
+    await expect.poll(() => ask.locator(".fr-st").evaluateAll((els) => els.map((e) => `${getComputedStyle(e).opacity}/${getComputedStyle(e).transform}`)), { timeout: 5000 }).toEqual(["1/none", "1/none", "1/none"]);
     const send = await box(ask.getByTestId("ask-send"));
     expect(Math.min(send.width, send.height)).toBeGreaterThanOrEqual(43.5);
     const idleHeight = (await box(ask)).height;
@@ -321,10 +347,13 @@ test.describe("Paket F2: Frost – drei Elemente mit echter Funktion", () => {
     await ask.getByTestId("ask-input").click();
     await ask.getByTestId("ask-input").pressSequentially("Trades ohne Stopp", { delay: 15 });
     await ask.getByTestId("ask-input").press("Enter");
-    // the shimmer names the real count, then three cards
-    await expect(ask).toHaveAttribute("data-phase", "seek");
-    await expect(ask.getByTestId("ask-seek")).toHaveText("Durchsuche 9 Trades …");
+    // no pretended calculation time (Runde 13): the answer is there as soon as it is worked out – well inside half a second, and no
+    // loader is left behind (the orb exists only while a run is open)
+    const asked = Date.now();
     await expect(ask).toHaveAttribute("data-phase", "done", { timeout: 5000 });
+    expect(Date.now() - asked, "the answer does not wait for a beat").toBeLessThan(450);
+    await expect(ask.getByTestId("ask-seek")).toHaveCount(0);
+    await expect(ask.locator("[data-thinking-orb]")).toHaveCount(0);
     const cards = ask.getByTestId("ask-card");
     await expect(cards).toHaveCount(3);
     // 1 of the 9 seeded trades (day 2) has no stop – and nothing else is claimed

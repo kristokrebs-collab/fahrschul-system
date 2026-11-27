@@ -14,7 +14,7 @@ import { MotionRoot } from "@/motion/MotionRoot";
 import * as feedback from "@/motion/processFeedback";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
-import { AskJournalCard, ASK_COPY, SEEK_MS } from "@/views/berichte/AskJournalCard";
+import { AskJournalCard, ASK_COPY, LOADER_AFTER_MS } from "@/views/berichte/AskJournalCard";
 import { BerichteView, useBerichteUi } from "@/views/berichte";
 import { JournalCard, JOURNAL_STRINGS } from "@/views/berichte/JournalCard";
 import { ASK_SETTINGS, askTrades, askWorld } from "./ask.fixtures";
@@ -33,7 +33,35 @@ function matchMediaReduced(reduced: boolean) {
 const world = askWorld();
 const closed = world.data.closed;
 
+/** A recording `IntersectionObserver`: nothing is "seen" until a test says so (`see`) – like a card below the fold. */
+const observers: { cb: IntersectionObserverCallback; els: Set<Element> }[] = [];
+class SeenIO {
+  private rec: { cb: IntersectionObserverCallback; els: Set<Element> };
+  constructor(cb: IntersectionObserverCallback) {
+    this.rec = { cb, els: new Set() };
+    observers.push(this.rec);
+  }
+  observe(el: Element) {
+    this.rec.els.add(el);
+  }
+  unobserve(el: Element) {
+    this.rec.els.delete(el);
+  }
+  disconnect() {
+    this.rec.els.clear();
+  }
+  takeRecords() {
+    return [];
+  }
+}
+/** The element scrolls into view: every observer that watches it is told. */
+const see = (el: Element) =>
+  act(() => {
+    for (const o of observers) if (o.els.has(el)) o.cb([{ target: el, isIntersecting: true } as IntersectionObserverEntry], o as unknown as IntersectionObserver);
+  });
+
 beforeAll(() => {
+  globalThis.IntersectionObserver = SeenIO as unknown as typeof IntersectionObserver;
   installDomPolyfills();
   HTMLCanvasElement.prototype.getContext = (() => null) as unknown as typeof HTMLCanvasElement.prototype.getContext;
 });
@@ -71,8 +99,25 @@ describe("Einträge durchgehen: die Journal-Karte", () => {
     // the giant word is decoration only
     const word = screen.getByTestId("journal-word");
     expect(word).toHaveAttribute("aria-hidden", "true");
-    expect(word.textContent).toBe("");
     expect(word.getAttribute("data-word")).toBe("REVIEW");
+    // one letter per span, each with its own step of the 45 ms stagger (`--i`)
+    const letters = [...word.querySelectorAll("span")];
+    expect(letters.map((l) => l.textContent).join("")).toBe("REVIEW");
+    expect(letters.map((l) => l.style.getPropertyValue("--i"))).toEqual(["0", "1", "2", "3", "4", "5"]);
+    // the entrance (word, card, its parts 45 ms apart) starts once, when the section is first on screen – not at mount below the fold
+    const section = screen.getByTestId("journal-cards");
+    expect(section).not.toHaveAttribute("data-in");
+    see(section);
+    expect(section).toHaveAttribute("data-in");
+    expect([...section.querySelectorAll<HTMLElement>(".fr-st")].map((e) => e.style.getPropertyValue("--i"))).toEqual(["0", "1", "2", "3", "4", "5", "6"]);
+    // the period behind the glass: one bar per closed trade, the entry on screen is the bright one
+    const bars = [...screen.getByTestId("journal-curve").querySelectorAll("rect")];
+    expect(bars).toHaveLength(12);
+    expect(bars.filter((b) => b.hasAttribute("data-on"))).toHaveLength(1);
+    expect(bars[0]).toHaveAttribute("data-on");
+    expect(bars[0]).toHaveAttribute("data-tone", "loss");
+    // process chips: bright with a check only when the trader did the thing
+    expect(screen.getByTestId("journal-review")).not.toHaveAttribute("data-ok");
   });
 
   it("pages with the buttons, stops at both ends (disabled, no wrap) and keeps „n von m“ in step with the entry", () => {
@@ -214,12 +259,38 @@ describe("Frag dein Journal: die Suchleiste", () => {
     it("starts with the bar open (no lone dot in an empty card, Rücknahme R3) and three example questions; no loader while idle", () => {
       renderAsk();
       const bar = screen.getByTestId("ask-bar");
+      // the bar grows out of its dot when it is first seen; the field is there and usable from the start
+      see(bar);
       expect(bar).toHaveAttribute("data-open");
+      expect(screen.getByTestId("ask-journal")).not.toHaveAttribute("data-in");
+      see(screen.getByTestId("ask-journal"));
+      expect(screen.getByTestId("ask-journal")).toHaveAttribute("data-in");
       expect(screen.queryByTestId("ask-open")).toBeNull();
-      expect(screen.getByTestId("ask-input")).toHaveAttribute("tabindex", "0");
+      expect(screen.getByTestId("ask-input")).not.toHaveAttribute("tabindex");
       expect(screen.getAllByTestId("ask-example").map((b) => b.textContent)).toEqual(["Verluste im Setup Breakout letzten Monat", "Trades ohne Stopp", "Beste Wochentage"]);
-      expect(screen.getByTestId("ask-seek")).toHaveTextContent("");
-      expect(screen.getByTestId("ask-seek")).not.toHaveAttribute("data-on");
+      expect(screen.queryByTestId("ask-seek")).toBeNull();
+      expect(document.querySelector("[data-thinking-orb]")).toBeNull();
+      // the limits stand on the card, not only in the docs
+      expect(screen.getByTestId("ask-limits")).toHaveTextContent("kein Rat und keine Prognose");
+    });
+
+    it("no pretended calculation time: the answer is there with the very next task; the loader exists only while the run is open", async () => {
+      renderAsk();
+      type("Trades ohne Stopp");
+      // the run is open: a small orb of the kind „search“ and the REAL trade count
+      const seek = screen.getByTestId("ask-seek");
+      expect(seek).toHaveTextContent("Durchsuche 12 Trades …");
+      expect(seek.querySelector('[data-thinking-orb="search"]')).not.toBeNull();
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+      expect(screen.getByTestId("ask-journal")).toHaveAttribute("data-phase", "done");
+      expect(screen.queryByTestId("ask-seek")).toBeNull();
+      expect(document.querySelector("[data-thinking-orb]")).toBeNull();
+      // the loader becomes visible only for a run that is still open after LOADER_AFTER_MS (the CSS delay of `.fr-seek`)
+      const css = readFileSync(join(__dirname, "../../src/views/berichte/frost.css"), "utf8");
+      expect(/\.fr-seek\s*\{[^}]*opacity:\s*0;[^}]*animation:\s*fr-late[^;]*\s0\.16s/.test(css)).toBe(true);
+      expect(LOADER_AFTER_MS).toBe(160);
     });
 
     it("typing a question shows the shimmer with the REAL trade count, then three cards with the hand-worked numbers", async () => {
@@ -229,10 +300,10 @@ describe("Frag dein Journal: die Suchleiste", () => {
       expect(screen.getByTestId("ask-seek")).toHaveTextContent("Durchsuche 12 Trades …");
       expect(screen.queryByTestId("ask-cards")).toBeNull();
       await act(async () => {
-        vi.advanceTimersByTime(SEEK_MS + 5);
+        vi.advanceTimersByTime(5);
       });
       expect(screen.getByTestId("ask-journal")).toHaveAttribute("data-phase", "done");
-      expect(screen.getByTestId("ask-seek")).toHaveTextContent("");
+      expect(screen.queryByTestId("ask-seek")).toBeNull();
       const cards = screen.getAllByTestId("ask-card");
       expect(cards).toHaveLength(3);
       expect(screen.getAllByTestId("ask-card-value").map((v) => v.textContent)).toEqual(["2 von 12 (17 %)", "−250 USDT", "ohne −125 USDT · mit −11 USDT"]);
@@ -245,7 +316,7 @@ describe("Frag dein Journal: die Suchleiste", () => {
       renderAsk();
       type("Beste Wochentage");
       await act(async () => {
-        vi.advanceTimersByTime(SEEK_MS + 5);
+        vi.advanceTimersByTime(5);
       });
       const cards = screen.getAllByTestId("ask-card");
       expect(cards.map((c) => c.style.getPropertyValue("--i"))).toEqual(["0", "1", "2"]);
@@ -256,7 +327,7 @@ describe("Frag dein Journal: die Suchleiste", () => {
       renderAsk();
       type("Verluste im Setup Breakout letzten Monat");
       await act(async () => {
-        vi.advanceTimersByTime(SEEK_MS + 5);
+        vi.advanceTimersByTime(5);
       });
       const toggle = screen.getByTestId("ask-trades-toggle");
       expect(toggle).toHaveTextContent("Betroffene Trades (4)");
@@ -274,18 +345,18 @@ describe("Frag dein Journal: die Suchleiste", () => {
       renderAsk();
       type("Wie wird das Wetter morgen?");
       await act(async () => {
-        vi.advanceTimersByTime(SEEK_MS + 5);
+        vi.advanceTimersByTime(5);
       });
       const box = screen.getByTestId("ask-unknown");
       expect(box).toHaveTextContent("So kann ich das noch nicht beantworten.");
       expect(box).toHaveTextContent("„wetter“");
       expect(within(box).getAllByTestId("ask-example")).toHaveLength(3);
       expect(screen.queryByTestId("ask-cards")).toBeNull();
-      expect(screen.queryByTestId("ask-trades-block")).toBeNull();
+      expect(screen.queryByTestId("ask-trades-toggle")).toBeNull();
       // an example is one click away – and answered
       fireEvent.click(within(box).getAllByTestId("ask-example")[1]!);
       await act(async () => {
-        vi.advanceTimersByTime(SEEK_MS + 5);
+        vi.advanceTimersByTime(5);
       });
       expect(screen.getAllByTestId("ask-card")).toHaveLength(3);
     });
@@ -294,7 +365,7 @@ describe("Frag dein Journal: die Suchleiste", () => {
       renderAsk();
       type("Verluste im Januar");
       await act(async () => {
-        vi.advanceTimersByTime(SEEK_MS + 5);
+        vi.advanceTimersByTime(5);
       });
       expect(screen.getByTestId("ask-empty")).toHaveTextContent("keine abgeschlossenen Trades");
       expect(screen.queryByTestId("ask-cards")).toBeNull();
@@ -304,14 +375,14 @@ describe("Frag dein Journal: die Suchleiste", () => {
       renderAsk();
       type("Trades ohne Review");
       await act(async () => {
-        vi.advanceTimersByTime(SEEK_MS + 5);
+        vi.advanceTimersByTime(5);
       });
       expect(screen.getAllByTestId("ask-card-value")[0]).toHaveTextContent("7 von 12 (58 %)");
       fireEvent.change(screen.getByTestId("ask-input"), { target: { value: "Trades ohne Stopp" } });
       fireEvent.click(screen.getByTestId("ask-send"));
       expect(screen.queryByTestId("ask-cards")).toBeNull();
       await act(async () => {
-        vi.advanceTimersByTime(SEEK_MS + 5);
+        vi.advanceTimersByTime(5);
       });
       expect(screen.getAllByTestId("ask-card")).toHaveLength(3);
       expect(screen.getAllByTestId("ask-card-value")[0]).toHaveTextContent("2 von 12 (17 %)");
@@ -327,7 +398,7 @@ describe("Frag dein Journal: die Suchleiste", () => {
       fireEvent.change(screen.getByTestId("ask-input"), { target: { value: "Beste Wochentage" } });
       fireEvent.submit(screen.getByTestId("ask-bar"));
       await act(async () => {
-        vi.advanceTimersByTime(SEEK_MS + 5);
+        vi.advanceTimersByTime(5);
       });
       expect(screen.getAllByTestId("ask-card")).toHaveLength(3);
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -338,12 +409,13 @@ describe("Frag dein Journal: die Suchleiste", () => {
   describe("reduced motion", () => {
     beforeEach(() => matchMediaReduced(true));
 
-    it("no shimmer beat: the answer stands there at once", () => {
+    it("the same run without a beat: the answer follows the tap, the orb is its still symbol, no loader is left", async () => {
       renderAsk();
       type("Beste Wochentage");
-      expect(screen.getByTestId("ask-journal")).toHaveAttribute("data-phase", "done");
+      expect(document.querySelector("[data-thinking-orb] [data-orb-still]")).not.toBeNull();
+      await waitFor(() => expect(screen.getByTestId("ask-journal")).toHaveAttribute("data-phase", "done"));
       expect(screen.getAllByTestId("ask-card")).toHaveLength(3);
-      expect(screen.getByTestId("ask-seek")).toHaveTextContent("");
+      expect(screen.queryByTestId("ask-seek")).toBeNull();
     });
   });
 });
@@ -418,6 +490,9 @@ describe("Heute abschließen: das Abschluss-Ritual in Berichte", () => {
     expect(spies.tone).not.toHaveBeenCalled();
     expect(dayClosesOf(useJournal.getState().settings)["2026-06-10"]).toMatchObject({ closed: true, ready: false });
     expect(screen.getByTestId("day-close-state")).toHaveTextContent("Heute abgeschlossen um");
+    // beside the check: what is still open, as a fact – no praise that was not earned, no scolding
+    expect(screen.getByTestId("day-close-hint")).toHaveTextContent("Noch offen: Notiz oder Check-in.");
+    expect(screen.getByTestId("day-close-hint").textContent).not.toMatch(/zählt|super|leider|versäumt/i);
     // it can be taken back
     fireEvent.click(screen.getByTestId("day-close-reopen"));
     await waitFor(() => expect(screen.getByTestId("day-close")).toHaveAttribute("data-state", "open"));
@@ -433,6 +508,8 @@ describe("Heute abschließen: das Abschluss-Ritual in Berichte", () => {
     expect(t.title).toBe("Tag abgeschlossen");
     expect(`${t.title} ${t.detail}`).not.toMatch(/\d|Gewinn|Verlust|Profit/);
     expect(dayClosesOf(useJournal.getState().settings)["2026-06-10"]).toMatchObject({ closed: true, ready: true });
+    // the line beside the check names the PROCESS as what counted – never the result
+    expect(screen.getByTestId("day-close-hint")).toHaveTextContent("das zählt, nicht das Ergebnis");
     // vibration and tone stayed off (default)
     expect(spies.vibrate).not.toHaveBeenCalled();
     expect(spies.tone).not.toHaveBeenCalled();
@@ -525,5 +602,34 @@ describe("Heute abschließen: das Abschluss-Ritual in Berichte", () => {
     fireEvent.click(within(ask).getByTestId("ask-send"));
     await waitFor(() => expect(within(ask).getAllByTestId("ask-card")).toHaveLength(3));
     expect(within(ask).getAllByTestId("ask-card-value")[0]).toHaveTextContent("2 von 12 (17 %)");
+  });
+
+  it("running week: „Heute abschließen“ (5) and „Frag dein Journal“ (7) share one row; a finished week gives the question the full row", async () => {
+    await load();
+    const { unmount } = renderView();
+    const day = await screen.findByTestId("day-close");
+    const ask = await screen.findByTestId("ask-journal", undefined, { timeout: 5000 });
+    expect(day.closest("[data-defer]")?.className).toContain("lg:col-span-5");
+    expect(ask.closest("[data-defer]")?.className).toContain("lg:col-span-7");
+    // both are frost panels with a real heading
+    expect(within(day).getByRole("heading", { level: 2 })).toHaveTextContent("Heute abschließen");
+    expect(within(ask).getByRole("heading", { level: 2 })).toHaveTextContent("Frag dein Journal");
+    unmount();
+    useBerichteUi.getState().setPeriod("2026-W19");
+    renderView();
+    const alone = await screen.findByTestId("ask-journal", undefined, { timeout: 5000 });
+    expect(screen.queryByTestId("day-close")).toBeNull();
+    expect(alone.closest("[data-defer]")?.className).toContain("lg:col-span-12");
+  });
+
+  it("an empty journal: the question card says so and offers no example that could only answer „nichts“", async () => {
+    await load([]);
+    renderView();
+    const ask = await screen.findByTestId("ask-journal", undefined, { timeout: 5000 });
+    expect(within(ask).getByTestId("ask-none")).toHaveTextContent("Noch keine abgeschlossenen Trades");
+    expect(within(ask).queryAllByTestId("ask-example")).toHaveLength(0);
+    expect(screen.queryByTestId("journal-cards")).toBeNull();
+    // the day can still be closed (a note counts on a day without trades)
+    expect(screen.getByTestId("day-close-item-checklist")).toHaveAttribute("data-state", "na");
   });
 });

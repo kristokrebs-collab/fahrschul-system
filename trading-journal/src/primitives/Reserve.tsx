@@ -20,8 +20,11 @@ import { Skeleton, SkeletonSwap } from "@/primitives/Skeleton";
  * Nothing here animates a size – the floor is a plain `min-height`, the placeholder shimmers by `transform`.
  */
 
-/** px per breakpoint: `base` below 640 px, `sm` from 640 px, `lg` from 1024 px (each falls back to the one before). */
-export type ReserveHeight = number | { base: number; sm?: number; lg?: number };
+/**
+ * px per breakpoint: `base` below 640 px, `sm` from 640 px, `lg` from 1024 px (each falls back to the one before). `xl` (from 1536 px, the
+ * wide tablet / desktop where charts with a fixed aspect grow taller) is optional: without it the `lg` size holds there too.
+ */
+export type ReserveHeight = number | { base: number; sm?: number; lg?: number; xl?: number };
 
 /** CSS custom properties of a reserve (`--reserve`, `--reserve-sm`, `--reserve-lg`), for `style`. */
 export function reserveStyle(height: ReserveHeight): CSSProperties {
@@ -29,20 +32,21 @@ export function reserveStyle(height: ReserveHeight): CSSProperties {
   const base = Math.max(0, Math.round(h.base));
   const sm = Math.max(0, Math.round(h.sm ?? h.base));
   const lg = Math.max(0, Math.round(h.lg ?? h.sm ?? h.base));
-  return { "--reserve": `${base}px`, "--reserve-sm": `${sm}px`, "--reserve-lg": `${lg}px` } as CSSProperties;
+  const xl = typeof height === "number" || height.xl == null ? null : Math.max(0, Math.round(height.xl));
+  return { "--reserve": `${base}px`, "--reserve-sm": `${sm}px`, "--reserve-lg": `${lg}px`, ...(xl == null ? {} : { "--reserve-xl": `${xl}px` }) } as CSSProperties;
 }
 
 /** The floor itself: `min-height` from the custom properties of `reserveStyle`. */
-export const RESERVE_CLASS = "min-h-(--reserve) sm:min-h-(--reserve-sm) lg:min-h-(--reserve-lg)";
+export const RESERVE_CLASS = "min-h-(--reserve) sm:min-h-(--reserve-sm) lg:min-h-(--reserve-lg) 2xl:min-h-[var(--reserve-xl,var(--reserve-lg))]";
 
 /** Same floor for a deferred cell (`Reveal defer`), whose box carries 12 px of room above and below its card (`DEFER_CLASS`). */
-export const RESERVE_CLASS_DEFER = "min-h-[calc(var(--reserve)+1.5rem)] sm:min-h-[calc(var(--reserve-sm)+1.5rem)] lg:min-h-[calc(var(--reserve-lg)+1.5rem)]";
+export const RESERVE_CLASS_DEFER = "min-h-[calc(var(--reserve)+1.5rem)] sm:min-h-[calc(var(--reserve-sm)+1.5rem)] lg:min-h-[calc(var(--reserve-lg)+1.5rem)] 2xl:min-h-[calc(var(--reserve-xl,var(--reserve-lg))+1.5rem)]";
 
 /**
  * `content-visibility: auto` remembers the size a skipped cell had when it was last rendered; until then it assumes this one
  * (the cell's end size per breakpoint, from the same custom properties as the floor).
  */
-export const INTRINSIC_CLASS = "[contain-intrinsic-block-size:auto_var(--reserve)] sm:[contain-intrinsic-block-size:auto_var(--reserve-sm)] lg:[contain-intrinsic-block-size:auto_var(--reserve-lg)]";
+export const INTRINSIC_CLASS = "[contain-intrinsic-block-size:auto_var(--reserve)] sm:[contain-intrinsic-block-size:auto_var(--reserve-sm)] lg:[contain-intrinsic-block-size:auto_var(--reserve-lg)] 2xl:[contain-intrinsic-block-size:auto_var(--reserve-xl,var(--reserve-lg))]";
 
 /**
  * Placeholder in a card's shape (rounded-2xl, hairline border, the label bar, then rows) that fills its parent. Use it

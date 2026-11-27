@@ -61,8 +61,8 @@ export interface CloseRitualProps {
   busy: boolean;
   /** the day whose dot pops after the tap ("YYYY-MM-DD"), when it is part of the week shown */
   todayKey?: string;
-  /** label of the round button and the line beside it */
-  action: { label: string; hint: string; done: string };
+  /** label of the round button and the line beside it (`doneHint`: the line once it is closed – what counted, never a result) */
+  action: { label: string; hint: string; done: string; doneHint?: string };
   onClose: () => void;
   /** where the caller's own parts (lesson field, state line) sit – above the button */
   children?: ReactNode;
@@ -74,7 +74,7 @@ export function CloseRitual({ testid, items, dots, dotsText, closed, ring, busy,
   const [fresh, setFresh] = useState(false);
   if (fresh && !closed) setFresh(false);
   return (
-    <div className="fr-ritual" data-testid={`${testid}-ritual`}>
+    <div className="fr-ritual fr-seq" data-testid={`${testid}-ritual`}>
       {items && (
         <ul className="fr-items" aria-label={RITUAL_STRINGS.items} data-testid={`${testid}-items`}>
           {items.map((i) => (
@@ -111,10 +111,12 @@ export function CloseRitual({ testid, items, dots, dotsText, closed, ring, busy,
         </button>
         <div className="grid min-w-0 gap-0.5">
           <b className="text-[14px] font-semibold">{closed ? action.done : action.label}</b>
-          <span className="text-[12.5px] text-mute">{closed ? "" : action.hint}</span>
+          <span className="text-[12.5px] leading-snug text-mute" data-testid={`${testid}-hint`}>
+            {closed ? (action.doneHint ?? "") : action.hint}
+          </span>
         </div>
       </div>
-      <div className="grid gap-1.5">
+      <div className="fr-week">
         <ul className="fr-days" aria-label={RITUAL_STRINGS.days} data-testid={`${testid}-days`}>
           {dots.map((d) => (
             <li key={d.key} data-state={d.state} data-fresh={fresh && d.key === todayKey ? "" : undefined} title={d.label}>

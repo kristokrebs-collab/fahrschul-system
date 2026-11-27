@@ -91,5 +91,7 @@ Symbolverzeichnisse von Nasdaq Trader, beide nur über Server-Funktionen. Der Ko
 
 35 fertig · 39 teilweise · 0 fehlt (von 74).
 
+Runde 13, Paket B (Berichte): die Zählung ändert sich nicht. Neu belegt sind die Berichte-Seite als Ganzes (`tests/e2e/berichte-funktion.spec.ts`: Arten, Fokus, Zeitraum, Tastatur, CSV / JSON / Druck, offline, leer, Touch-Ziele, axe) und ihr Laden ohne Springen (`tests/e2e/layout-shift.spec.ts`, Berichte bei 390×844 und 1692×978, 4× gedrosselt); die drei Frost-Karten in `tests/unit/views.frost.test.tsx` und `tests/e2e/frost-f2.spec.ts`. Nicht belegt: echtes Gerät, echter Drucker (geprüft ist das Druckdokument unter `@media print`).
+
 Nicht Teil dieser Übersicht: Betriebsprüfungen mit echten Konten (Supabase, Stripe, Bitunix, Anthropic) – die Tests laufen gegen Mocks, und das
 steht in den betroffenen Zeilen. Wer eine Zeile ändert, ändert auch das Register (`src/app/features.ts`) und umgekehrt.

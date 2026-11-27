@@ -7,8 +7,13 @@
  * "almost". The quiet curve behind the card is the real cumulative result of the period; the dashed line marks the entry on screen.
  *
  * Turning: the two round buttons (44 px), ← / → / Home / End with the card focused, a swipe (`swipeStep`). It stops at both ends (no wrap).
- * "Trade öffnen" opens the trade detail. An empty period says so. Reduced motion: the card and the word stand there at once, a step swaps
- * the entry without sliding (`base.css` zeroes every duration).
+ * "Trade öffnen" opens the trade detail. An empty period says so.
+ *
+ * Runde 13 (Paket B): the word is solid and rises letter by letter, the card and its parts follow 45 ms apart – once, when the section is
+ * first seen (`useSeen`). Behind the glass stands the period as a waterfall: one bar per closed trade from the cumulative result before
+ * it to the one after it (real numbers, never invented candles), the bar of the entry on screen is the bright one. Process chips carry a
+ * check mark when the trader did the thing (review, checklist, plan) – brightness for process, the result is only stated.
+ * Reduced motion: everything stands there after a short crossfade, a step swaps the entry without sliding.
  */
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { entryCurve, entryList, entryView, keyStep, pad2, stepIndex, swipeStep, type EntryView } from "@/domain/reports/entries";
@@ -18,6 +23,7 @@ import { price, r as fmtR, signed } from "@/lib/format";
 import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
 import { openTrade } from "@/views/insights/ui";
+import { st, useSeen } from "./FrostPanel";
 import "./frost.css";
 
 export const JOURNAL_STRINGS = {
@@ -44,24 +50,37 @@ const TONE_CLASS = { win: "text-win", loss: "text-loss", mute: "text-mute" } as 
 /** What the live region says after a step ("Eintrag 6 von 12: BTC/USDT, Long, −0,80 R"). */
 export const entrySpoken = (e: EntryView): string => `Eintrag ${e.n} von ${e.of}: ${e.pair}, ${sideLabel(e.side)}, ${e.r != null ? fmtR(e.r) : JOURNAL_STRINGS.noStop}`;
 
+/** The period behind the glass: one bar per entry (cumulative result before → after), the cumulative line, the entry on screen bright. */
 function Curve({ points, at }: { points: readonly number[]; at: number }) {
   const w = 960;
   const h = 560;
+  const n = points.length - 1;
   const lo = Math.min(...points);
   const hi = Math.max(...points);
   const span = hi - lo || 1;
-  const x = (i: number) => (points.length > 1 ? (i / (points.length - 1)) * w : w / 2);
-  const y = (v: number) => h * 0.78 - ((v - lo) / span) * h * 0.5;
-  const line = points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  // the dashed line stands on the point AFTER entry `at` (points[0] is the start at 0)
-  const cx = x(at + 1);
+  const slot = w / Math.max(n, 1);
+  const bw = Math.min(26, slot * 0.56);
+  const x = (i: number) => slot * (i + 0.5);
+  const y = (v: number) => h * 0.86 - ((v - lo) / span) * h * 0.46;
+  const line = points.slice(1).map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
   return (
     <svg className="fr-curve" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden="true" data-testid="journal-curve">
-      <polyline points={line} />
-      <line x1={0} x2={0} y1={0} y2={h} style={{ transform: `translate3d(${cx}px,0,0)` }} />
+      {points.slice(1).map((v, i) => {
+        const from = points[i] ?? 0;
+        const top = Math.min(y(from), y(v));
+        return <rect key={i} x={x(i) - bw / 2} y={top} width={bw} height={Math.max(3, Math.abs(y(v) - y(from)))} rx={3} data-tone={v > from ? "win" : v < from ? "loss" : "mute"} data-on={i === at ? "" : undefined} />;
+      })}
+      {n > 1 && <polyline points={line} />}
+      <line x1={0} x2={0} y1={0} y2={h} style={{ transform: `translate3d(${x(at)}px,0,0)` }} />
     </svg>
   );
 }
+
+const Pill = ({ ok, children, testid }: { ok: boolean; children: string; testid?: string }) => (
+  <li className="fr-pill" data-ok={ok ? "" : undefined} data-quiet={ok ? undefined : ""} data-testid={testid}>
+    {children}
+  </li>
+);
 
 function EntryBody({ e, dir }: { e: EntryView; dir: "next" | "prev" | "none" }) {
   const S = JOURNAL_STRINGS;
@@ -73,9 +92,10 @@ function EntryBody({ e, dir }: { e: EntryView; dir: "next" | "prev" | "none" }) 
     ["Ziel", e.plan.target],
     ["Ausstieg", e.plan.exit],
   ];
+  const list = e.process.checklist;
   return (
     <div className="fr-body" data-dir={dir} data-testid="journal-entry" data-id={e.id}>
-      <div className="fr-top">
+      <div className="fr-top fr-st" style={st(0)}>
         <span className="fr-pill" data-testid="journal-pill">
           Eintrag {pad2(e.n)} von {pad2(e.of)}
         </span>
@@ -83,13 +103,15 @@ function EntryBody({ e, dir }: { e: EntryView; dir: "next" | "prev" | "none" }) 
           {pad2(e.n)}
         </span>
       </div>
-      <h3 className="fr-title">
+      <h3 className="fr-title fr-st" style={st(1)}>
         {e.pair}
-        <small>
-          {sideLabel(e.side)} · {e.when}
-        </small>
+        <em> · {sideLabel(e.side)}</em>
+        <small>{e.when}</small>
       </h3>
-      <dl className="fr-plan" aria-label="Plan und Ausführung">
+      <p className="fr-excerpt fr-st" style={st(2)} data-testid="journal-excerpt">
+        {e.excerpt || S.noText}
+      </p>
+      <dl className="fr-plan fr-st" style={st(3)} aria-label="Plan und Ausführung">
         {numbers.map(([k, v]) => (
           <div key={k}>
             <dt>{k}</dt>
@@ -97,8 +119,7 @@ function EntryBody({ e, dir }: { e: EntryView; dir: "next" | "prev" | "none" }) 
           </div>
         ))}
       </dl>
-      <p className="fr-excerpt" data-testid="journal-excerpt">{e.excerpt || S.noText}</p>
-      <div className="grid gap-1.5">
+      <div className="grid gap-2 fr-st" style={st(4)}>
         <span className="fr-label" id={labelId}>
           Setup
         </span>
@@ -116,7 +137,7 @@ function EntryBody({ e, dir }: { e: EntryView; dir: "next" | "prev" | "none" }) 
           )}
         </ul>
       </div>
-      <div className="fr-res">
+      <div className="fr-res fr-st" style={st(5)}>
         <div>
           <output className={TONE_CLASS[e.tone]} data-testid="journal-r" data-tone={e.tone} aria-label={`Ergebnis ${e.r != null ? fmtR(e.r) : S.noStop}`}>
             {e.r != null ? fmtR(e.r) : "– R"}
@@ -127,19 +148,11 @@ function EntryBody({ e, dir }: { e: EntryView; dir: "next" | "prev" | "none" }) 
           </small>
         </div>
         <ul className="fr-chips" aria-label="Prozess" style={{ justifyContent: "flex-end" }}>
-          <li className="fr-pill" data-quiet="" data-testid="journal-review">
+          <Pill ok={e.process.reviewed} testid="journal-review">
             {e.process.reviewed ? S.review.yes : S.review.no}
-          </li>
-          {e.process.checklist && (
-            <li className="fr-pill" data-quiet="">
-              {S.checklist(e.process.checklist.checked, e.process.checklist.total)}
-            </li>
-          )}
-          {e.process.followedPlan != null && (
-            <li className="fr-pill" data-quiet="">
-              {e.process.followedPlan ? S.plan.yes : S.plan.no}
-            </li>
-          )}
+          </Pill>
+          {list && <Pill ok={list.total > 0 && list.checked >= list.total}>{S.checklist(list.checked, list.total)}</Pill>}
+          {e.process.followedPlan != null && <Pill ok={e.process.followedPlan}>{e.process.followedPlan ? S.plan.yes : S.plan.no}</Pill>}
         </ul>
       </div>
     </div>
@@ -155,6 +168,7 @@ export function JournalCard({ trades, settings, className }: { trades: readonly 
   const cur = Math.min(index, Math.max(0, list.length - 1));
   const e = entryView(list, cur, settings);
   const drag = useRef<{ x: number; y: number } | null>(null);
+  const [box, seen] = useSeen<HTMLElement>();
   // the live region reads a step, not the first paint
   const [spoken, setSpoken] = useState("");
 
@@ -193,10 +207,16 @@ export function JournalCard({ trades, settings, className }: { trades: readonly 
   };
 
   return (
-    <section className={cn("fr-journal", className)} aria-label={S.title} data-testid="journal-cards" data-state="ready" data-index={cur + 1} data-total={list.length}>
+    <section ref={box} className={cn("fr-journal", className)} aria-label={S.title} data-testid="journal-cards" data-state="ready" data-index={cur + 1} data-total={list.length} data-in={seen ? "" : undefined}>
       <Curve points={curve} at={cur} />
       <div className="fr-shade" aria-hidden="true" />
-      <p className="fr-word" data-word={S.word} aria-hidden="true" data-testid="journal-word" />
+      <p className="fr-word" data-word={S.word} aria-hidden="true" data-testid="journal-word">
+        {Array.from(S.word, (c, i) => (
+          <span key={i} style={st(i)}>
+            {c}
+          </span>
+        ))}
+      </p>
       <article
         className="fr-card fr-glass"
         tabIndex={0}
@@ -210,7 +230,7 @@ export function JournalCard({ trades, settings, className }: { trades: readonly 
         data-testid="journal-card"
       >
         <EntryBody key={e.id} e={e} dir={dir} />
-        <div className="fr-nav">
+        <div className="fr-nav fr-st" style={st(6)}>
           <button type="button" className="fr-round" aria-label={S.prev} disabled={cur === 0} onClick={() => go(cur - 1)} data-testid="journal-prev">
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
               <path d="M10 3.5 5.5 8l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
