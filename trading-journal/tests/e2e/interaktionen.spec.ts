@@ -280,11 +280,12 @@ test.describe("Radial Share", () => {
     // the reference's discs are opaque surfaces (no blur), 48 px
     const disc = await copy.evaluate((el) => {
       const face = el.firstElementChild as HTMLElement;
-      return { blur: getComputedStyle(face).backdropFilter, bg: getComputedStyle(face).backgroundColor, w: el.getBoundingClientRect().width };
+      return { blur: getComputedStyle(face).backdropFilter, bg: getComputedStyle(face).backgroundColor };
     });
     expect(disc.blur === "none" || disc.blur === "").toBe(true);
     expect(disc.bg).toMatch(/^rgb\(/);
-    expect(disc.w).toBeGreaterThanOrEqual(44);
+    // the discs grow in (scale 0.3 → 1 in ≈ 300 ms, visible from the first frame): measure the finished size, not a frame on the way
+    await expect.poll(() => copy.evaluate((el) => el.getBoundingClientRect().width), { timeout: 3000 }).toBeGreaterThanOrEqual(44);
     // the caption: first the prompt, then what the active target does
     const caption = page.getByTestId("radial-caption");
     await expect(caption).toHaveText("Kanal wählen");

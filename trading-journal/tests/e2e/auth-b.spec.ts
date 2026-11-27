@@ -241,7 +241,8 @@ test.describe("Paket B: Anmeldung, Registrierung, Einrichtung", () => {
       const flat = await read();
       expect(flat.bezelContent, `flat (${v})`).toBe("none");
       expect([flat.card, flat.band, flat.dim, flat.close], `flat (${v})`).toEqual(["none", "none", "none", "none"]);
-      expect(flat.closeBg).toBe("rgba(255, 255, 255, 0.12)");
+      // the button's background eases over 150 ms when the attribute flips: read the settled value, not a frame on the way
+      await expect.poll(async () => (await read()).closeBg, { timeout: 3_000 }).toBe("rgba(255, 255, 255, 0.12)");
     }
     // Runde 14: the glass look is a setting (`html[data-glass]`, set by the app; here from outside) – this test is about „Glas“
     await page.evaluate(() => document.documentElement.setAttribute("data-glass", "on"));
