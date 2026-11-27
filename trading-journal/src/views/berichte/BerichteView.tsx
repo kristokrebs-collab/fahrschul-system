@@ -76,16 +76,18 @@ function Cell({ index, span, size, children }: { index: number; span: string; si
 }
 
 const SIZE = {
-  performance: { base: 376, sm: 282, lg: 333 },
-  compare: { base: 333, sm: 333, lg: 333 },
+  performance: { base: 376, sm: 282, lg: 333, xl: 421 },
+  compare: { base: 333, sm: 333, lg: 333, xl: 421 },
   strategy: { base: 373, sm: 277, lg: 410 },
   risk: { base: 410, sm: 410, lg: 410 },
-  psych: { base: 338, sm: 276, lg: 276 },
-  mistakes: { base: 185, sm: 169, lg: 276 },
-  goals: { base: 410, sm: 237, lg: 237 },
-  review: { base: 907, sm: 774, lg: 754 },
-  journal: { base: 590, sm: 600 },
-  ask: { base: 328, sm: 242 },
+  psych: { base: 338, sm: 276, lg: 276, xl: 286 },
+  mistakes: { base: 185, sm: 169, lg: 276, xl: 286 },
+  goals: { base: 410, sm: 237, lg: 237, xl: 262 },
+  review: { base: 907, sm: 774, lg: 754, xl: 822 },
+  journal: { base: 648, sm: 652, lg: 667 },
+  ask: { base: 396, sm: 292, lg: 242 },
+  day: { base: 533, sm: 500, lg: 517 },
+  askPair: { base: 396, sm: 292, lg: 517 },
 } as const satisfies Record<string, ReserveHeight>;
 
 function Arrow({ dir, onClick, disabled, label }: { dir: "prev" | "next"; onClick: () => void; disabled?: boolean; label: string }) {
@@ -167,6 +169,14 @@ export function BerichteView({ className }: { className?: string }) {
     ...(focus === "all" ? [{ id: "ask-journal", label: "Frag dein Journal" }] : []),
     { id: "ledger-card", label: "Transaktionsbuch" },
   ];
+  // Runde 13: beside "Heute abschließen" (5 / 7, the pair of the Frost-Vorlage) in a running day / week, else the full row
+  const ask = focus === "all" && (
+    <Cell index={1} span={showDay ? "lg:col-span-7" : "lg:col-span-12"} size={showDay ? SIZE.askPair : SIZE.ask}>
+      <Suspense fallback={<CardSkeleton rows={3} />}>
+        <AskJournalCard page={page} />
+      </Suspense>
+    </Cell>
+  );
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="berichte-view" data-kind={kind} data-key={period.key}>
       <PageHeader
@@ -284,10 +294,11 @@ export function BerichteView({ className }: { className?: string }) {
       )}
       {/* Paket F2: "Heute abschließen" – the same ritual as the weekly closing, for the running day */}
       {showDay && (
-        <Cell index={2} span="lg:col-span-12">
+        <Cell index={0} span="lg:col-span-5" size={SIZE.day}>
           <DayCloseCard page={page} />
         </Cell>
       )}
+      {showDay && ask}
       {/* Paket P: the closing of a finished week – behaviour and a lesson for tomorrow, never a result or an offer */}
       {showClose && (
         <Cell index={2} span="lg:col-span-12">
@@ -301,13 +312,7 @@ export function BerichteView({ className }: { className?: string }) {
         </Cell>
       )}
       {/* Paket F2: a question to the whole journal, answered on the device (lazy chunk, reserved size) */}
-      {focus === "all" && (
-        <Cell index={1} span="lg:col-span-12" size={SIZE.ask}>
-          <Suspense fallback={<CardSkeleton rows={3} />}>
-            <AskJournalCard page={page} />
-          </Suspense>
-        </Cell>
-      )}
+      {!showDay && ask}
       {/* F70: independent of the period and the focus – the whole journal as a ledger */}
       {/* no `Cell` (Reveal): the ledger grows with every 50 rows and a reveal waits for 15 % of its element in view – a card that tall would stay at opacity 0 */}
       <Fold id="berichte-ledger" title="Transaktionsbuch" hint="Käufe, Verkäufe, Gebühren und Funding aus deinem Journal, mit Abgleich und CSV" className="lg:col-span-12">

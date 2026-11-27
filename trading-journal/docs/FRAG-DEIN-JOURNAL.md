@@ -53,14 +53,17 @@ Eine verstandene Frage ohne Trades sagt das offen („Für Letzter Monat · Brea
 - **Betroffene Trades:** „Betroffene Trades (n)“ öffnet die neuesten 8; jede Zeile öffnet den Trade. Eine Trades-Liste mit genau diesen IDs gibt es (noch) nicht;
   die übrigen findest du in Trades über die Filter.
 - **Keine Empfehlung.** Die Antworten sind Rückblick auf die eigenen Trades, keine Prognose und keine Anlageempfehlung.
-- **Schimmer:** die Rechnung dauert Millisekunden; die halbe Sekunde „Durchsuche 214 Trades …“ (mit der echten Zahl) ist eine bewusste Pause für das Auge und
-  entfällt unter „Bewegung reduzieren“.
+- **Keine vorgetäuschte Rechenzeit (Runde 13):** die Antwort wird im nächsten Schritt nach dem Tipp gerechnet und steht, sobald sie da ist. Der Lader – ein kleiner
+  `ThinkingOrb` („search“) mit „Durchsuche 214 Trades …“ (die echte Zahl) – existiert nur während eines offenen Laufs und wird erst sichtbar, wenn der nach 160 ms noch
+  läuft; eine normale Antwort zeigt also keinen Lader. Die frühere halbe Sekunde „Schimmer“ ist entfernt.
+- **Weg der Antwort:** `askCards` (`src/domain/ask`) – dieselbe deterministische Maschine wie Coach-Chat und Journal-Zweig des Assistenten, mit denselben Grenzen. Die
+  Tippfehler-Korrektur und die Umgangssprache des Assistenten (`src/assistant/understand.ts`) nutzt die Leiste bewusst **nicht**: ein unbekanntes Wort wird gemeldet.
+- **Leeres Journal:** statt Beispielfragen steht „Noch keine abgeschlossenen Trades …“; die Grenzen stehen als Zeile auf der Karte.
 - **Sprache:** nur Deutsch, ohne Tippfehler-Korrektur (ein unbekanntes Wort wird gemeldet, nicht „verbessert“); Fachwörter außerhalb der Tabellen
   (Sortino, Kelly …) werden von dieser Leiste nicht beantwortet – sie stehen in Analyse.
 
 ## Belege
 
 `tests/unit/ask.test.ts` (jeder Fragetyp mit von Hand gerechneten Erwartungen auf einem festen 12-Trade-Journal `ask.fixtures.ts`; nicht verstandene Fragen;
-die Beispiele sind selbst Fragen, die beantwortet werden; die alten Coach-Fragen laufen weiter), `tests/unit/views.frost.test.tsx` (Punkt → Leiste → Schimmer →
-drei Karten, Unbekanntes, Trades dahinter, reduzierte Bewegung, kein `fetch`), `tests/unit/psych.guard.test.ts` Block 6 (lokal: kein Netz, kein Modell),
+die Beispiele sind selbst Fragen, die beantwortet werden; die alten Coach-Fragen laufen weiter), `tests/unit/views.frost.test.tsx` (Leiste → drei Karten ohne eingebaute Pause, Lader nur im offenen Lauf, Unbekanntes, Trades dahinter, reduzierte Bewegung, kein `fetch`), `tests/unit/psych.guard.test.ts` Block 6 (lokal: kein Netz, kein Modell),
 `tests/e2e/frost-f2.spec.ts` (Handy und Desktop, offline, axe hell und dunkel, Touch ≥ 44 px, kein Layoutsprung), Bilder in `docs/audit/img-frost/`.

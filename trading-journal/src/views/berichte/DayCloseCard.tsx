@@ -20,10 +20,10 @@ import { cn } from "@/lib/cn";
 import { localDateKey } from "@/lib/dates";
 import { processDone } from "@/motion/processFeedback";
 import { Button } from "@/primitives/Button";
-import { Card } from "@/primitives/Card";
 import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
 import { CloseRitual } from "./CloseRitual";
+import { FrostPanel, st } from "./FrostPanel";
 import { mondayOf, usePrepared, useWeekDots } from "./closeData";
 import type { ReportPage } from "./hooks";
 import "./frost.css";
@@ -43,6 +43,9 @@ export const DAY_CLOSE = {
   retry: "Bitte noch einmal versuchen.",
   count: (n: number) => (n === 1 ? "Ein Tag abgeschlossen." : `${n} Tage abgeschlossen.`),
   detail: (ready: boolean) => (ready ? "Alles Nötige ist erledigt." : ""),
+  /** the line beside the check once the day is closed: what counted (process), never the result */
+  earned: "Checkliste und Review sind erledigt – das zählt, nicht das Ergebnis.",
+  plain: "Festgehalten. Was offen blieb, kannst du jederzeit nachtragen.",
 } as const;
 
 /** Should the card show for this page: focus „Alles“, a day or week report whose period contains today. */
@@ -102,8 +105,8 @@ export function DayCloseCard({ page, className }: { page: ReportPage; className?
     );
 
   return (
-    <Card title={DAY_CLOSE.title} note={DAY_CLOSE.note} className={className} data-testid="day-close" data-state={closed ? "closed" : "open"} data-ready={ready ? "yes" : "no"} innerClassName="grid content-start gap-4">
-      <p className="text-[13px] text-fg" data-testid="day-close-state" id={`${uid}-state`}>
+    <FrostPanel title={DAY_CLOSE.title} note={DAY_CLOSE.note} className={className} data-testid="day-close" data-state={closed ? "closed" : "open"} data-ready={ready ? "yes" : "no"}>
+      <p className="fr-state fr-st" style={st(1)} data-testid="day-close-state" id={`${uid}-state`}>
         {closed ? DAY_CLOSE.closedOn(timeOf(stored?.at ?? "")) : DAY_CLOSE.open}
       </p>
       <CloseRitual
@@ -115,7 +118,7 @@ export function DayCloseCard({ page, className }: { page: ReportPage; className?
         ring={ring}
         busy={busy}
         todayKey={today}
-        action={{ label: DAY_CLOSE.label, hint: DAY_CLOSE.hint, done: DAY_CLOSE.done }}
+        action={{ label: DAY_CLOSE.label, hint: DAY_CLOSE.hint, done: DAY_CLOSE.done, doneHint: stored?.ready ? DAY_CLOSE.earned : openItemsText(items) || DAY_CLOSE.plain }}
         onClose={close}
       />
       <div className={cn("flex flex-wrap items-center gap-2.5", !closed && closedCount === 0 && "hidden")}>
@@ -130,6 +133,6 @@ export function DayCloseCard({ page, className }: { page: ReportPage; className?
           </span>
         )}
       </div>
-    </Card>
+    </FrostPanel>
   );
 }
