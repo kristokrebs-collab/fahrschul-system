@@ -1,0 +1,55 @@
+/** Texte des Scanners „Wer bricht aus?“ – kurze, ruhige Sätze: was geprüft wird, was erfüllt ist, nie ein Aufruf zu handeln. */
+import { BREAKOUT_BASES, BREAKOUT_RULES, type BreakoutSessionId } from "@/domain/breakout";
+import type { BreakoutSource } from "@/market/breakout/candles";
+
+const R = BREAKOUT_RULES;
+const de = (x: number): string => String(x).replace(".", ",");
+
+export const BREAKOUT = {
+  title: "Wer bricht aus",
+  lead: (session: string) => `${BREAKOUT_BASES.length} Märkte · ${session} · Spanne der ersten ${R.rangeMinutes} Minuten · ${R.interval.replace("m", "-Minuten")}-Kerzen`,
+  sessionLabel: "Sitzung",
+  sessions: { newyork: "New York 9:30", london: "London 8:00" } satisfies Record<BreakoutSessionId, string>,
+  sessionShort: { newyork: "New York", london: "London" } satisfies Record<BreakoutSessionId, string>,
+  rescan: "Neu scannen",
+  scanStart: "Scan starten",
+  scanning: "Scan läuft",
+  checked: "Geprüft",
+  topGrades: "A+ / A",
+  idle: "Noch nicht gescannt. Der Scan lädt echte 5-Minuten-Kerzen der zwölf Märkte.",
+  pending: "lädt …",
+  best: "Meiste Gründe",
+  calm: (base: string, grade: string) => `Kein Markt erfüllt gerade alle Gründe. Am weitesten ist ${base} mit Note ${grade} – nichts zu erzwingen ist auch eine Entscheidung.`,
+  none: "In dieser Sitzung ist bisher kein Markt mit einem Schluss aus der Spanne gelaufen.",
+  failed: (reason: string) => `Keine Kerzen erhalten: ${reason} Ohne echte Kerzen prüft der Scanner nichts – es gibt keine Ersatzdaten.`,
+  retry: "Erneut versuchen",
+  chips: { breakout: "Ausbruch", volume: "Volumen", trend: "Trend" },
+  chipState: { yes: "erfüllt", no: "nicht erfüllt", unknown: "nicht bestimmbar" },
+  facts: { level: "Marke", dist: "Abstand zur Marke", volume: "Volumen-Faktor", time: "Zeitpunkt", grade: "Stärke", atr: "ATR 14" },
+  gradeText: { "A+": "3 von 3 Gründen, Volumen stark", A: "3 von 3 Gründen", B: "2 von 3 Gründen", C: "1 von 3 Gründen" } as Record<string, string>,
+  noGrade: "keine Note ohne Ausbruch",
+  back: "wieder in der Spanne",
+  toHigh: "bis zum Hoch",
+  toLow: "bis zum Tief",
+  chartLabel: (base: string, n: number) => `Mini-Chart ${base}: ${n} echte 5-Minuten-Kerzen mit der Spanne`,
+  detailEmpty: "Wähle eine Karte: dann stehen hier die Zahlen und die Gründe in Worten.",
+  why: "Warum",
+  toCalc: "In den Rechner übernehmen",
+  toCalcNote: "Belegt im Rechner nur Paar, Richtung, Einstieg und Stop vor. Nichts wird gehandelt oder gespeichert.",
+  noPrefill: "Ohne Ausbruch gibt es nichts zu übernehmen.",
+  stopFrom: { range: "andere Seite der Spanne", atr: `${de(R.atrStop)} ATR (die Spanne liegt schon auf der falschen Seite)` },
+  prefillSource: "Aus dem Ausbruch-Scanner vorbelegt – nur eine Vorbelegung, kein Trade:",
+  rulesTitle: "So wird erkannt",
+  rules: [
+    `Spanne: Hoch und Tief der ersten ${R.rangeMinutes} Minuten der Sitzung (New York 9:30, London 8:00 Ortszeit – mit Sommerzeit), aus ${R.interval.replace("m", "-Minuten")}-Kerzen.`,
+    `Ausbruch: die erste vollständig geschlossene Kerze danach, deren Schluss außerhalb liegt. Ein Docht zählt nicht, eine laufende Kerze auch nicht. Gesucht wird ${R.searchMinutes} Minuten ab Sitzungsbeginn.`,
+    `Volumen: Volumen der Ausbruchskerze geteilt durch den Durchschnitt der ${R.volumeBars} Kerzen davor – ab ${de(R.volumeOk)}× gilt es als bestätigt, ab ${de(R.volumeStrong)}× als stark.`,
+    `Trend: Der Schluss der Ausbruchskerze liegt auf der passenden Seite des EMA ${R.emaBars} (Long darüber, Short darunter).`,
+    `Abstand: wie weit der letzte geschlossene Kurs von der gebrochenen Marke weg ist – in Prozent und in ATR ${R.atrBars} (durchschnittliche Schwankung einer Kerze), damit ruhige und wilde Märkte vergleichbar sind.`,
+    "Note: A+ = Ausbruch, starkes Volumen und Trend · A = Ausbruch, Volumen und Trend · B = Ausbruch und einer der beiden · C = nur der Ausbruch. Die Note zählt Gründe – sie sagt nichts über einen Gewinn.",
+  ],
+  sourceName: { binance: "Binance USDⓈ-M", proxy: "Binance USDⓈ-M (EU-Proxy)", bybit: "Bybit USDT-Perp (Ersatzquelle, nicht Binance)" } satisfies Record<BreakoutSource, string>,
+  standFetch: "Abruf",
+  standBar: "letzter Schluss 5m",
+  note: "Regel-Abgleich auf öffentlichen Kerzen, nur aus geschlossenen Kerzen – keine Prognose, kein Signal zum Handeln.",
+} as const;

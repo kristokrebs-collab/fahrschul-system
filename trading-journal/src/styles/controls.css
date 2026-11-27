@@ -1,0 +1,556 @@
+/* Bedienelemente (Runde 10): Zustände und kleine Spielereien für Buttons, Chips, Felder, Auswahllisten, Falten.
+   Alles nur transform / opacity / clip-path. Die reichen Hover-Effekte hängen an `[data-rich]` (PageHost setzt es auf jeder
+   Seite außer Übersicht und Cockpit) und an `(hover: hover)`; Reduced Motion setzt base.css auf „sofort fertig“. Außerhalb
+   von `[data-rich]` bleibt jedes Pixel wie vorher. */
+
+/* Häkchen zeichnet sich: <svg class="fx-check"><path pathLength="1" …/></svg> (Button-Erfolg, Kopieren, Auswahlliste) */
+@keyframes fx-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+.fx-check path {
+  stroke-dasharray: 1;
+  animation: fx-draw 0.28s cubic-bezier(0.22, 1, 0.36, 1) 0.04s backwards;
+}
+
+/* Fehler: ein kurzes Schütteln des Buttons (die einzelne `translate`-Eigenschaft stört das `transform` der Feder nicht) */
+@keyframes fx-shake {
+  20% {
+    translate: -4px;
+  }
+  40% {
+    translate: 4px;
+  }
+  60% {
+    translate: -3px;
+  }
+  80% {
+    translate: 2px;
+  }
+}
+button[data-status="error"] {
+  animation: fx-shake 0.35s ease-in-out;
+}
+
+/* Platz für das längere von zwei Wörtern: <span class="fx-reserve" data-reserve="Kopieren">…</span> (kein Text im DOM) */
+.fx-reserve {
+  display: inline-grid;
+}
+.fx-reserve::before {
+  content: attr(data-reserve) / "";
+  grid-area: 1 / 1;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  /* TextRoll sets every letter in its own box (no kerning between them): the reserve measures the same way */
+  font-kerning: none;
+}
+
+/* Glanzstreifen und Text-Rollen beim Hover (Button): Streifen = ::after der Welle-Ebene `.btn-fx` (clippt, liegt hinter dem Text) */
+[data-fx~="shine"] {
+  --btn-shine: rgb(var(--veil-rgb, 255 255 255) / 0.13);
+}
+[data-variant="primary"][data-fx~="shine"] {
+  --btn-shine: rgb(var(--veil-ink-rgb, 4 4 4) / 0.1);
+}
+@media (hover: hover) {
+  [data-rich] [data-fx~="shine"] > .btn-fx::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 22%, var(--btn-shine) 48%, transparent 74%);
+    transform: translateX(-130%);
+  }
+  [data-rich] [data-fx~="shine"]:not(:disabled):hover > .btn-fx::after {
+    transform: translateX(130%);
+    transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  /* zwei Zeilen übereinander, beim Hover rollt die zweite herein (Kopie nur als Pseudo-Inhalt: der Name bleibt einfach) */
+  [data-rich] [data-fx~="roll"] .btn-roll {
+    position: relative;
+    display: block;
+    overflow: clip;
+  }
+  [data-rich] [data-fx~="roll"] .btn-roll > span {
+    display: block;
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  [data-rich] [data-fx~="roll"] .btn-roll::after {
+    content: attr(data-t) / "";
+    position: absolute;
+    inset: 0;
+    transform: translateY(100%);
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  [data-rich] [data-fx~="roll"]:not(:disabled):hover .btn-roll > span {
+    transform: translateY(-100%);
+  }
+  [data-rich] [data-fx~="roll"]:not(:disabled):hover .btn-roll::after {
+    transform: translateY(0);
+  }
+  /* Magnet-Zug (buttonMagnet.ts): die Rückkehr federt leicht */
+  [data-magnet] {
+    transition: translate 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+}
+
+/* Chip gewählt: ein kleines Abzeichen mit Häkchen springt an die Ecke (kein Platz im Fluss, nichts verschiebt sich); das Häkchen
+   wird von unten nach oben gezeichnet. Farbe des Abzeichens: --fx-tick (Standard: Schrift). */
+.fx-chip::before,
+.fx-chip::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+.fx-chip::before {
+  top: -5px;
+  right: -5px;
+  width: 15px;
+  height: 15px;
+  border-radius: 9999px;
+  background: var(--fx-tick, var(--color-fg));
+  scale: 0;
+  transition: scale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.fx-chip::after {
+  top: -2px;
+  right: 0;
+  width: 4px;
+  height: 8px;
+  border: solid var(--color-ink-950);
+  border-width: 0 2px 2px 0;
+  rotate: 45deg;
+  clip-path: inset(100% 0 0);
+  transition: clip-path 0.22s ease-out;
+}
+.fx-chip[aria-pressed="true"]::before,
+.fx-chip[aria-checked="true"]::before {
+  scale: 1;
+}
+.fx-chip[aria-pressed="true"]::after,
+.fx-chip[aria-checked="true"]::after {
+  clip-path: inset(0);
+  transition-delay: 0.12s;
+}
+
+/* Felder (nur reiche Seiten): die Beschriftung hebt sich beim Fokus, färbt sich bei einem Fehler; Suchfeld mit eigenem „×“ */
+[data-rich] [data-field] > .label {
+  transition:
+    color 0.2s,
+    translate 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-rich] [data-field]:focus-within > .label {
+  color: var(--color-fg);
+  translate: 0 -1px;
+}
+[data-rich] [data-field]:has([aria-invalid="true"]) > .label {
+  color: var(--color-loss);
+}
+.fx-clear {
+  display: none;
+}
+[data-rich] [data-input]:has(.fx-clear) input[type="search"] {
+  padding-right: 2.25rem;
+}
+[data-rich] [data-input]:has(.fx-clear) input[type="search"]::-webkit-search-cancel-button {
+  appearance: none;
+  display: none;
+}
+[data-rich] .fx-clear {
+  display: grid;
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
+  place-items: center;
+  border-radius: 9999px;
+  color: var(--color-mute);
+  scale: 0.5;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    scale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.15s,
+    visibility 0s 0.15s;
+}
+[data-rich] [data-input]:has(input:not(:placeholder-shown)) .fx-clear {
+  scale: 1;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+[data-rich] .fx-clear:hover {
+  color: var(--color-fg);
+}
+
+/* Fold: der Inhalt gleitet beim Aufklappen herein (erst nach dem ersten Antippen, nicht beim Laden), der Pfeil federt */
+@keyframes fx-fold-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+[data-rich] [data-fold][data-touched][open] > :not(summary) {
+  animation: fx-fold-in 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-rich] [data-fold] > summary svg {
+  transition-duration: 0.35s;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Auswahlliste (MorphSelect, nur Optik): Zeilen laufen gestaffelt ein, ein gleitender Marker folgt der aktiven Zeile, das Häkchen
+   der gewählten Zeile wird gezeichnet. Das Feld bekommt einen Hover und einen federnden Pfeil. Die Öffnen-Logik bleibt unberührt. */
+.ms-glide {
+  display: none;
+}
+@keyframes fx-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+[data-rich] button[aria-haspopup="listbox"]:not(:disabled):hover {
+  border-color: rgb(var(--veil-rgb, 255 255 255) / 0.24);
+}
+[data-rich] button[aria-haspopup="listbox"] > svg {
+  transition-duration: 0.35s;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+[data-ms-rich] .ms-glide {
+  display: block;
+  position: absolute;
+  z-index: -1;
+  left: 6px;
+  right: 6px;
+  top: 6px;
+  border-radius: 10px;
+  background: var(--color-ink-750);
+  box-shadow: inset 0 0 0 1px rgb(var(--veil-rgb, 255 255 255) / 0.14);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-ms-rich] [role="option"][data-active]:not([aria-selected="true"]) {
+  background-color: transparent;
+  box-shadow: none;
+}
+[data-ms-rich][data-state="open"] [role="option"] {
+  animation: fx-row-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 14ms + 30ms);
+}
+[data-ms-rich][data-state="open"] [aria-selected="true"] svg path {
+  stroke-dasharray: 1;
+  animation: fx-draw 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.18s backwards;
+}
+
+/* Suchfeld (`primitives/SearchField.tsx`): weiche, räumliche „Clay“-Fläche aus Glas. Hell von oben links (--sf-hi), Schatten unten rechts
+   (--sf-lo), 90 % deckend – der Text liegt auf jedem Grund auf ≥ AA; ohne `backdrop-filter` (alter Browser, `data-safe-fx`) bleibt die
+   Fläche gleich lesbar. Bewegt wird nur transform / opacity / filter: Fokusring 200 ms, Treffer 220 ms, Auswahlplatte auf der Feder
+   `--sf-ease` (von SearchField aus `spring.layout` gerechnet), Leeren-Knopf auf `--sf-pop` (`spring.pop`). Reduced Motion: base.css. */
+.sf {
+  --sf-r: 18px;
+  --sf-h: 56px;
+  --sf-hi: 255 255 255;
+  --sf-lo: 0 0 0;
+  /* the colour of edges, ring and the selection plate: light on dark, ink on light (a white edge on paper would be gone) */
+  --sf-ink: 255 255 255;
+  /* strengths of the edge, the inner light / shade and the drop shadow */
+  --sf-a-edge: 0.09;
+  --sf-a-hi: 0.09;
+  --sf-a-in: 0.22;
+  --sf-a-drop: 0.2;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+/* paper: soft slate shade, white inner light – but not inside the dark islands of the light mode (the immersive navigation stays ink, themes.css) */
+:root[data-theme="light"] .sf:not(:where([data-theme-scope="dark"], [data-layer="Navigation (Vollbild)"], [data-intro-stage]) *) {
+  --sf-lo: 15 23 42;
+  --sf-ink: 15 23 42;
+  --sf-a-edge: 0.14;
+  --sf-a-hi: 0.9;
+  --sf-a-in: 0.09;
+  --sf-a-drop: 0.1;
+}
+.sf[data-size="md"] {
+  --sf-r: 16px;
+  --sf-h: 48px;
+}
+.sf[data-size="sm"] {
+  --sf-r: 14px;
+  --sf-h: 40px;
+}
+@media (pointer: coarse) {
+  .sf[data-size="sm"] {
+    --sf-h: 44px;
+  }
+}
+.sf-anchor {
+  position: relative;
+}
+.sf-box {
+  position: relative;
+  isolation: isolate;
+  height: var(--sf-h);
+  border-radius: var(--sf-r);
+  background:
+    linear-gradient(160deg, rgb(var(--sf-hi) / 0.07), rgb(var(--sf-hi) / 0.01) 60%),
+    color-mix(in srgb, var(--color-ink-850) 90%, transparent);
+  border: 1px solid rgb(var(--sf-ink) / var(--sf-a-edge));
+  box-shadow:
+    inset 2px 2px 5px rgb(var(--sf-hi) / var(--sf-a-hi)),
+    inset -3px -4px 9px rgb(var(--sf-lo) / var(--sf-a-in)),
+    0 6px 18px rgb(var(--sf-lo) / var(--sf-a-drop));
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  transition: transform 200ms var(--ease-out-quint);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sf-box,
+  .sf-panel[data-mode="popover"] {
+    background: linear-gradient(160deg, rgb(var(--sf-hi) / 0.07), transparent 60%), var(--color-ink-850);
+  }
+}
+.sf-box:focus-within {
+  transform: translateY(-1px);
+}
+.sf-ring {
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: calc(var(--sf-r) + 1px);
+  box-shadow:
+    0 0 0 1px rgb(var(--sf-ink) / 0.5),
+    0 0 0 4px rgb(var(--sf-ink) / 0.09),
+    0 12px 28px rgb(var(--sf-lo) / 0.28);
+  opacity: 0;
+  scale: 0.985;
+  pointer-events: none;
+  transition:
+    opacity 200ms ease-out,
+    scale 200ms var(--ease-out-quint);
+}
+.sf-box:focus-within .sf-ring {
+  opacity: 1;
+  scale: 1;
+}
+.sf-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  display: grid;
+  margin-top: -9px;
+  color: var(--color-mute);
+  pointer-events: none;
+  transition:
+    color 200ms,
+    translate 200ms var(--ease-out-quint);
+}
+.sf-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.sf-box:focus-within .sf-icon {
+  color: var(--color-fg);
+  translate: 2px 0;
+}
+.sf-input {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  padding: 0 52px 0 46px;
+  font-size: 16px;
+  color: var(--color-fg);
+  outline: none;
+  appearance: none;
+}
+.sf-input::placeholder {
+  color: var(--color-mute);
+  opacity: 1;
+}
+.sf-input::-webkit-search-cancel-button,
+.sf-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  display: none;
+}
+.sf-clear {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin-top: -22px;
+  place-items: center;
+  border-radius: 9999px;
+  color: var(--color-mute);
+  scale: 0.6;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    scale var(--sf-pop-ms, 300ms) var(--sf-pop, ease-out),
+    opacity 150ms,
+    visibility 0s 150ms,
+    color 150ms;
+}
+.sf-clear svg {
+  width: 14px;
+  height: 14px;
+}
+.sf[data-has-value] .sf-clear {
+  scale: 1;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.sf-clear:hover,
+.sf-clear:focus-visible {
+  color: var(--color-fg);
+}
+.sf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sf-chip {
+  display: inline-flex;
+  /* 44 px for every pointer in the menu and the page searches (the navigation's own rule); a compact list search may be 36 px with a mouse */
+  min-height: 44px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9999px;
+  border: 1px solid rgb(var(--sf-ink) / 0.12);
+  padding: 0 14px;
+  font-size: 12.5px;
+  color: var(--color-mute);
+  transition:
+    color 160ms,
+    background-color 160ms,
+    border-color 160ms;
+}
+@media (pointer: fine) {
+  .sf[data-size="sm"] .sf-chip {
+    min-height: 36px;
+  }
+}
+.sf-chip:hover {
+  color: var(--color-fg);
+}
+.sf-chip[aria-pressed="true"] {
+  color: var(--color-fg);
+  border-color: rgb(var(--sf-ink) / 0.4);
+  background: rgb(var(--sf-ink) / 0.08);
+}
+.sf-chip small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.8;
+}
+.sf-status {
+  min-height: 18px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--color-mute);
+}
+.sf-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 240ms var(--ease-out-quint);
+}
+.sf-panel[data-open] {
+  grid-template-rows: 1fr;
+}
+.sf-panel-in {
+  min-height: 0;
+  overflow: hidden;
+}
+.sf-panel[data-mode="popover"] {
+  position: absolute;
+  inset: calc(var(--sf-h) + 8px) 0 auto 0;
+  z-index: 20;
+  display: block;
+  max-height: min(60vh, 24rem);
+  overflow: auto;
+  border-radius: var(--sf-r);
+  background: color-mix(in srgb, var(--color-ink-850) 94%, transparent);
+  border: 1px solid rgb(var(--sf-ink) / 0.1);
+  box-shadow: 0 18px 40px rgb(var(--sf-lo) / 0.35);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  opacity: 0;
+  visibility: hidden;
+  translate: 0 -6px;
+  transition:
+    opacity 180ms,
+    translate 220ms var(--ease-out-quint),
+    visibility 0s 220ms;
+}
+.sf-panel[data-mode="popover"][data-open] {
+  opacity: 1;
+  visibility: visible;
+  translate: 0 0;
+  transition-delay: 0s;
+}
+.sf-wrap {
+  position: relative;
+}
+.sf-list {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.sf-panel[data-mode="popover"] .sf-list {
+  gap: 2px;
+  padding: 6px;
+}
+.sf-opt {
+  position: relative;
+  display: grid;
+  min-height: 44px;
+  min-width: 0;
+  gap: 2px;
+  align-content: center;
+  border-radius: calc(var(--sf-r) - 4px);
+  border: 1px solid rgb(var(--sf-ink) / 0.1);
+  padding: 8px 14px;
+  cursor: pointer;
+  animation: sf-in 220ms var(--ease-out-quint) both;
+  animation-delay: calc(var(--i, 0) * 28ms);
+}
+.sf-panel[data-mode="popover"] .sf-opt {
+  border-color: transparent;
+}
+.sf-opt[aria-selected="true"] {
+  border-color: rgb(var(--sf-ink) / 0.34);
+}
+.sf-plate {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 0;
+  border-radius: calc(var(--sf-r) - 4px);
+  background: rgb(var(--sf-ink) / 0.06);
+  opacity: 0;
+  pointer-events: none;
+}
+.sf-plate[data-ready] {
+  opacity: 1;
+  transition: transform var(--sf-ms, 400ms) var(--sf-ease, ease-out);
+}
+.sf-opt > * {
+  position: relative;
+  z-index: 1;
+}
+@keyframes sf-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+    filter: blur(3px);
+  }
+}

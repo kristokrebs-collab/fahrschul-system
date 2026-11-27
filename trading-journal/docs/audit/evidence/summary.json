@@ -1,0 +1,232 @@
+{
+  "builtAt": "2026-11-08T06:59:19.408Z",
+  "units": [
+    {
+      "tag": "LF@1280",
+      "base": "http://127.0.0.1:4414",
+      "screens": 1,
+      "at": "2026-11-08T05:20:52.027Z"
+    },
+    {
+      "tag": "LF@1440",
+      "base": "http://127.0.0.1:4414",
+      "screens": 1,
+      "at": "2026-11-08T05:23:14.078Z"
+    },
+    {
+      "tag": "LF@390",
+      "base": "http://127.0.0.1:4414",
+      "screens": 1,
+      "at": "2026-11-08T06:18:41.343Z"
+    },
+    {
+      "tag": "LF@768",
+      "base": "http://127.0.0.1:4414",
+      "screens": 1,
+      "at": "2026-11-08T05:20:42.164Z"
+    },
+    {
+      "tag": "LO@1280",
+      "base": "http://127.0.0.1:4414",
+      "screens": 25,
+      "at": "2026-11-08T04:46:19.627Z"
+    },
+    {
+      "tag": "LO@1440",
+      "base": "http://127.0.0.1:4414",
+      "screens": 25,
+      "at": "2026-11-08T05:20:34.331Z"
+    },
+    {
+      "tag": "LO@390",
+      "base": "http://127.0.0.1:4414",
+      "screens": 25,
+      "at": "2026-11-08T04:51:39.418Z"
+    },
+    {
+      "tag": "LO@768",
+      "base": "http://127.0.0.1:4414",
+      "screens": 25,
+      "at": "2026-11-08T04:44:38.296Z"
+    },
+    {
+      "tag": "PV@1280",
+      "base": "https://deploy-preview-6--xxhuxabbyubzv.netlify.app",
+      "screens": 25,
+      "at": "2026-11-08T04:34:17.217Z"
+    },
+    {
+      "tag": "PV@1440",
+      "base": "https://deploy-preview-6--xxhuxabbyubzv.netlify.app",
+      "screens": 25,
+      "at": "2026-11-08T04:43:04.620Z"
+    },
+    {
+      "tag": "PV@390",
+      "base": "https://deploy-preview-6--xxhuxabbyubzv.netlify.app",
+      "screens": 25,
+      "at": "2026-11-08T06:23:40.349Z"
+    },
+    {
+      "tag": "PV@768",
+      "base": "https://deploy-preview-6--xxhuxabbyubzv.netlify.app",
+      "screens": 25,
+      "at": "2026-11-08T04:34:18.344Z"
+    },
+    {
+      "tag": "CI@1280",
+      "base": "http://127.0.0.1:4415",
+      "screens": 6,
+      "at": "2026-11-08T06:12:39.534Z"
+    },
+    {
+      "tag": "CI@1440",
+      "base": "http://127.0.0.1:4415",
+      "screens": 6,
+      "at": "2026-11-08T06:17:04.470Z"
+    },
+    {
+      "tag": "CI@390",
+      "base": "http://127.0.0.1:4415",
+      "screens": 6,
+      "at": "2026-11-08T06:13:34.358Z"
+    },
+    {
+      "tag": "CI@768",
+      "base": "http://127.0.0.1:4415",
+      "screens": 6,
+      "at": "2026-11-08T06:12:11.650Z"
+    },
+    {
+      "tag": "CO@1280",
+      "base": "http://127.0.0.1:4415",
+      "screens": 5,
+      "at": "2026-11-08T06:10:25.549Z"
+    },
+    {
+      "tag": "CO@1440",
+      "base": "http://127.0.0.1:4415",
+      "screens": 5,
+      "at": "2026-11-08T06:14:29.340Z"
+    },
+    {
+      "tag": "CO@390",
+      "base": "http://127.0.0.1:4415",
+      "screens": 5,
+      "at": "2026-11-08T06:11:39.460Z"
+    },
+    {
+      "tag": "CO@768",
+      "base": "http://127.0.0.1:4415",
+      "screens": 5,
+      "at": "2026-11-08T06:10:23.423Z"
+    }
+  ],
+  "rows": 2569,
+  "elementRows": 2540,
+  "pageRows": 29,
+  "priority": {
+    "P0": 0,
+    "P1": 1,
+    "P2": 225,
+    "ok": 2339
+  },
+  "repaired": {
+    "P0": 3,
+    "P1": 0,
+    "P2": 1
+  },
+  "probeStatuses": {
+    "ok": 1431,
+    "no-effect-handler": 15,
+    "input-ok": 138,
+    "noop-active": 31,
+    "gone": 130,
+    "disabled": 36,
+    "covered": 7,
+    "dead-candidate": 2,
+    "not-clicked": 7,
+    "input-dead": 5
+  },
+  "personas": {
+    "PV": "PV = gehostete Vorschau (nichts gemockt, Erstbesucher)",
+    "LO": "LO = lokaler Default-Build mit Fixture-Journal + Markt-Mock",
+    "LF": "LF = lokaler Default-Build, leeres Journal, Einführung erlaubt",
+    "CO": "CO = Cloud-Build gegen Supabase-Mock, abgemeldet",
+    "CI": "CI = Cloud-Build gegen Supabase-/Billing-/Social-/Börsen-Mock, angemeldet"
+  },
+  "loadLogs": 756,
+  "p0p1": [
+    {
+      "prio": "P0 (repariert)",
+      "route": "#preise",
+      "element": "button „Tarif im Detail“ [main; details-pro]",
+      "why": "Vorher/Nachher von Hand: Build ohne Cloud zeigte 3 Buttons, der Stand mit Korrektur 0. Die gehostete Vorschau trägt noch den alten Stand.",
+      "err": "Handler vorhanden (React-Prop), aber kein sichtbarer Effekt: Leerlauf bei leerem Zustand / gleicher Auswahl möglich, manuell prüfen",
+      "path": "src/views/preise/strings.ts , src/billing/purchase/strings.ts"
+    },
+    {
+      "prio": "P0 (repariert)",
+      "route": "#preise",
+      "element": "button „Tarif im Detail“ [main; details-premium]",
+      "why": "Vorher/Nachher von Hand: Build ohne Cloud zeigte 3 Buttons, der Stand mit Korrektur 0. Die gehostete Vorschau trägt noch den alten Stand.",
+      "err": "Handler vorhanden (React-Prop), aber kein sichtbarer Effekt: Leerlauf bei leerem Zustand / gleicher Auswahl möglich, manuell prüfen",
+      "path": "src/views/preise/strings.ts , src/billing/purchase/strings.ts"
+    },
+    {
+      "prio": "P0 (repariert)",
+      "route": "#preise",
+      "element": "button „Tarif im Detail“ [main; details-team]",
+      "why": "Vorher/Nachher von Hand: Build ohne Cloud zeigte 3 Buttons, der Stand mit Korrektur 0. Die gehostete Vorschau trägt noch den alten Stand.",
+      "err": "Handler vorhanden (React-Prop), aber kein sichtbarer Effekt: Leerlauf bei leerem Zustand / gleicher Auswahl möglich, manuell prüfen",
+      "path": "src/views/preise/strings.ts , src/billing/purchase/strings.ts"
+    },
+    {
+      "prio": "P1",
+      "route": "#funktionen",
+      "element": "SEITE: Laden, Zustand, Tab-Durchlauf",
+      "why": "MANUELL: echt, nicht aus der Sandbox: Der Börsen-Proxy der Vorschau antwortet bei `GET /api/binance/fapi/v1/time` mit HTTP 451 und dem Binance-Text „Service unavailable from a restricted location“ (mit curl nachgemessen, die Antwort stammt von Binance, nicht aus dem Browser). Binance sperrt die Ausgangsadresse des Netlify-Proxys. `netlify.toml` nennt den Fall selbst („set the functions region to the EU if both are blocked“). Folge: Marktdaten aus Binance fehlen auf der gehosteten Vorschau, die Seiten fangen es mit Leerzuständen ab. Betreiber: Region bzw. EU-Weg klären (siehe STATUS.md Abschnitt 8).",
+      "err": "–",
+      "path": "src/views/funktionen/ (siehe src/app/pages.ts)"
+    }
+  ],
+  "consoleErrorsOnLoad": [
+    "PV@1280 studio: Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+  ],
+  "consoleLinesByClass": {
+    "harness": 20,
+    "extern": 735,
+    "app": 1
+  },
+  "failedRequests": [
+    "GET /api/v1/congress/index?year=2026 → 404",
+    "GET /api/v1/industry/daily → 404",
+    "GET /api/v1/stocks/bars?symbols=AAPL&interval=5m&range=5d → 404",
+    "GET /api/v1/stocks/bars?symbols=AAPL&interval=15m&range=5d → 404",
+    "GET /api/v1/stocks/symbols → 404",
+    "GET /.netlify/scripts/cdp → net::ERR_FAILED",
+    "GET /api/binance/fapi/v1/time → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=BTCUSDT&interval=4h&limit=499 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=ETHUSDT&interval=4h&limit=499 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=SOLUSDT&interval=4h&limit=499 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=BNBUSDT&interval=4h&limit=499 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=XRPUSDT&interval=4h&limit=499 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=DOGEUSDT&interval=4h&limit=499 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=ADAUSDT&interval=4h&limit=499 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=AVAXUSDT&interval=4h&limit=499 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=LINKUSDT&interval=4h&limit=499 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=BTCUSDT&interval=5m&startTime=1794049800000&endTime=1794085499999&limit=119 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=SUIUSDT&interval=4h&limit=499 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=BTCUSDT&interval=1d&limit=99 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=ETHUSDT&interval=1d&limit=99 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=SOLUSDT&interval=1d&limit=99 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=BNBUSDT&interval=1d&limit=99 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=XRPUSDT&interval=1d&limit=99 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=DOGEUSDT&interval=1d&limit=99 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=ADAUSDT&interval=1d&limit=99 → 451",
+    "GET /api/binance/fapi/v1/klines?symbol=AVAXUSDT&interval=1d&limit=99 → 451",
+    "GET /api/v1/alerts/prefs → 404",
+    "GET /api/v1/connections/tradingview → 404",
+    "GET /api/v1/alerts/test → 404"
+  ]
+}

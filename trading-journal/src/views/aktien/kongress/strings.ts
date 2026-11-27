@@ -1,0 +1,66 @@
+/** German copy of the Congress tracker. One place, so the caveats read the same wherever they appear. */
+import { LATE_AFTER_DAYS } from "@/market/congress/wire";
+
+export const KONGRESS = {
+  title: "Kongress-Tracker",
+  lead: "Mitglieder des US-Repräsentantenhauses müssen Aktiengeschäfte melden – eigene, die ihres Ehepartners und die abhängiger Kinder (STOCK Act). Der House Clerk veröffentlicht jede Meldung als PDF; der Tracker liest diese Berichte und zeigt jede Zeile mit dem Link zum Original.",
+  /** always visible above the list: what these rows are, and are not */
+  caveatsTitle: "Bevor du die Zeilen liest",
+  caveats: [
+    { id: "late", head: "Die Daten kommen zu spät.", text: `Eine Meldung ist bis zu ${LATE_AFTER_DAYS} Tage nach dem Geschäft fällig. Wenn du sie liest, liegt das Geschäft meist Wochen zurück – es ist öffentliche Information, kein Vorsprung.` },
+    { id: "ranges", head: "Beträge sind Spannen.", text: "Die Meldung nennt nur eine Spanne wie „$1,000,001 – $5,000,000“, keinen Preis und keine genaue Summe." },
+    { id: "intent", head: "Mitglied ist nicht gleich Absicht.", text: "„Eigentümer“ zeigt, wessen Konto es ist – das Mitglied, Ehepartner oder Kind. Wer entschieden hat und warum, steht nicht in der Meldung." },
+    { id: "signal", head: "Kein Signal.", text: "Die Zeilen sind keine Kauf- oder Verkaufsempfehlung und kein Grund, dasselbe zu tun. Die App sendet nie Orders." },
+  ],
+  filters: {
+    member: "Mitglied",
+    memberHint: "Liest alle Meldungen dieses Mitglieds im Zeitraum.",
+    memberPlaceholder: "z. B. Pelosi",
+    query: "Ticker oder Name",
+    queryPlaceholder: "z. B. NVDA",
+    side: "Art",
+    window: "Gemeldet in den letzten",
+    watch: "Auf meiner Watchlist",
+    fresh: "Neu seit dem letzten Besuch",
+    ticker: "Nur mit Kürzel",
+    reset: "Filter zurücksetzen",
+  },
+  loading: "Meldungen des House Clerk werden geladen …",
+  indexFailedTitle: "Der House Clerk lässt sich gerade nicht lesen",
+  retry: "Nochmals versuchen",
+  refresh: "Neu laden",
+  noFilings: "Im gewählten Zeitraum hat der House Clerk keine Meldung gelistet.",
+  noMemberFilings: "Von diesem Mitglied hat der House Clerk im gewählten Zeitraum keine Meldung gelistet. Mit „Dieses Jahr“ siehst du mehr.",
+  noMatch: "Keine Zeile passt zu deinen Filtern.",
+  emptyReport: "Meldung ohne Geschäftszeilen",
+  more: "Weitere anzeigen",
+  readMore: "Weitere Meldungen lesen",
+  firstVisit: "Erster Besuch auf diesem Gerät – es wird nichts als neu markiert. Ab dem nächsten Besuch steht hier, was seither hinzugekommen ist.",
+  markSeen: "Als gesehen markieren",
+  unreadable: "Nicht lesbar",
+  unreadableHint: "Diese Zeile lässt sich nicht sauber lesen. Sie wird nicht geraten – das Original-PDF zeigt sie.",
+  openPdf: "Original-PDF",
+  noTicker: "kein Kürzel",
+  senateTitle: "Senat: nur von Hand",
+  senateText: "Für den Senat gibt es keinen automatischen Abruf: Die Suche verlangt vorher, dass du den Nutzungsbedingungen selbst zustimmst – das tut die App nicht für dich. Öffne die Seite, bestätige die Zustimmung, wähle „Periodic Transactions“, trage Nachnamen und Zeitraum ein und lies die Tabelle dort; es gilt dieselbe Frist von 45 Tagen.",
+  senateLink: "efdsearch.senate.gov",
+  disclaimer: "Öffentliche Meldungen nach dem STOCK Act, bis zu 45 Tage nach dem Geschäft eingereicht – keine Insiderinformation, kein Handelssignal.",
+} as const;
+
+/** What the card says about a report that could not be fetched, by the client's reason. */
+export const FAIL_SHORT: Readonly<Record<string, string>> = {
+  "no-server": "Server-Funktionen fehlen",
+  offline: "offline",
+  network: "Server nicht erreichbar",
+  timeout: "Zeitüberschreitung",
+  login: "Anmeldung nötig",
+  plan: "nicht im Tarif",
+  "rate-limited": "Abruf begrenzt",
+  blocked: "gesperrt",
+  upstream: "House Clerk nicht erreichbar",
+  "no-data": "beim House Clerk nicht vorhanden",
+  "bad-response": "unerwartete Antwort",
+  format: "Format geändert",
+  "no-index": "kein Index",
+  aborted: "abgebrochen",
+};

@@ -1,0 +1,92 @@
+/* Runde 10 – the richer motion of charts, numbers and lists. Everything here is scoped to `[data-rich]` (every page layer
+   except the Übersicht and the Cockpit, `PageHost.tsx`) or to a node that only a rich page renders, so those two pages keep
+   their exact picture. Compositor-only (opacity / transform); reduced motion collapses every animation in `base.css`. */
+
+/* Calm placeholder line of a chart without data: it breathes while on screen */
+@keyframes ph-breathe {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scaleY(0.55);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scaleY(1);
+  }
+}
+.chart-ph__line {
+  animation: ph-breathe 3.6s ease-in-out infinite;
+}
+[data-chart-ph][data-idle] .chart-ph__line {
+  animation-play-state: paused;
+}
+[data-chart-ph][data-still] .chart-ph__line {
+  animation: none;
+  opacity: 0.5;
+}
+
+/* Lists and tables: the first rows rise one after the other the first time the list is seen (`Rows` / `useRowsIn` arms
+   and releases it; only the first 12 are staggered, the rest is there at once) */
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+}
+[data-rich] [data-rows-arm] > :nth-child(-n + 12) {
+  opacity: 0;
+}
+[data-rich] [data-rows-go] > :nth-child(-n + 12) {
+  animation: row-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+[data-rich] [data-rows-go] > :nth-child(2) { animation-delay: 30ms; }
+[data-rich] [data-rows-go] > :nth-child(3) { animation-delay: 60ms; }
+[data-rich] [data-rows-go] > :nth-child(4) { animation-delay: 90ms; }
+[data-rich] [data-rows-go] > :nth-child(5) { animation-delay: 120ms; }
+[data-rich] [data-rows-go] > :nth-child(6) { animation-delay: 150ms; }
+[data-rich] [data-rows-go] > :nth-child(7) { animation-delay: 180ms; }
+[data-rich] [data-rows-go] > :nth-child(8) { animation-delay: 210ms; }
+[data-rich] [data-rows-go] > :nth-child(9) { animation-delay: 240ms; }
+[data-rich] [data-rows-go] > :nth-child(10) { animation-delay: 270ms; }
+[data-rich] [data-rows-go] > :nth-child(11) { animation-delay: 300ms; }
+[data-rich] [data-rows-go] > :nth-child(12) { animation-delay: 330ms; }
+
+/* a row lifts a little under the pointer */
+@media (hover: hover) and (pointer: fine) {
+  [data-rich] [data-lift] {
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  [data-rich] [data-lift]:hover {
+    transform: translate3d(0, -1px, 0);
+  }
+}
+
+/* status pills snap into place when they appear (one small overshoot) */
+@keyframes pill-snap {
+  0% {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+[data-rich] [data-pill] {
+  animation: pill-snap 0.34s cubic-bezier(0.34, 1.4, 0.5, 1) backwards;
+}
+
+/* grid cells that land along the diagonal (the delay is `--d` × 70 ms, set per cell) */
+@keyframes diag-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+[data-rich] [data-diag] {
+  animation: diag-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--d, 0) * 70ms);
+}

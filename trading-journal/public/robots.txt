@@ -1,0 +1,4 @@
+# Trade Journal: Startseite und Rechtsseiten dürfen gefunden werden, Schnittstellen nicht.
+User-agent: *
+Disallow: /api/
+Disallow: /.netlify/

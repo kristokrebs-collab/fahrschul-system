@@ -1,0 +1,291 @@
+{
+ "source": {
+  "label": "Federal Reserve – FOMC Meeting calendars and information",
+  "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+  "fetchedAt": "2026-10-25",
+  "pageUpdated": "2026-10-07"
+ },
+ "note": "Zweitägige Sitzungen; die Mitteilung (Statement) trägt auf der Seite das Datum des zweiten Tages, dort fällt die Entscheidung. Die Seite nennt keine Uhrzeit, deshalb steht der Termin ohne Uhrzeit. Laut Seite ist jeder Termin vorläufig, bis er in der davor liegenden Sitzung bestätigt wird. Die Abstimmung ohne Sitzung vom 22.08.2025 (notation vote) ist keine Sitzung und fehlt.",
+ "meetings": [
+  {
+   "from": "2021-01-26",
+   "to": "2021-01-27",
+   "sep": false
+  },
+  {
+   "from": "2021-03-16",
+   "to": "2021-03-17",
+   "sep": true
+  },
+  {
+   "from": "2021-04-27",
+   "to": "2021-04-28",
+   "sep": false
+  },
+  {
+   "from": "2021-06-15",
+   "to": "2021-06-16",
+   "sep": true
+  },
+  {
+   "from": "2021-07-27",
+   "to": "2021-07-28",
+   "sep": false
+  },
+  {
+   "from": "2021-09-21",
+   "to": "2021-09-22",
+   "sep": true
+  },
+  {
+   "from": "2021-11-02",
+   "to": "2021-11-03",
+   "sep": false
+  },
+  {
+   "from": "2021-12-14",
+   "to": "2021-12-15",
+   "sep": true
+  },
+  {
+   "from": "2022-01-25",
+   "to": "2022-01-26",
+   "sep": false
+  },
+  {
+   "from": "2022-03-15",
+   "to": "2022-03-16",
+   "sep": true
+  },
+  {
+   "from": "2022-05-03",
+   "to": "2022-05-04",
+   "sep": false
+  },
+  {
+   "from": "2022-06-14",
+   "to": "2022-06-15",
+   "sep": true
+  },
+  {
+   "from": "2022-07-26",
+   "to": "2022-07-27",
+   "sep": false
+  },
+  {
+   "from": "2022-09-20",
+   "to": "2022-09-21",
+   "sep": true
+  },
+  {
+   "from": "2022-11-01",
+   "to": "2022-11-02",
+   "sep": false
+  },
+  {
+   "from": "2022-12-13",
+   "to": "2022-12-14",
+   "sep": true
+  },
+  {
+   "from": "2023-01-31",
+   "to": "2023-02-01",
+   "sep": false
+  },
+  {
+   "from": "2023-03-21",
+   "to": "2023-03-22",
+   "sep": true
+  },
+  {
+   "from": "2023-05-02",
+   "to": "2023-05-03",
+   "sep": false
+  },
+  {
+   "from": "2023-06-13",
+   "to": "2023-06-14",
+   "sep": true
+  },
+  {
+   "from": "2023-07-25",
+   "to": "2023-07-26",
+   "sep": false
+  },
+  {
+   "from": "2023-09-19",
+   "to": "2023-09-20",
+   "sep": true
+  },
+  {
+   "from": "2023-10-31",
+   "to": "2023-11-01",
+   "sep": false
+  },
+  {
+   "from": "2023-12-12",
+   "to": "2023-12-13",
+   "sep": true
+  },
+  {
+   "from": "2024-01-30",
+   "to": "2024-01-31",
+   "sep": false
+  },
+  {
+   "from": "2024-03-19",
+   "to": "2024-03-20",
+   "sep": true
+  },
+  {
+   "from": "2024-04-30",
+   "to": "2024-05-01",
+   "sep": false
+  },
+  {
+   "from": "2024-06-11",
+   "to": "2024-06-12",
+   "sep": true
+  },
+  {
+   "from": "2024-07-30",
+   "to": "2024-07-31",
+   "sep": false
+  },
+  {
+   "from": "2024-09-17",
+   "to": "2024-09-18",
+   "sep": true
+  },
+  {
+   "from": "2024-11-06",
+   "to": "2024-11-07",
+   "sep": false
+  },
+  {
+   "from": "2024-12-17",
+   "to": "2024-12-18",
+   "sep": true
+  },
+  {
+   "from": "2025-01-28",
+   "to": "2025-01-29",
+   "sep": false
+  },
+  {
+   "from": "2025-03-18",
+   "to": "2025-03-19",
+   "sep": true
+  },
+  {
+   "from": "2025-05-06",
+   "to": "2025-05-07",
+   "sep": false
+  },
+  {
+   "from": "2025-06-17",
+   "to": "2025-06-18",
+   "sep": true
+  },
+  {
+   "from": "2025-07-29",
+   "to": "2025-07-30",
+   "sep": false
+  },
+  {
+   "from": "2025-09-16",
+   "to": "2025-09-17",
+   "sep": true
+  },
+  {
+   "from": "2025-10-28",
+   "to": "2025-10-29",
+   "sep": false
+  },
+  {
+   "from": "2025-12-09",
+   "to": "2025-12-10",
+   "sep": true
+  },
+  {
+   "from": "2026-01-27",
+   "to": "2026-01-28",
+   "sep": false
+  },
+  {
+   "from": "2026-03-17",
+   "to": "2026-03-18",
+   "sep": true
+  },
+  {
+   "from": "2026-04-28",
+   "to": "2026-04-29",
+   "sep": false
+  },
+  {
+   "from": "2026-06-16",
+   "to": "2026-06-17",
+   "sep": true
+  },
+  {
+   "from": "2026-07-28",
+   "to": "2026-07-29",
+   "sep": false
+  },
+  {
+   "from": "2026-09-15",
+   "to": "2026-09-16",
+   "sep": true
+  },
+  {
+   "from": "2026-10-27",
+   "to": "2026-10-28",
+   "sep": false
+  },
+  {
+   "from": "2026-12-08",
+   "to": "2026-12-09",
+   "sep": true
+  },
+  {
+   "from": "2027-01-26",
+   "to": "2027-01-27",
+   "sep": false
+  },
+  {
+   "from": "2027-03-16",
+   "to": "2027-03-17",
+   "sep": true
+  },
+  {
+   "from": "2027-04-27",
+   "to": "2027-04-28",
+   "sep": false
+  },
+  {
+   "from": "2027-06-08",
+   "to": "2027-06-09",
+   "sep": true
+  },
+  {
+   "from": "2027-07-27",
+   "to": "2027-07-28",
+   "sep": false
+  },
+  {
+   "from": "2027-09-14",
+   "to": "2027-09-15",
+   "sep": true
+  },
+  {
+   "from": "2027-10-26",
+   "to": "2027-10-27",
+   "sep": false
+  },
+  {
+   "from": "2027-12-07",
+   "to": "2027-12-08",
+   "sep": true
+  }
+ ]
+}
