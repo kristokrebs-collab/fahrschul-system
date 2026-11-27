@@ -15,10 +15,13 @@
  * structure of the cards are fixed; the own appointment is placed two days ahead of whatever "now" is).
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, screenshot, seed, stored } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, pinClock, screenshot, seed, stored } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 
 const PROJECTS = ["mobile", "desktop"];
+
+/** An ordinary Tuesday in mid-month (2026-10-13 10:00 UTC): no market holiday, no month-end expiry – the two tests that count lines of the list must not depend on the real date (the day after Thanksgiving added rows and pushed the Funding line behind "Alle … anzeigen"). */
+const ORDINARY_DAY = Date.UTC(2026, 9, 13, 10, 0, 0);
 
 async function openMarkt(page: Page): Promise<void> {
   await openRoute(page, "/#markt", "Markt");
@@ -56,6 +59,7 @@ test.describe("Termine", () => {
   });
 
   test("the calendar: next Funding, kinds, month, zone – no errors, no horizontal scroll, touch targets", async ({ page }, info) => {
+    await pinClock(page, ORDINARY_DAY);
     const errors = collectErrors(page);
     await seed(page);
     await openMarkt(page);
@@ -165,6 +169,7 @@ test.describe("Termine", () => {
   });
 
   test("Heute wichtig: sections, every line with source and time, missing data as keine Daten, the sentence that it is no advice", async ({ page }, info) => {
+    await pinClock(page, ORDINARY_DAY);
     const errors = collectErrors(page);
     await seed(page);
     await openMarkt(page);
