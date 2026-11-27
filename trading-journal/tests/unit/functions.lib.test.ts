@@ -215,6 +215,14 @@ describe("_lib/auth", () => {
     expect(client.auth.getClaims).toHaveBeenCalledWith(JWT);
   });
 
+  it("a token of the right shape but garbage inside makes getClaims THROW: still a 401, never a 500 (found on the live preview)", async () => {
+    const f = fakeAdmin({ claims: null });
+    (f.client.auth.getClaims as unknown as { mockImplementation: (fn: () => Promise<never>) => void }).mockImplementation(async () => {
+      throw Object.assign(new Error("Invalid JWT structure"), { name: "AuthInvalidJwtError" });
+    });
+    await expect(requireUser(authed("abc.def.ghi"))).rejects.toMatchObject({ status: 401, code: "invalid_token" });
+  });
+
   it("requireUser() rejects missing, invalid and anon tokens with 401", async () => {
     fakeAdmin({ claims: null });
     await expect(requireUser(new Request("https://x.test"))).rejects.toMatchObject({ status: 401, code: "unauthenticated" });

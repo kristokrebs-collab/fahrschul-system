@@ -91,6 +91,21 @@ describe("PlanCard", () => {
     expect(screen.getByTestId("billing-closed")).toHaveTextContent("Zahlungen noch nicht eingerichtet");
   });
 
+  it("Stripe set up but the operator's legal texts missing: the notice names what is missing and does NOT claim that everything is unlocked", () => {
+    useBilling.setState({ config: { ...CONFIG, purchaseOpen: false, purchaseBlockedBy: ["legal"] } });
+    wrap(<PlanCard />);
+    const note = screen.getByTestId("billing-closed");
+    expect(note).toHaveTextContent("Bestellung noch nicht freigeschaltet");
+    expect(note).toHaveTextContent("Impressum, AGB und Datenschutz des Betreibers fehlen noch");
+    expect(note.textContent).not.toMatch(/alle Funktionen freigeschaltet/);
+  });
+
+  it("an open shop shows no such notice", () => {
+    useBilling.setState({ config: CONFIG });
+    wrap(<PlanCard />);
+    expect(screen.queryByTestId("billing-closed")).toBeNull();
+  });
+
   it("signed out: sign in, and the pricing page when navigation is wired", () => {
     useBilling.setState({ config: CONFIG });
     const nav = vi.fn();
@@ -336,6 +351,8 @@ describe("PreiseView", () => {
       expect(screen.queryByTestId(`cta-${p}`)).toBeNull();
       expect(screen.getByTestId(`note-${p}`)).toHaveTextContent("Noch nicht bestellbar");
     }
+    // …and the page says WHY, in one place: the operator's Impressum / AGB / Datenschutz are missing (not just a grey button)
+    expect(screen.getByTestId("billing-closed")).toHaveTextContent("Impressum, AGB und Datenschutz des Betreibers fehlen noch");
   });
 
   it("every price carries the tax note (PAngV) and the yearly saving is a calculation: 24 € / 17 % / 2 months for Pro", () => {

@@ -15,7 +15,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { pendingOrderParam } from "@/store/returnTo";
 import { pushToast } from "@/store/uiStore";
-import { emailProblem, isSendLimit, passwordProblem, type AuthField } from "../authErrors";
+import { emailProblem, isMailFailure, isSendLimit, passwordProblem, type AuthField } from "../authErrors";
 import { oauthProviders, type OAuthProvider } from "../env";
 import { setIdleMinutes, useIdlePref } from "../idle";
 import { gateViewOf, knownVisitor } from "../gate";
@@ -563,6 +563,10 @@ function SentView({ titleId }: { titleId: string }) {
       // the server refused for the send limit: say so and wait longer (never retried in a loop)
       pushToast({ kind: "error", title: AUTH.sent.limit });
       setLeft(RESEND_LIMIT_S);
+    } else if (r && !r.ok && isMailFailure(r.code)) {
+      // the mail server of the site cannot deliver (not set up / refuses this address): say what it is, wait longer, no loop
+      pushToast({ kind: "error", title: r.message });
+      setLeft(RESEND_LIMIT_S);
     } else pushToast({ kind: "error", title: r && !r.ok ? r.message : AUTH.unavailable });
   }
   const draw = (i: number) => (reduced ? { duration: 0 } : { ...tween.draw, delay: i * stagger.lead });
@@ -580,6 +584,11 @@ function SentView({ titleId }: { titleId: string }) {
           {text}
         </p>
         <p className="aw-lead mt-1">{AUTH.sent.sameBrowser}</p>
+        {sentKind !== "magic" && (
+          <p className="aw-lead mt-1" data-testid="auth-sent-nomail">
+            {AUTH.sent.noMail}
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-4" data-aw-btn="">
         <Button onClick={() => void resend()} disabled={left > 0 || busy} aria-busy={busy || undefined} data-testid="auth-resend">

@@ -100,6 +100,7 @@ export function ManageSheet() {
                 )}
               </div>
               {!cancelled && <p className="text-[12px] text-faint">{MANAGE.switchNote}</p>}
+              {!cancelled && sub.status === "trialing" && <p className="text-[12px] text-faint" data-testid="manage-trial-switch-note">{MANAGE.switchNoteTrial}</p>}
             </StaggerItem>
 
             {!cancelled && (

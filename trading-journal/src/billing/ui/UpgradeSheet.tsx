@@ -106,11 +106,9 @@ export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
           <p className="text-[13.5px] leading-relaxed text-mute">{feature ? FEATURE_INFO[feature].pitch : cat.tagline}</p>
         </StaggerItem>
 
-        {mode !== "open" && (
-          <StaggerItem>
-            <ClosedNotice mode={mode} config={config} />
-          </StaggerItem>
-        )}
+        <StaggerItem>
+          <ClosedNotice mode={mode} config={config} />
+        </StaggerItem>
 
         <StaggerItem className="grid gap-4 rounded-2xl border border-line bg-ink-950/50 p-4">
           {eligible.length > 1 && (

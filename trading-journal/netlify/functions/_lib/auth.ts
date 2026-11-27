@@ -45,9 +45,11 @@ export async function requireUser(req: Request, opts: RequireUserOptions = {}): 
   const jwt = bearerToken(req);
   if (!jwt) throw new HttpError(401, "unauthenticated");
   const sb = supabaseAdmin();
-  const { data, error } = await sb.auth.getClaims(jwt);
-  const claims = data?.claims;
-  if (error || !claims || typeof claims.sub !== "string" || !claims.sub || claims.role !== "authenticated") {
+  // A token of the right SHAPE but garbage inside makes `getClaims` THROW (not return an error): that was a 500 "internal" on the live preview
+  // (Runde 13, BT) – a wrong or damaged token is a 401, never a server error.
+  const verified = await sb.auth.getClaims(jwt).catch(() => null);
+  const claims = verified && !verified.error ? verified.data?.claims : undefined;
+  if (!claims || typeof claims.sub !== "string" || !claims.sub || claims.role !== "authenticated") {
     throw new HttpError(401, "invalid_token", "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.");
   }
   if ((claims as { is_anonymous?: unknown }).is_anonymous === true) throw new HttpError(403, "anonymous_not_allowed", ANONYMOUS_MESSAGE);

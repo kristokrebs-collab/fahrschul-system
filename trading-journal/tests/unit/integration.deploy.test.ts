@@ -39,6 +39,21 @@ describe("netlify.toml", () => {
     expect(share).toBeLessThan(spa);
   });
 
+  it("unknown assets / icons / OCR files / API routes are an honest 404 (not the app's HTML with 200), the files exist, the manifest has its media type", () => {
+    const spa = toml.indexOf('from = "/*"');
+    for (const from of ["/assets/*", "/teilen/assets/*", "/icons/*", "/ocr/*", "/api/*"]) {
+      const at = toml.indexOf(`from = "${from}"`);
+      expect(at, from).toBeGreaterThan(0);
+      expect(at, `${from} before the catch-all`).toBeLessThan(spa);
+      expect(toml.slice(at, at + 120), from).toMatch(/to = "\/404\.html"\s+status = 404/);
+    }
+    // the Binance proxy (forced) still comes before the /api/* 404, so it keeps answering
+    expect(toml.indexOf('from = "/api/binance/fapi/v1/klines"')).toBeLessThan(toml.indexOf('from = "/api/*"'));
+    expect(readFileSync(join(root, "public/404.html"), "utf8")).toMatch(/Diese Seite gibt es nicht/);
+    expect(readFileSync(join(root, "public/robots.txt"), "utf8")).toMatch(/Disallow: \/api\//);
+    expect(toml).toMatch(/for = "\/manifest\.webmanifest"\s+\[headers\.values\]\s+Content-Type = "application\/manifest\+json"/);
+  });
+
   it("CSP: same origin, the public market feeds and Supabase (https + wss, storage images); nothing inline; frames only Stripe's card fields", () => {
     expect(directive("default-src")).toEqual(["'self'"]);
     // the local screenshot reader (tesseract.js) compiles WebAssembly; Paket V: Stripe.js for the payment window's card fields (loaded only when it

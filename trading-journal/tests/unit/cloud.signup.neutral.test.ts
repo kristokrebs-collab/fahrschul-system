@@ -62,8 +62,21 @@ describe("AUTH-03: registration never says whether an account exists", () => {
     expect(await signUp("a@example.com", "Sehr-sicheres-Passwort-42!")).toMatchObject({ ok: false, code: "over_email_send_rate_limit" });
   });
 
+  it("mail that cannot be delivered (built-in mail server: unauthorised address / broken SMTP) is shown as an operator-side cause – the same text for any address, no account fact", async () => {
+    signUpApi.mockResolvedValueOnce({ data: { user: null, session: null }, error: Object.assign(new Error('Email address "x@y.de" cannot be used as it is not authorized'), { code: "email_address_not_authorized", status: 400 }) });
+    const notAuthorized = await signUp("neu@example.com", "Sehr-sicheres-Passwort-42!");
+    expect(notAuthorized).toMatchObject({ ok: false, code: "email_address_not_authorized", field: null });
+    // an older server sends only the message – Supabase says "Error sending confirmation email" with status 500
+    signUpApi.mockResolvedValueOnce({ data: { user: null, session: null }, error: Object.assign(new Error("Error sending confirmation email"), { status: 500 }) });
+    const failed = await signUp("neu@example.com", "Sehr-sicheres-Passwort-42!");
+    expect(failed).toMatchObject({ ok: false, code: "mail_failed", field: null });
+    expect(failed.ok ? "" : failed.message).toMatch(/nicht verschickt werden/);
+    expect(notAuthorized.ok ? "" : notAuthorized.message).toMatch(/Mail-Server noch nicht eingerichtet/);
+    for (const r of [notAuthorized, failed]) expect(r.ok ? "" : r.message).not.toMatch(/gibt es schon|existiert|kein Konto|nicht registriert/i);
+  });
+
   it("no text of the auth error table (any code, any message pattern) says an account exists, is taken or is missing", () => {
-    const codes = ["invalid_credentials", "email_not_confirmed", "user_already_exists", "email_exists", "weak_password", "same_password", "email_address_invalid", "validation_failed", "signup_disabled", "email_provider_disabled", "over_email_send_rate_limit", "over_request_rate_limit", "otp_expired", "flow_state_expired", "flow_state_not_found", "bad_code_verifier", "mfa_verification_failed", "mfa_challenge_expired", "session_not_found", "user_banned", "captcha_failed"];
+    const codes = ["invalid_credentials", "email_not_confirmed", "user_already_exists", "email_exists", "weak_password", "same_password", "email_address_invalid", "validation_failed", "signup_disabled", "email_provider_disabled", "over_email_send_rate_limit", "over_request_rate_limit", "email_address_not_authorized", "mail_failed", "otp_expired", "flow_state_expired", "flow_state_not_found", "bad_code_verifier", "mfa_verification_failed", "mfa_challenge_expired", "session_not_found", "user_banned", "captcha_failed"];
     const texts = codes.map((c) => authErrorText({ code: c }).message);
     for (const m of ["User already registered", "email address already exists", "user not found", "Invalid login credentials"]) texts.push(authErrorText({ message: m }).message);
     for (const t of texts) expect(t, t).not.toMatch(/gibt es schon|existiert|bereits (registriert|vergeben)|kein Konto|nicht registriert|schon ein Konto\. Melde|kein Benutzer/i);

@@ -154,6 +154,8 @@ export const MANAGE = {
   invoices: "Rechnungen ansehen",
   switchInterval: (to: BillingInterval) => (to === "year" ? "Auf jährlich wechseln" : "Auf monatlich wechseln"),
   switchNote: "Den Wechsel führt das Stripe-Kundenportal durch (Stripe rechnet den Rest der Laufzeit um). Er gilt erst, wenn Stripe ihn bestätigt.",
+  /** Im Portal beendet ein Tarifwechsel die Testphase und stellt den neuen Tarif sofort in Rechnung (so zeigt es das Portal selbst: „Heute fälliger Betrag“). */
+  switchNoteTrial: "Achtung: Ein Wechsel während der Testphase beendet die Testphase – Stripe berechnet den neuen Tarif dann sofort. Das Portal zeigt den Betrag vor der Bestätigung.",
   seatsBtn: "Sitze ändern",
   cancelLead: "Kündigen",
   cancel: BUTTON_LABELS.cancel,

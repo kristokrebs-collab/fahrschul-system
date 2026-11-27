@@ -273,7 +273,9 @@ export function rowFromSubscription(sub: Stripe.Subscription, userId: string, ev
     amount: unit === null ? null : unit * seats,
     currency: price?.currency ?? sub.currency ?? null,
     current_period_end: iso(item?.current_period_end),
-    cancel_at_period_end: !!sub.cancel_at_period_end,
+    // A cancellation in the Customer Portal arrives as `cancel_at` (the end of the period) with `cancel_at_period_end: false` (seen on the real sandbox
+    // subscription, Runde 13 BT): both mean "ends at the end of the term", so the app must show "Gekündigt" for both.
+    cancel_at_period_end: !!sub.cancel_at_period_end || (typeof sub.cancel_at === "number" && sub.cancel_at > 0 && sub.status !== "canceled"),
     cancel_at: iso(sub.cancel_at),
     canceled_at: iso(sub.canceled_at),
     trial_end: iso(sub.trial_end),
@@ -882,9 +884,13 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
     ...(cardless ? { payment_method_collection: "if_required" as const } : {}),
     // allow_promotion_codes and discounts are mutually exclusive: a pre-checked code is applied, otherwise the field shows
     ...(discounts ? { discounts } : { allow_promotion_codes: true }),
-    // § 312j Abs. 3 BGB: Stripe's button cannot read "zahlungspflichtig bestellen" - `pay` + the text beside it say so
-    submit_type: "pay",
+    // § 312j Abs. 3 BGB: Stripe's button cannot read "zahlungspflichtig bestellen" - the text beside it says so. NO `submit_type`: Stripe refuses it in
+    // `subscription` mode ("You can not pass `submit_type: 'pay'` in `subscription` mode", 400) – found by the first real sandbox order (Runde 13, BT):
+    // with it NO Checkout session could ever be created, the fake Stripe of the unit tests accepted anything.
     custom_text: { submit: { message: checkoutSubmitText(o.days) } },
+    // The prices of this app are EUR amounts (what the order sheet showed). Stripe's Adaptive Pricing would show another currency by default
+    // (seen on the first real sandbox order: "13,70 $" for a 12 € plan, "inkl. 4 % Umrechnungsgebühr") – the person must pay exactly what the app said.
+    adaptive_pricing: { enabled: false },
     ...(tax
       ? { automatic_tax: { enabled: true }, customer_update: { address: "auto" as const, name: "auto" as const }, tax_id_collection: { enabled: true } }
       : {}),
@@ -1060,7 +1066,8 @@ export async function changeSubscription(
     const comment = opts.comment?.trim().slice(0, 500);
     params = { cancel_at_period_end: true, cancellation_details: { ...(opts.reason ? { feedback: opts.reason } : {}), ...(comment ? { comment } : {}) } };
   } else if (action === "resume") {
-    params = { cancel_at_period_end: false, ...(current.status === "paused" || current.pause_resumes_at ? { pause_collection: "" as const } : {}) };
+    // Stripe refuses `cancel_at_period_end` and `cancel_at` in one request; `cancel_at: ""` alone clears BOTH kinds of cancellation (checked on the real sandbox)
+    params = { ...(current.cancel_at || current.cancel_at_period_end ? { cancel_at: "" as const } : { cancel_at_period_end: false }), ...(current.status === "paused" || current.pause_resumes_at ? { pause_collection: "" as const } : {}) };
   } else if (action === "feedback") {
     // the optional reason AFTER the cancellation was confirmed (§ 312k: no question stands in front of the confirmation)
     if (!current.cancel_at_period_end) throw new HttpError(409, "not_canceled", "Es gibt keine Kündigung, zu der du etwas sagen könntest.");

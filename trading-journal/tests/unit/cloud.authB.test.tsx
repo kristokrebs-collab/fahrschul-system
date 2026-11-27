@@ -165,6 +165,23 @@ describe("the 'mail sent' step: resend with a wait and the server's limit", () =
     expect(resendConfirmation).toHaveBeenCalledTimes(1);
   });
 
+  it("a mail server that cannot deliver at all (not set up / address refused) is named as such, the wait gets longer", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    resendConfirmation.mockResolvedValue({ ok: false, code: "email_address_not_authorized", message: "An diese Adresse kann der Mail-Versand dieser Seite gerade nichts zustellen: Der Betreiber hat seinen Mail-Server noch nicht eingerichtet. Schreib ihm über die Kontaktadresse im Impressum.", field: null });
+    await sent();
+    await waitCountdown(RESEND_S);
+    fireEvent.click(screen.getByTestId("auth-resend"));
+    await waitFor(() => expect(toastTitles().some((t) => t.includes("Mail-Server noch nicht eingerichtet"))).toBe(true));
+    expect(screen.getByTestId("auth-resend")).toBeDisabled();
+    expect(resendConfirmation).toHaveBeenCalledTimes(1);
+  });
+
+  it("the 'nothing arrived?' help stands under the neutral step for EVERY address – it is not a reaction to a failure", async () => {
+    await sent();
+    expect(screen.getByTestId("auth-sent-nomail")).toHaveTextContent("Nichts angekommen?");
+    expect(screen.getByTestId("auth-sent-nomail")).toHaveTextContent("Spam-Ordner");
+  });
+
   it("offline is said before anything is sent", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await sent();
