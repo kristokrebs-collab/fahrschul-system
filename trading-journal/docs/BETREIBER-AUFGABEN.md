@@ -1,6 +1,6 @@
 # Aufgaben für den Betreiber (Checkliste)
 
-Stand: 07.11.2026. Das hier kannst nur du erledigen: Konten, Einstellungen in fremden Oberflächen, Entscheidungen. Der Code kann das nicht für dich tun und nicht prüfen, ob du es getan hast. Er sagt nur ehrlich „nicht eingerichtet“, wenn etwas fehlt.
+Stand: 26.11.2026 (Betriebslauf Runde 13, Paket BT – oben der echte Ist-Stand, darunter die lange Liste). Das hier kannst nur du erledigen: Konten, Einstellungen in fremden Oberflächen, Entscheidungen. Der Code kann das nicht für dich tun und nicht prüfen, ob du es getan hast. Er sagt nur ehrlich „nicht eingerichtet“, wenn etwas fehlt.
 
 **So liest du die Liste:** von oben nach unten, die Reihenfolge ist Absicht. Haken setzen: ☐ wird ☑. Zu jedem Punkt steht: was, wo du klickst oder einträgst, wofür es gut ist und wo es genauer steht. Die Verweise: `SETUP.md` (Schritt für Schritt), `docs/ENV.md` (alle Variablen), `docs/BETRIEB.md` (laufender Betrieb). Pfade sind relativ zu `trading-journal/`.
 
@@ -10,6 +10,39 @@ Stand: 07.11.2026. Das hier kannst nur du erledigen: Konten, Einstellungen in fr
 - Geheimnisse (Schlüssel, Tokens) kommen **nur** in Netlify, Bereich Functions, mit „Contains secret values“. Nie in `VITE_…`, nie ins Repo, nie in den Chat.
 - Änderst du eine Variable in Netlify, **musst du neu deployen**. Vorher gilt der alte Wert.
 - Was ohne dich nicht prüfbar ist (Live-Test gegen echte Dienste, echte Geräte), steht in `docs/ABNAHME-40.md` und `docs/PRODUKTABGLEICH.md`.
+
+## Ist-Stand am 26.11.2026 (gemessen, nicht angenommen)
+
+Gemessen auf der Vorschau `deploy-preview-6--xxhuxabbyubzv.netlify.app` (Stand des Zweigs `5fa335a3`), gegen die echte Supabase-Instanz und die Stripe-**Sandbox**. Nichts davon betrifft Echtgeld.
+
+| Bereich | Stand | Beleg |
+| --- | --- | --- |
+| Supabase `vambigdmdrnwplaxewaw` | läuft; Migrationen 0001–0019 liegen drin (49 Tabellen, RLS überall), Anmeldung mit E-Mail geht, anonyme Logins aus, Bestätigung der E-Mail an | `docs/BETRIEB.md` §10 (RLS-Stichprobe, Anmeldung) |
+| Stripe-Sandbox | 6 Preise, Webhook auf die Vorschau, Kundenportal; **eine echte Bestellung** lief durch (Checkout → Webhook → Tarif in der App → Kündigung) | `docs/BETRIEB.md` §10 (Zahlungslauf) |
+| Bestellung für Besucher | **bewusst gesperrt**: „Noch nicht bestellbar“, Grund auf Preise, Konto und im Bestellfenster: „Impressum, AGB und Datenschutz des Betreibers fehlen noch“. Der Server lehnt Bestellungen mit 503 `purchase_closed` ab | Vorschau `/api/v1/billing/status`: `purchaseOpen: false`, `purchaseBlockedBy: ["legal"]` |
+| Rechtsseiten | ohne Anmeldung erreichbar; fehlende Angaben stehen als markierte **PLATZHALTER** mit dem Namen der Variable, die Texte als „ENTWURF – PRÜFUNG DURCH ANWALT NÖTIG“ | Vorschau `/?rechtliches=impressum` usw. |
+| Mail (Registrierung, Passwort-Reset) | **nicht belegt**: ob und wie das Supabase-Projekt Mails verschickt, konnte ohne Zugang zur Verwaltungs-Schnittstelle und ohne zustellbares Postfach nicht gemessen werden. Bestellungs-/Kündigungs-Mails (Resend): `mailReady: false` | `docs/BETRIEB.md` §11 |
+| Betreiber-Statusseite | `OPS_TOKEN` fehlt: Seite antwortet 503 „nicht eingerichtet“ | `GET /api/v1/ops/status` |
+| Stripe-Webhook „Produktion“ | zeigt auf `xxhuxabbyubzv.netlify.app`, dort laufen **keine** Functions: jede Lieferung dort scheitert und wird von Stripe tagelang wiederholt (Stripe kann den Endpunkt abschalten und dir mailen) | Stripe › Webhooks: `pending_webhooks` bleibt 1 |
+
+**Im Lauf gefundene und im Code behobene Fehler** (wirken erst nach dem nächsten Build der Vorschau): Stripe lehnte jede Bestellung wegen `submit_type` im Abo-Modus ab (keine Checkout-Sitzung war möglich); die Stripe-Seite zeigte „13,70 $“ statt „12 €“ (Adaptive Pricing, jetzt aus); eine Kündigung im Kundenportal zeigte die App weiter als „Testphase“ (Stripe sendet `cancel_at`); Sperrtext sagte falsch „alle Funktionen freigeschaltet“; ein kaputtes Token ergab 500 statt 401; unbekannte Pfade antworteten mit „200 + HTML“ (jetzt 404, `netlify.toml`, **noch nicht auf einem Deploy geprüft**).
+
+## Start-Checkliste: was du noch tun musst
+
+Von oben nach unten. Alles Weitere steht in den Abschnitten darunter.
+
+| ☐ | Was | Wo | Warum es nötig ist |
+| --- | --- | --- | --- |
+| ☐ | **Impressum-Daten eintragen**: `VITE_LEGAL_OPERATOR`, `VITE_LEGAL_ADDRESS`, `VITE_LEGAL_EMAIL` (oder `VITE_LEGAL_IMPRESSUM_URL`), `VITE_LEGAL_DATENSCHUTZ_URL`, `VITE_LEGAL_AGB_URL` – echte Angaben, nichts erfinden; in **Builds und Functions**, dann neu deployen | Netlify › Environment variables | Ohne sie bleibt „Noch nicht bestellbar“ – gewollt, kein Fake-Kauf |
+| ☐ | **Mail einrichten**: eigenen SMTP-Server (Resend-SMTP) in Supabase eintragen **und** `RESEND_API_KEY` + `ALERT_FROM` in Netlify; Domain bei Resend verifizieren | Supabase › Authentication › Emails › SMTP; Netlify; Resend | Der eingebaute Supabase-Versand ist für echte Nutzer nicht gedacht (`docs/BETRIEB.md` §11) |
+| ☐ | `pk_test_…` ist als `VITE_STRIPE_PUBLISHABLE_KEY` gesetzt; vor dem Live-Gang `pk_live_…` (nur der veröffentlichbare Schlüssel, nie `sk_…`) | Netlify › Builds | Eingebettetes Bezahlfenster; ohne ihn: Stripe Checkout |
+| ☐ | **Netlify-Drawer der Vorschau ausschalten** (er wird von der CSP blockiert und erzeugt Fehler in der Konsole) | Netlify › Site configuration › Deploy Previews / Collaborative deploy previews | Saubere Vorschau; kein Eingriff in die CSP nötig |
+| ☐ | **Zugriffstokens widerrufen**, die für die Einrichtung benutzt wurden (Netlify, Supabase-Verwaltung, Stripe) und dir nur Zugang geben, wo du ihn brauchst | jeweils Konto › Tokens / API-Schlüssel | Geheimnisse, die im Gespräch benutzt wurden, gelten als verbraucht |
+| ☐ | Veralteten Stripe-Webhook „Produktion“ ändern oder löschen, solange die Produktions-Adresse keine Functions hat | Stripe › Entwickler › Webhooks | sonst Fehllieferungen und Abschaltung durch Stripe |
+| ☐ | Kundenportal: AGB- und Datenschutz-Link eintragen; entscheiden, ob Planwechsel in der Testphase erlaubt sein soll (er beendet die Testphase und berechnet sofort) | Stripe › Einstellungen › Billing › Kundenportal | Pflichtangaben; ehrlicher Ablauf |
+| ☐ | `OPS_TOKEN` setzen (≥ 24 Zeichen) | Netlify › Functions | Betreiber-Statusseite |
+| ☐ | **Live-Stripe später**: erst nach Rechtstexten und Anwalt; alles im Live-Modus neu (Produkte, Preise, Webhook, Portal, `sk_live_…`, `whsec_…`, `pk_live_…`) | Stripe, Netlify | Echtes Geld |
+| ☐ | **Anwalt**: die 31 offenen Fragen (`docs/RECHT/anwaltsfragen.md`), besonders Button-Wortlaut (Stripe zeigt „Kostenpflichtig abonnieren“) und Widerruf bei sofortigem Beginn | `docs/RECHT/` | Keiner der Texte ist geprüft |
 
 ## Reihenfolge auf einen Blick
 

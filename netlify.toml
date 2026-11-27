@@ -127,6 +127,36 @@
   status = 200
   force = true
 
+# Honest 404s (Runde 13, BT – the live preview answered EVERY unknown path with "200 + index.html"): a missing hashed asset, icon, OCR file or API route
+# is a 404, not the app's HTML (a stale tab after a deploy got "Unexpected token <" instead of a clear error, /api/v1/<typo> returned HTML to JSON clients).
+# Not forced: an existing file is served as always; functions with their own `path` are matched before redirects (the catch-all below never
+# shadowed them either), the Binance proxy rules above are forced and come first. NOT yet checked on a deploy (the preview predates this rule):
+# after the next deploy `curl -i <site>/assets/gibt-es-nicht.js` must say 404 and the app must still load.
+[[redirects]]
+  from = "/assets/*"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
+  from = "/teilen/assets/*"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
+  from = "/icons/*"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
+  from = "/ocr/*"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
+  from = "/api/*"
+  to = "/404.html"
+  status = 404
+
 # Share edition: its own SPA fallback, BEFORE the catch-all (existing files such as /teilen/assets/* win anyway;
 # `/teilen` without slash is served as /teilen/index.html by Netlify itself – no extra rule, rules ignore the slash).
 [[redirects]]
@@ -170,6 +200,12 @@
     # off. Paket V: `payment` for the app and Stripe's frames only (the card fields / 3-D Secure of the payment window).
     Permissions-Policy = "camera=(), microphone=(self), geolocation=(), payment=(self \"https://js.stripe.com\")"
     X-Frame-Options = "DENY"
+
+# The web app manifest: Netlify served it as application/octet-stream (live preview, Runde 13 BT); browsers expect application/manifest+json.
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
 
 # Hashed build assets never change: cache them for a year (index.html stays revalidated, so a deploy is picked up at once).
 [[headers]]

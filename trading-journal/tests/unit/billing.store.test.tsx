@@ -190,7 +190,10 @@ describe("store flows", () => {
       requestOrder({ plan: "pro", interval: "month" });
       expect(useBilling.getState().order.open).toBe(false);
     }
-    expect(useUi.getState().toasts.at(-1)).toMatchObject({ kind: "info", title: "Zahlungen noch nicht eingerichtet" });
+    // locked by the legal texts: the toast names that (Stripe IS set up, the plan gates apply) – never "alle Funktionen freigeschaltet"
+    expect(useUi.getState().toasts.at(-1)).toMatchObject({ kind: "info", title: "Bestellung noch nicht freigeschaltet" });
+    expect(String(useUi.getState().toasts.at(-1)?.detail)).toMatch(/Impressum, AGB und Datenschutz des Betreibers fehlen noch/);
+    expect(String(useUi.getState().toasts.at(-1)?.detail)).not.toMatch(/alle Funktionen freigeschaltet/);
     expect(purchaseOpenOf({ ...CONFIG, purchaseOpen: false, purchaseBlockedBy: ["legal"] }, "open")).toEqual({ open: false, blockedBy: ["legal"] });
     expect(purchaseOpenOf(CONFIG, "closed")).toEqual({ open: false, blockedBy: ["stripe"] });
     expect(purchaseOpenOf(CONFIG, "open")).toEqual({ open: true, blockedBy: [] });
