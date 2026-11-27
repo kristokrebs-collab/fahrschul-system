@@ -264,7 +264,11 @@ test.describe("Rahmen: Logo-Sequenz und Bewegung (Kopfleiste, Einstellungen)", (
     await page.goto("/#settings");
     const sec = page.getByTestId("motion-section");
     await sec.scrollIntoViewIfNeeded();
-    await expect(sec.getByRole("radio")).toHaveCount(3);
+    // the section also holds the Glas-Look pair (Runde 14: Glas · Flach): three motion profiles + two glass choices
+    await expect(sec.getByTestId("glass-section").getByRole("radio")).toHaveCount(2);
+    await expect(sec.getByRole("radio")).toHaveCount(5);
+    await expect(sec.getByRole("radio", { name: "Reduziert" })).toHaveCount(1);
+    await expect(sec.getByRole("radio", { name: "Volles Profil" })).toHaveCount(1);
     await expect(page.locator("html")).not.toHaveAttribute("data-motion", /.+/);
     await sec.getByRole("radio", { name: "Reduziert" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-motion", "reduced");
