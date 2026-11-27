@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ImportDialog } from "@/overlays/ImportDialog";
 import { bootJournal, resetJournal, useJournal } from "@/store/journalStore";
@@ -45,6 +45,21 @@ describe("ImportDialog", () => {
     expect(useUi.getState().toasts.map((t) => t.title)).toContain("Backup importiert");
     expect(onClose).toHaveBeenCalled();
     expect(Object.keys(localStorage).some((k) => k.startsWith("tj2-backup-import-"))).toBe(true);
+  });
+
+  it("a wrong file is refused in German: an empty one, an empty list, and a wrong field (Runde 13: used to be zod's English or an empty „Backup“)", async () => {
+    const pick = async (text: string) => {
+      render(<ImportDialog open onClose={vi.fn()} readFile={async () => text} />);
+      fireEvent.change(screen.getByLabelText("Backup-Datei"), { target: { files: [new File([text], "x.json")] } });
+      const alert = await screen.findByRole("alert");
+      const said = alert.textContent ?? "";
+      expect(screen.queryByTestId("import-preview")).toBeNull();
+      cleanup();
+      return said;
+    };
+    expect(await pick("")).toBe("Import fehlgeschlagen: Die Datei ist leer.");
+    expect(await pick("[]")).toBe("Import fehlgeschlagen: Keine Trades oder Einstellungen in der Datei");
+    expect(await pick(JSON.stringify({ settings: 5 }))).toBe("Import fehlgeschlagen: settings: muss ein Objekt sein (gefunden: eine Zahl)");
   });
 
   it("asks before replacing and shows parse errors inline", async () => {

@@ -252,7 +252,7 @@ export function ChatCard({ data, enriched, aiNotes = false, className }: ChatCar
           Fragen
         </Button>
       </form>
-      <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Vorschläge">
+      <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Vorschläge">
         {(follow.length ? [...follow, ...chips].filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 6) : chips).map((c) => (
           <Chip key={c} onClick={() => ask(c)} testId="coach-chip">
             {c}

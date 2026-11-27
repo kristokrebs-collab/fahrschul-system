@@ -62,3 +62,88 @@ dunkel und hell, mobil 390 × 844 (grober Zeiger) und Desktop 1280 × 800, gegen
 - **Abdeckung:** `docs/COVERAGE.md` stimmt in Pfaden (alle genannten Dateien und Tests existieren), Stand-Zeile (32 fertig · 33 teilweise · 9 fehlt) und den
   stichprobenartig nachgezählten Zahlen (33 Bausteine, 32 Bibliothekskarten, 9 CSV-Formate, 20 / 240 Versionen, 8 / 5 / 250 Konten, 80 und 20 als Mindestmengen).
   Nicht belegt sind die Aussagen zu echten Konten (Supabase, Stripe, Bitunix, Anthropic): die Tests laufen gegen Mocks, und das steht in den Zeilen.
+
+## Runde 13 – Funktionsprüfung
+
+Auftrag: „halte dich genau an die Funktionsprüfung“ – die Tabellen von `ABNAHME-40`, `UX-MATRIX-74`, `PRODUKTABGLEICH` und `COVERAGE` gegen den **Produktionsbau** halten (`npm run build`, ausgeliefert mit den Headern aus `netlify.toml` – CSP, HSTS, gzip – über einen kleinen eigenen Static-Server; der Cloud-Bau `npm run build:e2e-cloud` gegen die Supabase-/Stripe-Mocks). Chromium (Playwright 1.63), Profile: Galaxy-Tab 1692 × 978 (Touch, grober Zeiger) und Handy 390 × 844, dunkel und hell. **Ehrlich zur Umgebung:** die Maschine war während der Läufe mit anderen Aufträgen stark belegt (Load 15 – 45 auf 4 Kernen, einmal Neustart); Zeitmessungen (LCP, TBT, INP) sind deshalb **nicht aussagekräftig**, zwei Specs liefen in Zeitüberschreitungen und bestanden beim Wiederholen (siehe unten). Was nur mit echten Geräten oder Diensten prüfbar ist, steht am Ende.
+
+### Seiten, Zustände, Zugänglichkeit
+
+| Anforderung | Ergebnis | Beleg |
+|---|---|---|
+| Alle 19 Seiten (`overview trades setups settings markt analyse risiko coach berichte labor wachstum community cockpit konto preise funktionen studio plan aktien`), 2 Größen × 2 Themen = 76 Läufe: keine Konsolenfehler oder -warnungen, keine fehlgeschlagene oder mit ≥ 400 beantwortete Anfrage (Märkte gemockt) | bestanden | Messlauf je Seite (Konsole, Netz, Überstand, CLS, axe); 0 von 76 mit Befund |
+| axe (WCAG 2.1 A + AA, Kontrast) auf jeder Seite, beide Größen, beide Themen | bestanden (0 Verstöße) | dieselben 76 Läufe |
+| Kein seitliches Scrollen | bestanden | dieselben 76 Läufe |
+| Layoutsprünge CLS ≤ 0,02 | bestanden für alle Seiten (≤ 0,006). **Grenze Startseite:** 0,0135 – 0,0170 bei ruhiger Maschine (0,0153 allein gemessen), aber 0,026 – 0,037 unter Last; Quelle: die Karte „Lage“ ändert ihre Höhe (222 → 200 px), wenn ihre Daten ankommen. Die Startseite ist laut Auftrag nicht angefasst; Berichte gehört einem anderen Auftrag | `layout-shift`-Einträge mit Quellen, `tests/e2e/layout-shift.spec.ts` |
+| Touch-Ziele ≥ 44 px bei grobem Zeiger, **Handy**, alle Seiten | **behoben:** Einstellungen hatte drei Stellen unter 44 px; danach bestanden | neu `tests/e2e/touch-mobile.spec.ts` (16 Seiten; vorher rot, nachher grün). Die seitlich scrollende „Inhalt“-Leiste bleibt ausgenommen, Grund wie in `touch.spec.ts` |
+| Touch-Ziele, **Galaxy-Tab 1692**, alle 19 Seiten | bestanden (nur die ausgenommene „Inhalt“-Leiste) | Messlauf mit `hitbox.ts`; `touch.spec.ts` deckt dort 5 Seiten + Overlays |
+| Leere Zustände (leeres Journal), Tablet + Handy, dunkel (38 Läufe) | **behoben:** Coach (axe `aria-prohibited-attr`), Trades-Leerzustand (Tippfläche 30 px); sonst bestanden. Einmal „color-contrast ×3“ auf Funktionen (Handy, leer) unter Höchstlast gesehen, in weiteren Läufen nicht reproduzierbar | Messlauf; `tests/e2e/funktionspruefung.spec.ts` |
+| Rechtsseiten (Impressum, Datenschutz, AGB, Widerruf, Hinweise via `?rechtliches=`), 2 Größen × 2 Themen = 20 Läufe | bestanden: axe 0, kein Überstand, Escape schließt. **Behoben:** Tab verließ das Fenster (siehe „Behoben“) | Messlauf; `funktionspruefung.spec.ts` |
+| `#preise` und Anmeldung / Gate (Cloud-Bau gegen Mocks) | bestanden | `gate`, `preise`, `konto-b1`, `kaufstrecke`, `cloud` auf Tablet + Handy: 44 bestanden, 0 rot (die übrigen Fälle laufen nur auf anderen Profilen) |
+| Fokusreihenfolge / Tastatur | bestanden: Reihenfolge Kopf → Seitenleiste → Seite → Fußzeile, jeder Stopp mit sichtbarem Ring, nichts verdeckt; Fenster halten Tab (Rechtliches, Backup-Import, Navigation, Screenshot-Import, Trade-Editor in 70 Tab-Drücken). **Grenze:** es gibt keinen „Zum Inhalt springen“-Link, nur Landmarken; von der Kopfzeile bis zum Seiteninhalt sind es ≈ 30 Tab-Stopps. Empfehlung, nicht gebaut (ändert den ersten Tab-Stopp jeder Seite, auch der Startseite) | Messlauf Tab-Reihenfolge; `motion.a11y.test.tsx` |
+| Offline-Verhalten | bestanden: eine noch nicht geladene Seite offline = ehrlicher Platzhalter, lädt nach „online“; das Journal bleibt lokal nutzbar. **Grenze:** kein Service Worker – ein **kalter Start ohne Netz** zeigt die Offline-Seite des Browsers (installierbar, aber nicht offline-first) | `reliability.spec.ts` (ein Lauf rot durch die Maschinenlast, beim Wiederholen auf Handy und Tablet grün); `ABNAHME-40` Nr. 30 |
+
+### Funktions-Durchläufe als Nutzer (lokale Daten)
+
+| Anforderung | Ergebnis | Beleg |
+|---|---|---|
+| Trade anlegen / bearbeiten / löschen (Papierkorb mit „Rückgängig“), „Speichern & neu“, Enter im Feld, Verwerfen-Frage bei Escape, offener Trade | bestanden: leere Eingabe und `−5` / `abc` zeigen die Meldung am Feld, `80.000,5` wird 80000,5, Bearbeiten übernimmt die Werte. **Grenze (Altlast, 1:1-Port des Parsers):** `85.900` ohne Komma wird als 85,9 gelesen, nicht als 85 900 – die Seite warnt dabei nicht | eigener Durchlauf auf leerem Profil; `trades.spec.ts`, `editor.spec.ts` (Tablet + Handy grün) |
+| Screenshot-Import (Fixture `tests/fixtures/ocr/bitunix-positionshistorie-1.jpg`) | bestanden: 2 Trades, 1 abgeschnittene Karte gemeldet, „Alle 2 Trades eintragen“, „Rückgängig“; unter den Produktions-Headern ohne CSP-Verstoß (WebAssembly, Worker, Sprachdaten) | `screenshotImport.spec.ts` (Handy), CSP-Lauf |
+| Export / Import-Backup | bestanden: JSON (13 Trades, Schema 1) und CSV (BOM, `;`) laden herunter; das JSON in einem leeren Profil: gleiche 13 IDs, Vorschau „13 Trades, 8 Grundlagen, 3 Ablesungen“ | eigener Rundlauf; `data.spec.ts` grün |
+| Einstellungen | bestanden | `settings.spec.ts` |
+| Filter / Suche (Trades, Finder, Navigation) | bestanden: Gewinner 6, Verlierer 4, „btc“ 12 von 13, unsinnige Suche 0 Zeilen mit Hinweis; 15 Ziele des Funktionsfinders mit echten Klicks | `funktionsfinder`, `search`, `navigation` (Tablet + Handy grün) |
+| Strategiesuche „1.000 Varianten“, Strategie-Studio | bestanden | `labor-search.spec.ts`, `studio.spec.ts` |
+| Tarif- / Gate-Fluss ohne Backend | bestanden, **nur Mock** (Fremddienste nicht live) | siehe Gate-Zeile; `ABNAHME-40` Nr. 1 – 8 |
+| Bewegung / Reduced Motion, Navigation mobil und Desktop, Suche mit Rückkehr, Original-Screenshots | bestanden | `motion-global`, `shell-frame`, `nav-groups`, `funktionsfinder-rueckkehr`, `screenshot-originale`, `interaktionen` (ein Radial-Share-Lauf rot unter Last, allein grün) |
+| UX-Matrix (74) / Abdeckung: „Ort in der App“ führt dorthin | bestanden über das Funktionsregister (`features.registry.test.ts`, `ux.matrix.test.ts`) und den Finder; **nicht** jede der 74 Zeilen wurde einzeln im Browser durchgespielt, ihr Status bleibt der in `COVERAGE.md` benannte | vollständiger Vitest-Lauf |
+
+### Importwege gegen kaputte und riesige Dateien
+
+| Datei | Ergebnis |
+|---|---|
+| Backup-JSON: leer, kein JSON, `[]`, falsche Form, `__proto__`-Schlüssel, 201 MB | abgelehnt oder harmlos, kein Absturz, keine Prototyp-Verschmutzung; **behoben:** englische Meldung, leere Datei und `[]` |
+| Backup-ZIP: kaputt, leer, ohne Manifest, ZIP-Bombe (1 GB Nullen) | abgelehnt mit deutscher Meldung („beschädigt“, „keine ZIP-Datei“, „Manifest fehlt“, „nicht von diesem Journal erzeugt“), Journal unverändert |
+| CSV: leer, binär, nur Kopfzeile, 21 MB, Zelle mit `<img onerror>` | abgelehnt oder leere Vorschau, kein Skript läuft; **behoben:** leere Datei sagt es |
+| Bild: 0 Byte, Text als `.png`, SVG mit Skript, 30 000 × 30 000 PNG (855 KB) | „ließ sich nicht als Bild lesen“, kein Absturz; SVG wird nicht ausgeführt |
+| OCR-Dateien gesperrt / 404 / Unsinn (erstes Auslesen ohne Netz) | **behoben:** die Meldung nennt Verbindung und den einmaligen Download |
+
+### Leistung und Erstladung
+
+| Anforderung | Ergebnis | Beleg |
+|---|---|---|
+| Budget (`npm run build && npm run budget`) | JS **662,3 / 800 KiB**, CSS **52,5 / 52,5 KiB** (vorher 661,8 / 52,5; Rest ≈ 80 Byte; die Korrekturen nutzen nur bereits vorhandene Klassen `min-h-tap`, `gap-3.5`) | `npm run budget` |
+| Lazy-Chunks | bestanden: Seiten und Hosts bleiben eigene Chunks; nach dem ersten Bild laden Seiten-Chunks im Leerlauf nach (≈ 160 Skripte), ohne Fehlschlag oder 404 | Netzprotokoll des ersten Besuchs |
+| Schrift ohne Sprung | **behoben (billig):** die woff2-Dateien wurden erst nach dem ersten Skript angefragt (Plex Sans 0,3 s, Plex Mono 3,8 s nach dem ersten Bild, angekommen bei ≈ 7 s) – bis dahin Ersatzschrift, dann ein Sprung. Jetzt `rel=preload` für Sans und Mono 400 / 500 / 600 (4 Dateien, 80 KB): angekommen bei 1,6 – 2,6 s statt 2,7 – 7,3 s (Handy-Profil, 4× CPU, Slow 4G). Doto (nur Startseite, 5 KB) bleibt beim Stylesheet. Kein „nicht benutzt“-Hinweis auf den 19 Seiten | `scripts/fontPreload.ts`, `tests/unit/build.fontPreload.test.ts` |
+| LCP / INP / TBT auf 4× CPU, Slow 4G, 390 px | **nicht belastbar:** FCP ≈ 2,0 s; LCP 7 – 10 s, TBT 8 – 21 s, INP 1,0 – 1,8 s bei Load 19 – 45 der Maschine und zusätzlicher 4-facher Drosselung – Obergrenzen, keine Gerätewerte. Messung auf ruhigem Gerät steht aus (`ABNAHME-40` Nr. 24) | Messlauf mit `PerformanceObserver` |
+
+### Sicherheit und Härtung ohne Backend-Änderung
+
+| Anforderung | Ergebnis | Beleg |
+|---|---|---|
+| CSP / Header stimmig (Stripe, Supabase, Binance, Bybit, OKX) | bestanden: unter den Headern aus `netlify.toml` 0 Verstöße auf allen 19 Seiten, im OCR (WebAssembly, Worker, Sprachdaten aus `/ocr/`), im Labor-Backtest (Worker) und im Monte-Carlo. Jeder Host, den der Code anspricht, steht in `connect-src`; `wss://stream.bybit.com` steht dort ohne Verwendung (harmlos). **Nicht live prüfbar:** Stripe.js; Stripe empfiehlt zusätzlich `img-src https://*.stripe.com` – erst beim Test mit dem Betreiber-Konto entscheiden | Messlauf mit `securitypolicyviolation`-Hörer |
+| Keine Geheimnisse im Bundle | bestanden: `dist/` ohne `sk_`, `rk_`, `whsec_`, `service_role`, JWT, PEM, `sk-ant`; Treffer sind nur Namen von Umgebungsvariablen in Hinweistexten und der Prüfer, der `sb_secret_` ablehnt; keine Sourcemaps; `secretGuard` bleibt als Bau-Wächter | `grep` über `dist/`, `scripts/secretGuard.ts` |
+| Eingabevalidierung der Importwege | siehe Tabelle oben | eigene Läufe + `security.*`-Unit-Tests |
+
+### Behoben (je mit Regressionstest)
+
+| Fehler | Korrektur | Test |
+|---|---|---|
+| Backup importieren zeigte zod-Englisch („settings: Expected object, received number“); leere Datei = „Kein gültiges JSON“; ein bares `[]` galt als Backup mit 0 / 0 / 0 (mit „Ersetzen“ leert es das Journal) | `src/lib/zodDe.ts`, `src/store/backup.ts` | `import.errorsDe.test.ts`, `overlays.import.test.tsx`, `funktionspruefung.spec.ts` |
+| CSV importieren: leere Datei öffnete die Spaltenzuordnung ohne etwas zuzuordnen | `CsvImportSheet.tsx` | `exchange.ui.test.tsx` |
+| Einstellungen, Handy: „Vorschau“ / „Logo wiederholen“, „Einführung starten“ / „Alle Tastenkürzel“ und die zwei Rückmeldungs-Schalter überdeckten sich in der Tippfläche (30-px-Knöpfe, umgebrochene Zeile, 40 px Mittenabstand) | `MotionSection.tsx`, `OnboardingCard.tsx` | `touch-mobile.spec.ts` (vorher rot) |
+| Trades ohne Einträge, Handy: „Trade eintragen“ / „Filter zurücksetzen“ hatten nur 30 px Tippfläche (der Glanz des Leerzustands überschreibt die 44-px-Fläche) | `TradesView.tsx` (`min-h-tap`) | `funktionspruefung.spec.ts` |
+| Coach / Assistent: Gruppe „Vorschläge“ ohne Rolle (axe `aria-prohibited-attr`, schwer) | `ChatCard.tsx`, `AssistantHost.tsx` (`role="group"`) | `funktionspruefung.spec.ts` |
+| Rechtliches: jeder dritte Tab landete auf `<body>` – die Tab-Falle hielt den letzten Knopf der Umschalter-Gruppe (`tabindex=-1`) für den letzten Stopp; gilt für jedes Fenster, das mit einer solchen Gruppe endet | `src/motion/a11y.ts` | `motion.a11y.test.tsx` (2 Fälle, vorher rot), `funktionspruefung.spec.ts` |
+| Screenshot lesen ohne Netz (erstes Mal): „Das Auslesen hat nicht geklappt.“ ohne Grund | `ocr/browser.ts`, `OcrImportSheet.tsx` | `ocr.engineLoad.test.ts`, `ocr.sheet.test.tsx` |
+| Preise ohne Abos: „Keine Abos in dieser Version – In dieser Version gibt es keine Abos – …“ (doppelt) | `billing/strings.ts` | `billing.ui.test.tsx` |
+| Schrift erst nach dem Skript angefragt | `scripts/fontPreload.ts`, `vite.config.ts` | `build.fontPreload.test.ts` |
+
+### Nur mit echten Geräten oder Diensten prüfbar (hier nicht geprüft)
+
+- Echte Telefone und Tablets (Samsung Internet, Safari, Firefox), Touch-Gefühl, Bildschirmleser (TalkBack, VoiceOver, NVDA); axe prüft nur einen Teil von WCAG, ein Nachweis nach EN 301 549 liegt nicht vor.
+- Leistung auf ruhigem Gerät (LCP, INP, TBT): hier nur Obergrenzen unter Last.
+- Alle Fremddienste: Supabase, Stripe (Stripe.js und seine CSP), Twilio, Resend, Binance, TradingView, Anthropic – nur Mocks (`ABNAHME-40`: „nur Mock“).
+- Die Header auf Netlify selbst (hier mit den Headern aus `netlify.toml` lokal nachgestellt; Verstöße zeigen sich sonst erst im Deploy-Preview).
+- Nicht wiederholt: die 74 Zeilen der UX-Matrix einzeln im Browser; Berichte, Scanner / Rechner, Zahlung / Betrieb gehören anderen Aufträgen.
+
+**Stand der Gesamtprüfung:** `npx tsc -b` und `npm run lint` ohne Befund; `npm run build && npm run budget` grün (662,3 / 800 KiB JS, 52,5 / 52,5 KiB CSS). Vollständiger `npx vitest run`: 9 671 Tests grün, 12 rot – alle durch Zeitgrenzen unter der Maschinenlast (Load 20 – 45); einzeln oder mit zwei Workern wiederholt sind alle 670 Dateien grün (`views.aktien` auch auf dem unveränderten Stand `5fa335a3` grün).

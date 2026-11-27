@@ -87,7 +87,7 @@ export function OnboardingCard({ className }: { className?: string }) {
           ))}
         </ul>
         <FeatureLinks items={ONBOARDING_CARD.news.items} lead={ONBOARDING_CARD.news.lead} label={ONBOARDING_CARD.news.label} testId="onboarding-news" className="border-t border-line pt-3" />
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-wrap gap-3.5">
           <Button variant="primary" size="sm" onClick={() => startOnboarding()}>
             {ONBOARDING_CARD.start}
           </Button>

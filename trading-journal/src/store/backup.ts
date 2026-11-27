@@ -4,6 +4,7 @@ import { toJsonBackup, tradesToCsv } from "@/domain/csv";
 import { normalizeDayNotes, normalizeSettings } from "@/domain/normalize";
 import { fmt } from "@/lib/format";
 import { isUnsafeKey, parseJsonSafe } from "@/lib/unsafeKeys";
+import { issueDe } from "@/lib/zodDe";
 import { download } from "./download";
 import { freshSnapshot, getEnriched, useJournal } from "./journalStore";
 import type { StorageSnapshot } from "./adapters/StoreApi";
@@ -183,6 +184,9 @@ export type ParsedBackup =
 
 /** Error text for an object that carries neither trades nor settings. */
 export const NOT_A_BACKUP = "Keine Trades oder Einstellungen in der Datei";
+/** Error texts of a file that is not JSON at all (an empty file gets its own sentence). */
+export const NOT_JSON = "Kein gültiges JSON – das ist keine Backup-Datei dieses Journals.";
+export const EMPTY_FILE = "Die Datei ist leer.";
 
 /** `{n} Einträge übersprungen` – detail line for a partially valid backup. */
 export function skippedText(n: number): string {
@@ -206,19 +210,24 @@ export function previewText(p: ImportPreview): string {
  * carries. Never throws.
  */
 export function parseBackup(text: string): ParsedBackup {
+  if (text.trim() === "") return { ok: false, error: EMPTY_FILE, path: "" };
   let json: unknown;
   try {
     // keys like `__proto__` are dropped while parsing (they would reach a prototype setter in the merge below)
     json = parseJsonSafe(text);
   } catch {
-    return { ok: false, error: "Kein gültiges JSON", path: "" };
+    return { ok: false, error: NOT_JSON, path: "" };
   }
+  // a bare `[]` carries nothing (no envelope, no trade): it is not a backup, and „Ersetzen“ with it would only empty the journal
+  if (Array.isArray(json) && json.length === 0) return { ok: false, error: NOT_A_BACKUP, path: "" };
   if (Array.isArray(json)) json = { trades: json };
   const parsed = JsonBackupSchema.passthrough().safeParse(json);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const path = issue ? issue.path.map(String).join(".") : "";
-    return { ok: false, error: issue?.message ?? "Ungültiges Backup", path };
+    // German, never zod's English ("Expected object, received number"); a problem at the top level says the file is no backup
+    const detail = issue ? issueDe(issue) : "ist ungültig";
+    return { ok: false, error: path ? detail : `Die Datei ist kein Backup – sie ${detail}`, path };
   }
   const data = parsed.data as unknown as Omit<JsonBackup, "trades" | "hyblock" | "settings" | "exportedAt" | "days"> & {
     exportedAt?: string;

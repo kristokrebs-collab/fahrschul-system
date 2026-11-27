@@ -15,7 +15,7 @@ import { resolveZone } from "@/journal/extract/candidate";
 import { detectLocaleStyle } from "@/journal/extract/locale";
 import { localZoneId, ZONE_CHOICES } from "@/journal/extract/time";
 import type { Extraction } from "@/journal/extract/contract";
-import { cropUrl, IMAGE_ACCEPT, loadPicture, ocrSupport, PictureError, progressText, startEngine, type Picture } from "../browser";
+import { cropUrl, EngineLoadError, IMAGE_ACCEPT, loadPicture, ocrSupport, PictureError, progressText, startEngine, type Picture } from "../browser";
 import { ocrCandidates } from "../candidates";
 import { buildTrade, commitTrades, undoCommit } from "../commit";
 import type { OcrEngine } from "../engine";
@@ -335,7 +335,7 @@ export default function OcrImportSheet() {
     } catch (e) {
       if (cancelled.current) return;
       stopEngine();
-      setMessage(e instanceof Error && e.message ? `Das Auslesen hat nicht geklappt: ${e.message}` : "Das Auslesen hat nicht geklappt.");
+      setMessage(e instanceof EngineLoadError ? e.message : e instanceof Error && e.message ? `Das Auslesen hat nicht geklappt: ${e.message}` : "Das Auslesen hat nicht geklappt.");
       setPhase("error");
     }
   }, [mode, stopEngine]);

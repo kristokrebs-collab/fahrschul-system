@@ -51,7 +51,7 @@ export function MotionSection() {
       <p className="text-[12px] text-mute" data-testid="motion-hint">
         {MOTION_STRINGS.hints[mode]}
       </p>
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex flex-wrap items-center gap-3.5">
         <Button size="sm" onClick={preview} data-testid="motion-preview" aria-describedby="motion-label">
           {running ? MOTION_STRINGS.previewing : MOTION_STRINGS.preview}
         </Button>
@@ -86,14 +86,14 @@ function FeedbackRows() {
       </span>
       <p className="text-[12px] text-mute">{FEEDBACK_STRINGS.lead}</p>
       {canVibrate && (
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex min-h-tap items-center justify-between gap-4">
           <label htmlFor="fb-haptic" className="cursor-pointer text-[13px] text-fg">
             {FEEDBACK_STRINGS.haptic}
           </label>
           <Switch id="fb-haptic" className="touch-hit shrink-0" checked={haptic} onCheckedChange={(on) => set({ haptic: on })} data-testid="feedback-haptic" />
         </div>
       )}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex min-h-tap items-center justify-between gap-4">
         <label htmlFor="fb-sound" className="cursor-pointer text-[13px] text-fg">
           {FEEDBACK_STRINGS.sound}
         </label>

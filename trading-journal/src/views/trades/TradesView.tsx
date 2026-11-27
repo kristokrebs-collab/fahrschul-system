@@ -105,7 +105,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
         text="Trag deinen ersten Trade ein – oder lies ihn mit „Screenshot importieren“ aus einem Bild."
         line={false}
         action={
-          <Button variant="primary" size="sm" fx={false} className="mt-2" onClick={newTrade} {...ctaMotion}>
+          <Button variant="primary" size="sm" fx={false} className="mt-2 min-h-tap" onClick={newTrade} {...ctaMotion}>
             Trade eintragen
           </Button>
         }
@@ -119,7 +119,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
         text="Kein Trade passt zu diesen Filtern."
         line="Filter lockern oder zurücksetzen."
         action={
-          <Button size="sm" className="mt-2" onClick={() => resetTradeFilter()} {...ctaMotion}>
+          <Button size="sm" className="mt-2 min-h-tap" onClick={() => resetTradeFilter()} {...ctaMotion}>
             Filter zurücksetzen
           </Button>
         }

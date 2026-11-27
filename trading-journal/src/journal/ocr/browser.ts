@@ -24,6 +24,11 @@ export function ocrSupport(): { ok: true } | { ok: false; reason: string } {
 
 export class PictureError extends Error {}
 
+/** The engine's files could not be fetched or started (offline on the first use, a blocked or broken `/ocr/` file). */
+export class EngineLoadError extends PictureError {}
+export const ENGINE_LOAD_MESSAGE =
+  "Die Texterkennung ließ sich nicht laden. Beim ersten Mal holt dein Browser sie einmalig (ca. 8 MB, von dieser Seite) – prüfe die Internetverbindung und versuche es noch einmal.";
+
 export interface Picture {
   id: string;
   name: string;
@@ -107,7 +112,12 @@ export function progressText(p: EngineProgress): string {
 
 /** Starts the engine from the self-hosted files (the first start downloads a few MB, later ones come from the cache). */
 export async function startEngine(onProgress?: (p: EngineProgress) => void): Promise<OcrEngine> {
-  const { createTesseractEngine } = await import("./engine");
-  const u = ocrUrls();
-  return await createTesseractEngine({ langPath: u.lang, corePath: u.core, workerPath: u.worker, encode: encodePlaneBlob, ...(onProgress ? { onProgress } : {}), cacheMethod: "write" });
+  try {
+    const { createTesseractEngine } = await import("./engine");
+    const u = ocrUrls();
+    return await createTesseractEngine({ langPath: u.lang, corePath: u.core, workerPath: u.worker, encode: encodePlaneBlob, ...(onProgress ? { onProgress } : {}), cacheMethod: "write" });
+  } catch (cause) {
+    // whatever the browser called it ("Failed to fetch", a bare event, an empty message): the trader gets one German sentence
+    throw new EngineLoadError(ENGINE_LOAD_MESSAGE, { cause });
+  }
 }
