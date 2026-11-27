@@ -2,7 +2,7 @@
 import type { CancelReason } from "./contract";
 
 export const BILLING = {
-  offNoCloud: "In dieser Version gibt es keine Abos – alle Funktionen sind freigeschaltet.",
+  offNoCloud: "alle Funktionen sind freigeschaltet.",
   closedTitle: "Zahlungen noch nicht eingerichtet",
   closedText: "Der Betreiber hat Stripe noch nicht verbunden. Bis dahin sind alle Funktionen freigeschaltet.",
   /** Stripe is set up but the operator's Impressum / AGB / Datenschutz are not: nothing can be ordered (B4). The plan gates ARE enforced (Free stays Free) – never "alles freigeschaltet". */

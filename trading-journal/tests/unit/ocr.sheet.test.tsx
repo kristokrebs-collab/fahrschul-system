@@ -17,7 +17,7 @@ import words from "../fixtures/ocr/words-bitunix-positionshistorie-1.json";
 import { seedV0 } from "./store.fixture";
 
 const REAL = words as unknown as OcrPage;
-const support = vi.hoisted(() => ({ ok: true as boolean }));
+const support = vi.hoisted(() => ({ ok: true as boolean, engineFails: false as boolean }));
 
 vi.mock("@/journal/ocr/browser", async (orig) => {
   const m = await orig<typeof import("@/journal/ocr/browser")>();
@@ -28,7 +28,11 @@ vi.mock("@/journal/ocr/browser", async (orig) => {
       picture: { id, name: file.name, width: 923, height: 2000, bitmap: { width: 923, height: 2000, close: () => undefined } as unknown as ImageBitmap, thumb: "data:image/gif;base64,R0lGODlhAQABAAAAACw=" },
       raster: { width: 4, height: 4, data: new Uint8ClampedArray(64) },
     }),
-    startEngine: async () => ({ recognize: async () => [], terminate: async () => undefined }),
+    startEngine: async () => {
+      // the engine's files cannot be loaded (offline on the first use): the real class, the real sentence
+      if (support.engineFails) throw new m.EngineLoadError(m.ENGINE_LOAD_MESSAGE);
+      return { recognize: async () => [], terminate: async () => undefined };
+    },
     cropUrl: async () => "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
   };
 });
@@ -59,6 +63,7 @@ async function openAndRead(): Promise<HTMLElement> {
 describe("Screenshot-Import sheet", () => {
   beforeEach(async () => {
     support.ok = true;
+    support.engineFails = false;
     seedV0();
     resetJournal();
     await bootJournal({ autoBackup: false });
@@ -75,6 +80,27 @@ describe("Screenshot-Import sheet", () => {
     expect(dialog).toHaveTextContent("Bilder werden weder gespeichert noch gesendet");
     expect(dialog).toHaveTextContent("einmalig");
     expect(screen.getByTestId("ocr-read")).toBeDisabled();
+  });
+
+  it("offline on the first use: the failure names the connection and the one-off download, and „Erneut versuchen“ reads once the engine is there (Runde 13)", async () => {
+    support.engineFails = true;
+    render(<OcrImportSheet />);
+    act(() => openScreenshotImport());
+    await screen.findByTestId("ocr-sheet");
+    fireEvent.change(screen.getByTestId("ocr-file"), { target: { files: [png()] } });
+    await waitFor(() => expect(screen.getAllByTestId("ocr-picture")).toHaveLength(1));
+    fireEvent.click(screen.getByTestId("ocr-read"));
+    const sheet = screen.getByTestId("ocr-sheet");
+    await waitFor(() => expect(sheet).toHaveAttribute("data-phase", "error"), { timeout: 8000 });
+    const said = screen.getByTestId("ocr-message");
+    expect(said).toHaveTextContent("Die Texterkennung ließ sich nicht laden");
+    expect(said).toHaveTextContent("Internetverbindung");
+    expect(said).not.toHaveTextContent("Das Auslesen hat nicht geklappt");
+    expect(said).toHaveAttribute("role", "alert");
+    // the connection is back: the same button reads the picture
+    support.engineFails = false;
+    fireEvent.click(screen.getByTestId("ocr-read"));
+    await waitFor(() => expect(sheet).toHaveAttribute("data-phase", "preview"), { timeout: 8000 });
   });
 
   it("says why it cannot run instead of a dead drop zone", async () => {

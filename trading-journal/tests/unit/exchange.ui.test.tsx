@@ -293,6 +293,15 @@ describe("CsvImportSheet", () => {
     expect(read).not.toHaveBeenCalled();
   });
 
+  it("an empty file says so (Runde 13: it used to open the column mapping with nothing to map)", async () => {
+    wrap(<CsvImportSheet readFile={async () => "  \n"} />);
+    act(() => openCsvImport());
+    fireEvent.change(await screen.findByTestId("csv-file"), { target: { files: [new File([""], "leer.csv", { type: "text/csv" })] } });
+    expect(await screen.findByText("Die Datei ist leer – wähle den Export deiner Börse.")).toBeTruthy();
+    expect(screen.queryByTestId("csv-mapping")).toBeNull();
+    expect(screen.queryByTestId("csv-preview")).toBeNull();
+  });
+
   it("re-importing the same file promises nothing it will not do (review F7): „Alles schon im Journal“, button off", async () => {
     const read = vi.fn(async () => BITUNIX_CSV);
     wrap(<CsvImportSheet readFile={read} />);

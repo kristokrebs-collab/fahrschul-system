@@ -78,6 +78,7 @@ export const CSV_STRINGS = {
   readError: "Datei konnte nicht gelesen werden.",
   tooBig: "Die Datei ist größer als 20 MB – exportiere einen kürzeren Zeitraum.",
   empty: "Keine Trades in der Datei gefunden.",
+  emptyFile: "Die Datei ist leer – wähle den Export deiner Börse.",
 } as const;
 
 /** A CSV is parsed in the main thread – larger exports are refused instead of freezing the tab. */
@@ -147,6 +148,11 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
     }
     try {
       const text = await (readFile ? readFile(file) : file.text());
+      if (text.trim() === "") {
+        setLoaded(null);
+        setReadError(CSV_STRINGS.emptyFile);
+        return;
+      }
       const l = loadCsv(text);
       setLoaded(l);
       setMapping(l.format ? null : guessMapping(l.table.header));

@@ -294,7 +294,7 @@ function AssistantBody() {
             <div className="grid gap-3">
               <p className="text-[13px] leading-relaxed text-mute">{ASSISTANT_STRINGS.empty}</p>
               {view.closed.length === 0 && <p className="text-[12.5px] leading-relaxed text-faint">{ASSISTANT_STRINGS.noTrades}</p>}
-              <div className="flex flex-wrap gap-1.5" aria-label="Vorschläge">
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Vorschläge">
                 {chips.map((c) => (
                   <Chip key={c} onClick={() => ask(c)} testId="assistant-chip">
                     {c}
@@ -354,7 +354,7 @@ function AssistantBody() {
           </p>
         )}
         {entries.length > 0 && (
-          <div className="flex flex-wrap gap-1.5" aria-label="Vorschläge">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Vorschläge">
             {chips.slice(0, 3).map((c) => (
               <Chip key={c} onClick={() => ask(c)} testId="assistant-chip">
                 {c}

@@ -325,6 +325,8 @@ describe("PreiseView", () => {
     wrap(<PreiseView />);
     expect(screen.getByTestId("preise-view")).toHaveAttribute("data-mode", "off");
     expect(screen.getByTestId("billing-closed")).toHaveTextContent("Keine Abos in dieser Version");
+    // Runde 13: the title and the sentence behind it said the same thing twice („Keine Abos in dieser Version – In dieser Version gibt es keine Abos – …“)
+    expect(screen.getByTestId("billing-closed").textContent).toBe("Keine Abos in dieser Version – alle Funktionen sind freigeschaltet.");
     expect(screen.queryByTestId("cta-pro")).toBeNull();
     expect(screen.getByTestId("note-pro")).toHaveTextContent("Noch nicht buchbar");
     for (const p of ["free", "pro", "premium", "team"]) expect(screen.queryByTestId(`cta-${p}`)).toBeNull();

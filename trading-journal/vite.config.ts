@@ -18,6 +18,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { dirname, join, resolve } from "node:path";
 import { privacyGuard } from "./scripts/privacyGuard.ts";
 import { secretGuard } from "./scripts/secretGuard.ts";
+import { fontPreload } from "./scripts/fontPreload.ts";
 import { OCR_URL_ROOT, OCR_VERSION, ocrSources } from "./src/journal/ocr/assets.ts";
 
 /**
@@ -146,7 +147,7 @@ export default defineConfig(({ mode }) => {
   const showroom = !share && process.env.VITE_SHOWROOM === "1";
   return {
     base: share ? SHARE_BASE : "/",
-    plugins: [offlineTolerantLazy(), react(), tailwindcss(), secretGuard(), ocrAssets(share), ...(share ? [privacyGuard(), shareAppName()] : [keepLegacyDashboard()])],
+    plugins: [offlineTolerantLazy(), react(), tailwindcss(), secretGuard(), fontPreload(), ocrAssets(share), ...(share ? [privacyGuard(), shareAppName()] : [keepLegacyDashboard()])],
     define: {
       __TJ_EDITION__: JSON.stringify(share ? "share" : "personal"),
       __TJ_TARGET__: JSON.stringify("web"),

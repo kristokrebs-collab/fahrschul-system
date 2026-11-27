@@ -12,8 +12,10 @@ const FOCUSABLE =
 export const UNREACHABLE_SELECTOR = "[inert],[data-modal-behind]";
 
 function focusables(root: HTMLElement): HTMLElement[] {
-  // `closest` covers the element itself and unreachable wrappers
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => !el.closest(UNREACHABLE_SELECTOR));
+  // `closest` covers the element itself and unreachable wrappers. `tabindex="-1"` is no Tab stop: a roving group (the Segmented radios,
+  // tabs) is ONE stop and its other buttons carry -1 – counted as head / tail, a group at the end of a dialog let Tab walk out of it
+  // (Runde 13: the legal sheet ended on <body> every third Tab)
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => !el.matches('[tabindex="-1"]') && !el.closest(UNREACHABLE_SELECTOR));
 }
 
 /**

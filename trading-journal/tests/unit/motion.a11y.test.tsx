@@ -272,6 +272,58 @@ describe("useDialogBehaviour", () => {
   });
 });
 
+describe("useDialogBehaviour – a roving group (Segmented / tabs) at the end of a dialog is ONE Tab stop (Runde 13)", () => {
+  /** The legal sheet's shape: a close button, then a radiogroup whose checked radio is the only tabbable one. */
+  function RovingHarness({ reversed = false }: { reversed?: boolean }) {
+    const ref = useRef<HTMLDivElement>(null);
+    useDialogBehaviour(ref, true, () => {}, undefined);
+    const radios = ["Impressum", "Datenschutz", "AGB"].map((name, i) => (
+      <button key={name} type="button" role="radio" aria-checked={i === 1} tabIndex={i === 1 ? 0 : -1}>
+        {name}
+      </button>
+    ));
+    return (
+      <div ref={ref} role="dialog" aria-label="Rechtliches">
+        {reversed && (
+          <div role="radiogroup" aria-label="Seite">
+            {radios}
+          </div>
+        )}
+        <button type="button">Schließen</button>
+        {!reversed && (
+          <div role="radiogroup" aria-label="Seite">
+            {radios}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  it("Tab on the tabbable radio (the checked one) wraps to the first stop – it used to leave the dialog, because the last BUTTON in the DOM (tabindex -1) was taken for the tail", () => {
+    render(<RovingHarness />);
+    const radio = screen.getByRole("radio", { name: "Datenschutz" });
+    radio.focus();
+    const ev = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    document.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Schließen" }));
+  });
+
+  it("Shift+Tab from the first stop wraps to the tabbable radio, never to a -1 radio; and a group at the START works the same way", () => {
+    const { unmount } = render(<RovingHarness />);
+    screen.getByRole("button", { name: "Schließen" }).focus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(screen.getByRole("radio", { name: "Datenschutz" }));
+    unmount();
+
+    render(<RovingHarness reversed />);
+    const radio = screen.getByRole("radio", { name: "Datenschutz" });
+    radio.focus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Schließen" }));
+  });
+});
+
 function EscapeHarness({ open, tick, onClose }: { open: boolean; tick: number; onClose: (tick: number) => void }) {
   // an inline closure per render, like every caller passes
   useEscape(open, () => onClose(tick));
